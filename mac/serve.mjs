@@ -5,7 +5,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "app");
-const port = Number(process.env.PORT || 4177);
+const port = Number(process.env.PORT || 47177);
 const types = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript",
   ".css": "text/css", ".json": "application/json", ".webmanifest": "application/manifest+json",
@@ -29,12 +29,18 @@ async function resolveFile(urlPath) {
 
 createServer(async (req, res) => {
   const path = new URL(req.url, "http://localhost").pathname;
+  // The launcher asks this to know the server on the port is ours.
+  if (path === "/__pare3d") {
+    res.writeHead(200, { "content-type": "text/plain", "x-pare3d": "1" });
+    res.end("pare3d");
+    return;
+  }
   const file = await resolveFile(path);
   if (!file) {
     res.writeHead(404, { "content-type": "text/html; charset=utf-8" });
     res.end(await readFile(join(root, "404.html")).catch(() => "Not found"));
     return;
   }
-  res.writeHead(200, { "content-type": types[extname(file).toLowerCase()] || "application/octet-stream", "cache-control": "no-cache" });
+  res.writeHead(200, { "content-type": types[extname(file).toLowerCase()] || "application/octet-stream", "cache-control": "no-cache", "x-pare3d": "1" });
   res.end(await readFile(file));
 }).listen(port, "127.0.0.1", () => console.log(`Pare 3D running at http://localhost:${port}/  (close this window to stop)`));

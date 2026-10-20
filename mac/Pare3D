@@ -1,22 +1,37 @@
 #!/bin/bash
 # Pare 3D launcher: starts the bundled local server, opens the app in its own
-# browser window, and stops the server when that window is closed.
+# browser window, and stops the server when that browser instance quits.
 RES="$(cd "$(dirname "$0")/../Resources" && pwd)"
-PORT=4177
-URL="http://localhost:$PORT/"
 SUPPORT="$HOME/Library/Application Support/Pare 3D"
 PROFILE="$SUPPORT/browser-profile"
 mkdir -p "$PROFILE"
 LOG="$SUPPORT/launcher.log"
 exec >>"$LOG" 2>&1
-echo "--- $(date) starting"
+echo "--- $(date) starting from $RES"
 
+is_ours() { [ "$(/usr/bin/curl -s --max-time 1 "http://localhost:$1/__pare3d")" = "pare3d" ]; }
+port_busy() { /usr/bin/curl -s -o /dev/null --max-time 1 "http://localhost:$1/"; }
+
+# Our own port, well away from common ones. If something else holds it, try the next few.
+PORT=""
 SERVER=""
-if ! /usr/bin/curl -s -o /dev/null "$URL"; then
-  PORT=$PORT "$RES/bun" "$RES/serve.mjs" &
-  SERVER=$!
-  for _ in $(seq 1 100); do /usr/bin/curl -s -o /dev/null "$URL" && break; sleep 0.1; done
+for CANDIDATE in 47177 47178 47179 47180 47181; do
+  if is_ours "$CANDIDATE"; then PORT=$CANDIDATE; echo "reusing Pare 3D server on $PORT"; break; fi
+  if ! port_busy "$CANDIDATE"; then
+    PORT=$CANDIDATE "$RES/bun" "$RES/serve.mjs" &
+    SERVER=$!
+    for _ in $(seq 1 100); do is_ours "$CANDIDATE" && break; sleep 0.1; done
+    if is_ours "$CANDIDATE"; then PORT=$CANDIDATE; echo "started server on $PORT"; break; fi
+    echo "server did not start on $CANDIDATE"; kill "$SERVER" 2>/dev/null; SERVER=""
+  else
+    echo "port $CANDIDATE is used by something else"
+  fi
+done
+if [ -z "$PORT" ]; then
+  /usr/bin/osascript -e 'display alert "Pare 3D could not start" message "Its local server did not start. See ~/Library/Application Support/Pare 3D/launcher.log"'
+  exit 1
 fi
+URL="http://localhost:$PORT/"
 cleanup() { [ -n "$SERVER" ] && kill "$SERVER" 2>/dev/null; }
 trap cleanup EXIT
 
@@ -25,7 +40,7 @@ trap cleanup EXIT
 for BROWSER in "Google Chrome" "Microsoft Edge" "Brave Browser" "Chromium" "Vivaldi"; do
   for ROOT in "/Applications" "$HOME/Applications"; do
     if [ -d "$ROOT/$BROWSER.app" ]; then
-      echo "using $BROWSER"
+      echo "using $BROWSER at $URL"
       /usr/bin/open -n -W -a "$ROOT/$BROWSER.app" --args \
         --app="$URL" --user-data-dir="$PROFILE" \
         --no-first-run --no-default-browser-check --window-size=1440,900
@@ -34,8 +49,7 @@ for BROWSER in "Google Chrome" "Microsoft Edge" "Brave Browser" "Chromium" "Viva
   done
 done
 
-# No Chromium browser: open in the default browser and keep serving until quit.
-echo "no Chromium browser, using default"
+echo "no Chromium browser, using default at $URL"
 /usr/bin/osascript -e 'display notification "Opened in your browser. Chrome or Edge gives Pare 3D its own window and automatic backup." with title "Pare 3D"' || true
 /usr/bin/open "$URL"
-wait "$SERVER"
+[ -n "$SERVER" ] && wait "$SERVER"
