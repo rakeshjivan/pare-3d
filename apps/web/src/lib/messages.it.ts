@@ -21,6 +21,10 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "theme.short.dark": "Scuro",
   "theme.short.graphite": "Grafite",
   "theme.short.classic": "Classic",
+  "bambu.preparing": "Preparing {format} for Bambu Studio…",
+  "bambu.sent": "Sent to Bambu Studio: {name}",
+  "bambu.savedNotOpened": "Saved {name} in Documents › Pare 3D Exports, but Bambu Studio could not be opened{reason}. Is it installed?",
+  "bambu.downloaded": "Downloaded {name}. A browser cannot open Bambu Studio by itself, so open the file there; the Pare 3D app sends it straight in.",
   
   "aria.originDimensions": "Distanze dall'origine",
   "aria.moveDimensions": "Dimensioni dello spostamento",

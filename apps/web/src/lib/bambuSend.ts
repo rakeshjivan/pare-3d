@@ -4,6 +4,8 @@
  * and opened in Bambu Studio. Anywhere else a web page cannot open another app,
  * so the file is downloaded instead and the message says so.
  */
+import { t } from "@/lib/i18n";
+
 export type BambuSendFormat = "stl" | "3mf";
 
 export const BAMBU_FORMAT_STORAGE_KEY = "pare3d.bambuFormat";
@@ -39,11 +41,11 @@ export async function sendToBambuStudio(fileName: string, blob: Blob, download: 
   }
   if (response && response.ok) {
     const result = (await response.json().catch(() => null)) as { opened?: boolean; path?: string; error?: string } | null;
-    if (result?.opened) return `Sent to Bambu Studio: ${fileName}`;
+    if (result?.opened) return t("bambu.sent", { name: fileName });
     if (result?.path) {
-      return `Saved ${fileName} in Documents › Pare 3D Exports, but Bambu Studio could not be opened${result.error ? ` (${result.error})` : ""}. Is it installed in Applications?`;
+      return t("bambu.savedNotOpened", { name: fileName, reason: result.error ? ` (${result.error})` : "" });
     }
   }
   await download(fileName, blob);
-  return `Downloaded ${fileName}. A browser cannot open Bambu Studio by itself, so open the file there; the Pare 3D Mac app sends it straight in.`;
+  return t("bambu.downloaded", { name: fileName });
 }

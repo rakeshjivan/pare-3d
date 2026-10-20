@@ -18,6 +18,10 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "theme.short.dark": "Dunkel",
   "theme.short.graphite": "Graphit",
   "theme.short.classic": "Klassisch",
+  "bambu.preparing": "{format} für Bambu Studio wird vorbereitet…",
+  "bambu.sent": "An Bambu Studio gesendet: {name}",
+  "bambu.savedNotOpened": "{name} in Dokumente › Pare 3D Exports gespeichert, aber Bambu Studio ließ sich nicht öffnen{reason}. Ist es installiert?",
+  "bambu.downloaded": "{name} heruntergeladen. Ein Browser kann Bambu Studio nicht selbst öffnen, also öffne die Datei dort; die Pare-3D-App schickt sie direkt hinein.",
 
   "aria.originDimensions": "Abstände zum Nullpunkt",
   "aria.moveDimensions": "Maße beim Verschieben",

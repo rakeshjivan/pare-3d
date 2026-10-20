@@ -19,6 +19,10 @@ export const MESSAGES_EN = {
   "theme.short.dark": "Dark",
   "theme.short.graphite": "Graphite",
   "theme.short.classic": "Classic",
+  "bambu.preparing": "Preparing {format} for Bambu Studio…",
+  "bambu.sent": "Sent to Bambu Studio: {name}",
+  "bambu.savedNotOpened": "Saved {name} in Documents › Pare 3D Exports, but Bambu Studio could not be opened{reason}. Is it installed?",
+  "bambu.downloaded": "Downloaded {name}. A browser cannot open Bambu Studio by itself, so open the file there; the Pare 3D app sends it straight in.",
 
   "aria.originDimensions": "Distances to origin",
   "aria.moveDimensions": "Movement dimensions",

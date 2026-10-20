@@ -10853,7 +10853,7 @@ export function LayerlingEditor({
   useEffect(() => {
     const onSend = (event: Event) => {
       const format = (event as CustomEvent<{ format?: BambuSendFormat }>).detail?.format === "3mf" ? "3mf" : "stl";
-      setNotice(`Preparing ${format.toUpperCase()} for Bambu Studio…`, true);
+      setNotice(t("bambu.preparing", { format: format.toUpperCase() }), true);
       void exportDesignRef.current(format, projectNameForBambuRef.current, false, true);
     };
     window.addEventListener(SEND_TO_BAMBU_EVENT, onSend);
