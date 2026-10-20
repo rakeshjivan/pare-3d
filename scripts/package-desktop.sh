@@ -2,6 +2,8 @@
 # Builds the Pare 3D downloads from the static export (run `node scripts/build-static-export.mjs` first):
 #   dist/Pare-3D-Mac.zip       Pare 3D.app for Apple silicon and Intel Macs
 #   dist/Pare-3D-Windows.zip   a folder with "Pare 3D.vbs" for Windows 10/11 (64-bit)
+#   dist/Pare-3D-app.tar.gz    just the app files, which installed copies update themselves from
+#   dist/pare3d-update.json    the build number and checksum of that package
 # The JavaScript runtime (Bun) comes from npm, so nothing else needs installing.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,6 +13,10 @@ OUT="$ROOT/dist"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 [ -f "$EXPORT/index.html" ] || { echo "No static export in $EXPORT"; exit 1; }
+BUILD="${PARE_BUILD:-$(tr -dc '0-9' < "$ROOT/PARE_BUILD" 2>/dev/null || true)}"
+BUILD="${BUILD:-0}"
+# Raise together with RUNTIME_VERSION in mac/serve.mjs when app files need a newer launcher.
+MIN_RUNTIME="${MIN_RUNTIME:-1}"
 
 fetch_bun() { # package name -> path of its extracted folder
   local pkg="$1"
@@ -21,6 +27,7 @@ fetch_bun() { # package name -> path of its extracted folder
 copy_app() { # destination
   cp -R "$EXPORT" "$1"
   rm -f "$1/store.php" "$1/sitemap.xml" "$1/robots.txt"
+  echo "$BUILD" > "$1/pare-build.txt"
 }
 
 rm -rf "$OUT" && mkdir -p "$OUT"
@@ -47,5 +54,13 @@ cp "$ROOT/LICENSE" "$WIN/LICENSE.txt"
 cp "$(fetch_bun bun-windows-x64)/bun.exe" "$WIN/"
 copy_app "$WIN/app"
 (cd "$WORK/win" && zip -qr -9 "$OUT/Pare-3D-Windows.zip" "Pare 3D")
+
+# Update package: the app folder's contents at the top of the archive.
+copy_app "$WORK/update"
+tar -czf "$OUT/Pare-3D-app.tar.gz" -C "$WORK/update" .
+SHA=$(sha256sum "$OUT/Pare-3D-app.tar.gz" | cut -d' ' -f1)
+VERSION=$(node -p "require('$ROOT/package.json').version")
+printf '{"build":%s,"version":"%s","minRuntime":%s,"sha256":"%s"}\n' "$BUILD" "$VERSION" "$MIN_RUNTIME" "$SHA" > "$OUT/pare3d-update.json"
+cat "$OUT/pare3d-update.json"
 
 ls -lh "$OUT"

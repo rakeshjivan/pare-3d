@@ -21,7 +21,7 @@ export function PareUpdateBanner() {
     <div className="pare-update-banner" role="status">
       <Download size={16} aria-hidden="true" />
       <span>
-        Pare 3D build {update.build} is available (you have build {PARE_BUILD}).
+        Pare 3D build {update.build} is available (you have build {PARE_BUILD}). This one needs a fresh download.
       </span>
       <a href={update.url} target="_blank" rel="noreferrer">Download</a>
       <button type="button" aria-label="Dismiss" onClick={() => { dismissPareUpdate(update.build); setUpdate(null); }}>

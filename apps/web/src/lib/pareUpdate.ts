@@ -17,8 +17,35 @@ export function parseBuildTag(tag: unknown): number | null {
   return match ? Number(match[1]) : null;
 }
 
+/**
+ * Running from the Pare 3D app, its server updates the app files by itself; the page is told only
+ * when an update needs a fresh download (a newer launcher). Returns undefined when no Pare 3D
+ * server answers (a plain browser or a hosted copy), so the GitHub check below takes over.
+ */
+async function serverUpdateState(fetchFn: typeof fetch): Promise<PareUpdate | null | undefined> {
+  try {
+    const response = await fetchFn("/__pare3d/update", { cache: "no-store" });
+    if (!response.ok || response.headers.get("x-pare3d") !== "1") return undefined;
+    const state = (await response.json()) as { serving?: number; needsReinstall?: number };
+    const needs = Number(state.needsReinstall) || 0;
+    return needs > (Number(state.serving) || 0) ? { build: needs, url: RELEASES_PAGE } : null;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function checkPareUpdate(fetchFn: typeof fetch = fetch): Promise<PareUpdate | null> {
   if (PARE_BUILD <= 0 || typeof window === "undefined") return null;
+  const fromServer = await serverUpdateState(fetchFn);
+  if (fromServer !== undefined) {
+    if (!fromServer) return null;
+    try {
+      if (Number(window.localStorage.getItem(DISMISS_KEY)) >= fromServer.build) return null;
+    } catch {
+      // Shown anyway.
+    }
+    return fromServer;
+  }
   let latest: { build: number; url: string; at: number } | null = null;
   try {
     const cached = JSON.parse(window.localStorage.getItem(CACHE_KEY) || "null");
