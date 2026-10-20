@@ -1,10 +1,11 @@
 "use client";
 
-import { Archive, ArchiveRestore, ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { AppFooter } from "@/components/AppFooter";
 import { AutoBackupControl } from "@/components/AutoBackupControl";
 import { PareUpdateBanner } from "@/components/PareUpdateBanner";
+import { OPEN_TINKERCAD_GUIDE_EVENT, TinkercadGuide } from "@/components/TinkercadGuide";
 import { AUTO_BACKUP_INTERVAL_MS, getAutoBackupStatus, initAutoBackup, subscribeAutoBackup, writeAutoBackup } from "@/lib/autoBackup";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
@@ -2545,6 +2546,7 @@ export default function Home() {
 
   return (
     <>
+      <TinkercadGuide />
       <pre data-codex-projects hidden>
         {JSON.stringify(projectDebugSummary)}
       </pre>
@@ -3513,6 +3515,10 @@ function Dashboard({
                 </div>
               ) : null}
               <PareUpdateBanner />
+              <button type="button" className="tc-guide-card" onClick={() => window.dispatchEvent(new Event(OPEN_TINKERCAD_GUIDE_EVENT))}>
+                <GraduationCap size={22} aria-hidden="true" />
+                <span><strong>Coming from Tinkercad?</strong> See where everything is, what&apos;s new and which shortcuts are the same.</span>
+              </button>
               {/* The designs live in the browser, and a browser can fail or break with an update: said plainly and always (not to be closed). */}
               <aside className="storage-notice" aria-label={t("storageNotice.title")}>
                 <span className="storage-notice-icon" aria-hidden="true">

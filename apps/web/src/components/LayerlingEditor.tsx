@@ -2,7 +2,7 @@
 
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { ShapeMenuPanel } from "@/components/workplane/ShapeMenuPanel";
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Blend, Check, CircleHelp, Percent, Circle as CircleIcon, CloudUpload, Download, Eye, EyeOff, FilePlus2, FolderOpen, Hexagon as HexagonIcon, Info, ListTree, Pencil, Pentagon as PentagonIcon, Rotate3d, Route as RouteIcon, Search, Square as SquareIcon, Star as StarIcon, Triangle as TriangleIcon, X } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Blend, Check, CircleHelp, Percent, Circle as CircleIcon, CloudUpload, Download, Eye, EyeOff, FilePlus2, FolderOpen, Hexagon as HexagonIcon, Info, ListTree, MoreHorizontal, Pencil, Pentagon as PentagonIcon, Rotate3d, Route as RouteIcon, Search, Square as SquareIcon, Star as StarIcon, Triangle as TriangleIcon, X } from "lucide-react";
 import { ObjectListPanel } from "@/components/workplane/ObjectListPanel";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useWheelField } from "@/lib/useWheelField";
@@ -10,7 +10,7 @@ import { wheelNextValue } from "@/lib/wheelValueStep";
 import * as THREE from "three";
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import type { ComponentType, ReactNode, SVGProps } from "react";
-import { t, type MessageKey } from "@/lib/i18n";
+import { getLanguage, t, type MessageKey } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import { loftShapePatch, type LoftMeasures } from "@/lib/loftGeometry";
 import { hingeWorldParts } from "@/lib/hingeParts";
@@ -159,6 +159,7 @@ import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, tra
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
+import { FORK_MORE_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_ICONS, ForkExportIcon, ForkHomeIcon, ForkImportIcon, ForkNoteIcon, ForkShapesIcon } from "@/components/forkToolbarIcons";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -181,6 +182,7 @@ import { AppFooter } from "@/components/AppFooter";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { SimpleModeSwitch } from "@/components/SimpleModeSwitch";
+import { TinkercadGuideButton } from "@/components/TinkercadGuide";
 import { useFileAccept } from "@/lib/fileAccept";
 import { exportLylProject, importLylProject, LYL_CREATED_WITH_VERSION, LYL_MEDIA_TYPE } from "@/lib/lylProject";
 import { isBuildMessage, reportWorkerBuild } from "@/lib/buildStamp";
@@ -8119,6 +8121,8 @@ export function LayerlingEditor({
     exitIntersectPreview();
     commitShapes([...remainingShapes, intersection], intersection.id, t("status.intersectedMany", { count: groupable.length }));
   }, [refuseLockedSelection, commitShapes, exitIntersectPreview, selectedShapes]);
+  const intersectSelectedRef = useRef(intersectSelected);
+  intersectSelectedRef.current = intersectSelected;
 
   // Each step answers with what happened, so the buttons can show it and MCP can pass it on.
   const refuseOpenGroupStep = useCallback((message: string): OpenGroupOutcome => {
@@ -11837,7 +11841,13 @@ export function LayerlingEditor({
         return;
       }
 
+      // Fork: Ctrl+I intersects, as in Tinkercad; Import moved to Ctrl+Shift+I.
       if (shortcut && key === "i" && !event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        intersectSelectedRef.current();
+        return;
+      }
+      if (shortcut && key === "i" && event.shiftKey && !event.altKey) {
         event.preventDefault();
         setTopPanel((panel) => (panel === "import" ? null : "import"));
         return;
@@ -13073,7 +13083,8 @@ const COMMAND_SHORTCUTS: Readonly<Record<string, string>> = {
   chamfer: "Shift+B",
   drop: "D",
   note: "N",
-  import: "Ctrl+I",
+  import: "Ctrl+Shift+I",
+  intersect: "Ctrl+I",
   "interactive-help": "Shift+F1",
   export: "Ctrl+E",
   "sketch-copy": "Ctrl+C",
@@ -13355,6 +13366,24 @@ function SecondaryToolbar({
   onSelectObject: (id: string) => void;
 }) {
   const [shapesOpen, setShapesOpen] = useState(false);
+  // Fork: the "More" menu of advanced tools.
+  const [moreToolsOpen, setMoreToolsOpen] = useState(false);
+  const moreToolsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!moreToolsOpen) return;
+    const close = (event: PointerEvent) => {
+      if (!moreToolsRef.current?.contains(event.target as Node)) setMoreToolsOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMoreToolsOpen(false);
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", escape);
+    };
+  }, [moreToolsOpen]);
   // The Shapes panel kept open while shapes are placed one after the other (#433); remembered in this browser.
   const [geometryShapesPinned, setGeometryShapesPinned] = useState(false);
   // The sketch's panel has its own pin, its own place and its own size (#577).
@@ -13633,7 +13662,10 @@ function SecondaryToolbar({
     { id: "sketch-delete", label: t("editor.tool.delete"), icon: ToolbarTrashIcon, action: onSketchDelete, enabled: sketchHasSelection },
   ];
   const renderToolButton = (tool: (typeof leftTools)[number] | (typeof visibilityTools)[number] | (typeof combineTools)[number] | (typeof modifyTools)[number] | (typeof arrangeTools)[number]) => {
-    const { id, icon: Icon, action, label } = tool;
+    const { id, action, label } = tool;
+    // Fork: Pare 3D's own icon where there is one, and a short name under it.
+    const Icon = FORK_TOOL_ICONS[id] ?? tool.icon;
+    const shortLabel = getLanguage() === "en" ? FORK_SHORT_LABELS_EN[id] ?? label : label;
     // Im Verlaufsblick schlaeft jedes Werkzeug ausser dem, das ihn beendet -
     // wirklich, nicht nur im Aussehen: eine Auswahl aus der Zeit davor darf
     // kein Loeschen freischalten, waehrend die Flaeche etwas anderes zeigt.
@@ -13650,6 +13682,7 @@ function SecondaryToolbar({
         disabled={!enabled}
       >
         <Icon />
+        <span className="tool-label" aria-hidden="true">{shortLabel}</span>
       </button>
     );
   };
@@ -13802,7 +13835,8 @@ function SecondaryToolbar({
             <div className="toolbar-section-label">{t("editor.group.home")}</div>
             <div className="toolbar-section-tools">
               <button className="toolbar-icon editor-home-control" aria-label={t("editor.homeDashboard")} title={t("editor.homeDashboard")} onClick={onHome}>
-                <ToolbarHomeIcon />
+                <ForkHomeIcon />
+                <span className="tool-label" aria-hidden="true">{getLanguage() === "en" ? "Home" : t("editor.group.home")}</span>
               </button>
             </div>
           </div>
@@ -13829,7 +13863,8 @@ function SecondaryToolbar({
                 setShapesOpen((value) => !value);
               }}
             >
-              <ToolbarShapeAddIcon />
+              <ForkShapesIcon />
+              <span className="tool-label" aria-hidden="true">{t("editor.group.shapes")}</span>
             </button>
           </div>
           {shapesOpen ? (
@@ -14025,15 +14060,38 @@ function SecondaryToolbar({
         </div>
         <div className="toolbar-section" data-group="combine">
           <div className="toolbar-section-label">{t("editor.group.combine")}</div>
-          <div className="toolbar-section-tools">{combineTools.map(renderToolButton)}</div>
+          <div className="toolbar-section-tools">{combineTools.filter((tool) => !FORK_MORE_TOOLS.has(tool.id)).map(renderToolButton)}</div>
         </div>
         <div className="toolbar-section" data-group="modify">
           <div className="toolbar-section-label">{t("editor.group.modify")}</div>
-          <div className="toolbar-section-tools">{modifyTools.map(renderToolButton)}</div>
+          <div className="toolbar-section-tools">{modifyTools.filter((tool) => !FORK_MORE_TOOLS.has(tool.id)).map(renderToolButton)}</div>
         </div>
         <div className="toolbar-section" data-group="arrange">
           <div className="toolbar-section-label">{t("editor.group.arrange")}</div>
-          <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>
+          <div className="toolbar-section-tools">{arrangeTools.filter((tool) => !FORK_MORE_TOOLS.has(tool.id)).map(renderToolButton)}</div>
+        </div>
+        {/* Fork: the advanced tools in one "More" menu, so the toolbar stays on one row with names. */}
+        <div className="toolbar-section fork-more-section" data-group="more" ref={moreToolsRef}>
+          <div className="toolbar-section-tools">
+            <button
+              type="button"
+              className={`toolbar-icon fork-more-button ${moreToolsOpen ? "active" : ""}`}
+              aria-label={t("editor.moreTools")}
+              aria-haspopup="menu"
+              aria-expanded={moreToolsOpen}
+              onClick={() => setMoreToolsOpen((open) => !open)}
+            >
+              <MoreHorizontal />
+              <span className="tool-label" aria-hidden="true">{t("editor.moreToolsShort")}</span>
+            </button>
+          </div>
+          {moreToolsOpen ? (
+            <div className="fork-more-menu" role="menu" onClick={(event) => {
+              if ((event.target as HTMLElement).closest(".toolbar-icon")) setMoreToolsOpen(false);
+            }}>
+              {[...combineTools, ...modifyTools, ...arrangeTools].filter((tool) => FORK_MORE_TOOLS.has(tool.id)).map(renderToolButton)}
+            </div>
+          ) : null}
         </div>
       </div>
           </>
@@ -14364,13 +14422,13 @@ function SecondaryToolbar({
                   onClick={onNoteTool}
                   disabled={historyViewActive}
                 >
-                  <ToolbarNoteIcon />
+                  <ForkNoteIcon />
                 </button>
                 <button className="action-icon-button" aria-label={t("editor.import")} title={`${t("editor.import")} (${COMMAND_SHORTCUTS.import})`} onClick={() => onTopPanel("import")} disabled={historyViewActive}>
-                  <ToolbarImportIcon />
+                  <ForkImportIcon />
                 </button>
                 <button className="action-icon-button" aria-label={t("editor.export")} title={`${t("editor.export")} (${COMMAND_SHORTCUTS.export})`} onClick={() => onTopPanel("export")}>
-                  <ToolbarVectorExportIcon />
+                  <ForkExportIcon />
                 </button>
                 <button className="action-icon-button" aria-label={t("editor.workspaceSettings")} title={t("editor.workspaceSettings")} onClick={() => window.dispatchEvent(new Event("layerling:open-workspace-settings"))}>
                   <ToolbarSettingsIcon />
@@ -14396,6 +14454,7 @@ function SecondaryToolbar({
             </div>
             </div>
           ) : null}
+          <TinkercadGuideButton />
           <SimpleModeSwitch />
           <ThemeSwitch />
           <LanguageSwitch />

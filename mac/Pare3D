@@ -43,11 +43,17 @@ trap cleanup EXIT
 # address bar, designs kept apart from normal browsing, automatic backup works.
 for BROWSER in "Google Chrome" "Microsoft Edge" "Brave Browser" "Chromium" "Vivaldi"; do
   for ROOT in "/Applications" "$HOME/Applications"; do
-    if [ -d "$ROOT/$BROWSER.app" ]; then
+    APPDIR="$ROOT/$BROWSER.app"
+    if [ -d "$APPDIR" ]; then
+      EXE="$(/usr/bin/defaults read "$APPDIR/Contents/Info" CFBundleExecutable 2>/dev/null || echo "$BROWSER")"
       echo "using $BROWSER at $URL"
-      /usr/bin/open -n -W -a "$ROOT/$BROWSER.app" --args \
+      # Started directly, not through "open": that also sends the browser a "reopen" event,
+      # which made it add an empty New Tab window beside Pare 3D. Waiting on the process
+      # means the server stops when this browser instance quits.
+      "$APPDIR/Contents/MacOS/$EXE" \
         --app="$URL" --user-data-dir="$PROFILE" \
-        --no-first-run --no-default-browser-check --window-size=1440,900
+        --no-first-run --no-default-browser-check --disable-session-crashed-bubble \
+        --window-size=1440,900
       exit 0
     fi
   done

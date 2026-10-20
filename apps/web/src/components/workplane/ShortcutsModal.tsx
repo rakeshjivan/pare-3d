@@ -58,7 +58,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: "shortcuts.group.file",
     mode: "geometry",
     shortcuts: [
-      { combos: ["Ctrl+I"], label: "shortcuts.import" },
+      { combos: ["Ctrl+Shift+I"], label: "shortcuts.import" },
       { combos: ["Ctrl+E"], label: "shortcuts.export" },
       { combos: ["Ctrl+S"], label: "shortcuts.save" },
     ],
@@ -70,6 +70,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { combos: ["Ctrl+G"], label: "shortcuts.group" },
       { combos: ["Ctrl+B"], label: "shortcuts.bundle" },
       { combos: ["Ctrl+Shift+G"], label: "shortcuts.ungroup" },
+      { combos: ["Ctrl+I"], label: "shortcuts.intersect" },
       { combos: ["E"], label: "shortcuts.editGroup" },
       { combos: ["Ctrl+L"], label: "shortcuts.lock" },
       { combos: ["Ctrl+H"], label: "shortcuts.hide" },
@@ -92,6 +93,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { combos: ["D"], label: "shortcuts.dropToWorkplane" },
       { combos: ["C"], label: "shortcuts.carryOntoFace" },
       { combos: ["N"], label: "shortcuts.note" },
+      { combos: ["R"], label: "shortcuts.ruler" },
     ],
   },
   {

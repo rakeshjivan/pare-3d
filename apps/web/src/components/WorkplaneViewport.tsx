@@ -8910,6 +8910,11 @@ export function WorkplaneViewport({
         if (!event.shiftKey || !setPlacementWorkplaneAtSelection()) {
           togglePlacementWorkplane();
         }
+      } else if (key === "r" && selectedIdsRef.current.length === 0 && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        // Fork: R adds a ruler, as in Tinkercad, while nothing is selected; with a selection the
+        // editor's R turns the shapes instead.
+        event.preventDefault();
+        toggleCornerRulerTool();
       } else if (key === "f" && event.shiftKey) {
         event.preventDefault();
         focusSelection();
@@ -8935,7 +8940,7 @@ export function WorkplaneViewport({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [focusSelection, onSetPlacementWorkplane, onWorkplaneModeChange, resetView, tapeToolsOpen, sectionViewOpen, setPlacementWorkplaneAtSelection, setTapeActive, setViewCubeFace, togglePlacementWorkplane, toggleProjection, zoomCamera]);
+  }, [focusSelection, onSetPlacementWorkplane, onWorkplaneModeChange, resetView, tapeToolsOpen, sectionViewOpen, setPlacementWorkplaneAtSelection, setTapeActive, setViewCubeFace, togglePlacementWorkplane, toggleProjection, toggleCornerRulerTool, zoomCamera]);
 
   return (
     <main className="workplane-stage">
