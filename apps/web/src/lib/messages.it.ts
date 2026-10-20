@@ -20,6 +20,7 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "theme.short.light": "Chiaro",
   "theme.short.dark": "Scuro",
   "theme.short.graphite": "Grafite",
+  "theme.short.classic": "Classic",
   
   "aria.originDimensions": "Distanze dall'origine",
   "aria.moveDimensions": "Dimensioni dello spostamento",
@@ -2215,6 +2216,7 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "workspace.themeLight": "Chiaro",
   "workspace.themeDark": "Scuro",
   "workspace.themeGraphite": "Grafite (scuro neutro)",
+  "workspace.themeClassic": "Classic (light, blue)",
   "workspace.toolbarSize": "Dimensione della barra degli strumenti",
   "workspace.toolbarSizeSmall": "Piccola",
   "workspace.toolbarSizeMedium": "Media",

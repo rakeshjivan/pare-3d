@@ -13,6 +13,19 @@ export const DEFAULT_SKETCH_BACKGROUND = "#fcfbf8";
 export const DEFAULT_SKETCH_GRID_COLOR = "#d9822b";
 /** The sketch's area under the grid in the light theme (#143). */
 export const DEFAULT_SKETCH_PLATE_COLOR = "#f5f0e7";
+/**
+ * The Classic theme's plate while its colours are left at the defaults: white
+ * ground, pale blue grid with a darker blue line every tenth (as the "Classic
+ * look" preset in the settings). Any colour the user picks still wins.
+ */
+export const CLASSIC_WORKPLANE = {
+  background: "#ffffff",
+  surface: "#fbfcfe",
+  minor: "#c8edf9",
+  major: "#8fcbe1",
+  axis: "#5aa9d6",
+  border: "#5aa9d6",
+} as const;
 /** Edge lines on every body, when switched on: black like in similar tools. */
 export const DEFAULT_EDGE_LINE_COLOR = "#000000";
 
@@ -139,6 +152,14 @@ function baseWorkplaneGridPalette(theme: ResolvedAppTheme, configuredColor: stri
       border: { color: "#b08f2f", opacity: 0.88 },
     };
   }
+  if (palette === "classic") {
+    return {
+      minor: { color: CLASSIC_WORKPLANE.minor, opacity: 0.9 },
+      major: { color: CLASSIC_WORKPLANE.major, opacity: 0.95 },
+      axis: { color: CLASSIC_WORKPLANE.axis, opacity: 0.95 },
+      border: { color: CLASSIC_WORKPLANE.border, opacity: 0.95 },
+    };
+  }
   return {
     minor: { color: "#e0c377", opacity: 0.55 },
     major: { color: "#c08a12", opacity: 0.7 },
@@ -170,11 +191,20 @@ export function workplaneThemePalette(
         surface: { color: "#332b16", opacity: 0.9 },
         grid: workplaneGridPalette("dark", configuredGridColor, "default", configuredMajorColor),
       }
-    : {
-        sceneBackground: configuredBackground,
-        surface: { color: configuredSurface, opacity: 0.68 },
-        grid: workplaneGridPalette("light", configuredGridColor, "default", configuredMajorColor),
-      };
+    : palette === "classic"
+      ? {
+          sceneBackground: configuredBackground.toLowerCase() === DEFAULT_WORKPLANE_BACKGROUND ? CLASSIC_WORKPLANE.background : configuredBackground,
+          surface: {
+            color: configuredSurface.toLowerCase() === DEFAULT_WORKPLANE_SURFACE_COLOR ? CLASSIC_WORKPLANE.surface : configuredSurface,
+            opacity: 0.9,
+          },
+          grid: workplaneGridPalette("light", configuredGridColor, "classic", configuredMajorColor),
+        }
+      : {
+          sceneBackground: configuredBackground,
+          surface: { color: configuredSurface, opacity: 0.68 },
+          grid: workplaneGridPalette("light", configuredGridColor, "default", configuredMajorColor),
+        };
 }
 
 /** Grid sizes offered with Imperial units; the line spacing in millimetres follows from the name. */

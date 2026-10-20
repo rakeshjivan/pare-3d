@@ -107,6 +107,7 @@ const THEME_LABEL_KEYS: Record<AppThemePreference, MessageKey> = {
   light: "workspace.themeLight",
   dark: "workspace.themeDark",
   graphite: "workspace.themeGraphite",
+  classic: "workspace.themeClassic",
 };
 
 const TOOLBAR_SIZE_LABEL_KEYS: Record<ToolbarSize, MessageKey> = {

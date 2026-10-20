@@ -18,6 +18,7 @@ export const MESSAGES_EN = {
   "theme.short.light": "Light",
   "theme.short.dark": "Dark",
   "theme.short.graphite": "Graphite",
+  "theme.short.classic": "Classic",
 
   "aria.originDimensions": "Distances to origin",
   "aria.moveDimensions": "Movement dimensions",
@@ -2306,6 +2307,7 @@ export const MESSAGES_EN = {
   "workspace.themeLight": "Light",
   "workspace.themeDark": "Dark",
   "workspace.themeGraphite": "Graphite (neutral dark)",
+  "workspace.themeClassic": "Classic (light, blue)",
   "workspace.toolbarSize": "Toolbar size",
   "workspace.toolbarSizeSmall": "Small",
   "workspace.toolbarSizeMedium": "Medium",

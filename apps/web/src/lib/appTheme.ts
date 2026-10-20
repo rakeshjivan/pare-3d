@@ -5,6 +5,7 @@ export const APP_THEME_OPTIONS = [
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
   { value: "graphite", label: "Graphite" },
+  { value: "classic", label: "Classic" },
 ] as const;
 
 export type AppThemePreference = (typeof APP_THEME_OPTIONS)[number]["value"];
@@ -14,18 +15,21 @@ export type AppThemePreference = (typeof APP_THEME_OPTIONS)[number]["value"];
  * dark keeps working; the palette on top only swaps colours.
  */
 export type ResolvedAppTheme = "light" | "dark";
-export type AppThemePalette = "default" | "graphite";
+export type AppThemePalette = "default" | "graphite" | "classic";
 
 export function appThemePalette(preference: AppThemePreference): AppThemePalette {
-  return preference === "graphite" ? "graphite" : "default";
+  if (preference === "graphite" || preference === "classic") return preference;
+  return "default";
 }
 
 export function normalizeAppThemePreference(value: unknown): AppThemePreference {
-  return value === "light" || value === "dark" || value === "graphite" || value === "system" ? value : "system";
+  return value === "light" || value === "dark" || value === "graphite" || value === "classic" || value === "system" ? value : "system";
 }
 
 export function resolveAppTheme(preference: AppThemePreference, prefersDark: boolean): ResolvedAppTheme {
   if (preference === "system") return prefersDark ? "dark" : "light";
+  // Classic is the light theme in cool greys with a blue accent.
+  if (preference === "classic") return "light";
   return preference === "graphite" ? "dark" : preference;
 }
 
@@ -74,6 +78,7 @@ export function applyAppTheme(preference: AppThemePreference, prefersDark?: bool
   else document.documentElement.dataset.palette = palette;
   document.documentElement.style.colorScheme = resolved;
   if (palette === "graphite") ensureGraphiteStylesheet();
+  if (palette === "classic") ensurePaletteStylesheet(CLASSIC_STYLESHEET_ID, CLASSIC_STYLESHEET_HREF);
 }
 
 export const GRAPHITE_STYLESHEET_ID = "layerling-graphite-theme";
@@ -91,11 +96,18 @@ export const GRAPHITE_STYLESHEET_HREF = `/assets/theme/graphite-theme.css${appVe
  * when the theme is switched away again.
  */
 function ensureGraphiteStylesheet() {
-  if (document.getElementById(GRAPHITE_STYLESHEET_ID)) return;
+  ensurePaletteStylesheet(GRAPHITE_STYLESHEET_ID, GRAPHITE_STYLESHEET_HREF);
+}
+
+export const CLASSIC_STYLESHEET_ID = "layerling-classic-theme";
+export const CLASSIC_STYLESHEET_HREF = `/assets/theme/classic-theme.css${appVersion ? `?v=${appVersion}` : ""}`;
+
+function ensurePaletteStylesheet(id: string, href: string) {
+  if (document.getElementById(id)) return;
   const link = document.createElement("link");
-  link.id = GRAPHITE_STYLESHEET_ID;
+  link.id = id;
   link.rel = "stylesheet";
-  link.href = GRAPHITE_STYLESHEET_HREF;
+  link.href = href;
   document.head.appendChild(link);
 }
 

@@ -11,6 +11,7 @@ const THEME_LABEL_KEYS: Record<AppThemePreference, MessageKey> = {
   light: "workspace.themeLight",
   dark: "workspace.themeDark",
   graphite: "workspace.themeGraphite",
+  classic: "workspace.themeClassic",
 };
 
 const THEME_SHORT_KEYS: Record<AppThemePreference, MessageKey> = {
@@ -18,6 +19,7 @@ const THEME_SHORT_KEYS: Record<AppThemePreference, MessageKey> = {
   light: "theme.short.light",
   dark: "theme.short.dark",
   graphite: "theme.short.graphite",
+  classic: "theme.short.classic",
 };
 
 export function ThemeSwitch() {

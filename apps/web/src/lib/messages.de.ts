@@ -17,6 +17,7 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "theme.short.light": "Hell",
   "theme.short.dark": "Dunkel",
   "theme.short.graphite": "Graphit",
+  "theme.short.classic": "Klassisch",
 
   "aria.originDimensions": "Abstände zum Nullpunkt",
   "aria.moveDimensions": "Maße beim Verschieben",
@@ -2305,6 +2306,7 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "workspace.themeLight": "Hell",
   "workspace.themeDark": "Dunkel",
   "workspace.themeGraphite": "Graphit (neutral dunkel)",
+  "workspace.themeClassic": "Klassisch (hell, blau)",
   "workspace.toolbarSize": "Größe der Werkzeugleiste",
   "workspace.toolbarSizeSmall": "Klein",
   "workspace.toolbarSizeMedium": "Mittel",

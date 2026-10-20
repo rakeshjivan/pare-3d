@@ -17,6 +17,7 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "theme.short.light": "Licht",
   "theme.short.dark": "Donker",
   "theme.short.graphite": "Grafiet",
+  "theme.short.classic": "Klassiek",
 
   "aria.originDimensions": "Afstanden tot de oorsprong",
   "aria.moveDimensions": "Verplaatsingsmaten",
@@ -2305,6 +2306,7 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "workspace.themeLight": "Licht",
   "workspace.themeDark": "Donker",
   "workspace.themeGraphite": "Grafiet (neutraal donker)",
+  "workspace.themeClassic": "Klassiek (licht, blauw)",
   "workspace.toolbarSize": "Grootte van werkbalk",
   "workspace.toolbarSizeSmall": "Klein",
   "workspace.toolbarSizeMedium": "Middel",

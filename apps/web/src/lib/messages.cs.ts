@@ -111,6 +111,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "theme.short.light": "Světlý",
   "theme.short.dark": "Tmavý",
   "theme.short.graphite": "Grafitový",
+  "theme.short.classic": "Classic",
 
   "aria.originDimensions": "Vzdálenosti od počátku souřadnic",
   "aria.moveDimensions": "Rozměry posunu",
@@ -2299,6 +2300,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "workspace.themeLight": "Světlý",
   "workspace.themeDark": "Tmavý",
   "workspace.themeGraphite": "Grafitový (neutrální tmavý)",
+  "workspace.themeClassic": "Classic (light, blue)",
   "workspace.toolbarSize": "Velikost nástrojové lišty",
   "workspace.toolbarSizeSmall": "Malá",
   "workspace.toolbarSizeMedium": "Střední",

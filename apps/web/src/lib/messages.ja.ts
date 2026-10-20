@@ -22,6 +22,7 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "theme.short.light": "ライト",
   "theme.short.dark": "ダーク",
   "theme.short.graphite": "グラファイト",
+  "theme.short.classic": "Classic",
 
   "aria.originDimensions": "原点までの距離",
   "aria.moveDimensions": "移動の寸法",
@@ -2244,6 +2245,7 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "workspace.themeLight": "ライト",
   "workspace.themeDark": "ダーク",
   "workspace.themeGraphite": "グラファイト（中間色のダーク）",
+  "workspace.themeClassic": "Classic (light, blue)",
   "workspace.toolbarSize": "ツールバーのサイズ",
   "workspace.toolbarSizeSmall": "小",
   "workspace.toolbarSizeMedium": "中",

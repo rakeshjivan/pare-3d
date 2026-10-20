@@ -26,6 +26,7 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "theme.short.light": "فاتح",
   "theme.short.dark": "داكن",
   "theme.short.graphite": "غرافيت",
+  "theme.short.classic": "Classic",
 
   "aria.originDimensions": "المسافات إلى نقطة الأصل",
   "aria.moveDimensions": "أبعاد الحركة",
@@ -2307,6 +2308,7 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "workspace.themeLight": "فاتح",
   "workspace.themeDark": "داكن",
   "workspace.themeGraphite": "غرافيت (داكن محايد)",
+  "workspace.themeClassic": "Classic (light, blue)",
   "workspace.toolbarSize": "حجم شريط الأدوات",
   "workspace.toolbarSizeSmall": "صغير",
   "workspace.toolbarSizeMedium": "متوسط",
