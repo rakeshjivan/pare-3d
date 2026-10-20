@@ -1,0 +1,54 @@
+# Builds the Pare 3D downloads and publishes them as a GitHub release.
+# Start it by pushing a tag such as  pare-2  (the number is the Pare 3D build;
+# the installed app compares it to tell you an update is out).
+name: Pare 3D release
+
+on:
+  push:
+    tags: ["pare-*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+      - run: npm ci
+      - name: Build number from the tag
+        id: build
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          BUILD="${TAG#pare-}"
+          case "$BUILD" in ''|*[!0-9]*) BUILD=0 ;; esac
+          echo "number=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Static export
+        env:
+          NEXT_PUBLIC_PARE_BUILD: ${{ steps.build.outputs.number }}
+          NEXT_PUBLIC_SUPPORT_HINT: "off"
+          NEXT_PUBLIC_SOURCE_CODE_URL: https://github.com/${{ github.repository }}
+        run: node scripts/build-static-export.mjs
+      - name: Package for Mac and Windows
+        run: bash scripts/package-desktop.sh
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/pare-')
+        with:
+          name: Pare 3D build ${{ steps.build.outputs.number }} (layerling ${{ steps.build.outputs.version }})
+          files: |
+            dist/Pare-3D-Mac.zip
+            dist/Pare-3D-Windows.zip
+          body: |
+            **Download:** `Pare-3D-Mac.zip` for a Mac (Apple silicon or Intel), `Pare-3D-Windows.zip` for Windows 10/11.
+
+            **Mac:** unzip, drag Pare 3D into Applications, open it. The first time, go to System Settings → Privacy & Security → Open Anyway.
+            **Windows:** extract the folder, double-click "Pare 3D.vbs". If SmartScreen warns, choose More info → Run anyway.
+            Chrome or Edge gives Pare 3D its own window and automatic backup.
+
+            Pare 3D is based on [layerling](https://github.com/henmedia/layerling) (AGPL-3.0-only); this release's source is this repository at this tag.

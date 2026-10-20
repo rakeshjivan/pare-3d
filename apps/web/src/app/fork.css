@@ -359,3 +359,32 @@ html:has([aria-modal="true"]) .empty-plate-hint { display: none; }
 }
 /* The open menu stays above status messages. */
 .secondary-toolbar:has(.bambu-send-menu) { z-index: 90; }
+
+/* Fork: update available. */
+.pare-update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  color: #fff;
+  background: var(--primary);
+  border-radius: 10px;
+  font: 600 13.5px var(--font-ui);
+}
+.pare-update-banner a {
+  margin-left: auto;
+  padding: 4px 12px;
+  color: var(--primary);
+  background: #fff;
+  border-radius: 6px;
+  text-decoration: none;
+}
+.pare-update-banner button {
+  display: inline-flex;
+  padding: 4px;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}

@@ -73,12 +73,38 @@ function run(command, args) {
   });
 }
 
-async function openInBambuStudio(file) {
-  if (platform() !== "darwin") return { opened: false, error: "only on a Mac" };
-  for (const app of ["BambuStudio", "Bambu Studio"]) {
-    if (await run("/usr/bin/open", ["-a", app, file])) return { opened: true };
+async function exists(path) {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
   }
-  return { opened: false, error: "Bambu Studio not found" };
+}
+
+async function openInBambuStudio(file) {
+  if (platform() === "darwin") {
+    for (const app of ["BambuStudio", "Bambu Studio"]) {
+      if (await run("/usr/bin/open", ["-a", app, file])) return { opened: true };
+    }
+    return { opened: false, error: "Bambu Studio not found" };
+  }
+  if (platform() === "win32") {
+    const candidates = [
+      join(process.env.ProgramFiles || "C:\\Program Files", "Bambu Studio", "bambu-studio.exe"),
+      join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "Programs", "Bambu Studio", "bambu-studio.exe"),
+    ];
+    for (const exe of candidates) {
+      if (await exists(exe)) {
+        // Started detached; Bambu Studio keeps running after this answers.
+        const child = spawn(exe, [file], { detached: true, stdio: "ignore" });
+        child.unref();
+        return { opened: true };
+      }
+    }
+    return { opened: false, error: "Bambu Studio not found" };
+  }
+  return { opened: false, error: "not supported on this system" };
 }
 
 function json(res, status, value) {

@@ -1,0 +1,8 @@
+Pare 3D for Windows
+
+1. Extract this whole folder somewhere permanent, e.g. Documents.
+2. Double-click "Pare 3D.vbs". It opens Pare 3D in its own Edge window.
+3. If Windows SmartScreen warns you, choose More info > Run anyway.
+
+Tip: right-click "Pare 3D.vbs" > Show more options > Send to > Desktop (create shortcut).
+Exports for Bambu Studio go to Documents\Pare 3D Exports.

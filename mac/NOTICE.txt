@@ -1,0 +1,3 @@
+Pare 3D is based on layerling (https://github.com/henmedia/layerling), licensed AGPL-3.0-only.
+Modified: Classic theme, Pare 3D branding, docked shape panel, contextual toolbar,
+Simple mode, automatic backup, A1 mini default plate; marketing and update checks removed.

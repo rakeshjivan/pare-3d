@@ -4,6 +4,7 @@ import { Archive, ArchiveRestore, ArrowLeft, Clock3, Copy, EllipsisVertical, Fol
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { AppFooter } from "@/components/AppFooter";
 import { AutoBackupControl } from "@/components/AutoBackupControl";
+import { PareUpdateBanner } from "@/components/PareUpdateBanner";
 import { AUTO_BACKUP_INTERVAL_MS, getAutoBackupStatus, initAutoBackup, subscribeAutoBackup, writeAutoBackup } from "@/lib/autoBackup";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
@@ -3511,6 +3512,7 @@ function Dashboard({
                   {dashboardNotice}
                 </div>
               ) : null}
+              <PareUpdateBanner />
               {/* The designs live in the browser, and a browser can fail or break with an update: said plainly and always (not to be closed). */}
               <aside className="storage-notice" aria-label={t("storageNotice.title")}>
                 <span className="storage-notice-icon" aria-hidden="true">
