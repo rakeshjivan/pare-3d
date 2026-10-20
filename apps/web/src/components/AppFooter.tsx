@@ -116,92 +116,22 @@ export function AppFooter({
     setRunsLocally(["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname));
   }, []);
 
+  // Trimmed build: the user guide and, as the AGPL asks, a link to the source.
+  void sponsor; void update; void runsLocally; void onBugReport; void communityUrl; void legalLinks; void updateStepsUrl;
   return (
     <>
-    {variant === "editor" ? <InstallAppHint variant="editor" /> : null}
-    {variant === "editor" ? <TabletHint variant="editor" /> : null}
     {variant === "editor" ? <PenHoverTips /> : null}
-    {sponsor && supportCardEnabled(SUPPORT_SETTINGS) ? <SupportNudge href={sponsor.href} /> : null}
     <footer className={variant === "editor" ? "dashboard-legal editor-legal" : "dashboard-legal"}>
       <div className="dashboard-legal-group">
-        {joinWithDots([
-          sponsor ? (
-            <a
-              className="dashboard-legal-sponsor"
-              href={sponsor.href}
-              target="_blank"
-              rel="noreferrer"
-              key="sponsor"
-            >
-              <Heart size={13} aria-hidden="true" />
-              {sponsor.label || t("dashboard.sponsor")}
-            </a>
-          ) : null,
-          <a href={t("welcome.guideUrl")} target="_blank" rel="noreferrer" key="guide">
-            {t("dashboard.userGuide")}
-          </a>,
-          <a href={communityUrl(language)} target="_blank" rel="noreferrer" key="community">
-            {t("dashboard.forum")}
-          </a>,
-          // Ein Link in Knopfrolle: so traegt er die Farben der Fusszeile in
-          // jedem Thema, und die Werkzeugleiste wird nicht breiter.
-          onBugReport ? (
-            <a
-              href="#"
-              role="button"
-              key="bug-report"
-              title={t("editor.bugReportHint")}
-              onClick={(event) => {
-                event.preventDefault();
-                onBugReport();
-              }}
-            >
-              {t("editor.bugReport")}
-            </a>
-          ) : null,
-          ...legalLinks(language).map((link) => (
-            <a key={link.href} href={link.href}>{link.label}</a>
-          )),
-        ])}
+        <a href={t("welcome.guideUrl")} target="_blank" rel="noreferrer">
+          {t("dashboard.userGuide")}
+        </a>
       </div>
       <div className="dashboard-legal-group">
-        {joinWithDots([
-          <a href={readmeUrl(language)} target="_blank" rel="noreferrer" key="readme">
-            {t("dashboard.projectOnGitHub")}
-          </a>,
-          // Only on the start page, where the list is shown.
-          variant === "dashboard" ? (
-            <a
-              href="#"
-              role="button"
-              key="whats-new"
-              onClick={(event) => {
-                event.preventDefault();
-                window.dispatchEvent(new Event(SHOW_WHATS_NEW_EVENT));
-              }}
-            >
-              {t("whatsNew.footerLink")}
-            </a>
-          ) : null,
-          <a href={releaseNotesUrl()} target="_blank" rel="noreferrer" key="releases" data-help={t("dashboard.footerHelp")}>
-            {t("dashboard.releaseNotes", { version })}
-          </a>,
-          update ? (
-            <a
-              className="dashboard-legal-update"
-              href={runsLocally ? updateStepsUrl(language) : update.releaseUrl}
-              target="_blank"
-              rel="noreferrer"
-              key="update-available"
-              title={runsLocally ? t("dashboard.updateLocalHint") : t("dashboard.updateAvailable", { version: update.latestVersion })}
-            >
-              <Sparkles size={13} aria-hidden="true" />
-              <span>{t("dashboard.updateAvailable", { version: update.latestVersion })}</span>
-            </a>
-          ) : null,
-        ])}
+        <a href={SOURCE_CODE_URL} target="_blank" rel="noreferrer" title="Based on layerling (AGPL-3.0)">
+          Source (AGPL-3.0) &middot; v{version}
+        </a>
       </div>
-      {variant === "dashboard" ? <p className="dashboard-trademark">{t("footer.trademark")}</p> : null}
     </footer>
     </>
   );

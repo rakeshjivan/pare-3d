@@ -3463,9 +3463,6 @@ function Dashboard({
                   {dashboardNotice}
                 </div>
               ) : null}
-              {whatsNew.view ? <WhatsNewCard view={whatsNew.view} current={LYL_CREATED_WITH_VERSION} onClose={whatsNew.dismiss} /> : null}
-              <InstallAppHint />
-              <TabletHint />
               {/* The designs live in the browser, and a browser can fail or break with an update: said plainly and always (not to be closed). */}
               <aside className="storage-notice" aria-label={t("storageNotice.title")}>
                 <span className="storage-notice-icon" aria-hidden="true">
@@ -3838,20 +3835,6 @@ function Dashboard({
                   <span>{t("dashboard.folderEmptyHint")}</span>
                 </div>
               ) : null}
-              {/* Open on a first visit, when there is nothing else to look at,
-                  and folded away to a single line once projects exist - still
-                  there for anyone who wants to read it again. `open` is keyed
-                  to the unfiltered count, so a fruitless search neither opens
-                  nor closes it behind the reader's back. */}
-              <details className="dashboard-welcome" open={!hasProjects}>
-                <summary className="dashboard-welcome-summary">
-                  <span className="dashboard-welcome-summary-title">{t("welcome.teaserTitle")}</span>
-                  <span className="dashboard-welcome-summary-hint">{t("welcome.teaserHint")}</span>
-                </summary>
-                <div className="dashboard-welcome-body">
-                  <WelcomeGuideBody tr={t} offline={offlineOk} />
-                </div>
-              </details>
             </>
           )}
           <AppFooter version={LYL_CREATED_WITH_VERSION} updateInfo={update} />

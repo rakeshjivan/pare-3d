@@ -84,15 +84,13 @@ export function renderFooter({ language, messages, environment, version }) {
   const sponsorUrl = ownSponsorUrl || (supportOff ? "" : "https://layerling.com/support.html");
   const sponsorNeedsLang = !ownSponsorUrl || sponsorUrl.startsWith("/");
   if (sponsorUrl) left.push(link(sponsorNeedsLang ? `${sponsorUrl}${sponsorUrl.includes("?") ? "&" : "?"}lang=${language}` : sponsorUrl, environment.NEXT_PUBLIC_SPONSOR_LABEL?.trim() || messages["dashboard.sponsor"], external));
-  left.push(link(GUIDE_LANGUAGES[language].forumUrl, messages["dashboard.forum"], external));
   const imprintUrl = environment.NEXT_PUBLIC_IMPRINT_URL?.trim();
   if (imprintUrl) left.push(link(imprintUrl, environment.NEXT_PUBLIC_IMPRINT_LABEL?.trim() || fallback.imprint));
   const privacyUrl = environment.NEXT_PUBLIC_PRIVACY_URL?.trim();
   if (privacyUrl) left.push(link(privacyUrl, environment.NEXT_PUBLIC_PRIVACY_LABEL?.trim() || fallback.privacy));
-  const right = [
-    link(SOURCE_CODE, messages["dashboard.projectOnGitHub"], external),
-    link(`${SOURCE_CODE}/releases`, (messages["dashboard.releaseNotes"] ?? "").replace("{version}", version), external),
-  ];
+  // Trimmed build: only the source link the AGPL asks for.
+  void version;
+  const right = [link(SOURCE_CODE, "Source (AGPL-3.0)", external)];
   const group = (items) => `<div>${items.join('<span class="dot" aria-hidden="true">&middot;</span>')}</div>`;
   const trademark = messages["footer.trademark"] ? `<p class="trademark">${escapeHtml(messages["footer.trademark"])}</p>` : "";
   return `<footer class="site-footer">${group(left)}${group(right)}${trademark}</footer>`;

@@ -23,7 +23,7 @@ export function appThemePalette(preference: AppThemePreference): AppThemePalette
 }
 
 export function normalizeAppThemePreference(value: unknown): AppThemePreference {
-  return value === "light" || value === "dark" || value === "graphite" || value === "classic" || value === "system" ? value : "system";
+  return value === "light" || value === "dark" || value === "graphite" || value === "classic" || value === "system" ? value : "classic";
 }
 
 export function resolveAppTheme(preference: AppThemePreference, prefersDark: boolean): ResolvedAppTheme {
@@ -34,11 +34,11 @@ export function resolveAppTheme(preference: AppThemePreference, prefersDark: boo
 }
 
 export function readStoredAppTheme(storage: Pick<Storage, "getItem"> | null | undefined): AppThemePreference {
-  if (!storage) return "system";
+  if (!storage) return "classic";
   try {
     return normalizeAppThemePreference(storage.getItem(APP_THEME_STORAGE_KEY));
   } catch {
-    return "system";
+    return "classic";
   }
 }
 
@@ -113,7 +113,7 @@ function ensurePaletteStylesheet(id: string, href: string) {
 
 const themeListeners = new Set<() => void>();
 let currentThemePreference: AppThemePreference =
-  typeof window !== "undefined" ? readStoredAppTheme(window.localStorage) : "system";
+  typeof window !== "undefined" ? readStoredAppTheme(window.localStorage) : "classic";
 
 if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
   const media = window.matchMedia("(prefers-color-scheme: dark)");

@@ -11,7 +11,9 @@ import { checkAppUpdate, dismissUpdate as storeDismissUpdate, isUpdateDismissed,
 const PUBLISHED_HOSTS = new Set(["layerling.com", "www.layerling.com", "layerling.server"]);
 
 function asksGitHubForUpdates() {
-  return typeof window === "undefined" || !PUBLISHED_HOSTS.has(window.location.hostname.toLowerCase());
+  // Trimmed build: never phones home for updates.
+  void PUBLISHED_HOSTS;
+  return false;
 }
 
 export function useAppUpdate(currentVersion: string) {
