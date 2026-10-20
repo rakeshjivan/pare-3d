@@ -74,6 +74,7 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "dashboard.updateAvailable": "Aggiornamento disponibile: {version}",
   "newVersion.title": "Una nuova versione di Pare 3D è pronta",
   "newVersion.body": "Questa pagina è stata avviata con la versione {current}; sul server è ora disponibile la versione {latest}. Ricarica la pagina per passare alla nuova versione: i tuoi progetti restano salvati in questo browser e quello aperto verrà salvato prima del ricaricamento, per poi riapparire esattamente com'era.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "Rilevata una versione diversa",
   "newVersion.bodyMismatch": "È stato caricato un file non compatibile con la versione attuale. Questo può accadere dopo un aggiornamento o quando viene utilizzata una copia memorizzata di una versione precedente. Ricarica la pagina per risolvere il problema: i tuoi progetti restano salvati in questo browser e quello aperto verrà salvato prima del ricaricamento, per poi riapparire esattamente com'era.",
   "newVersion.reload": "Salva e ricarica",

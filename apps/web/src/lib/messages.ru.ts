@@ -80,6 +80,7 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "dashboard.updateAvailable": "Доступно обновление: {version}",
   "newVersion.title": "Доступна новая версия Pare 3D",
   "newVersion.body": "Эта страница загружена с версией {current}, на сервере доступна {latest}. Перезагрузите, чтобы обновиться: ваши проекты хранятся в браузере, а открытый сейчас сначала сохранится и вернётся в том же виде.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "Часть страницы загружена из другой версии",
   "newVersion.bodyMismatch": "Файл, загруженный позже, не совпадает с остальными — обычно так бывает после обновления или при использовании сохранённой копии старой версии. Перезагрузите, чтобы исправить: ваши проекты хранятся в браузере, а открытый сейчас сначала сохранится и вернётся в том же виде.",
   "newVersion.reload": "Сохранить и перезагрузить",

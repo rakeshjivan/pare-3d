@@ -20,7 +20,7 @@ export function NewVersionNotice() {
   return (
     <div className="new-version-notice" role="alertdialog" aria-labelledby="new-version-title" aria-describedby="new-version-body">
       <strong id="new-version-title">{reason === "mismatch" ? t("newVersion.titleMismatch") : t("newVersion.title")}</strong>
-      <p id="new-version-body">{reason === "mismatch" ? t("newVersion.bodyMismatch") : t("newVersion.body", { current: RUNNING_VERSION, latest: latest.version })}</p>
+      <p id="new-version-body">{reason === "mismatch" ? t("newVersion.bodyMismatch") : (latest.version && latest.version !== RUNNING_VERSION ? t("newVersion.body", { current: RUNNING_VERSION, latest: latest.version }) : t("newVersion.bodySameVersion"))}</p>
       {news.length > 0 ? (
         <ul>
           {news.map((entry) => (

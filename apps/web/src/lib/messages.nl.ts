@@ -74,6 +74,7 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "dashboard.updateAvailable": "Update beschikbaar: {version}",
   "newVersion.title": "Er staat een nieuwe versie van Pare 3D klaar",
   "newVersion.body": "Deze pagina is gestart met versie {current}; de server heeft nu {latest}. Herlaad om over te stappen - je ontwerpen blijven in deze browser bewaard, en het ontwerp dat je open hebt wordt eerst opgeslagen en komt precies zo terug.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "Een deel van deze pagina komt uit een andere versie",
   "newVersion.bodyMismatch": "Een bestand dat deze pagina later heeft geladen past niet bij de rest, meestal na een update of door een opgeslagen kopie van een oudere versie. Herlaad om het op te lossen - je ontwerpen blijven in deze browser bewaard, en het ontwerp dat je open hebt wordt eerst opgeslagen en komt precies zo terug.",
   "newVersion.reload": "Opslaan en herladen",

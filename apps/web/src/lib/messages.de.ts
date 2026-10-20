@@ -73,6 +73,7 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "dashboard.sponsor": "Projekt unterstützen",
   "newVersion.title": "Eine neue Version von Pare 3D ist da",
   "newVersion.body": "Diese Seite wurde mit Version {current} gestartet, auf dem Server liegt jetzt {latest}. Lade sie neu, um zu wechseln - deine Entwürfe bleiben in diesem Browser erhalten, der offene wird vorher gespeichert und kommt genau so zurück.",
+  "newVersion.bodySameVersion": "Ein Update wurde heruntergeladen. Lade neu, um zu wechseln - deine Entwürfe bleiben erhalten, und der geöffnete wird vorher gespeichert und kommt genau so zurück.",
   "newVersion.titleMismatch": "Ein Teil dieser Seite stammt aus einer anderen Version",
   "newVersion.bodyMismatch": "Eine Datei, die diese Seite später nachgeladen hat, passt nicht zum Rest, meist nach einem Update oder bei einer gespeicherten Kopie einer älteren Version. Lade neu, um das zu beheben - deine Entwürfe bleiben in diesem Browser erhalten, der offene wird vorher gespeichert und kommt genau so zurück.",
   "newVersion.reload": "Speichern und neu laden",

@@ -2723,6 +2723,7 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "export.historyNone": "Brez",
   "newVersion.title": "Nova različica layerlinga je pripravljena",
   "newVersion.body": "Ta stran se je zagnala z različico {current}; strežnik ima zdaj {latest}. Naloži znova za preklop – tvoji načrti ostanejo v tem brskalniku, tisti, ki ga imaš odprtega, se najprej shrani in se vrne točno takšen, kot je.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.reload": "Shrani in naloži znova",
   "newVersion.later": "Pozneje",
   "welcome.moreSaveTitle": "Shrani v svojo mapo",

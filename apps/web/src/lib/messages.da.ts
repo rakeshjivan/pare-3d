@@ -90,6 +90,7 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "dashboard.updateAvailable": "Opdatering tilgængelig: {version}",
   "newVersion.title": "En ny version af Pare 3D er klar",
   "newVersion.body": "Denne side startede med version {current}; serveren har nu {latest}. Genindlæs for at skifte - dine designs gemmes i denne browser, og det du har åbent gemmes først og kommer tilbage præcis som det var.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "Del af denne side er fra en anden version",
   "newVersion.bodyMismatch": "En fil denne side indlæste senere passer ikke til resten, normalt efter en opdatering eller med en gemt kopi af en ældre version. Genindlæs for at rette det - dine designs gemmes i denne browser, og det du har åbent gemmes først og kommer tilbage præcis som det var.",
   "newVersion.reload": "Gem og genindlæs",

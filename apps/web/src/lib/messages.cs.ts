@@ -167,6 +167,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "dashboard.updateAvailable": "Dostupná aktualizace: {version}",
   "newVersion.title": "Nová verze layerlingu je připravena",
   "newVersion.body": "Tato stránka běží ve verzi {current}; na serveru už je {latest}. Pro přechod načtěte stránku znovu. Projekty zůstávají v tomto prohlížeči a otevřený projekt se nejprve uloží a potom znovu otevře v původním stavu.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "Část stránky pochází z jiné verze",
   "newVersion.bodyMismatch": "Dodatečně načtený soubor neodpovídá zbytku stránky, obvykle po aktualizaci nebo kvůli uložené starší verzi. Načtěte stránku znovu. Projekty zůstávají v tomto prohlížeči a otevřený projekt se nejprve uloží a potom znovu otevře v původním stavu.",
   "newVersion.reload": "Uložit a znovu načíst",

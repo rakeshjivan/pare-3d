@@ -73,6 +73,7 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "dashboard.updateAvailable": "Frissítés érhető el: {version}",
   "newVersion.title": "Elkészült a Pare 3D új verziója",
   "newVersion.body": "Ez az oldal ezzel a verzióval indult: {current}; a szerveren most ez van: {latest}. Töltsd újra az oldalt a váltáshoz – a terveid ebben a böngészőben maradnak, a megnyitott tervet pedig előbb elmenti, és pontosan úgy kapod vissza, ahogy volt.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "Az oldal egy része másik verzióból való",
   "newVersion.bodyMismatch": "Egy fájl, amelyet az oldal később töltött be, nem illik a többihez – általában frissítés után, vagy ha egy régebbi verzió tárolt másolata maradt meg. Töltsd újra az oldalt a javításhoz – a terveid ebben a böngészőben maradnak, a megnyitott tervet pedig előbb elmenti, és pontosan úgy kapod vissza, ahogy volt.",
   "newVersion.reload": "Mentés és újratöltés",

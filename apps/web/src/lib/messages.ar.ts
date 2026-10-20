@@ -83,6 +83,7 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "dashboard.updateAvailable": "يتوفر تحديث: {version}",
   "newVersion.title": "إصدار جديد من Pare 3D جاهز",
   "newVersion.body": "بدأت هذه الصفحة بالإصدار {current}؛ بينما يحمل الخادم الآن {latest}. أعد التحميل للتبديل - تُحفظ تصاميمك في هذا المتصفح، والتصميم المفتوح يُحفظ أولًا ثم يعود كما كان.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "جزء من هذه الصفحة يعود لإصدار آخر",
   "newVersion.bodyMismatch": "الملف الذي حملته الصفحة لاحقًا لا يتوافق مع بقية الأجزاء، ويحدث ذلك عادةً بعد التحديث أو عند وجود نسخة مخزنة من إصدار أقدم. أعد التحميل للإصلاح - تصاميمك محفوظة في هذا المتصفح، والتصميم المفتوح يُحفظ أولًا ثم يعود كما كان.",
   "newVersion.reload": "حفظ وإعادة التحميل",

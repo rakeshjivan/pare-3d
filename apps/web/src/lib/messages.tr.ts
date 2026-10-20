@@ -67,6 +67,7 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "dashboard.updateAvailable": "Güncelleme var: {version}",
   "newVersion.title": "Pare 3D'in yeni bir sürümü hazır",
   "newVersion.body": "Bu sayfa {current} sürümüyle açıldı; sunucuda artık {latest} var. Geçmek için yeniden yükle - tasarımların bu tarayıcıda kalır, açık olan önce kaydedilir ve aynen geri gelir.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "Bu sayfanın bir kısmı başka bir sürümden",
   "newVersion.bodyMismatch": "Bu sayfanın sonradan yüklediği bir dosya geri kalanıyla uyuşmuyor; genelde bir güncellemeden sonra veya eski bir sürümün kayıtlı kopyasıyla olur. Düzeltmek için yeniden yükle - tasarımların bu tarayıcıda kalır, açık olan önce kaydedilir ve aynen geri gelir.",
   "newVersion.reload": "Kaydet ve yeniden yükle",

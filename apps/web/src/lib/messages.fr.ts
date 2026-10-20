@@ -69,6 +69,7 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "dashboard.updateAvailable": "Mise à jour disponible : {version}",
   "newVersion.title": "Une nouvelle version de Pare 3D est prête",
   "newVersion.body": "Cette page a démarré avec la version {current} ; le serveur a désormais {latest}. Recharger pour changer : vos conceptions sont conservées dans ce navigateur, et celle que vous avez ouverte est enregistrée en premier et revient telle quelle.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "Une partie de cette page provient d'une autre version",
   "newVersion.bodyMismatch": "Un fichier chargé ultérieurement sur cette page ne correspond pas au reste, généralement après une mise à jour ou avec une copie stockée d'une ancienne version. Rechargez pour résoudre le problème : vos conceptions sont conservées dans ce navigateur, et celle que vous avez ouverte est enregistrée en premier et revient telle quelle.",
   "newVersion.reload": "Enregistrer et recharger",

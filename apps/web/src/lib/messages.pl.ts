@@ -81,6 +81,7 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "dashboard.updateAvailable": "Dostępna aktualizacja: {version}",
   "newVersion.title": "Nowa wersja Pare 3D jest gotowa",
   "newVersion.body": "Ta strona została uruchomiona w wersji {current}, a serwer ma już {latest}. Odśwież stronę, aby przejść na nową wersję. Twoje projekty zostają w tej przeglądarce, a otwarty projekt zostanie najpierw zapisany i wróci dokładnie w tym samym stanie.",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "Część tej strony pochodzi z innej wersji",
   "newVersion.bodyMismatch": "Plik wczytany później przez tę stronę nie pasuje do reszty. Zwykle zdarza się to po aktualizacji albo przy zapisanej kopii starszej wersji. Odśwież stronę, aby to naprawić. Twoje projekty zostają w tej przeglądarce, a otwarty projekt zostanie najpierw zapisany i wróci dokładnie w tym samym stanie.",
   "newVersion.reload": "Zapisz i odśwież",

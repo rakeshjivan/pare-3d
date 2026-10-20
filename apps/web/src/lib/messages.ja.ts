@@ -79,6 +79,7 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "dashboard.updateAvailable": "アップデートがあります: {version}",
   "newVersion.title": "layerlingの新しいバージョンが使えます",
   "newVersion.body": "このページはバージョン{current}で起動しましたが、サーバーには{latest}があります。再読み込みすると切り替わります。デザインはこのブラウザーに保存されており、開いているデザインは先に保存されるので、同じ状態で戻ります。",
+  "newVersion.bodySameVersion": "An update has been downloaded. Reload to switch - your designs are kept, and the one you have open is saved first and comes back just as it is.",
   "newVersion.titleMismatch": "このページの一部が別のバージョンのものです",
   "newVersion.bodyMismatch": "このページが後から読み込んだファイルが他と合っていません。たいていは、アップデートの後や、古いバージョンのコピーが残っている場合に起こります。再読み込みすると直ります。デザインはこのブラウザーに保存されており、開いているデザインは先に保存されるので、同じ状態で戻ります。",
   "newVersion.reload": "保存して再読み込み",
