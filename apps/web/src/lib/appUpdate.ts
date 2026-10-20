@@ -1,4 +1,5 @@
-export const DEFAULT_SOURCE_CODE_URL = "https://github.com/henmedia/layerling";
+// Fork: the modified source, as AGPL section 13 asks. Upstream: https://github.com/henmedia/layerling
+export const DEFAULT_SOURCE_CODE_URL = "https://github.com/rakeshjivan/pare-3d";
 
 export const SOURCE_CODE_URL =
   process.env.NEXT_PUBLIC_SOURCE_CODE_URL?.trim() || DEFAULT_SOURCE_CODE_URL;

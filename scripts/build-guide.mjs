@@ -64,7 +64,7 @@ function printLink(strings, className = "") {
 /** The page with every chapter in a row, for printing; one in each guide folder. */
 export const PRINT_ALL_PAGE = "print-all.html";
 
-const SOURCE_CODE = "https://github.com/henmedia/layerling";
+const SOURCE_CODE = "https://github.com/rakeshjivan/pare-3d"; // fork; upstream is henmedia/layerling
 
 /**
  * The footer of the program, for the guide's pages: the same links from the

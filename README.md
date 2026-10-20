@@ -1,3 +1,22 @@
+# Pare 3D
+
+**Pare 3D is a modified version of [layerling](https://github.com/henmedia/layerling)** by henmedia and the layerling contributors, itself a fork of [SketchForge-3D](https://github.com/Formsmith746/SketchForge-3D). All credit for the CAD engine, editor and tools goes to them. Pare 3D keeps their licence, the **GNU AGPL v3.0 only**, and their copyright notices.
+
+What Pare 3D changes (branch `classic-theme`):
+
+- A light "Classic" theme in cool greys with a blue accent, and Pare 3D branding
+- The Shapes panel docked on the right, drag-and-drop onto the plate
+- A one-row toolbar: Combine, Modify and Arrange appear when something is selected; tool names on hover
+- Simple mode, which hides the advanced tools
+- Automatic backup to a folder (Chrome and Edge)
+- A first-run hint on an empty plate; Bambu Lab A1 mini plate by default, P2S one click away
+- Marketing panels, donation prompts, community links and update checks removed
+- A Mac app bundle (`mac/`)
+
+The original layerling README follows.
+
+---
+
 <div align="center">
   <table>
     <tr>
