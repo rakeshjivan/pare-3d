@@ -38,10 +38,11 @@ export function booleanTriangleLimitPreset(limit: number): BooleanTriangleLimitP
 }
 
 export const DEFAULT_WORKPLANE_WORKSPACE: WorkplaneWorkspaceSettings = {
-  width: 200,
-  depth: 200,
-  sizePreset: "200 x 200 mm",
-  printer: "",
+  // Fork default: the Bambu Lab A1 mini plate (180 x 180 mm).
+  width: 180,
+  depth: 180,
+  sizePreset: "Custom",
+  printer: "bambu-lab-a1-mini",
   gridBlockSize: 5,
   gridBlockPreset: "5 mm",
   gridColor: DEFAULT_WORKPLANE_GRID_COLOR,
@@ -50,7 +51,7 @@ export const DEFAULT_WORKPLANE_WORKSPACE: WorkplaneWorkspaceSettings = {
   background: DEFAULT_WORKPLANE_BACKGROUND,
   surfaceColor: DEFAULT_WORKPLANE_SURFACE_COLOR,
   showAxes: true,
-  showPlateLabels: true,
+  showPlateLabels: false,
   gridLinesGrow: true,
   edgeLines: false,
   edgeColor: DEFAULT_EDGE_LINE_COLOR,

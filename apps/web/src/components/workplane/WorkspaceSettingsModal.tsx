@@ -16,6 +16,9 @@ import { gearCenterHoleLimits, gearToothPitch, gearTypeHasHelix } from "@/lib/ge
 import { automaticSideCount } from "@/lib/roundSideCount";
 import { torusTessellation } from "@/lib/torusTessellation";
 import { printerPresetById } from "@/lib/printBed";
+
+/** The printers offered first and as one-click buttons (fork default). */
+const MY_PRINTER_IDS = ["bambu-lab-a1-mini", "bambu-lab-p2s"] as const;
 import { PRINTER_PRESETS } from "@/lib/printerPresets.generated";
 import {
   DEFAULT_THREAD_CLEARANCE,
@@ -1146,6 +1149,11 @@ export function WorkspaceSettingsModal({
                     <span>{t("workspace.printer")}</span>
                     <select value={chosenPrinter?.id ?? ""} onChange={(event) => setPrinter(event.currentTarget.value)}>
                       <option value="">{t("workspace.printerNone")}</option>
+                      <optgroup label="My printers">
+                        {MY_PRINTER_IDS.map((id) => printerPresetById(id)).filter(Boolean).map((preset) => (
+                          <option key={`mine-${preset!.id}`} value={preset!.id}>{`${preset!.vendor} ${preset!.model}`}</option>
+                        ))}
+                      </optgroup>
                       {PRINTER_VENDORS.map((vendor) => (
                         <optgroup key={vendor} label={vendor}>
                           {(PRINTERS_BY_VENDOR.get(vendor) ?? []).map((preset) => (
@@ -1155,6 +1163,19 @@ export function WorkspaceSettingsModal({
                       ))}
                     </select>
                   </label>
+                  <div className="my-printer-switch" role="group" aria-label="My printers">
+                    {MY_PRINTER_IDS.map((id) => printerPresetById(id)).filter(Boolean).map((preset) => (
+                      <button
+                        key={`quick-${preset!.id}`}
+                        type="button"
+                        className={chosenPrinter?.id === preset!.id ? "active" : ""}
+                        aria-pressed={chosenPrinter?.id === preset!.id}
+                        onClick={() => setPrinter(preset!.id)}
+                      >
+                        {preset!.model}
+                      </button>
+                    ))}
+                  </div>
                   <p className="workspace-printer-info">
                     {chosenPrinter
                       ? t("workspace.printerInfo", { width: chosenPrinter.width, depth: chosenPrinter.depth, height: chosenPrinter.height })

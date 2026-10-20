@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "layerling - Easy 3D CAD for 3D printing",
-  "short_name": "layerling",
-  "description": "Easy 3D CAD for 3D printing, right in your browser",
+  "name": "Pare 3D",
+  "short_name": "Pare 3D",
+  "description": "Easy 3D design for 3D printing",
   "lang": "en",
   "dir": "ltr",
   "start_url": "./",
@@ -17,29 +17,29 @@
   ],
   "orientation": "any",
   "background_color": "#fafafa",
-  "theme_color": "#fafaf9",
+  "theme_color": "#ffffff",
   "categories": ["graphics", "productivity", "utilities"],
   "icons": [
     {
-      "src": "assets/layerling/layerling-icon-192.png",
+      "src": "assets/pare3d/pare3d-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "assets/layerling/layerling-icon-512.png",
+      "src": "assets/pare3d/pare3d-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "assets/layerling/layerling-icon-maskable-512.png",
+      "src": "assets/pare3d/pare3d-icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "assets/layerling/layerling-icon.svg",
+      "src": "assets/pare3d/pare3d-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml"
     }

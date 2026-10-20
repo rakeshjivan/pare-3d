@@ -178,6 +178,7 @@ import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketc
 import { AppFooter } from "@/components/AppFooter";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
+import { SimpleModeSwitch } from "@/components/SimpleModeSwitch";
 import { useFileAccept } from "@/lib/fileAccept";
 import { exportLylProject, importLylProject, LYL_CREATED_WITH_VERSION, LYL_MEDIA_TYPE } from "@/lib/lylProject";
 import { isBuildMessage, reportWorkerBuild } from "@/lib/buildStamp";
@@ -2387,7 +2388,7 @@ export function LayerlingEditor({
   onProjectNameChange,
   onCreateProjectFromState,
   projectId,
-  projectName = "Layerling design",
+  projectName = "Untitled design",
   projectCreatedAt = Date.now(),
   projectModifiedAt = Date.now(),
   projectRevision = 0,
@@ -13340,7 +13341,8 @@ function SecondaryToolbar({
   shapesPinnedRef.current = shapesPinned;
   useEffect(() => {
     try {
-      const pinned = window.localStorage.getItem("layerling.editor.shapeMenuPinned") === "true";
+      // Fork: the Shapes panel is docked on the right unless it was unpinned.
+      const pinned = window.localStorage.getItem("layerling.editor.shapeMenuPinned") !== "false";
       setGeometryShapesPinned(pinned);
       setSketchShapesPinned(window.localStorage.getItem("layerling.sketch.shapeMenuPinned") === "true");
       // A pinned panel is there again at the next start, not only its pin (forum, prmod3d).
@@ -13359,6 +13361,17 @@ function SecondaryToolbar({
       // The pin still works for this visit.
     }
   };
+  // Fork: tell the page when the Shapes panel is docked, so the workplane makes room for it.
+  const shapeDockOn = toolbarMode === "geometry" && shapesPinned && shapesOpen;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (shapeDockOn) root.dataset.shapeDock = "on";
+    else delete root.dataset.shapeDock;
+    window.dispatchEvent(new Event("resize"));
+    return () => {
+      delete root.dataset.shapeDock;
+    };
+  }, [shapeDockOn]);
   /** Picking a shape closes the panel, unless it is pinned open. */
   const closeShapesAfterPick = () => {
     if (!shapesPinnedRef.current) setShapesOpen(false);
@@ -13749,8 +13762,14 @@ function SecondaryToolbar({
   };
 
   return (
-    <div className="secondary-toolbar">
+    <div className="secondary-toolbar" data-selection={canModifySelection ? "yes" : "no"}>
       {paletteOpen ? <CommandPalette commands={buildPaletteCommands()} onClose={() => setPaletteOpen(false)} /> : null}
+      {toolbarMode === "geometry" && objects.length === 0 && !historyViewActive ? (
+        <div className="empty-plate-hint" aria-live="polite">
+          <strong>Your plate is empty</strong>
+          <span>{shapesPinned && shapesOpen ? "Drag a shape from the panel on the right onto the plate, or click one and then click the plate." : "Open Shapes in the toolbar and drag one onto the plate."}</span>
+        </div>
+      ) : null}
       <div ref={toolbarContentRef} className={`toolbar-mode-content ${toolbarMode}`}>
         {toolbarMode === "geometry" ? (
           <>
@@ -13792,6 +13811,7 @@ function SecondaryToolbar({
           </div>
           {shapesOpen ? (
             <ShapeMenuPanel
+              className={shapesPinned ? "shape-menu-docked" : ""}
               title={t("shape.basicShapes")}
               helpSection="addShape"
               pinned={shapesPinned}
@@ -14291,9 +14311,9 @@ function SecondaryToolbar({
         {/* The brand, in the same corner as on the start page. Not a link:
             leaving the editor is not something to trigger by accident. */}
         <div className="toolbar-brand">
-          <img src="/assets/layerling/layerling-logo.svg" alt="Layerling" />
+          <img src="/assets/pare3d/pare3d-icon.svg" alt="Pare 3D" />
           <span className="toolbar-brand-text">
-            <span className="toolbar-brand-name">layerling</span>
+            <span className="toolbar-brand-name">Pare 3D</span>
             <span className="toolbar-brand-tagline">{t("brand.tagline")}</span>
           </span>
         </div>
@@ -14347,6 +14367,7 @@ function SecondaryToolbar({
           </label>
         </div>
         <div className="toolbar-title-row-actions">
+          <SimpleModeSwitch />
           <ThemeSwitch />
           <LanguageSwitch />
         </div>

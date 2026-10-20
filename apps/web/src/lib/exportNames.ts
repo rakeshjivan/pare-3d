@@ -7,7 +7,7 @@ export function projectExportFileName(projectName: string, format: ProjectExport
     .replace(/\s+/g, " ")
     .replace(/[. ]+$/g, "")
     .slice(0, 120);
-  return `${safeProjectName || "layerling design"}.${format}`;
+  return `${safeProjectName || "Untitled design"}.${format}`;
 }
 
 /**

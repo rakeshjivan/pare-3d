@@ -129,7 +129,7 @@ export function AppFooter({
       </div>
       <div className="dashboard-legal-group">
         <a href={SOURCE_CODE_URL} target="_blank" rel="noreferrer" title="Based on layerling (AGPL-3.0)">
-          Source (AGPL-3.0) &middot; v{version}
+          Based on layerling &middot; Source (AGPL-3.0) &middot; v{version}
         </a>
       </div>
     </footer>

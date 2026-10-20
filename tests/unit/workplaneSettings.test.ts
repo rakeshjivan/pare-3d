@@ -44,6 +44,7 @@ describe("workplane settings helpers", () => {
     ).toEqual({
       ...fallback,
       width: 500,
+      printer: "", // settings saved without a printer mean "none"
       gridBlockSize: 2.5,
       gridBlockPreset: "Custom",
       gridColor: "#a34fd1",

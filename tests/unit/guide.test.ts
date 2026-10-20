@@ -132,10 +132,10 @@ describe("guide footer", () => {
     expect(full).toContain('href="/impressum.html">Impressum');
     expect(full).toContain('href="/datenschutz.html">Datenschutz');
     expect(full).toContain("https://example.org/spende");
-    expect(full).toContain("v9.9.9");
+    expect(full).toContain("Source (AGPL-3.0)"); // fork: only the source link on the right
     const bare = renderFooter({ language: "en", messages: await loadMessages("en"), version: "1.0.0", environment: {} });
     expect(bare).not.toMatch(/Imprint|Privacy|impressum/i);
-    expect(bare).toContain("Discussions");
+    expect(bare).not.toContain("Discussions"); // fork: no community link
   });
 
   it("links the project's support page by default and drops it when switched off", async () => {

@@ -1,0 +1,290 @@
+
+/* Fork: one-click switch between my printers in Settings. */
+.workspace-modal .my-printer-switch {
+  height: auto !important;
+  min-height: 32px;
+  max-height: none !important;
+  width: max-content !important;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+.workspace-modal .my-printer-switch button {
+  height: auto !important;
+  min-height: 30px;
+  line-height: 1.2 !important;
+}
+.my-printer-switch {
+  display: inline-flex;
+  gap: 0;
+  margin: 6px 0 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.my-printer-switch button {
+  padding: 6px 14px;
+  font: 600 13px var(--font-ui);
+  color: var(--foreground);
+  background: var(--panel);
+  border: 0;
+  cursor: pointer;
+}
+.my-printer-switch button + button { border-left: 1px solid var(--border-strong); }
+.my-printer-switch button.active { color: #fff; background: var(--primary); }
+
+/* ---------------------------------------------------------------------------
+ * Fork: toolbar.
+ * Manage and Help move up into the title row, so the tools stay on one row.
+ * Combine, Modify and Arrange only show while something is selected.
+ * ------------------------------------------------------------------------ */
+.secondary-toolbar .toolbar-actions-section[data-group="manage"],
+.secondary-toolbar .toolbar-actions-section[data-group="help"] {
+  position: absolute;
+  /* Positioned against the tools row, which starts under the title row. */
+  top: calc(var(--editor-toolbar-title-height) * -1);
+  z-index: 3;
+  height: var(--editor-toolbar-title-height);
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+.secondary-toolbar .toolbar-actions-section[data-group="manage"] { right: 470px; }
+.secondary-toolbar .toolbar-actions-section[data-group="help"] { right: 330px; }
+.secondary-toolbar .toolbar-actions-section .toolbar-section-label { display: none; }
+.secondary-toolbar .toolbar-actions-section .action-buttons {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+  align-items: center;
+  border: 0;
+  background: transparent;
+}
+.secondary-toolbar .toolbar-actions-section .action-icon-button {
+  transform: scale(0.82);
+}
+
+.secondary-toolbar[data-selection="no"] .toolbar-section[data-group="combine"],
+.secondary-toolbar[data-selection="no"] .toolbar-section[data-group="modify"],
+.secondary-toolbar[data-selection="no"] .toolbar-section[data-group="arrange"] {
+  display: none;
+}
+
+/* A hint where the selection tools appear, while nothing is selected. */
+.secondary-toolbar[data-selection="no"] .tool-group.left::after {
+  content: "Select a shape to combine, modify or arrange it";
+  align-self: center;
+  margin: 18px 0 0 18px;
+  color: var(--muted-strong);
+  font: 500 12px var(--font-ui);
+  white-space: nowrap;
+}
+
+/* Tool names under the pointer, straight away instead of the slow browser tooltip. */
+.secondary-toolbar .toolbar-icon[aria-label],
+.secondary-toolbar .action-icon-button[aria-label] {
+  position: relative;
+}
+.secondary-toolbar .toolbar-icon[aria-label]:hover::after,
+.secondary-toolbar .action-icon-button[aria-label]:hover::after {
+  content: attr(aria-label);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 60;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  color: #fff;
+  background: #2a3442;
+  border-radius: 6px;
+  font: 600 11px/1.3 var(--font-ui);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(20, 30, 45, 0.25);
+}
+.secondary-toolbar .action-icon-button[aria-label]:hover::after {
+  transform: translateX(-50%) scale(1.22);
+  transform-origin: top center;
+}
+
+/* ---------------------------------------------------------------------------
+ * Fork: the Shapes panel docked down the right side while pinned.
+ * ------------------------------------------------------------------------ */
+:root { --shape-dock-width: 232px; }
+
+.shape-menu-dropdown.shape-menu-docked {
+  position: fixed !important;
+  top: var(--editor-toolbar-height) !important;
+  right: 0 !important;
+  bottom: var(--editor-footer-height) !important;
+  left: auto !important;
+  width: var(--shape-dock-width) !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  transform: none !important;
+  border-width: 0 0 0 1px !important;
+  border-radius: 0 !important;
+  box-shadow: -2px 0 10px rgba(20, 30, 45, 0.06) !important;
+  display: flex;
+  flex-direction: column;
+}
+.shape-menu-dropdown.shape-menu-docked .shape-menu-title { cursor: default; }
+.shape-menu-dropdown.shape-menu-docked .shape-menu-resize { display: none; }
+.shape-menu-dropdown.shape-menu-docked .shape-menu-body {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+.shape-menu-dropdown.shape-menu-docked .shape-menu-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 8px;
+}
+.shape-menu-dropdown.shape-menu-docked .shape-menu-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 6px 2px 5px !important;
+  gap: 3px !important;
+}
+.shape-menu-dropdown.shape-menu-docked .shape-menu-item img { width: 46px !important; height: 46px !important; flex: 0 0 auto; }
+.shape-menu-dropdown.shape-menu-docked .shape-menu-item span {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  writing-mode: horizontal-tb !important;
+  font-size: 10.5px !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere;
+}
+
+html[data-shape-dock="on"] .workplane-stage { margin-right: var(--shape-dock-width); }
+html[data-shape-dock="on"] .edge-modifier-panel,
+html[data-shape-dock="on"] .split-panel { right: calc(var(--shape-dock-width) + 14px); }
+html[data-shape-dock="on"] .top-action-panel { right: calc(var(--shape-dock-width) + 18px); }
+
+/* ---------------------------------------------------------------------------
+ * Fork: Simple mode hides the advanced tools.
+ * ------------------------------------------------------------------------ */
+.simple-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+  padding: 4px 8px;
+  color: var(--toolbar-label);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font: 600 12px var(--font-ui);
+  cursor: pointer;
+}
+.simple-mode-switch:hover { background: var(--subbar); }
+.simple-mode-track {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  background: var(--muted);
+  border-radius: 999px;
+  transition: background 0.15s;
+}
+.simple-mode-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s;
+}
+.simple-mode-switch.active { color: var(--primary); }
+.simple-mode-switch.active .simple-mode-track { background: var(--primary); }
+.simple-mode-switch.active .simple-mode-thumb { transform: translateX(12px); }
+
+html[data-simple="on"] .toolbar-workspace-tabs button:nth-child(2),
+html[data-simple="on"] [data-layerling-tool="history"],
+html[data-simple="on"] [data-layerling-tool="bundle"],
+html[data-simple="on"] [data-layerling-tool="intersect"],
+html[data-simple="on"] [data-layerling-tool="intersect-preview"],
+html[data-simple="on"] [data-layerling-tool="pivot"],
+html[data-simple="on"] [data-layerling-tool="array"],
+html[data-simple="on"] [data-layerling-tool="holePattern"],
+html[data-simple="on"] [data-layerling-tool="faceTool"],
+html[data-simple="on"] [data-layerling-tool="split"],
+html[data-simple="on"] [data-layerling-tool="chamfer"],
+html[data-simple="on"] [data-layerling-tool="hollow"],
+html[data-simple="on"] [data-layerling-tool="deleteFace"],
+html[data-simple="on"] [data-layerling-tool="simplify"],
+html[data-simple="on"] [data-layerling-tool="snap"],
+html[data-simple="on"] [data-layerling-tool="layFlat"],
+html[data-simple="on"] [data-layerling-tool="mateFaces"] {
+  display: none !important;
+}
+
+/* Fork: automatic backup line in the storage notice. */
+.auto-backup-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 8px;
+  color: var(--foreground);
+  font: 600 13px var(--font-ui);
+}
+.auto-backup-control svg { color: var(--primary); }
+.auto-backup-control button {
+  padding: 3px 10px;
+  color: #fff;
+  background: var(--primary);
+  border: 0;
+  border-radius: 6px;
+  font: 600 12.5px var(--font-ui);
+  cursor: pointer;
+}
+.auto-backup-control button.quiet {
+  color: var(--primary);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+}
+
+/* Fork: first-run hint on an empty plate. */
+.empty-plate-hint {
+  position: fixed;
+  top: calc(var(--editor-toolbar-height) + 26px);
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 20px;
+  color: var(--foreground);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 6px 22px rgba(20, 30, 45, 0.1);
+  font: 500 13px var(--font-ui);
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.empty-plate-hint strong { font-size: 15px; color: var(--primary); }
+html[data-shape-dock="on"] .empty-plate-hint { left: calc((100vw - var(--shape-dock-width)) / 2); }
+html[data-theme="dark"] .empty-plate-hint { background: rgba(30, 30, 30, 0.92); }
+
+/* No hint over an open dialog. */
+html:has([aria-modal="true"]) .empty-plate-hint { display: none; }

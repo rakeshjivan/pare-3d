@@ -63,9 +63,9 @@ describe("designs from a newer layerling", () => {
     expect(message).toMatch(/^This design was saved with layerling 99\.0\.0, newer than this layerling/);
     expect(message).toMatch(/warpDrive/);
     setLanguage("de");
-    expect(localizedError(message)).toContain(`mit layerling 99.0.0 gespeichert, du hast ${LYL_CREATED_WITH_VERSION}`);
+    expect(localizedError(message)).toContain(`mit Pare 3D 99.0.0 gespeichert, du hast ${LYL_CREATED_WITH_VERSION}`);
     setLanguage("en");
-    expect(localizedError(message)).toContain(`saved with layerling 99.0.0, and you have ${LYL_CREATED_WITH_VERSION}`);
+    expect(localizedError(message)).toContain(`saved with Pare 3D 99.0.0, and you have ${LYL_CREATED_WITH_VERSION}`);
   });
 
   it("keeps the plain reason for a broken design from this or an older version", async () => {

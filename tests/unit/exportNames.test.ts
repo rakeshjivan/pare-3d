@@ -15,7 +15,7 @@ describe("project export filenames", () => {
   });
 
   it("falls back to a useful name when the project name cannot be used", () => {
-    expect(projectExportFileName("...", "obj")).toBe("layerling design.obj");
+    expect(projectExportFileName("...", "obj")).toBe("Untitled design.obj");
   });
 });
 

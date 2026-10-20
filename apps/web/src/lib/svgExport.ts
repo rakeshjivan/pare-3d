@@ -24,7 +24,7 @@ function safeFillColor(value: string) {
   return /^(?:#[0-9a-f]{3,8}|(?:rgb|hsl)a?\([^<>]+\))$/i.test(value.trim()) ? value.trim() : "#0098c7";
 }
 
-export function toSvgProjection(layers: ReadonlyArray<SvgProjectionLayer>, title = "Layerling design") {
+export function toSvgProjection(layers: ReadonlyArray<SvgProjectionLayer>, title = "Untitled design") {
   const cleanLayers = layers.flatMap((layer) => {
     const polygons = layer.polygons.filter(
       (polygon) => polygon.length >= 3 && polygon.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y)),

@@ -1038,7 +1038,7 @@ export async function exportLylProject(input: LylProjectExportInput) {
     createdWithVersion: LYL_CREATED_WITH_VERSION,
     metadata: {
       ...(input.projectId ? { projectId: input.projectId } : {}),
-      projectName: input.projectName.trim() || "layerling design",
+      projectName: input.projectName.trim() || "Untitled design",
       units: normalizeWorkspaceSettings(input.workspace).units,
       createdAt: safeIsoTimestamp(input.createdAt, now),
       modifiedAt: safeIsoTimestamp(input.modifiedAt, now),

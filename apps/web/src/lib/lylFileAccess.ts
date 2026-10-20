@@ -43,7 +43,7 @@ export const rememberLylFile = (projectId: string, handle: LylFileHandle) => voi
 export const linkedLylFile = (projectId: string) => linkedFiles.get(projectId) ?? null;
 export const forgetLylFile = (projectId: string) => void linkedFiles.delete(projectId);
 
-const lylTypes = [{ description: "layerling design", accept: { [LYL_MEDIA_TYPE]: [".lyl"] } }];
+const lylTypes = [{ description: "Pare 3D design", accept: { [LYL_MEDIA_TYPE]: [".lyl"] } }];
 
 /** Asks where to save; null when the dialog is closed without a choice. */
 export async function pickLylFileToSave(suggestedName: string): Promise<LylFileHandle | null> {
@@ -84,7 +84,7 @@ export async function pickLylFileToOpen(): Promise<{ file: File; handle: LylFile
   const picker = filePickerWindow().showOpenFilePicker;
   if (!picker) return null;
   try {
-    const [handle] = await picker({ id: PICKER_ID, multiple: false, types: [{ description: "layerling design", accept: { [LYL_MEDIA_TYPE]: [".lyl", ".skf"] } }] });
+    const [handle] = await picker({ id: PICKER_ID, multiple: false, types: [{ description: "Pare 3D design", accept: { [LYL_MEDIA_TYPE]: [".lyl", ".skf"] } }] });
     return handle ? { file: await handle.getFile(), handle } : null;
   } catch (error) {
     if (isPickerCancelled(error)) return null;
@@ -120,7 +120,7 @@ export async function pickFilesToImport(extensions: string[]): Promise<Array<{ f
   const picker = filePickerWindow().showOpenFilePicker;
   if (!picker) return null;
   try {
-    const handles = await picker({ id: PICKER_ID, multiple: true, types: [{ description: "layerling designs and 3D files", accept: { "application/octet-stream": extensions } }] });
+    const handles = await picker({ id: PICKER_ID, multiple: true, types: [{ description: "Pare 3D designs and 3D files", accept: { "application/octet-stream": extensions } }] });
     return await Promise.all(handles.map(async (handle) => ({ file: await handle.getFile(), handle })));
   } catch (error) {
     if (isPickerCancelled(error)) return null;

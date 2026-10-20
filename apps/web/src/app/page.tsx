@@ -3,6 +3,8 @@
 import { Archive, ArchiveRestore, ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { AppFooter } from "@/components/AppFooter";
+import { AutoBackupControl } from "@/components/AutoBackupControl";
+import { AUTO_BACKUP_INTERVAL_MS, getAutoBackupStatus, initAutoBackup, subscribeAutoBackup, writeAutoBackup } from "@/lib/autoBackup";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { useAppUpdate } from "@/lib/useAppUpdate";
@@ -2063,6 +2065,52 @@ export default function Home() {
 
   // Every design of this browser as its own .lyl, together in one ZIP, and
   // the custom shapes of this browser in a folder beside them.
+  // Fork: the same ZIP as "Back up all", built quietly for the automatic backup.
+  const buildBackupBlob = useCallback(async (): Promise<Blob | null> => {
+    const shapeEntries = await customShapesBackupEntries().catch(() => []);
+    if (projects.length === 0 && shapeEntries.length <= 1) return null;
+    const names = backupEntryPaths(projects.map((project) => ({ name: project.name, folder: folderPathNames(designFolders, project.folderId) })), t("dashboard.backupFallbackName"));
+    const entries = [];
+    for (let index = 0; index < projects.length; index += 1) {
+      entries.push({ name: names[index], bytes: await projectPackageBytes(projects[index]) });
+    }
+    entries.push(...shapeEntries);
+    const holding = new Set(projects.flatMap((project) => folderTrail(designFolders, folderOfDesign(designFolders, project.folderId)).map((folder) => folder.id)));
+    const emptyFolders = designFolders.filter((folder) => !holding.has(folder.id) && !designFolders.some((other) => other.parentId === folder.id));
+    backupFolderPaths(emptyFolders.map((folder) => folderPathNames(designFolders, folder.id))).forEach((name) => entries.push({ name, bytes: new Uint8Array() }));
+    return new Blob([packBackup(entries) as BlobPart], { type: "application/zip" });
+  }, [designFolders, projects]);
+  const buildBackupBlobRef = useRef(buildBackupBlob);
+  buildBackupBlobRef.current = buildBackupBlob;
+  const backupSignature = projects.map((project) => `${project.id}:${project.updatedAt}`).join("|") + `#${designFolders.length}`;
+  const backupSignatureRef = useRef(backupSignature);
+  backupSignatureRef.current = backupSignature;
+  useEffect(() => {
+    void initAutoBackup();
+    let lastWritten = "";
+    let running = false;
+    const tick = async () => {
+      if (running || getAutoBackupStatus().state !== "on") return;
+      const signature = backupSignatureRef.current;
+      if (signature === lastWritten) return;
+      running = true;
+      try {
+        const blob = await buildBackupBlobRef.current();
+        if (blob && (await writeAutoBackup(blob))) lastWritten = signature;
+      } finally {
+        running = false;
+      }
+    };
+    const timer = window.setInterval(() => void tick(), AUTO_BACKUP_INTERVAL_MS);
+    // A first backup soon after it is switched on, not five minutes later.
+    const unsubscribe = subscribeAutoBackup(() => {
+      if (getAutoBackupStatus().state === "on" && lastWritten === "") window.setTimeout(() => void tick(), 1500);
+    });
+    return () => {
+      window.clearInterval(timer);
+      unsubscribe();
+    };
+  }, []);
   const backupAllProjects = useCallback(async () => {
     const shapeEntries = await customShapesBackupEntries().catch(() => []);
     const shapeCount = Math.max(0, shapeEntries.length - 1);
@@ -3095,9 +3143,9 @@ function Dashboard({
     <main className="dashboard-shell">
       <header className="dashboard-topbar">
         <a className="dashboard-brand" href="./" aria-label={t("brand.home")}>
-          <img src="/assets/layerling/layerling-logo.svg" alt="" />
+          <img src="/assets/pare3d/pare3d-icon.svg" alt="" />
           <span className="dashboard-brand-text">
-            <span className="dashboard-brand-name">layerling</span>
+            <span className="dashboard-brand-name">Pare 3D</span>
             <span className="dashboard-tagline">{t("brand.tagline")}</span>
           </span>
         </a>
@@ -3471,6 +3519,7 @@ function Dashboard({
                 <div className="storage-notice-text">
                   <strong>{t("storageNotice.title")} <GuideHelpLink chapter="files" section="backingUp" className="storage-notice-help" iconSize={16} /></strong>
                   <span>{t("storageNotice.body")}</span>
+                  <AutoBackupControl />
                 </div>
                 <div className="storage-notice-actions">
                   {projects.length > 0 ? (

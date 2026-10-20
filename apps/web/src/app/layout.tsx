@@ -3,6 +3,7 @@ import "./globals.css";
 import "./historyView.css";
 import "./myShapes.css";
 import "./viewCube.css";
+import "./fork.css";
 import { DiagnoseStrip } from "@/components/DiagnoseStrip";
 import { NewVersionNotice } from "@/components/NewVersionNotice";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
@@ -11,9 +12,9 @@ import { LANGUAGES } from "@/lib/languages";
 import { TOOLBAR_SIZE_BOOT_SCRIPT } from "@/lib/toolbarSize";
 import { VIEW_CUBE_POSITION_BOOT_SCRIPT } from "@/lib/viewCubePosition";
 
-const NAME = "layerling";
-const TITLE = "layerling - Free 3D CAD for 3D printing in your browser";
-const DESCRIPTION = "Free 3D CAD in your browser, no account, easy for people coming from Tinkercad: fillets, chamfers, hollowing and threads. Export to STL, 3MF and STEP.";
+const NAME = "Pare 3D";
+const TITLE = "Pare 3D";
+const DESCRIPTION = "Easy 3D design for 3D printing. Runs on your own computer. Based on layerling (AGPL-3.0).";
 
 // Tells search engines what layerling is: a free web application, not an
 // article about one.
@@ -54,12 +55,12 @@ export const metadata: Metadata = {
     // Das SVG ist das eigentliche Symbol; die .ico steht daneben fuer alles,
     // was stur /favicon.ico abholt, statt in den Kopf zu sehen.
     icon: [
-      { url: "/assets/layerling/layerling-logo.svg", type: "image/svg+xml" },
+      { url: "/assets/pare3d/pare3d-icon.svg", type: "image/svg+xml" },
       { url: "/favicon.ico", sizes: "48x48" },
     ],
     // iOS nimmt hier ausschliesslich PNG. Stand da ein SVG, legte
     // "Zum Home-Bildschirm" einen Schnappschuss der Seite ab statt des Symbols.
-    apple: { url: "/assets/layerling/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    apple: { url: "/assets/pare3d/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
   },
   openGraph: {
     type: "website",
