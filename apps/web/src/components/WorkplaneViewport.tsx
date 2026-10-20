@@ -28,6 +28,7 @@ import { OriginDimensionOverlay } from "@/components/workplane/OriginDimensionOv
 import { SelectionInspector, ShapeInspector, SnapGridControl, type IconTagControls, type QrCodeControls, type ShapeInspectorUpdateOptions, type TextLayerPatch } from "@/components/workplane/ShapeInspector";
 import type { NameTagStack } from "@/lib/nameTag";
 import { WorkspaceSettingsModal } from "@/components/workplane/WorkspaceSettingsModal";
+import { PrinterPicker } from "@/components/PrinterPicker";
 import { appThemePalette, type AppThemePalette, type AppThemePreference, type ResolvedAppTheme } from "@/lib/appTheme";
 import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/cadBakeMetadata";
 import { t } from "@/lib/i18n";
@@ -8944,6 +8945,8 @@ export function WorkplaneViewport({
 
   return (
     <main className="workplane-stage">
+      {/* Fork: the printer, and so the plate size, chosen right on the plate. */}
+      <PrinterPicker workspace={workspace} onWorkspaceChange={changeWorkspace} />
       <div
         className={`view-cube ${viewCubeDragging ? "dragging" : ""}`}
         aria-label={t("view.cube")}
