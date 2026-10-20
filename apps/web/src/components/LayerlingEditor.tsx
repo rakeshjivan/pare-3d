@@ -157,6 +157,8 @@ import { carryShapePivot, heightPatchKeepingBase, shapePivotFromWorld, shapePivo
 import { createLocalId } from "@/lib/localIds";
 import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, trackOpenGroupLevels, type OpenGroupLevel } from "@/lib/openGroupParts";
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
+import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
+import { BambuSendButton } from "@/components/BambuSendButton";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -10716,7 +10718,7 @@ export function LayerlingEditor({
   }, [hasSelection, selectedShapes, shapes]);
 
   /** `chooseFile` asks for a new STL even when the design already has one (Save as). */
-  const exportDesign = useCallback(async (format: DirectExportFormat, exportName: string, chooseFile = false) => {
+  const exportDesign = useCallback(async (format: DirectExportFormat, exportName: string, chooseFile = false, toBambu = false) => {
     const source = exportSource();
     const selectionScoped = source.selection;
     // Ausgeblendetes bleibt draussen, wie bei vergleichbaren Programmen: ein beiseitegelegtes
@@ -10774,7 +10776,9 @@ export function LayerlingEditor({
     // where it cannot ask, the download stays.
     const designId = projectId ?? "";
     let target: LylFileHandle | "download" = "download";
-    if (format === "stl" && lylFileAccessSupported()) {
+    // Fork: "Send to Bambu Studio" never asks for a file; the file goes to the server or a download.
+    let bambuNote = "";
+    if (format === "stl" && lylFileAccessSupported() && !toBambu) {
       try {
         const linkedBefore = linkedStlFile(designId);
         // A name typed in the window that is not the linked file's asks for a file of its own (reported by mail, 15.10.2026).
@@ -10801,7 +10805,9 @@ export function LayerlingEditor({
       .then(async ({ meshes: fertig, quellen, verschmolzen, gescheitert, splinters }) => {
         if (format === "stl") {
           const bytes = new Uint8Array(exportMeshesToStl(fertig));
-          if (target === "download") {
+          if (toBambu) {
+            bambuNote = await sendToBambuStudio(projectExportFileName(exportName, "stl"), new Blob([bytes], { type: "model/stl" }), downloadBlobFile);
+          } else if (target === "download") {
             await downloadBlobFile(projectExportFileName(exportName, "stl"), new Blob([bytes], { type: "model/stl" }));
           } else {
             await writeLylFile(target, bytes).catch(() => {
@@ -10817,7 +10823,9 @@ export function LayerlingEditor({
             return { ...mesh, name: source?.name || mesh.name, color: source?.color, faceColors: partFaceColors(mesh, quellen[index]) };
           });
           const bytes = exportMeshesTo3mf(bodies, { title: exportName.trim() || projectName });
-          await downloadBlobFile(projectExportFileName(exportName, "3mf"), new Blob([bytes as BlobPart], { type: THREE_MF_MEDIA_TYPE }));
+          const blob3mf = new Blob([bytes as BlobPart], { type: THREE_MF_MEDIA_TYPE });
+          if (toBambu) bambuNote = await sendToBambuStudio(projectExportFileName(exportName, "3mf"), blob3mf, downloadBlobFile);
+          else await downloadBlobFile(projectExportFileName(exportName, "3mf"), blob3mf);
         } else {
           const bodies = fertig.map((mesh, index) => ({ ...mesh, color: bodiesWritten[quellen[index]]?.color, faceColors: partFaceColors(mesh, quellen[index]) }));
           await downloadTextFile(projectExportFileName(exportName, "obj"), exportMeshesToObj(bodies), "text/plain");
@@ -10827,7 +10835,8 @@ export function LayerlingEditor({
         const exportOverhangs = bedPrinter ? bedOverhangs(exportable, bedPrinter.width, bedPrinter.depth, bedPrinter.height) : [];
         // Tiny loose pieces a cut left behind are not written (#352); the notice says how many.
         const splinterNote = splinters > 0 ? ` ${t("status.exportSplinters", { count: splinters })}` : "";
-        if (gescheitert > 0) setNotice(t("status.exportUnionFailed"), true);
+        if (bambuNote && gescheitert === 0 && !(bedPrinter && exportOverhangs.length > 0)) setNotice(bambuNote + hiddenNote + splinterNote, true);
+        else if (gescheitert > 0) setNotice(t("status.exportUnionFailed"), true);
         else if (bedPrinter && exportOverhangs.length > 0) setNotice(bedOverhangMessage(exportOverhangs, `${bedPrinter.vendor} ${bedPrinter.model}`), true);
         else if (verschmolzen > 0) setNotice(t("status.exportUnioned", { count: verschmolzen, label }) + hiddenNote + splinterNote);
         else if (savedFile) setNotice(t("status.stlSavedToFile", { name: savedFile.name }) + hiddenNote + splinterNote);
@@ -10836,6 +10845,20 @@ export function LayerlingEditor({
       })
       .catch((error: unknown) => failNotice(label, error));
   }, [bedPrinter, exportSource, projectId, projectName]);
+  // Fork: the "Send to Bambu Studio" button in the title row asks for an export through this event.
+  const exportDesignRef = useRef(exportDesign);
+  exportDesignRef.current = exportDesign;
+  const projectNameForBambuRef = useRef(projectName);
+  projectNameForBambuRef.current = projectName;
+  useEffect(() => {
+    const onSend = (event: Event) => {
+      const format = (event as CustomEvent<{ format?: BambuSendFormat }>).detail?.format === "3mf" ? "3mf" : "stl";
+      setNotice(`Preparing ${format.toUpperCase()} for Bambu Studio…`, true);
+      void exportDesignRef.current(format, projectNameForBambuRef.current, false, true);
+    };
+    window.addEventListener(SEND_TO_BAMBU_EVENT, onSend);
+    return () => window.removeEventListener(SEND_TO_BAMBU_EVENT, onSend);
+  }, []);
 
   /**
    * The drawing of a set of bodies, from the same bodies as the export (visible solids, holes taken
@@ -14013,47 +14036,6 @@ function SecondaryToolbar({
           <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>
         </div>
       </div>
-      <div className="toolbar-section toolbar-actions-section" data-group="manage">
-        <div className="toolbar-section-label">{t("editor.group.manage")}</div>
-        <div className="action-buttons">
-          <button
-            className={`action-icon-button ${noteMode ? "active" : ""}`}
-            aria-label={t("editor.tool.note")}
-            aria-pressed={noteMode}
-            title={`${t("editor.tool.note")} (${COMMAND_SHORTCUTS.note})`}
-            onClick={onNoteTool}
-            disabled={historyViewActive}
-          >
-            <ToolbarNoteIcon />
-          </button>
-          <button className="action-icon-button" aria-label={t("editor.import")} title={`${t("editor.import")} (${COMMAND_SHORTCUTS.import})`} onClick={() => onTopPanel("import")} disabled={historyViewActive}>
-            <ToolbarImportIcon />
-          </button>
-          <button className="action-icon-button" aria-label={t("editor.export")} title={`${t("editor.export")} (${COMMAND_SHORTCUTS.export})`} onClick={() => onTopPanel("export")}>
-            <ToolbarVectorExportIcon />
-          </button>
-          <button className="action-icon-button" aria-label={t("editor.workspaceSettings")} title={t("editor.workspaceSettings")} onClick={() => window.dispatchEvent(new Event("layerling:open-workspace-settings"))}>
-            <ToolbarSettingsIcon />
-          </button>
-        </div>
-      </div>
-      <div className="toolbar-section toolbar-actions-section" data-group="help">
-        <div className="toolbar-section-label">{t("editor.group.help")}</div>
-        <div className="action-buttons">
-          <button className="action-icon-button" aria-label={t("palette.open")} title={t("palette.open")} aria-haspopup="dialog" data-layerling-tool="command-search" onClick={openPalette}>
-            <Search className="toolbar-search-icon" aria-hidden="true" />
-          </button>
-          <button className="action-icon-button" aria-label={t("editor.guide")} title={t("editor.guide")} onClick={onGuide}>
-            <ToolbarGuideIcon />
-          </button>
-          <button className="action-icon-button" aria-label={t("editor.keyboardShortcuts")} title={t("editor.keyboardShortcuts")} onClick={onShortcuts}>
-            <ToolbarKeyboardIcon />
-          </button>
-          <button className={`action-icon-button ${interactiveHelpActive ? "active" : ""}`} type="button" aria-label={t("interactiveHelp.title")} title={`${t("interactiveHelp.title")} (${COMMAND_SHORTCUTS["interactive-help"]})`} aria-pressed={interactiveHelpActive} data-layerling-tool="interactive-help" data-help-exempt onClick={onInteractiveHelp}>
-            <CircleHelp className="toolbar-search-icon" aria-hidden="true" />
-          </button>
-        </div>
-      </div>
           </>
         ) : (
           <div className="sketch-toolbar-ribbon" aria-label={t("sketch.toolbar")}>
@@ -14367,6 +14349,53 @@ function SecondaryToolbar({
           </label>
         </div>
         <div className="toolbar-title-row-actions">
+          {/* Fork: Manage and Help sit in the title row, in line, so the tools stay on one row. */}
+          {toolbarMode === "geometry" ? (
+            <div className="title-row-tools">
+              <BambuSendButton />
+            <div className="toolbar-section toolbar-actions-section" data-group="manage">
+              <div className="toolbar-section-label">{t("editor.group.manage")}</div>
+              <div className="action-buttons">
+                <button
+                  className={`action-icon-button ${noteMode ? "active" : ""}`}
+                  aria-label={t("editor.tool.note")}
+                  aria-pressed={noteMode}
+                  title={`${t("editor.tool.note")} (${COMMAND_SHORTCUTS.note})`}
+                  onClick={onNoteTool}
+                  disabled={historyViewActive}
+                >
+                  <ToolbarNoteIcon />
+                </button>
+                <button className="action-icon-button" aria-label={t("editor.import")} title={`${t("editor.import")} (${COMMAND_SHORTCUTS.import})`} onClick={() => onTopPanel("import")} disabled={historyViewActive}>
+                  <ToolbarImportIcon />
+                </button>
+                <button className="action-icon-button" aria-label={t("editor.export")} title={`${t("editor.export")} (${COMMAND_SHORTCUTS.export})`} onClick={() => onTopPanel("export")}>
+                  <ToolbarVectorExportIcon />
+                </button>
+                <button className="action-icon-button" aria-label={t("editor.workspaceSettings")} title={t("editor.workspaceSettings")} onClick={() => window.dispatchEvent(new Event("layerling:open-workspace-settings"))}>
+                  <ToolbarSettingsIcon />
+                </button>
+              </div>
+            </div>
+            <div className="toolbar-section toolbar-actions-section" data-group="help">
+              <div className="toolbar-section-label">{t("editor.group.help")}</div>
+              <div className="action-buttons">
+                <button className="action-icon-button" aria-label={t("palette.open")} title={t("palette.open")} aria-haspopup="dialog" data-layerling-tool="command-search" onClick={openPalette}>
+                  <Search className="toolbar-search-icon" aria-hidden="true" />
+                </button>
+                <button className="action-icon-button" aria-label={t("editor.guide")} title={t("editor.guide")} onClick={onGuide}>
+                  <ToolbarGuideIcon />
+                </button>
+                <button className="action-icon-button" aria-label={t("editor.keyboardShortcuts")} title={t("editor.keyboardShortcuts")} onClick={onShortcuts}>
+                  <ToolbarKeyboardIcon />
+                </button>
+                <button className={`action-icon-button ${interactiveHelpActive ? "active" : ""}`} type="button" aria-label={t("interactiveHelp.title")} title={`${t("interactiveHelp.title")} (${COMMAND_SHORTCUTS["interactive-help"]})`} aria-pressed={interactiveHelpActive} data-layerling-tool="interactive-help" data-help-exempt onClick={onInteractiveHelp}>
+                  <CircleHelp className="toolbar-search-icon" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+            </div>
+          ) : null}
           <SimpleModeSwitch />
           <ThemeSwitch />
           <LanguageSwitch />

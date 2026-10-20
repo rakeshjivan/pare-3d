@@ -37,33 +37,45 @@
  * Manage and Help move up into the title row, so the tools stay on one row.
  * Combine, Modify and Arrange only show while something is selected.
  * ------------------------------------------------------------------------ */
-.secondary-toolbar .toolbar-actions-section[data-group="manage"],
-.secondary-toolbar .toolbar-actions-section[data-group="help"] {
-  position: absolute;
-  /* Positioned against the tools row, which starts under the title row. */
-  top: calc(var(--editor-toolbar-title-height) * -1);
-  z-index: 3;
-  height: var(--editor-toolbar-title-height);
-  margin: 0;
-  padding: 0;
+.title-row-tools {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+  min-width: 0;
+}
+.title-row-tools .toolbar-actions-section {
   display: flex;
   align-items: center;
-}
-.secondary-toolbar .toolbar-actions-section[data-group="manage"] { right: 470px; }
-.secondary-toolbar .toolbar-actions-section[data-group="help"] { right: 330px; }
-.secondary-toolbar .toolbar-actions-section .toolbar-section-label { display: none; }
-.secondary-toolbar .toolbar-actions-section .action-buttons {
-  height: 100%;
+  height: auto;
   margin: 0;
   padding: 0;
-  gap: 2px;
+  border: 0;
+  background: transparent;
+}
+.title-row-tools .toolbar-actions-section + .toolbar-actions-section {
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
+}
+.title-row-tools .toolbar-section-label { display: none; }
+.title-row-tools .action-buttons {
+  display: flex;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  gap: 0;
   align-items: center;
   border: 0;
   background: transparent;
 }
-.secondary-toolbar .toolbar-actions-section .action-icon-button {
-  transform: scale(0.82);
+.title-row-tools .action-icon-button {
+  width: 34px;
+  height: 34px;
+  min-width: 0;
+  padding: 5px;
 }
+.title-row-tools .action-icon-button svg { width: 22px; height: 22px; }
 
 .secondary-toolbar[data-selection="no"] .toolbar-section[data-group="combine"],
 .secondary-toolbar[data-selection="no"] .toolbar-section[data-group="modify"],
@@ -103,10 +115,7 @@
   pointer-events: none;
   box-shadow: 0 4px 12px rgba(20, 30, 45, 0.25);
 }
-.secondary-toolbar .action-icon-button[aria-label]:hover::after {
-  transform: translateX(-50%) scale(1.22);
-  transform-origin: top center;
-}
+
 
 /* ---------------------------------------------------------------------------
  * Fork: the Shapes panel docked down the right side while pinned.
@@ -288,3 +297,65 @@ html[data-theme="dark"] .empty-plate-hint { background: rgba(30, 30, 30, 0.92); 
 
 /* No hint over an open dialog. */
 html:has([aria-modal="true"]) .empty-plate-hint { display: none; }
+
+/* Fork: Send to Bambu Studio. */
+.bambu-send {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  margin-right: 8px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(20, 30, 45, 0.12);
+}
+.bambu-send button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #fff;
+  background: var(--primary);
+  border: 0;
+  font: 600 12.5px var(--font-ui);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bambu-send-main { padding: 6px 10px; border-radius: 8px 0 0 8px; }
+.bambu-send-format {
+  padding: 6px 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.35) !important;
+  border-radius: 0 8px 8px 0;
+  font-size: 11px !important;
+}
+.bambu-send button:hover { filter: brightness(1.08); }
+.bambu-send-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  width: 270px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(20, 30, 45, 0.18);
+}
+.bambu-send-menu button {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 8px 10px;
+  color: var(--foreground);
+  background: transparent;
+  border-radius: 7px;
+  text-align: left;
+  white-space: normal;
+}
+.bambu-send-menu button:hover { background: var(--subbar); filter: none; }
+.bambu-send-menu button[aria-checked="true"] strong { color: var(--primary); }
+.bambu-send-menu span { font-weight: 500; color: var(--muted-strong); font-size: 12px; }
+@media (max-width: 1240px) {
+  .bambu-send-main span { display: none; }
+}
+/* The open menu stays above status messages. */
+.secondary-toolbar:has(.bambu-send-menu) { z-index: 90; }

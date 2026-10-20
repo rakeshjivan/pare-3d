@@ -4641,8 +4641,16 @@ export function WorkplaneViewport({
       const controlsChanged = state.controls.update();
       fitCameraDepthRange(state.camera, state.controls.target);
       const cameraSettled = state.wasCameraMoving && !controlsChanged;
-      if (!controlsChanged && !state.needsRender && !cameraSettled) {
+      // Fork: draw at standard resolution while the view or a shape is moving, full sharpness once still.
+      const adapt = adaptiveResolution(state, state.renderer.domElement);
+      const wantLow = adapt.base > 1 && now - adapt.lastMotion < ADAPTIVE_SETTLE_MS;
+      const restorePending = adapt.low && !wantLow;
+      if (!controlsChanged && !state.needsRender && !cameraSettled && !restorePending) {
         return;
+      }
+      if (wantLow !== adapt.low) {
+        adapt.low = wantLow;
+        state.renderer.setPixelRatio(wantLow ? 1 : adapt.base);
       }
       constrainCamera(state, workspaceRef.current);
       // Future edits: keep this before any view cube or transform-overlay projection.
@@ -10249,7 +10257,9 @@ function rebuildWorkplane(
   state.renderer.shadowMap.enabled = view.showShadows;
   state.controls.enableDamping = view.cameraInertia;
   const pixelRatio = viewPixelRatio(workspace, window.devicePixelRatio);
-  if (state.renderer.getPixelRatio() !== pixelRatio) state.renderer.setPixelRatio(pixelRatio);
+  const adapt = adaptiveResolution(state, state.renderer.domElement);
+  adapt.base = pixelRatio;
+  if (!adapt.low && state.renderer.getPixelRatio() !== pixelRatio) state.renderer.setPixelRatio(pixelRatio);
   const lightLevels = sceneLightLevels(workspace.shadeContrast);
   state.lights.ambient.intensity = lightLevels.ambient;
   state.lights.key.intensity = lightLevels.key;
@@ -10646,6 +10656,47 @@ function createWorkplaneLabel(
   label.position.set(align === "right" ? -layout.lateralOffset : layout.lateralOffset, WORKPLANE_LINE_ELEVATION + 0.01, layout.depthOffset);
   label.renderOrder = 2;
   return label;
+}
+
+/**
+ * Fork: adaptive resolution. While the camera or a shape moves, the view is drawn at one pixel
+ * per screen point (as Fast mode does), and it goes back to full Retina sharpness
+ * ADAPTIVE_SETTLE_MS after the movement stops. Keyed by the viewport's state object.
+ */
+const ADAPTIVE_SETTLE_MS = 180;
+const adaptiveResolutionStates = new WeakMap<object, { base: number; low: boolean; lastMotion: number }>();
+/**
+ * Movement is read from the pointer and the wheel over the view: a drag with a button held
+ * (orbit, pan, moving a shape or a handle), a scroll or a pinch. A click alone changes nothing.
+ */
+function adaptiveResolution(state: object, canvas?: HTMLElement) {
+  let entry = adaptiveResolutionStates.get(state);
+  if (!entry) {
+    const base = typeof window === "undefined" ? 1 : Math.min(Math.max(1, window.devicePixelRatio || 1), 2);
+    const created = { base, low: false, lastMotion: -Infinity };
+    entry = created;
+    adaptiveResolutionStates.set(state, created);
+    if (canvas && typeof window !== "undefined") {
+      let held = false;
+      const mark = () => {
+        created.lastMotion = performance.now();
+      };
+      canvas.addEventListener("pointerdown", () => {
+        held = true;
+      });
+      window.addEventListener("pointerup", () => {
+        held = false;
+      });
+      window.addEventListener("pointercancel", () => {
+        held = false;
+      });
+      window.addEventListener("pointermove", (event) => {
+        if (held && event.buttons !== 0) mark();
+      });
+      canvas.addEventListener("wheel", mark, { passive: true });
+    }
+  }
+  return entry;
 }
 
 function createGridLines(
