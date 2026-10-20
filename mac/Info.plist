@@ -5,8 +5,8 @@
   <key>CFBundleName</key><string>Pare 3D</string>
   <key>CFBundleDisplayName</key><string>Pare 3D</string>
   <key>CFBundleIdentifier</key><string>app.parepdf.pare3d</string>
-  <key>CFBundleVersion</key><string>1.94.0</string>
-  <key>CFBundleShortVersionString</key><string>1.94.0</string>
+  <key>CFBundleVersion</key><string>1.95.0</string>
+  <key>CFBundleShortVersionString</key><string>1.95.0</string>
   <key>CFBundleExecutable</key><string>Pare3D</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
