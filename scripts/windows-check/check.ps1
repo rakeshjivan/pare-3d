@@ -3,7 +3,7 @@
 #   2. the updater downloads and unpacks an update (with Windows' own tar);
 #   3. "Pare 3D.exe" opens its window, starts the server, loads the app (checked through
 #      WebView2's debugging port) and stops the server when the window closes.
-param([string]$Dist = "dist", [string]$Out = "windows-check-output")
+param([string]$Dist = "dist", [string]$Out = "windows-check-output", [string]$Exe = "")
 $ErrorActionPreference = "Stop"
 # Any failure is reported as an annotation (readable from the run's summary), with where it happened.
 trap {
@@ -32,6 +32,7 @@ $Root = "C:\pare3d-check"
 Remove-Item -Recurse -Force $Root -ErrorAction SilentlyContinue
 Expand-Archive -Path (Join-Path $Dist "Pare-3D-Windows.zip") -DestinationPath $Root
 $App = Join-Path $Root "Pare 3D"
+if ($Exe) { Copy-Item -Force $Exe (Join-Path $App "Pare 3D.exe"); Write-Host "using the window program from $Exe" }
 Get-ChildItem $App | Format-Table Name, Length | Out-String | Write-Host
 foreach ($name in @("Pare 3D.exe", "bun.exe", "serve.mjs", "app\index.html", "app\pare-build.txt", "LICENSE.txt", "Pare 3D (browser).vbs")) {
   if (-not (Test-Path (Join-Path $App $name))) { throw "missing from the download: $name" }
@@ -92,7 +93,7 @@ if (-not $webview) {
   Start-Process -FilePath "$Root\webview2.exe" -ArgumentList "/silent /install" -Wait
 }
 Remove-Item Env:PORT
-$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9222"
+$env:PARE3D_DEBUG_PORT = "9222"
 $exe = Start-Process -FilePath (Join-Path $App "Pare 3D.exe") -WorkingDirectory $App -PassThru
 Wait-For "the app started its server" 90 { (Get-Text "http://127.0.0.1:47177/__pare3d") -eq "pare3d" }
 Wait-For "the window's debugging port is open" 60 { (Get-Text "http://127.0.0.1:9222/json/version") -ne $null }

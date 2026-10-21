@@ -40,9 +40,16 @@ jobs:
           npm init -y | Out-Null
           npm install --no-audit --no-fund playwright-core@1.48.2
           "PARE_CHECK_TOOLS=$tools" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      # The window program from this commit, so changes to it can be tried without a full rebuild.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build the window program
+        shell: pwsh
+        run: dotnet publish windows/Pare3D.csproj -c Release -o "$env:RUNNER_TEMP\winbuild"
       - name: Check the Windows app
         shell: pwsh
-        run: ./scripts/windows-check/check.ps1 -Dist dist -Out windows-check-output
+        run: ./scripts/windows-check/check.ps1 -Dist dist -Out windows-check-output -Exe "$env:RUNNER_TEMP\winbuild\Pare3D.exe"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

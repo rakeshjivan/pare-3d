@@ -143,7 +143,12 @@ sealed class MainForm : Form
         Log("--- native app starting");
         try
         {
-            var environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(DataDir, "WebView2"));
+            // Only for the automated Windows check: lets it look into the window through a debugging port.
+            var debugPort = Environment.GetEnvironmentVariable("PARE3D_DEBUG_PORT");
+            var options = int.TryParse(debugPort, out var parsedPort) && parsedPort > 1024
+                ? new CoreWebView2EnvironmentOptions($"--remote-debugging-port={parsedPort}")
+                : null;
+            var environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(DataDir, "WebView2"), options);
             await web.EnsureCoreWebView2Async(environment);
         }
         catch (Exception error)
