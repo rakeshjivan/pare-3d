@@ -3280,4 +3280,5 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "backupStrip.turnOff": "Turn off",
   "status.facePullHint": "Drag out to add material, in to cut a pocket. Shift: fine steps. Type a number for an exact depth, Esc to stop.",
   "status.facePullCancelled": "Push/pull stopped - nothing changed.",
+  "status.facePullAdjust": "Adjust the depth, corner radius or inset, or drag the face again. Create (or Enter) makes it; Esc puts it away.",
 };

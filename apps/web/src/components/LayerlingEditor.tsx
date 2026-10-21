@@ -304,6 +304,8 @@ type TopPanel = "import" | "export" | null;
 
 /** Die Befehle der Suche, die im Verlaufsblick wach bleiben: sie aendern nichts am Entwurf. */
 /** Fork (build 21): which library shapes are on show, so a new shape whose neighbour is missing still appears. */
+/** Fork (build 24): the face tool's live preview, which can be grabbed and dragged again. */
+const FACE_TOOL_PREVIEW_ID = "face-tool-preview";
 const libraryShapeIds: ReadonlySet<string> = new Set(libraryShapeAssets.map((shape) => shape.id));
 
 const HISTORY_VIEW_COMMANDS = new Set(["history", "export", "guide", "shortcuts"]);
@@ -8006,28 +8008,44 @@ export function LayerlingEditor({
     });
   }, []);
 
-  // The body or pocket is built by the CAD worker, so the preview follows the numbers a moment later.
+  // The body or pocket is built by the CAD worker. Fork (build 24): no waiting for the numbers to
+  // settle - each build starts as soon as the last one is done, with the newest numbers, so the
+  // preview keeps up with a drag as fast as the worker can.
+  const faceToolPreviewWantedRef = useRef<{ run: number; source: WorkplaneShape; face: PerforableFace; settings: FaceToolSettings } | null>(null);
+  const faceToolPreviewBusyRef = useRef(false);
+  const pumpFaceToolPreview = useCallback(() => {
+    if (faceToolPreviewBusyRef.current) return;
+    const wanted = faceToolPreviewWantedRef.current;
+    if (!wanted) return;
+    faceToolPreviewWantedRef.current = null;
+    faceToolPreviewBusyRef.current = true;
+    void faceToolBody(wanted.source, wanted.face, wanted.settings, { name: t("faceTool.bodyName"), color: wanted.source.color, id: FACE_TOOL_PREVIEW_ID })
+      .then((shape) => {
+        if (faceToolPreviewRunRef.current >= wanted.run) setFaceToolPreview({ shape, empty: !shape });
+      })
+      .catch(() => {
+        // A build that failed is not an empty face: Create stays and says what went wrong.
+        if (faceToolPreviewRunRef.current === wanted.run) setFaceToolPreview(null);
+      })
+      .finally(() => {
+        faceToolPreviewBusyRef.current = false;
+        // A newer request that came in meanwhile is built next; one that was put away shows nothing.
+        if (faceToolPreviewWantedRef.current) pumpFaceToolPreview();
+        else if (!faceToolRef.current?.face) setFaceToolPreview(null);
+      });
+  }, []);
   useEffect(() => {
     const run = ++faceToolPreviewRunRef.current;
     const face = faceTool?.face;
     const source = faceTool ? shapesRef.current.find((shape) => shape.id === faceTool.sourceId) : null;
     if (!face || !faceTool || !source) {
+      faceToolPreviewWantedRef.current = null;
       setFaceToolPreview(null);
       return;
     }
-    const settings = faceTool.settings;
-    const timer = window.setTimeout(() => {
-      void faceToolBody(source, face, settings, { name: t("faceTool.bodyName"), color: source.color, id: "face-tool-preview" })
-        .then((shape) => {
-          if (faceToolPreviewRunRef.current === run) setFaceToolPreview({ shape, empty: !shape });
-        })
-        .catch(() => {
-          // A build that failed is not an empty face: Create stays and says what went wrong.
-          if (faceToolPreviewRunRef.current === run) setFaceToolPreview(null);
-        });
-    }, 120);
-    return () => window.clearTimeout(timer);
-  }, [faceTool?.face, faceTool?.settings, faceTool?.sourceId]);
+    faceToolPreviewWantedRef.current = { run, source, face, settings: faceTool.settings };
+    pumpFaceToolPreview();
+  }, [faceTool?.face, faceTool?.settings, faceTool?.sourceId, pumpFaceToolPreview]);
 
   const applyFaceTool = useCallback(async (override?: NonNullable<typeof faceTool>) => {
     const tool = override ?? faceTool;
@@ -8078,9 +8096,18 @@ export function LayerlingEditor({
   const faceToolRef = useRef(faceTool);
   faceToolRef.current = faceTool;
   const facePullBeforeRef = useRef<NonNullable<typeof faceTool> | null>(null);
+  // Fork (build 24): grabbing the preview again carries on from its depth, like Fusion's arrow.
+  const facePullBaseRef = useRef(0);
   const startFacePull = useCallback((pick: LayFlatPick): boolean => {
     const tool = faceToolRef.current;
     if (!tool || tool.busy) return false;
+    if (pick.shapeId === FACE_TOOL_PREVIEW_ID && tool.face) {
+      facePullBeforeRef.current = tool;
+      facePullBaseRef.current = tool.settings.direction === "in" ? -tool.settings.depth : tool.settings.depth;
+      setNotice(t("status.facePullHint"));
+      return true;
+    }
+    facePullBaseRef.current = 0;
     const source = shapesRef.current.find((shape) => shape.id === tool.sourceId);
     if (!source || pick.shapeId !== source.id) {
       setNotice(t("status.faceToolMissed"));
@@ -8098,27 +8125,52 @@ export function LayerlingEditor({
     setNotice(t("status.facePullHint"));
     return true;
   }, []);
-  const dragFacePull = useCallback((distance: number) => {
+  const dragFacePull = useCallback((distance: number, exact = false) => {
     const tool = faceToolRef.current;
     if (!tool?.face) return;
-    const settings = faceToolSettingsOn(tool.face, normalizeFaceTool({ ...tool.settings, ...pullToFaceTool(distance, FACE_TOOL_MIN_DEPTH) }));
+    const signed = exact ? distance : facePullBaseRef.current + distance;
+    const settings = faceToolSettingsOn(tool.face, normalizeFaceTool({ ...tool.settings, ...pullToFaceTool(signed, FACE_TOOL_MIN_DEPTH) }));
     const next = { ...tool, settings };
     faceToolRef.current = next;
     setFaceTool(next);
   }, []);
-  const endFacePull = useCallback((distance: number | null) => {
+  const endFacePull = useCallback((distance: number | null, exact = false) => {
     const tool = faceToolRef.current;
     facePullBeforeRef.current = null;
     if (!tool?.face) return;
     // A press without a drag only picks the face: the panel takes it from there.
     if (distance === null) {
+      facePullBaseRef.current = 0;
       setNotice(t("status.faceToolReady"));
       return;
     }
-    const settings = faceToolSettingsOn(tool.face, normalizeFaceTool({ ...tool.settings, ...pullToFaceTool(distance, FACE_TOOL_MIN_DEPTH) }));
-    void applyFaceTool({ ...tool, settings });
-  }, [applyFaceTool]);
+    // Fork (build 24): letting go keeps the new part as a live preview, like Fusion: the depth,
+    // corner radius and inset still change it, the face can be dragged again, and Create (or
+    // Enter) makes it. Esc puts it away.
+    const signed = exact ? distance : facePullBaseRef.current + distance;
+    const settings = faceToolSettingsOn(tool.face, normalizeFaceTool({ ...tool.settings, ...pullToFaceTool(signed, FACE_TOOL_MIN_DEPTH) }));
+    facePullBaseRef.current = 0;
+    const next = { ...tool, settings };
+    faceToolRef.current = next;
+    setFaceTool(next);
+    setNotice(t("status.facePullAdjust"));
+  }, []);
+  useEffect(() => {
+    if (faceTool?.step !== "ready" || faceTool.busy) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      // Typing in a field of the panel keeps Enter for that field.
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void applyFaceTool();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [applyFaceTool, faceTool?.busy, faceTool?.step]);
   const cancelFacePull = useCallback(() => {
+    facePullBaseRef.current = 0;
     const before = facePullBeforeRef.current;
     facePullBeforeRef.current = null;
     if (before) {
@@ -13041,7 +13093,7 @@ export function LayerlingEditor({
               : faceTool && !faceTool.busy
                 ? { shapeIds: [faceTool.sourceId] }
                 : null}
-          facePull={faceTool && !faceTool.busy && !mateTool && !holePatternTool ? { shapeId: faceTool.sourceId } : null}
+          facePull={faceTool && !faceTool.busy && !mateTool && !holePatternTool ? { shapeIds: [faceTool.sourceId, FACE_TOOL_PREVIEW_ID] } : null}
           onFacePullStart={startFacePull}
           onFacePullDrag={dragFacePull}
           onFacePullEnd={endFacePull}

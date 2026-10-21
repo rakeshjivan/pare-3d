@@ -455,10 +455,11 @@ type WorkplaneViewportProps = {
    * out (positive) or pushes it in (negative) along its normal, snapped to the grid (Shift: finely).
    * Typing a number sets the depth; Enter takes it, Esc gives up. A press without a drag is a pick.
    */
-  facePull?: { shapeId: string } | null;
+  facePull?: { shapeIds: string[] } | null;
   onFacePullStart?: (pick: LayFlatPick) => boolean;
-  onFacePullDrag?: (distance: number) => void;
-  onFacePullEnd?: (distance: number | null) => void;
+  /** `exact` when the number was typed: it is the depth itself, not a change from where the drag began. */
+  onFacePullDrag?: (distance: number, exact?: boolean) => void;
+  onFacePullEnd?: (distance: number | null, exact?: boolean) => void;
   onFacePullCancel?: () => void;
   /** "Delete face" waiting for clicks on faces of the prepared body; a click toggles the face. */
   cadFacePick?: CadFacePick | null;
@@ -7279,7 +7280,7 @@ export function WorkplaneViewport({
     const target = facePullRef.current;
     const callbacks = facePullCallbacksRef.current;
     const pick = pickLayFlatFace(state, event.clientX, event.clientY);
-    if (!target || !pick || pick.shapeId !== target.shapeId) {
+    if (!target || !pick || !target.shapeIds.includes(pick.shapeId)) {
       onMateFacePick?.(pick);
       return;
     }
@@ -7350,7 +7351,7 @@ export function WorkplaneViewport({
       if (upEvent.pointerId !== pointerId) return;
       stop();
       const typedValue = typedPull(typed);
-      if (typedValue !== null) callbacks.onFacePullEnd?.(typedValue);
+      if (typedValue !== null) callbacks.onFacePullEnd?.(typedValue, true);
       else callbacks.onFacePullEnd?.(moved && distance !== 0 ? distance : null);
     };
     const cancel = (cancelEvent: PointerEvent) => {
@@ -7372,7 +7373,7 @@ export function WorkplaneViewport({
         keyEvent.preventDefault();
         keyEvent.stopPropagation();
         stop();
-        callbacks.onFacePullEnd?.(typedValue);
+        callbacks.onFacePullEnd?.(typedValue, true);
         return;
       }
       if (keyEvent.key === "Shift") {
@@ -7386,7 +7387,7 @@ export function WorkplaneViewport({
         // A number typed without a sign keeps the way the drag was going: in stays in.
         typed = !typed && keyEvent.key !== "-" && distance < 0 ? `-${keyEvent.key}` : typed + keyEvent.key;
         const typedValue = typedPull(typed);
-        if (typedValue !== null) callbacks.onFacePullDrag?.(typedValue);
+        if (typedValue !== null) callbacks.onFacePullDrag?.(typedValue, true);
         show();
         return;
       }
@@ -7395,7 +7396,8 @@ export function WorkplaneViewport({
         keyEvent.stopPropagation();
         typed = typed.slice(0, -1);
         const typedValue = typedPull(typed);
-        callbacks.onFacePullDrag?.(typedValue ?? distance);
+        if (typedValue !== null) callbacks.onFacePullDrag?.(typedValue, true);
+        else callbacks.onFacePullDrag?.(distance);
         show();
       }
     };

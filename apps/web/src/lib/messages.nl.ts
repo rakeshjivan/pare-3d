@@ -3302,4 +3302,5 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "backupStrip.turnOff": "Uitzetten",
   "status.facePullHint": "Naar buiten slepen voegt materiaal toe, naar binnen snijdt een uitsparing. Shift: fijne stappen. Typ een getal voor een exacte diepte, Esc stopt.",
   "status.facePullCancelled": "Duwen/trekken gestopt - niets veranderd.",
+  "status.facePullAdjust": "Pas de diepte, hoekradius of inspringing aan, of sleep het vlak opnieuw. Maken (of Enter) bevestigt; Esc annuleert.",
 };

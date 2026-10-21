@@ -3278,4 +3278,5 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "backupStrip.turnOff": "Désactiver",
   "status.facePullHint": "Tirez vers l'extérieur pour ajouter de la matière, vers l'intérieur pour creuser une poche. Maj : pas fins. Tapez un nombre pour une profondeur exacte, Échap pour arrêter.",
   "status.facePullCancelled": "Pousser/tirer arrêté - rien n'a changé.",
+  "status.facePullAdjust": "Ajustez la profondeur, le rayon des coins ou le retrait, ou tirez de nouveau la face. Créer (ou Entrée) valide ; Échap annule.",
 };

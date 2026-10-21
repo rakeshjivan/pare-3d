@@ -3302,4 +3302,5 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "backupStrip.turnOff": "Ausschalten",
   "status.facePullHint": "Nach außen ziehen fügt Material hinzu, nach innen schneidet eine Tasche. Umschalt: feine Schritte. Zahl tippen für eine genaue Tiefe, Esc bricht ab.",
   "status.facePullCancelled": "Drücken/Ziehen abgebrochen - nichts geändert.",
+  "status.facePullAdjust": "Tiefe, Eckenradius oder Abstand anpassen oder die Fläche erneut ziehen. Erstellen (oder Enter) übernimmt es; Esc verwirft es.",
 };
