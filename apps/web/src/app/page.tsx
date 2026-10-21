@@ -647,7 +647,7 @@ const newestRequestedRevision = new Map<string, number>();
 /** Fork (build 20): tells the editor's "Saved" line when a save starts, ends or fails. */
 let pendingSaves = 0;
 function announceSaveState(state: "saving" | "saved" | "error") {
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(SAVE_STATE_EVENT, { detail: state }));
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") window.dispatchEvent(new CustomEvent(SAVE_STATE_EVENT, { detail: state }));
 }
 function saveProjectShapesWhenIdle(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext): Promise<ProjectShapesSaveResult | void> {
   pendingSaves += 1;

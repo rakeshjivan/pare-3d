@@ -8,7 +8,8 @@ export type BusyKind = "combine" | "cad" | "export";
 const active = new Map<BusyKind, number>();
 
 function announce() {
-  if (typeof window === "undefined") return;
+  // Also used where there is no full browser (tests, workers): then there is nothing to tell.
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function" || typeof CustomEvent !== "function") return;
   const kinds = [...active.entries()].filter(([, count]) => count > 0).map(([kind]) => kind);
   window.dispatchEvent(new CustomEvent(BUSY_EVENT, { detail: kinds }));
 }
