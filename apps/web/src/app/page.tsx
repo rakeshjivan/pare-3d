@@ -3537,7 +3537,14 @@ function Dashboard({
                   </span>
                   <span>{t("dashboard.createDesign")}</span>
                 </button>
-                <button className="dashboard-action-tile" type="button" onClick={onWorkspace}>
+                {/* Fork: nothing to continue on a first visit - the tile says so instead of opening an empty plate. */}
+                <button
+                  className="dashboard-action-tile"
+                  type="button"
+                  onClick={onWorkspace}
+                  disabled={projects.length === 0}
+                  title={projects.length === 0 ? t("dashboard.noDesignYet") : undefined}
+                >
                   <span className="dashboard-action-icon">
                     <Clock3 size={24} strokeWidth={2.4} />
                   </span>

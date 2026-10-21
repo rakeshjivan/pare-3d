@@ -25,7 +25,7 @@ export const MESSAGES_EN = {
   "bambu.downloaded": "Downloaded {name}. A browser cannot open Bambu Studio by itself, so open the file there; the Pare 3D app sends it straight in.",
 
   "aria.originDimensions": "Distances to origin",
-  "originDimension.hint": "Distance from the plate's origin (you can turn this off in Settings)",
+  "originDimension.hint": "Distance from the plate's origin (turn on or off in Settings)",
   "aria.moveDimensions": "Movement dimensions",
   "aria.axisMovement": "{axis} movement",
   "aria.tapeMeasurements": "Tape measurements",
@@ -92,7 +92,7 @@ export const MESSAGES_EN = {
   "tabs.sameProject": "This design is open in another tab as well. Both save automatically and overwrite each other – keep working in just one of them.",
   "tabs.reload": "Reload",
   "dashboard.updateDismiss": "Dismiss update notice",
-  "dashboard.importGeometry": "Open a design or import geometry",
+  "dashboard.importGeometry": "Open or import",
   "dashboard.continueWorkplane": "Continue last design",
   "dashboard.sharedProjects": "On the server",
   "dashboard.projects": "Designs",
@@ -943,7 +943,7 @@ export const MESSAGES_EN = {
   "status.holePatternTooMany": "That would be too many holes for one pattern.",
   "status.holePatternNone": "No hole fits on the face.",
   "status.holePatternCreated": "Hole pattern created: {count} holes, grouped with the body",
-  "faceTool.title": "Face",
+  "faceTool.title": "Push/pull face",
   "faceTool.subtitle": "Push a flat face out or in",
   "faceTool.cancel": "Close face tool",
   "faceTool.step.pick": "Click a flat face of the body.",
@@ -1497,7 +1497,7 @@ export const MESSAGES_EN = {
   "inspector.gearPairFitApply": "Fit module of both",
   "inspector.gearPairFitHint": "Resizes both gears to this module, so they mesh where they stand. Teeth, height and centre hole stay.",
   "status.gearPairFitted": "Both gears set to module {module}.",
-  "inspector.selectionHint": "Colour, solid or hole and locking apply to every selected part. Sizes are changed on a single part, with the handles or with Scale by percent (right-click).",
+  "inspector.selectionHint": "Colour, solid or hole and locking apply to every selected part. Drag the handles to resize them all together, or use Scale by percent (right-click). Click one part to type its exact sizes.",
   "inspector.shapeMode": "Shape mode",
   "inspector.solid": "Solid",
   "inspector.hole": "Hole",
@@ -3122,6 +3122,8 @@ export const MESSAGES_EN = {
   "settings.advanced": "Advanced",
   "settings.showAdvanced": "Show advanced settings",
   "settings.advancedHint": "Most people never need these. They stay as they are when hidden.",
+  "export.lyl.label": "Pare 3D design (.lyl)",
+  "dashboard.noDesignYet": "No design yet - create one or start from an example",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

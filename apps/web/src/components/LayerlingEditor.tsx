@@ -129,6 +129,7 @@ import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootpr
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
 import { ReadyPartsSection } from "./ReadyPartsSection";
 import { HelpMenu } from "./HelpMenu";
+import { InstantTips } from "./InstantTips";
 import { MessageSquareText } from "lucide-react";
 import { PareBuildBadge } from "./PareVersionStatus";
 import { LithophanePanel, sampleImage, type LithophaneImage } from "./workplane/LithophanePanel";
@@ -14800,18 +14801,19 @@ function SecondaryToolbar({
                   aria-label={t("editor.tool.note")}
                   aria-pressed={noteMode}
                   title={`${t("editor.tool.note")} (${COMMAND_SHORTCUTS.note})`}
+                  data-tip={topTip(t("editor.tool.note"), "pin a note to a spot on the design", COMMAND_SHORTCUTS.note)}
                   onClick={onNoteTool}
                   disabled={historyViewActive}
                 >
                   <MessageSquareText className="title-icon" aria-hidden="true" />
                 </button>
-                <button className="action-icon-button" aria-label={t("editor.import")} title={`${t("editor.import")} (${COMMAND_SHORTCUTS.import})`} onClick={() => onTopPanel("import")} disabled={historyViewActive}>
+                <button className="action-icon-button" aria-label={t("editor.import")} title={`${t("editor.import")} (${COMMAND_SHORTCUTS.import})`} data-tip={topTip(t("editor.import"), "bring in STL, 3MF, STEP, SVG or images", COMMAND_SHORTCUTS.import)} onClick={() => onTopPanel("import")} disabled={historyViewActive}>
                   <Import className="title-icon" aria-hidden="true" />
                 </button>
-                <button className="action-icon-button" aria-label={t("editor.export")} title={`${t("editor.export")} (${COMMAND_SHORTCUTS.export})`} onClick={() => onTopPanel("export")}>
+                <button className="action-icon-button" aria-label={t("editor.export")} title={`${t("editor.export")} (${COMMAND_SHORTCUTS.export})`} data-tip={topTip(t("editor.export"), "save for printing (STL, 3MF) or as a design file", COMMAND_SHORTCUTS.export)} onClick={() => onTopPanel("export")}>
                   <Upload className="title-icon" aria-hidden="true" />
                 </button>
-                <button className="action-icon-button" aria-label={t("editor.workspaceSettings")} title={t("editor.workspaceSettings")} onClick={() => window.dispatchEvent(new Event("layerling:open-workspace-settings"))}>
+                <button className="action-icon-button" aria-label={t("editor.workspaceSettings")} title={t("editor.workspaceSettings")} data-tip={topTip(t("editor.workspaceSettings"), "units, grid, plate and appearance")} onClick={() => window.dispatchEvent(new Event("layerling:open-workspace-settings"))}>
                   <LucideSettings className="title-icon" aria-hidden="true" />
                 </button>
               </div>
@@ -14829,12 +14831,19 @@ function SecondaryToolbar({
             </div>
           ) : null}
           <SimpleModeSwitch />
+          <InstantTips />
           <ThemeSwitch />
           <LanguageSwitch />
         </div>
       </div>
     </div>
   );
+}
+
+/** Fork: a top-bar button's instant tip - its name, a few plain words (English) and its shortcut. */
+function topTip(label: string, hintEn: string, keys?: string) {
+  const hint = getLanguage() === "en" ? ` – ${hintEn}` : "";
+  return `${label}${hint}${keys ? ` (${keys})` : ""}`;
 }
 
 function TopActionPanel({
@@ -15036,7 +15045,8 @@ function TopActionPanel({
       note: t("export.png.note"),
     },
     lyl: {
-      label: "LYL",
+      // Fork: named for what it is, not its file ending.
+      label: t("export.lyl.label"),
       description: t("export.lyl.description"),
       note: t("export.lyl.note"),
     },

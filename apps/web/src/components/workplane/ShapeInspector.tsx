@@ -2674,12 +2674,9 @@ export function ShapeInspector({
           onInteractionActiveChange={onInteractionActiveChange}
         />
       ) : null}
-      {shape.kind === "text" && onLayerText ? <MakeLayersButton disabled={locked} onLayerText={onLayerText} /> : null}
       {qrCode ? <QrCodeCard key={`qr-code-${shape.id}`} shapeId={shape.id} controls={qrCode} disabled={locked} /> : null}
       {iconTag?.isTag ? (
         <IconTagCard key={`icon-tag-${shape.id}`} shapeId={shape.id} controls={iconTag} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
-      ) : iconTag ? (
-        <MakeIconLayersButton disabled={locked} onLayer={iconTag.onLayer} />
       ) : null}
       {shape.groupOperation === "bundle" ? (
         <p className="inspector-bundle-note">{t(nameTagStack || iconTag?.isTag ? "nameTag.bundleNote" : "inspector.bundleNote")}</p>
@@ -3091,6 +3088,9 @@ export function ShapeInspector({
           ) : null}
         </div>
       ) : null}
+      {/* Fork: "Make layers" (a multicolour tag from text or an outline) is an extra, so it waits below the sizes. */}
+      {shape.kind === "text" && onLayerText ? <MakeLayersButton disabled={locked} onLayerText={onLayerText} /> : null}
+      {iconTag && !iconTag.isTag ? <MakeIconLayersButton disabled={locked} onLayer={iconTag.onLayer} /> : null}
       {/* Fork: Print fit for holes, mouse ears for solids - folded away under the sizes (build 15). */}
       {shape.hole && shape.groupOperation !== "bundle" ? (
         <PrintHelpers><PrintFitCard shape={shape} locked={locked} onUpdate={(patch) => onUpdate(patch)} /></PrintHelpers>

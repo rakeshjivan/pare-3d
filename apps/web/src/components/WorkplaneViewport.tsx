@@ -591,9 +591,11 @@ function patchWithKeptProportions(
 
 function readOriginDimensionsEnabled() {
   if (typeof window === "undefined") {
-    return true;
+    return false;
   }
-  return window.localStorage.getItem(ORIGIN_DIMENSIONS_ENABLED_STORAGE_KEY) !== "false";
+  // Fork: off unless turned on in Settings - a bare distance on every selected part puzzled
+  // newcomers (as in Tinkercad, which has none).
+  return window.localStorage.getItem(ORIGIN_DIMENSIONS_ENABLED_STORAGE_KEY) === "true";
 }
 
 function readStartInPerspective() {
@@ -3481,7 +3483,7 @@ export function WorkplaneViewport({
   const [moveDimensionOverlay, setMoveDimensionOverlay] = useState<MoveDimensionOverlayState | null>(null);
   const [moveDimensionsEnabled, setMoveDimensionsEnabled] = useState(true);
   const [originDimensionOverlay, setOriginDimensionOverlay] = useState<OriginDimensionOverlayData | null>(null);
-  const [originDimensionsEnabled, setOriginDimensionsEnabled] = useState(true);
+  const [originDimensionsEnabled, setOriginDimensionsEnabled] = useState(false);
   const [startInPerspective, setStartInPerspective] = useState(true);
   const [sectionViewOpen, setSectionViewOpen] = useState(false);
   const [sectionSettings, setSectionSettings] = useState<SectionPlaneSettings>(DEFAULT_SECTION_SETTINGS);
@@ -3553,7 +3555,7 @@ export function WorkplaneViewport({
   const moveDimensionOverlayRef = useRef<MoveDimensionOverlayState | null>(null);
   const moveDimensionsEnabledRef = useRef(true);
   const originDimensionOverlayRef = useRef<OriginDimensionOverlayData | null>(null);
-  const originDimensionsEnabledRef = useRef(true);
+  const originDimensionsEnabledRef = useRef(false);
   const marqueeRef = useRef<MarqueeState | null>(null);
   const transformRef = useRef<TransformDragState | null>(null);
   const lastResizeAnchorRef = useRef<ResizeAnchorMemory | null>(null);
