@@ -3,6 +3,11 @@
 // Screenshots go to the folder given as the first argument.
 import { chromium } from "playwright-core";
 
+process.on("unhandledRejection", (error) => {
+  console.log(`::error::App window check: ${error instanceof Error ? error.message : error}`);
+  process.exit(1);
+});
+
 const out = process.argv[2] || ".";
 const browser = await chromium.connectOverCDP("http://127.0.0.1:9222", { timeout: 60000 });
 const context = browser.contexts()[0];
@@ -19,7 +24,7 @@ console.log("app page:", page.url());
 await page.waitForSelector(".dashboard-actions-band", { timeout: 120000 });
 await page.screenshot({ path: `${out}/windows-home.png` });
 const build = await page.locator(".pare-build-badge, [class*=build-badge]").first().textContent().catch(() => "");
-console.log("build badge:", build);
+console.log(`::notice::Windows app shows \"${(build || "").trim()}\"`);
 await page.locator('[data-starter="box"]').click();
 await page.waitForSelector(".toolbar-section", { timeout: 120000 });
 await page.waitForTimeout(6000);

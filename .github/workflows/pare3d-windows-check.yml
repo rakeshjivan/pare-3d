@@ -1,0 +1,47 @@
+# Runs only the Windows check, on the downloads built by an earlier "Pare 3D release" run -
+# for trying fixes to the check (or the Windows app's scripts) without a full rebuild.
+name: Pare 3D Windows check
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: The "Pare 3D release" run whose downloads to check
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  windows-check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+      - uses: actions/download-artifact@v4
+        with:
+          name: downloads
+          path: dist
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Tools for driving the app window
+        shell: pwsh
+        run: |
+          $tools = Join-Path $env:RUNNER_TEMP "windows-check-tools"
+          New-Item -ItemType Directory -Force -Path $tools | Out-Null
+          Copy-Item scripts/windows-check/cdp-check.mjs $tools
+          Set-Location $tools
+          npm init -y | Out-Null
+          npm install --no-audit --no-fund playwright-core@1.48.2
+          "PARE_CHECK_TOOLS=$tools" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Check the Windows app
+        shell: pwsh
+        run: ./scripts/windows-check/check.ps1 -Dist dist -Out windows-check-output
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-check
+          path: windows-check-output/

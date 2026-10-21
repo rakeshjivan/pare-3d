@@ -67,8 +67,16 @@ jobs:
           name: downloads
           path: dist
       - name: Tools for driving the app window
-        working-directory: scripts/windows-check
-        run: npm install --no-save --no-package-lock playwright-core@1.48.2
+        # Outside the repository, so npm does not try to install the whole project.
+        shell: pwsh
+        run: |
+          $tools = Join-Path $env:RUNNER_TEMP "windows-check-tools"
+          New-Item -ItemType Directory -Force -Path $tools | Out-Null
+          Copy-Item scripts/windows-check/cdp-check.mjs $tools
+          Set-Location $tools
+          npm init -y | Out-Null
+          npm install --no-audit --no-fund playwright-core@1.48.2
+          "PARE_CHECK_TOOLS=$tools" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Check the Windows app
         shell: pwsh
         run: ./scripts/windows-check/check.ps1 -Dist dist -Out windows-check-output

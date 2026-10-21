@@ -5,6 +5,14 @@
 #      WebView2's debugging port) and stops the server when the window closes.
 param([string]$Dist = "dist", [string]$Out = "windows-check-output")
 $ErrorActionPreference = "Stop"
+# Any failure is reported as an annotation (readable from the run's summary), with where it happened.
+trap {
+  $where = $_.InvocationInfo.ScriptLineNumber
+  Write-Host "::error::Windows check failed at line ${where}: $($_.Exception.Message)"
+  $log = Join-Path $env:LOCALAPPDATA "Pare 3D\launcher.log"
+  if (Test-Path $log) { Write-Host "::warning::launcher.log: $((Get-Content $log -Tail 8) -join ' | ')" }
+  exit 1
+}
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 $Out = (Resolve-Path $Out).Path
 $Dist = (Resolve-Path $Dist).Path
@@ -49,7 +57,7 @@ if ($wasm) {
   Write-Host "ok: wasm served as application/wasm"
 }
 Stop-Process -Id $server.Id -Force
-Write-Host "PASS 1: the server serves the app"
+Write-Host "::notice::PASS 1: the server serves the app"
 
 # 2. The updater: the installed copy pretends to be build 1, a stand-in for GitHub offers this build.
 $OldApp = Join-Path $Root "old"
@@ -74,7 +82,7 @@ Stop-Process -Id $old.Id -Force
 Stop-Process -Id $fake.Id -Force
 Remove-Item Env:PARE3D_RELEASES_API, Env:PARE3D_TEST_ORIGIN
 $env:LOCALAPPDATA = $env:LOCALAPPDATA_SAVED
-Write-Host "PASS 2: the updater works on Windows"
+Write-Host "::notice::PASS 2: the updater works on Windows"
 
 # 3. The real app window.
 $webview = Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" -ErrorAction SilentlyContinue
@@ -88,7 +96,8 @@ $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9222"
 $exe = Start-Process -FilePath (Join-Path $App "Pare 3D.exe") -WorkingDirectory $App -PassThru
 Wait-For "the app started its server" 90 { (Get-Text "http://127.0.0.1:47177/__pare3d") -eq "pare3d" }
 Wait-For "the window's debugging port is open" 60 { (Get-Text "http://127.0.0.1:9222/json/version") -ne $null }
-node "$PSScriptRoot\cdp-check.mjs" $Out
+$tools = if ($env:PARE_CHECK_TOOLS) { $env:PARE_CHECK_TOOLS } else { $PSScriptRoot }
+node (Join-Path $tools "cdp-check.mjs") $Out
 if ($LASTEXITCODE -ne 0) { throw "the app window check failed" }
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
@@ -98,7 +107,7 @@ $bitmap.Save((Join-Path $Out "windows-desktop.png"))
 $null = $exe.CloseMainWindow()
 Wait-For "the window closed" 30 { $exe.HasExited }
 Wait-For "the server stopped with it" 15 { (Get-Text "http://127.0.0.1:47177/__pare3d") -eq $null }
-Write-Host "PASS 3: the app window opens Pare 3D and closes cleanly"
+Write-Host "::notice::PASS 3: the app window opens Pare 3D and closes cleanly"
 $log = Join-Path $env:LOCALAPPDATA "Pare 3D\launcher.log"
 if (Test-Path $log) { Copy-Item $log $Out }
-Write-Host "All Windows checks passed for build $Build"
+Write-Host "::notice::All Windows checks passed for build $Build"
