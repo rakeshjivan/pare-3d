@@ -94,7 +94,7 @@ if (-not $webview) {
 }
 Remove-Item Env:PORT
 $env:PARE3D_DEBUG_PORT = "9222"
-$exe = Start-Process -FilePath (Join-Path $App "Pare 3D.exe") -WorkingDirectory $App -PassThru
+$appProcess = Start-Process -FilePath (Join-Path $App "Pare 3D.exe") -WorkingDirectory $App -PassThru
 Wait-For "the app started its server" 90 { (Get-Text "http://127.0.0.1:47177/__pare3d") -eq "pare3d" }
 Wait-For "the window's debugging port is open" 60 { (Get-Text "http://127.0.0.1:9222/json/version") -ne $null }
 $tools = if ($env:PARE_CHECK_TOOLS) { $env:PARE_CHECK_TOOLS } else { $PSScriptRoot }
@@ -105,8 +105,8 @@ $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
 [System.Drawing.Graphics]::FromImage($bitmap).CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
 $bitmap.Save((Join-Path $Out "windows-desktop.png"))
-$null = $exe.CloseMainWindow()
-Wait-For "the window closed" 30 { $exe.HasExited }
+$null = $appProcess.CloseMainWindow()
+Wait-For "the window closed" 30 { $appProcess.HasExited }
 Wait-For "the server stopped with it" 15 { (Get-Text "http://127.0.0.1:47177/__pare3d") -eq $null }
 Write-Host "::notice::PASS 3: the app window opens Pare 3D and closes cleanly"
 $log = Join-Path $env:LOCALAPPDATA "Pare 3D\launcher.log"
