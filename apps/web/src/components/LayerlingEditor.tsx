@@ -177,7 +177,7 @@ import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, tra
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
-import { FORK_SHORT_LABELS_EN, FORK_TOOL_ICONS, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
+import { FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
 import { BookOpen, Import, Keyboard, Settings as LucideSettings, StickyNote, Upload } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
@@ -14052,7 +14052,7 @@ function SecondaryToolbar({
         data-layerling-tool={id}
         aria-label={label}
         // Fork (build 16): the name and shortcut show at once on hover (fork.css), even on a greyed-out tool.
-        data-tip={COMMAND_SHORTCUTS[id] ? `${label} (${COMMAND_SHORTCUTS[id]})` : label}
+        data-tip={`${label}${getLanguage() === "en" && FORK_TOOL_HINTS_EN[id] ? ` – ${FORK_TOOL_HINTS_EN[id]}` : ""}${COMMAND_SHORTCUTS[id] ? ` (${COMMAND_SHORTCUTS[id]})` : ""}`}
         onClick={action}
         disabled={!enabled}
       >

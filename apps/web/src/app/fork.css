@@ -844,7 +844,7 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 
 /* Build 16: the hover name carries the shortcut, and greyed-out tools still say what they are
    (a click on them still does nothing - the button stays disabled). */
-.secondary-toolbar .toolbar-icon[data-tip]:hover::after { content: attr(data-tip); }
+.secondary-toolbar .toolbar-icon[data-tip]:hover::after { content: attr(data-tip); white-space: normal; width: max-content; max-width: 230px; text-align: center; }
 .secondary-toolbar .toolbar-icon:disabled { pointer-events: auto; cursor: default; }
 .secondary-toolbar .toolbar-icon:disabled:hover { background: transparent; }
 
