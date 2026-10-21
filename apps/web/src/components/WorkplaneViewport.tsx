@@ -456,8 +456,9 @@ type WorkplaneViewportProps = {
    * Typing a number sets the depth; Enter takes it, Esc gives up. A press without a drag is a pick.
    */
   facePull?: { shapeIds: string[] } | null;
-  onFacePullStart?: (pick: LayFlatPick) => boolean;
-  /** `exact` when the number was typed: it is the depth itself, not a change from where the drag began. */
+  /** False refuses the press; a number is the depth the face already stands at (grabbing the preview again). */
+  onFacePullStart?: (pick: LayFlatPick) => boolean | number;
+  /** The whole depth: out positive, in negative (typed or dragged). */
   onFacePullDrag?: (distance: number, exact?: boolean) => void;
   onFacePullEnd?: (distance: number | null, exact?: boolean) => void;
   onFacePullCancel?: () => void;
@@ -7284,7 +7285,10 @@ export function WorkplaneViewport({
       onMateFacePick?.(pick);
       return;
     }
-    if (!callbacks.onFacePullStart?.(pick)) return;
+    const started = callbacks.onFacePullStart?.(pick);
+    if (started === false || started === undefined) return;
+    // The depth shown and passed on is the whole depth, as in Fusion: where the face already stood plus the drag.
+    const base = typeof started === "number" ? started : 0;
     const element = event.currentTarget;
     const view = element.ownerDocument.defaultView ?? window;
     const pointerId = event.pointerId;
@@ -7293,7 +7297,7 @@ export function WorkplaneViewport({
     const origin = pick.point;
     const normal = pick.normal;
     let moved = false;
-    let distance = 0;
+    let distance = base;
     let typed = "";
     let shift = event.shiftKey;
     let lastX = startX;
@@ -7325,10 +7329,10 @@ export function WorkplaneViewport({
       moved = true;
       const ray = pointerRayFor(state, clientX, clientY);
       const raw = pullDistanceAlongNormal(origin, normal, ray.origin, ray.direction) ?? (startY - clientY) * screenScale();
-      const next = snapPullDistance(raw, snapStep(snapRef.current), shift);
+      const next = snapPullDistance(base + raw, snapStep(snapRef.current), shift);
       if (next !== distance || typed) {
         distance = next;
-        if (!typed) callbacks.onFacePullDrag?.(distance);
+        if (!typed) callbacks.onFacePullDrag?.(distance, true);
       }
       show();
     };
@@ -7352,7 +7356,7 @@ export function WorkplaneViewport({
       stop();
       const typedValue = typedPull(typed);
       if (typedValue !== null) callbacks.onFacePullEnd?.(typedValue, true);
-      else callbacks.onFacePullEnd?.(moved && distance !== 0 ? distance : null);
+      else callbacks.onFacePullEnd?.(moved && distance !== 0 ? distance : null, true);
     };
     const cancel = (cancelEvent: PointerEvent) => {
       if (cancelEvent.pointerId !== pointerId) return;
@@ -7397,7 +7401,7 @@ export function WorkplaneViewport({
         typed = typed.slice(0, -1);
         const typedValue = typedPull(typed);
         if (typedValue !== null) callbacks.onFacePullDrag?.(typedValue, true);
-        else callbacks.onFacePullDrag?.(distance);
+        else callbacks.onFacePullDrag?.(distance, true);
         show();
       }
     };

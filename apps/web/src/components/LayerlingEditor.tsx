@@ -8096,18 +8096,16 @@ export function LayerlingEditor({
   const faceToolRef = useRef(faceTool);
   faceToolRef.current = faceTool;
   const facePullBeforeRef = useRef<NonNullable<typeof faceTool> | null>(null);
-  // Fork (build 24): grabbing the preview again carries on from its depth, like Fusion's arrow.
-  const facePullBaseRef = useRef(0);
-  const startFacePull = useCallback((pick: LayFlatPick): boolean => {
+  // Fork (build 24): grabbing the preview again carries on from its depth, like Fusion's arrow; the
+  // view then reports the whole depth.
+  const startFacePull = useCallback((pick: LayFlatPick): boolean | number => {
     const tool = faceToolRef.current;
     if (!tool || tool.busy) return false;
     if (pick.shapeId === FACE_TOOL_PREVIEW_ID && tool.face) {
       facePullBeforeRef.current = tool;
-      facePullBaseRef.current = tool.settings.direction === "in" ? -tool.settings.depth : tool.settings.depth;
       setNotice(t("status.facePullHint"));
-      return true;
+      return tool.settings.direction === "in" ? -tool.settings.depth : tool.settings.depth;
     }
-    facePullBaseRef.current = 0;
     const source = shapesRef.current.find((shape) => shape.id === tool.sourceId);
     if (!source || pick.shapeId !== source.id) {
       setNotice(t("status.faceToolMissed"));
@@ -8125,31 +8123,27 @@ export function LayerlingEditor({
     setNotice(t("status.facePullHint"));
     return true;
   }, []);
-  const dragFacePull = useCallback((distance: number, exact = false) => {
+  const dragFacePull = useCallback((distance: number) => {
     const tool = faceToolRef.current;
     if (!tool?.face) return;
-    const signed = exact ? distance : facePullBaseRef.current + distance;
-    const settings = faceToolSettingsOn(tool.face, normalizeFaceTool({ ...tool.settings, ...pullToFaceTool(signed, FACE_TOOL_MIN_DEPTH) }));
+    const settings = faceToolSettingsOn(tool.face, normalizeFaceTool({ ...tool.settings, ...pullToFaceTool(distance, FACE_TOOL_MIN_DEPTH) }));
     const next = { ...tool, settings };
     faceToolRef.current = next;
     setFaceTool(next);
   }, []);
-  const endFacePull = useCallback((distance: number | null, exact = false) => {
+  const endFacePull = useCallback((distance: number | null) => {
     const tool = faceToolRef.current;
     facePullBeforeRef.current = null;
     if (!tool?.face) return;
     // A press without a drag only picks the face: the panel takes it from there.
     if (distance === null) {
-      facePullBaseRef.current = 0;
       setNotice(t("status.faceToolReady"));
       return;
     }
     // Fork (build 24): letting go keeps the new part as a live preview, like Fusion: the depth,
     // corner radius and inset still change it, the face can be dragged again, and Create (or
     // Enter) makes it. Esc puts it away.
-    const signed = exact ? distance : facePullBaseRef.current + distance;
-    const settings = faceToolSettingsOn(tool.face, normalizeFaceTool({ ...tool.settings, ...pullToFaceTool(signed, FACE_TOOL_MIN_DEPTH) }));
-    facePullBaseRef.current = 0;
+    const settings = faceToolSettingsOn(tool.face, normalizeFaceTool({ ...tool.settings, ...pullToFaceTool(distance, FACE_TOOL_MIN_DEPTH) }));
     const next = { ...tool, settings };
     faceToolRef.current = next;
     setFaceTool(next);
@@ -8170,7 +8164,6 @@ export function LayerlingEditor({
     return () => window.removeEventListener("keydown", onKey);
   }, [applyFaceTool, faceTool?.busy, faceTool?.step]);
   const cancelFacePull = useCallback(() => {
-    facePullBaseRef.current = 0;
     const before = facePullBeforeRef.current;
     facePullBeforeRef.current = null;
     if (before) {
