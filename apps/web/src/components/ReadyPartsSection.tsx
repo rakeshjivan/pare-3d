@@ -10,6 +10,7 @@ import {
   METRIC_SIZES,
   NUTS,
   boxWithLidParts,
+  dividerDrop,
   insertHolePart,
   normalizeBoxWithLid,
   nutTrapPart,
@@ -96,7 +97,25 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[])
                 <MmField label={t("readyParts.boxDepth")} value={box.depth} onChange={(depth) => setBox(normalizeBoxWithLid({ ...box, depth }))} />
                 <MmField label={t("readyParts.boxHeight")} value={box.height} onChange={(height) => setBox(normalizeBoxWithLid({ ...box, height }))} />
                 <MmField label={t("readyParts.boxWall")} value={box.wall} onChange={(wall) => setBox(normalizeBoxWithLid({ ...box, wall }))} />
+                <MmField label={t("readyParts.columns")} unit="" value={box.columns} onChange={(columns) => setBox(normalizeBoxWithLid({ ...box, columns }))} />
+                <MmField label={t("readyParts.rows")} unit="" value={box.rows} onChange={(rows) => setBox(normalizeBoxWithLid({ ...box, rows }))} />
+                <MmField label={t("readyParts.radius")} value={box.radius} onChange={(radius) => setBox(normalizeBoxWithLid({ ...box, radius }))} />
+                {box.columns * box.rows > 1 ? (
+                  <MmField label={t("readyParts.dividerHeight")} value={box.dividerHeight ?? box.height} onChange={(dividerHeight) => setBox(normalizeBoxWithLid({ ...box, dividerHeight }))} />
+                ) : null}
               </div>
+              <label className="ready-part-check">
+                <input type="checkbox" checked={box.stackable} onChange={(event) => setBox(normalizeBoxWithLid({ ...box, stackable: event.currentTarget.checked }))} />
+                {t("readyParts.stackable")}
+              </label>
+              <label className="ready-part-check">
+                <input type="checkbox" checked={box.lid} onChange={(event) => setBox(normalizeBoxWithLid({ ...box, lid: event.currentTarget.checked }))} />
+                {t("readyParts.withLid")}
+              </label>
+              {box.columns * box.rows > 1 && (box.lid || box.stackable) && dividerDrop({ ...box, dividerHeight: null }) > (box.dividerHeight === null ? 0 : box.height - box.dividerHeight) ? (
+                <p className="ready-part-note">{t("readyParts.dividerNote", { mm: String(Math.round(dividerDrop(box) * 10) / 10) })}</p>
+              ) : null}
+              {box.lid ? (
               <div className="ready-part-fit" role="group" aria-label={t("readyParts.lidFit")}>
                 <span>{t("readyParts.lidFit")}</span>
                 {([0.1, 0.2, 0.4] as const).map((clearance) => (
@@ -112,12 +131,13 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[])
                   </button>
                 ))}
               </div>
+              ) : null}
               <button
                 type="button"
                 className="ready-part-make"
                 onClick={() => onInsert(boxWithLidParts(box, { box: t("readyParts.boxName"), lid: t("readyParts.lidName") }))}
               >
-                {t("readyParts.makeBox")}
+                {t(box.lid ? "readyParts.makeBox" : "readyParts.makeBoxOnly")}
               </button>
             </div>
           ) : null}
@@ -135,7 +155,7 @@ function SizePicker({ label, value, onChange }: { label: string; value: MetricSi
   );
 }
 
-function MmField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+function MmField({ label, value, onChange, unit = "mm" }: { label: string; value: number; onChange: (value: number) => void; unit?: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
     if (draft !== null) {
@@ -162,7 +182,7 @@ function MmField({ label, value, onChange }: { label: string; value: number; onC
             if (event.key === "Escape") { setDraft(null); event.currentTarget.blur(); }
           }}
         />
-        <small>mm</small>
+        {unit ? <small>{unit}</small> : null}
       </span>
     </label>
   );

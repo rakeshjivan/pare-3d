@@ -91,56 +91,137 @@ export type BoxWithLidOptions = {
   wall: number;
   /** Added between the lid's lip and the box's inside, all round: 0.1 press, 0.2 snug, 0.4 loose. */
   clearance: number;
+  /** Compartments across (columns) and front to back (rows); the dividers are as thick as the wall. */
+  columns: number;
+  rows: number;
+  /** Rounding of the compartments' corners and floors (a scoop that is easy to empty); the outside follows. */
+  radius: number;
+  lid: boolean;
+  /** How high the dividers stand above the floor; null for the full height (less when a lid or a box above needs room). */
+  dividerHeight: number | null;
+  /** A stepped foot that sits inside the rim of the box below, so boxes stack without sliding. */
+  stackable: boolean;
 };
 
-export const DEFAULT_BOX_WITH_LID: BoxWithLidOptions = { width: 60, depth: 40, height: 30, wall: 2, clearance: 0.2 };
+export const DEFAULT_BOX_WITH_LID: BoxWithLidOptions = { width: 60, depth: 40, height: 30, wall: 2, clearance: 0.2, columns: 1, rows: 1, radius: 0, lid: true, dividerHeight: null, stackable: false };
+/** The stacking foot's height; the box below keeps this much (and a little) free under its rim. */
+export const STACK_FOOT = 3;
 export const LID_THICKNESS = 2;
 export const LID_LIP_HEIGHT = 5;
 export const LID_LIP_WALL = 1.6;
+/** The top of the dividers below the rim: room for a lid's lip, the foot of a box stacked on top, or a lower choice. */
+export function dividerDrop(o: BoxWithLidOptions) {
+  const needed = Math.max(o.lid ? DIVIDER_DROP : 0, o.stackable ? STACK_FOOT + 0.5 : 0);
+  const chosen = o.dividerHeight === null ? 0 : o.height - o.dividerHeight;
+  return Math.min(o.height - 1, Math.max(needed, chosen));
+}
+
+/** With a lid, the dividers stop this far below the rim so the lid's lip fits in over them. */
+export const DIVIDER_DROP = LID_LIP_HEIGHT + 0.5;
+export const MAX_COMPARTMENTS = 12;
 /** Between the box and its lid on the plate. */
 const PART_GAP = 10;
 
 export function normalizeBoxWithLid(options: Partial<BoxWithLidOptions>): BoxWithLidOptions {
   const merged = { ...DEFAULT_BOX_WITH_LID, ...options };
   const clamp = (value: number, min: number, max: number, fallback: number) => (Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback);
+  const width = clamp(merged.width, 10, 1000, DEFAULT_BOX_WITH_LID.width);
+  const depth = clamp(merged.depth, 10, 1000, DEFAULT_BOX_WITH_LID.depth);
+  const height = clamp(merged.height, 5, 1000, DEFAULT_BOX_WITH_LID.height);
+  const wall = clamp(merged.wall, 0.8, 10, DEFAULT_BOX_WITH_LID.wall);
+  const columns = Math.round(clamp(merged.columns, 1, MAX_COMPARTMENTS, 1));
+  const rows = Math.round(clamp(merged.rows, 1, MAX_COMPARTMENTS, 1));
+  // A compartment keeps at least 5 mm each way; its rounding at most half its narrow side.
+  const cellWidth = (width - (columns - 1) * wall) / columns;
+  const cellDepth = (depth - (rows - 1) * wall) / rows;
+  const fits = cellWidth >= 5 && cellDepth >= 5;
   return {
-    width: clamp(merged.width, 10, 1000, DEFAULT_BOX_WITH_LID.width),
-    depth: clamp(merged.depth, 10, 1000, DEFAULT_BOX_WITH_LID.depth),
-    height: clamp(merged.height, 5, 1000, DEFAULT_BOX_WITH_LID.height),
-    wall: clamp(merged.wall, 0.8, 10, DEFAULT_BOX_WITH_LID.wall),
+    width,
+    depth,
+    height,
+    wall,
     clearance: clamp(merged.clearance, 0, 1, DEFAULT_BOX_WITH_LID.clearance),
+    columns: fits ? columns : 1,
+    rows: fits ? rows : 1,
+    radius: clamp(merged.radius, 0, Math.min(fits ? Math.min(cellWidth, cellDepth) : Math.min(width, depth), height) / 2, 0),
+    lid: merged.lid !== false,
+    dividerHeight: merged.dividerHeight === null || merged.dividerHeight === undefined || !Number.isFinite(merged.dividerHeight) || merged.dividerHeight >= height
+      ? null
+      : Math.max(1, merged.dividerHeight),
+    stackable: Boolean(merged.stackable),
   };
 }
 
+/** A box, or a box with rounded corners (and floor edges) when a radius is given. */
+function block(x: number, z: number, elevation: number, width: number, depth: number, height: number, corner: number, floor = 0) {
+  if (corner <= 0.05 && floor <= 0.05) return makeShapeFromAsset(asset("box"), { x, z, elevation }, { width, depth, height });
+  return makeShapeFromAsset(asset("roundedBox"), { x, z, elevation }, { width, depth, height, cornerFillet: round(corner), topBottomFillet: round(floor) });
+}
+
 /**
- * The box and its lid, side by side, each as parts to group. The lid lies upside down - plate on
- * the bed, lip up - the way it prints; turned over, its lip drops inside the box.
+ * The box (with its compartments) and, when asked for, its lid, side by side, each as parts to
+ * group. The lid lies upside down - plate on the bed, lip up - the way it prints; turned over, its
+ * lip drops inside the box, over the dividers.
  */
 export function boxWithLidParts(raw: Partial<BoxWithLidOptions>, names: { box: string; lid: string }): ReadyPart[] {
   const o = normalizeBoxWithLid(raw);
   const outerWidth = round(o.width + 2 * o.wall);
   const outerDepth = round(o.depth + 2 * o.wall);
-  const boxCentre = -(outerWidth / 2 + PART_GAP / 2);
-  const lidCentre = outerWidth / 2 + PART_GAP / 2;
-  const box = makeShapeFromAsset(asset("box"), { x: boxCentre, z: 0, elevation: 0 }, { width: outerWidth, depth: outerDepth, height: round(o.height + o.wall) });
-  // The inside reaches 1 mm past the rim so the cut leaves no skin at the top.
-  const inside = makeShapeFromAsset(asset("box"), { x: boxCentre, z: 0, elevation: o.wall }, { width: o.width, depth: o.depth, height: round(o.height + 1) });
+  const outerHeight = round(o.height + o.wall);
+  // A stackable box stands on its foot: everything above it is raised by the foot's height.
+  const base = o.stackable ? STACK_FOOT : 0;
+  // Box and lid side by side, or one behind the other when that takes less room on the plate.
+  const sideBySide = Math.max(2 * outerWidth + PART_GAP, outerDepth) <= Math.max(outerWidth, 2 * outerDepth + PART_GAP);
+  const offset = o.lid ? (sideBySide ? outerWidth : outerDepth) / 2 + PART_GAP / 2 : 0;
+  const boxX = o.lid && sideBySide ? -offset : 0;
+  const boxZ = o.lid && !sideBySide ? -offset : 0;
+  const lidX = sideBySide ? offset : 0;
+  const lidZ = sideBySide ? 0 : offset;
+  const r = o.radius;
+  const outerCorner = r > 0 ? r + o.wall : 0;
+  const shapes: WorkplaneShape[] = [{ ...block(boxX, boxZ, base, outerWidth, outerDepth, outerHeight, outerCorner), name: names.box }];
+  if (o.stackable) {
+    // The foot is as big as the box's inside, less the fit, so it drops into the rim of the one below.
+    const foot = block(boxX, boxZ, 0, round(o.width - 2 * o.clearance), round(o.depth - 2 * o.clearance), round(STACK_FOOT + 0.01), Math.max(0, r - o.clearance));
+    shapes.push({ ...foot, name: `${names.box} (stacking foot)` });
+  }
 
-  const plate = makeShapeFromAsset(asset("box"), { x: lidCentre, z: 0, elevation: 0 }, { width: outerWidth, depth: outerDepth, height: LID_THICKNESS });
+  // Every compartment is a hole from the floor up past the rim: past it by its rounding too, so the
+  // rounded top of the cutter lies outside and only the floor gets the scoop.
+  const cells = o.columns * o.rows;
+  const drop = cells > 1 ? dividerDrop(o) : 0;
+  const cellWidth = (o.width - (o.columns - 1) * o.wall) / o.columns;
+  const cellDepth = (o.depth - (o.rows - 1) * o.wall) / o.rows;
+  for (let column = 0; column < o.columns; column += 1) {
+    for (let row = 0; row < o.rows; row += 1) {
+      const x = boxX - o.width / 2 + cellWidth / 2 + column * (cellWidth + o.wall);
+      const z = boxZ - o.depth / 2 + cellDepth / 2 + row * (cellDepth + o.wall);
+      const cell = block(round(x), round(z), base + o.wall, round(cellWidth), round(cellDepth), round(o.height + r + 1), r, r);
+      shapes.push({ ...cell, name: cells > 1 ? `${names.box} (compartment ${column + 1}-${row + 1})` : `${names.box} (inside)`, hole: true });
+    }
+  }
+  // With a lid over dividers: the top of the box is open all round, so the lip fits in.
+  if (drop > 0) {
+    const ledge = block(boxX, boxZ, round(base + o.wall + o.height - drop), o.width, o.depth, round(drop + 1), r);
+    shapes.push({ ...ledge, name: `${names.box} (top)`, hole: true });
+  }
+  const parts: ReadyPart[] = [{ name: names.box, shapes, group: true }];
+  if (!o.lid) return parts;
+
   const lipWidth = round(o.width - 2 * o.clearance);
   const lipDepth = round(o.depth - 2 * o.clearance);
-  const lip = makeShapeFromAsset(asset("box"), { x: lidCentre, z: 0, elevation: LID_THICKNESS }, { width: lipWidth, depth: lipDepth, height: LID_LIP_HEIGHT });
-  const lipInside = makeShapeFromAsset(asset("box"), { x: lidCentre, z: 0, elevation: LID_THICKNESS }, { width: round(lipWidth - 2 * LID_LIP_WALL), depth: round(lipDepth - 2 * LID_LIP_WALL), height: LID_LIP_HEIGHT + 1 });
-  return [
-    { name: names.box, shapes: [{ ...box, name: names.box }, { ...inside, name: `${names.box} (inside)`, hole: true }], group: true },
+  const lipCorner = Math.max(0, r - o.clearance);
+  const plate = block(lidX, lidZ, 0, outerWidth, outerDepth, LID_THICKNESS, outerCorner);
+  const lip = block(lidX, lidZ, LID_THICKNESS, lipWidth, lipDepth, LID_LIP_HEIGHT, lipCorner);
+  const lipInside = block(lidX, lidZ, LID_THICKNESS, round(lipWidth - 2 * LID_LIP_WALL), round(lipDepth - 2 * LID_LIP_WALL), LID_LIP_HEIGHT + 1, Math.max(0, lipCorner - LID_LIP_WALL));
+  parts.push({
     // The lip's hollow is cut first, then the ring joins the plate.
-    {
-      name: names.lid,
-      shapes: [{ ...plate, name: names.lid }],
-      group: true,
-      parts: [{ name: `${names.lid} (lip)`, shapes: [{ ...lip, name: `${names.lid} (lip)` }, { ...lipInside, name: `${names.lid} (lip inside)`, hole: true }], group: true }],
-    },
-  ];
+    name: names.lid,
+    shapes: [{ ...plate, name: names.lid }],
+    group: true,
+    parts: [{ name: `${names.lid} (lip)`, shapes: [{ ...lip, name: `${names.lid} (lip)` }, { ...lipInside, name: `${names.lid} (lip inside)`, hole: true }], group: true }],
+  });
+  return parts;
 }
 
 /**
