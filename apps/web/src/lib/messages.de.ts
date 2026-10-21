@@ -1558,7 +1558,7 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "version.build": "Build {build}",
   "version.dev": "Entwicklung",
   "version.badgeTitle": "Die Pare-3D-Version, die du verwendest",
-  "version.checking": "Suche nach Updates…",
+  "version.checking": "Suche nach Updates - Pare 3D bitte kurz offen lassen…",
   "version.current": "Aktuell (Build {build})",
   "version.offline": "Build {build} - Update-Prüfung nicht möglich",
   "version.ready": "Build {build} ist bereit",

@@ -1,5 +1,6 @@
 "use client";
 
+import { PARE_BUILD } from "@/lib/pareUpdate";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BUILD_MISMATCH_EVENT } from "@/lib/buildStamp";
 import {
@@ -53,6 +54,43 @@ export function useNewVersionNotice() {
     };
     window.addEventListener(BUILD_MISMATCH_EVENT, onMismatch);
     return () => window.removeEventListener(BUILD_MISMATCH_EVENT, onMismatch);
+  }, []);
+
+  // Fork: in the Pare 3D app its own server downloads new builds and says which one it serves.
+  // Asked often in the first minutes after opening (when the download usually finishes), then now
+  // and then: a newer build than this page's makes the offer at once, however early or late it came.
+  useEffect(() => {
+    if (PARE_BUILD <= 0) return;
+    let stopped = false;
+    let timer = 0;
+    const opened = Date.now();
+    const ask = async () => {
+      if (announced.current) return;
+      let serving = 0;
+      try {
+        const response = await fetch("/__pare3d/update", { cache: "no-store", signal: AbortSignal.timeout(4000) });
+        if (response.ok && response.headers.get("x-pare3d") === "1") {
+          const state = (await response.json()) as { serving?: number; ready?: number };
+          serving = Math.max(Number(state.serving) || 0, Number(state.ready) || 0);
+        } else {
+          return; // Not the app: nothing to ask again.
+        }
+      } catch {
+        // Asked again below.
+      }
+      if (stopped) return;
+      if (serving > PARE_BUILD && !announced.current) {
+        announced.current = true;
+        setOffer({ latest: { version: "", build: String(serving), highlights: [] }, reason: "update" });
+        return;
+      }
+      timer = window.setTimeout(() => void ask(), Date.now() - opened < 4 * 60 * 1000 ? 5000 : 5 * 60 * 1000);
+    };
+    void ask();
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {

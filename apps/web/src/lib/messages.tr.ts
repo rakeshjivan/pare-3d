@@ -1517,7 +1517,7 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "version.build": "Build {build}",
   "version.dev": "dev",
   "version.badgeTitle": "The Pare 3D version you are using",
-  "version.checking": "Checking for updates…",
+  "version.checking": "Looking for updates - keep Pare 3D open a moment…",
   "version.current": "Up to date (build {build})",
   "version.offline": "Build {build} - couldn't check for updates",
   "version.ready": "Build {build} is ready",
