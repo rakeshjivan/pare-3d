@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMovablePanel } from "@/lib/useMovablePanel";
 import { createPortal } from "react-dom";
 import { HexColorInput, HexColorPicker } from "react-colorful";
-import { APP_THEME_OPTIONS, type AppThemePreference } from "@/lib/appTheme";
+import { APP_THEME_CHOICES, type AppThemePreference } from "@/lib/appTheme";
 import { setToolbarSize, TOOLBAR_SIZE_OPTIONS, type ToolbarSize } from "@/lib/toolbarSize";
 import { useToolbarSize } from "@/lib/useToolbarSize";
 import { useViewCubePosition } from "@/lib/useViewCubePosition";
@@ -736,7 +736,7 @@ export function WorkspaceSettingsModal({
                       value={themePreference}
                       onChange={(event) => onThemePreferenceChange?.(event.currentTarget.value as AppThemePreference)}
                     >
-                      {APP_THEME_OPTIONS.map((option) => (
+                      {APP_THEME_CHOICES.map((option) => (
                         <option key={option.value} value={option.value}>
                           {t(THEME_LABEL_KEYS[option.value])}
                         </option>

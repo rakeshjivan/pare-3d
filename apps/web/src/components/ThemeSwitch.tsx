@@ -2,7 +2,7 @@
 
 import { Check, ChevronDown, Palette } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { APP_THEME_OPTIONS, setAppTheme, type AppThemePreference } from "@/lib/appTheme";
+import { APP_THEME_CHOICES, setAppTheme, type AppThemePreference } from "@/lib/appTheme";
 import { t, type MessageKey } from "@/lib/i18n";
 import { useAppTheme } from "@/lib/useAppTheme";
 
@@ -65,7 +65,7 @@ export function ThemeSwitch() {
 
       {isOpen && (
         <div className="theme-dropdown-menu" role="menu" aria-label={t("common.theme")}>
-          {APP_THEME_OPTIONS.map((option) => {
+          {APP_THEME_CHOICES.map((option) => {
             const isSelected = option.value === theme;
             return (
               <button

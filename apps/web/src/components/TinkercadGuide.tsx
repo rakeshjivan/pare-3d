@@ -130,7 +130,7 @@ export function TinkercadGuideButton() {
       title="Coming from Tinkercad? Where everything is"
       onClick={() => window.dispatchEvent(new Event(OPEN_TINKERCAD_GUIDE_EVENT))}
     >
-      <GraduationCap aria-hidden="true" />
+      <GraduationCap className="title-icon" aria-hidden="true" />
     </button>
   );
 }

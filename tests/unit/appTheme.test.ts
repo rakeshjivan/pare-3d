@@ -15,7 +15,7 @@ describe("application theme preference", () => {
   it("normalizes stored values and resolves the system theme", () => {
     expect(normalizeAppThemePreference("light")).toBe("light");
     expect(normalizeAppThemePreference("dark")).toBe("dark");
-    expect(normalizeAppThemePreference("unexpected")).toBe("classic"); // fork default
+    expect(normalizeAppThemePreference("unexpected")).toBe("light"); // fork default
     expect(resolveAppTheme("system", true)).toBe("dark");
     expect(resolveAppTheme("system", false)).toBe("light");
     expect(resolveAppTheme("light", true)).toBe("light");
@@ -32,19 +32,22 @@ describe("application theme preference", () => {
     expect(values.get(APP_THEME_STORAGE_KEY)).toBe("dark");
     expect(readStoredAppTheme(storage)).toBe("dark");
     values.set(APP_THEME_STORAGE_KEY, "neon");
-    expect(readStoredAppTheme(storage)).toBe("classic"); // fork default
+    expect(readStoredAppTheme(storage)).toBe("light"); // fork default
   });
 
   it("offers graphite as a dark theme with a neutral palette", () => {
     expect(normalizeAppThemePreference("graphite")).toBe("graphite");
     expect(resolveAppTheme("graphite", false)).toBe("dark");
     expect(resolveAppTheme("graphite", true)).toBe("dark");
-    expect(appThemePalette("graphite")).toBe("graphite");
-    expect(appThemePalette("dark")).toBe("default");
-    expect(appThemePalette("system")).toBe("default");
+    // Fork: light is always the blue Classic palette, dark always Graphite.
+    expect(appThemePalette("graphite", false)).toBe("graphite");
+    expect(appThemePalette("dark", false)).toBe("graphite");
+    expect(appThemePalette("system", true)).toBe("graphite");
+    expect(appThemePalette("system", false)).toBe("classic");
+    expect(appThemePalette("light", true)).toBe("classic");
   });
 
-  it("links the graphite stylesheet only once graphite is chosen, and only once", () => {
+  it("links the dark stylesheets once dark is in use, and only once", () => {
     const appended: Array<{ id: string; rel: string; href: string }> = [];
     const root = { dataset: {} as Record<string, string>, style: {} as Record<string, string> };
     const fakeDocument = {
@@ -55,16 +58,13 @@ describe("application theme preference", () => {
     };
     vi.stubGlobal("document", fakeDocument);
     try {
-      applyAppTheme("dark", false);
-      expect(appended).toHaveLength(0);
-      expect(root.dataset.palette).toBeUndefined();
-      applyAppTheme("graphite", false);
-      applyAppTheme("graphite", true);
-      expect(appended).toEqual([{ id: GRAPHITE_STYLESHEET_ID, rel: "stylesheet", href: GRAPHITE_STYLESHEET_HREF }]);
-      expect(root.dataset).toMatchObject({ theme: "dark", palette: "graphite" });
       applyAppTheme("light", false);
-      expect(root.dataset.palette).toBeUndefined();
-      expect(root.dataset.theme).toBe("light");
+      expect(root.dataset).toMatchObject({ theme: "light", palette: "classic" });
+      applyAppTheme("dark", false);
+      applyAppTheme("graphite", true);
+      expect(appended.filter((node) => node.id === GRAPHITE_STYLESHEET_ID)).toEqual([{ id: GRAPHITE_STYLESHEET_ID, rel: "stylesheet", href: GRAPHITE_STYLESHEET_HREF }]);
+      expect(appended.filter((node) => node.id === "layerling-classic-dark-theme")).toHaveLength(1);
+      expect(root.dataset).toMatchObject({ theme: "dark", palette: "graphite" });
     } finally {
       vi.unstubAllGlobals();
     }

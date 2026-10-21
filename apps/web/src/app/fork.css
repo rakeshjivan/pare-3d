@@ -69,13 +69,26 @@
   border: 0;
   background: transparent;
 }
-.title-row-tools .action-icon-button {
+.title-row-tools .action-icon-button,
+.toolbar-title-row-actions .tc-guide-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 34px;
   height: 34px;
   min-width: 0;
-  padding: 5px;
+  padding: 0;
+  color: var(--toolbar-label);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transform: none;
 }
-.title-row-tools .action-icon-button svg { width: 22px; height: 22px; }
+.title-row-tools .action-icon-button:hover,
+.toolbar-title-row-actions .tc-guide-button:hover { color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); }
+.title-row-tools .action-icon-button.active { color: #fff; background: var(--primary); }
+.title-icon { width: 20px !important; height: 20px !important; stroke-width: 2 !important; }
+.toolbar-title-row-actions .tc-guide-button { color: var(--primary); margin-right: 4px; }
 
 /* Tool names under the pointer, straight away instead of the slow browser tooltip. */
 .secondary-toolbar .toolbar-icon[aria-label],

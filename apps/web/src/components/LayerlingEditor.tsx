@@ -159,7 +159,8 @@ import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, tra
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
-import { FORK_SHORT_LABELS_EN, FORK_TOOL_ICONS, ForkExportIcon, ForkHomeIcon, ForkImportIcon, ForkNoteIcon, ForkShapesIcon } from "@/components/forkToolbarIcons";
+import { FORK_SHORT_LABELS_EN, FORK_TOOL_ICONS, ForkHomeIcon, ForkShapesIcon } from "@/components/forkToolbarIcons";
+import { BookOpen, Import, Keyboard, Settings as LucideSettings, StickyNote, Upload } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -14391,16 +14392,16 @@ function SecondaryToolbar({
                   onClick={onNoteTool}
                   disabled={historyViewActive}
                 >
-                  <ForkNoteIcon />
+                  <StickyNote className="title-icon" aria-hidden="true" />
                 </button>
                 <button className="action-icon-button" aria-label={t("editor.import")} title={`${t("editor.import")} (${COMMAND_SHORTCUTS.import})`} onClick={() => onTopPanel("import")} disabled={historyViewActive}>
-                  <ForkImportIcon />
+                  <Import className="title-icon" aria-hidden="true" />
                 </button>
                 <button className="action-icon-button" aria-label={t("editor.export")} title={`${t("editor.export")} (${COMMAND_SHORTCUTS.export})`} onClick={() => onTopPanel("export")}>
-                  <ForkExportIcon />
+                  <Upload className="title-icon" aria-hidden="true" />
                 </button>
                 <button className="action-icon-button" aria-label={t("editor.workspaceSettings")} title={t("editor.workspaceSettings")} onClick={() => window.dispatchEvent(new Event("layerling:open-workspace-settings"))}>
-                  <ToolbarSettingsIcon />
+                  <LucideSettings className="title-icon" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -14408,16 +14409,16 @@ function SecondaryToolbar({
               <div className="toolbar-section-label">{t("editor.group.help")}</div>
               <div className="action-buttons">
                 <button className="action-icon-button" aria-label={t("palette.open")} title={t("palette.open")} aria-haspopup="dialog" data-layerling-tool="command-search" onClick={openPalette}>
-                  <Search className="toolbar-search-icon" aria-hidden="true" />
+                  <Search className="title-icon" aria-hidden="true" />
                 </button>
                 <button className="action-icon-button" aria-label={t("editor.guide")} title={t("editor.guide")} onClick={onGuide}>
-                  <ToolbarGuideIcon />
+                  <BookOpen className="title-icon" aria-hidden="true" />
                 </button>
                 <button className="action-icon-button" aria-label={t("editor.keyboardShortcuts")} title={t("editor.keyboardShortcuts")} onClick={onShortcuts}>
-                  <ToolbarKeyboardIcon />
+                  <Keyboard className="title-icon" aria-hidden="true" />
                 </button>
                 <button className={`action-icon-button ${interactiveHelpActive ? "active" : ""}`} type="button" aria-label={t("interactiveHelp.title")} title={`${t("interactiveHelp.title")} (${COMMAND_SHORTCUTS["interactive-help"]})`} aria-pressed={interactiveHelpActive} data-layerling-tool="interactive-help" data-help-exempt onClick={onInteractiveHelp}>
-                  <CircleHelp className="toolbar-search-icon" aria-hidden="true" />
+                  <CircleHelp className="title-icon" aria-hidden="true" />
                 </button>
               </div>
             </div>

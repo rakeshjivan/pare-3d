@@ -10,6 +10,12 @@ export const APP_THEME_OPTIONS = [
 
 export type AppThemePreference = (typeof APP_THEME_OPTIONS)[number]["value"];
 /**
+ * Fork: the choices offered. Light is always the blue Classic look and dark the neutral Graphite
+ * one; the warm beige and orange palettes are not offered. "classic" and "graphite" stay valid
+ * values so a stored choice still reads, and resolve to light and dark.
+ */
+export const APP_THEME_CHOICES = APP_THEME_OPTIONS.filter((option) => option.value === "system" || option.value === "light" || option.value === "dark");
+/**
  * Graphite is the dark theme with neutral grey surfaces instead of the warm
  * brown ones. It resolves to "dark", so everything that only asks light or
  * dark keeps working; the palette on top only swaps colours.
@@ -17,13 +23,15 @@ export type AppThemePreference = (typeof APP_THEME_OPTIONS)[number]["value"];
 export type ResolvedAppTheme = "light" | "dark";
 export type AppThemePalette = "default" | "graphite" | "classic";
 
-export function appThemePalette(preference: AppThemePreference): AppThemePalette {
-  if (preference === "graphite" || preference === "classic") return preference;
-  return "default";
+export function appThemePalette(preference: AppThemePreference, prefersDark?: boolean): AppThemePalette {
+  const dark = prefersDark ?? (typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-color-scheme: dark)").matches
+    : false);
+  return resolveAppTheme(preference, dark) === "dark" ? "graphite" : "classic";
 }
 
 export function normalizeAppThemePreference(value: unknown): AppThemePreference {
-  return value === "light" || value === "dark" || value === "graphite" || value === "classic" || value === "system" ? value : "classic";
+  return value === "light" || value === "dark" || value === "graphite" || value === "classic" || value === "system" ? value : "light";
 }
 
 export function resolveAppTheme(preference: AppThemePreference, prefersDark: boolean): ResolvedAppTheme {
@@ -34,11 +42,11 @@ export function resolveAppTheme(preference: AppThemePreference, prefersDark: boo
 }
 
 export function readStoredAppTheme(storage: Pick<Storage, "getItem"> | null | undefined): AppThemePreference {
-  if (!storage) return "classic";
+  if (!storage) return "light";
   try {
     return normalizeAppThemePreference(storage.getItem(APP_THEME_STORAGE_KEY));
   } catch {
-    return "classic";
+    return "light";
   }
 }
 
@@ -73,11 +81,15 @@ export function applyAppTheme(preference: AppThemePreference, prefersDark?: bool
   );
   const resolved = resolveAppTheme(preference, systemPrefersDark);
   document.documentElement.dataset.theme = resolved;
-  const palette = appThemePalette(preference);
+  const palette = appThemePalette(preference, systemPrefersDark);
   if (palette === "default") delete document.documentElement.dataset.palette;
   else document.documentElement.dataset.palette = palette;
   document.documentElement.style.colorScheme = resolved;
-  if (palette === "graphite") ensureGraphiteStylesheet();
+  if (palette === "graphite") {
+    ensureGraphiteStylesheet();
+    // Fork: Graphite's accents in blue, after it.
+    ensurePaletteStylesheet(CLASSIC_DARK_STYLESHEET_ID, CLASSIC_DARK_STYLESHEET_HREF);
+  }
   if (palette === "classic") ensurePaletteStylesheet(CLASSIC_STYLESHEET_ID, CLASSIC_STYLESHEET_HREF);
 }
 
@@ -101,6 +113,8 @@ function ensureGraphiteStylesheet() {
 
 export const CLASSIC_STYLESHEET_ID = "layerling-classic-theme";
 export const CLASSIC_STYLESHEET_HREF = `/assets/theme/classic-theme.css${appVersion ? `?v=${appVersion}` : ""}`;
+export const CLASSIC_DARK_STYLESHEET_ID = "layerling-classic-dark-theme";
+export const CLASSIC_DARK_STYLESHEET_HREF = `/assets/theme/classic-dark-theme.css${appVersion ? `?v=${appVersion}` : ""}`;
 
 function ensurePaletteStylesheet(id: string, href: string) {
   if (document.getElementById(id)) return;
@@ -113,7 +127,7 @@ function ensurePaletteStylesheet(id: string, href: string) {
 
 const themeListeners = new Set<() => void>();
 let currentThemePreference: AppThemePreference =
-  typeof window !== "undefined" ? readStoredAppTheme(window.localStorage) : "classic";
+  typeof window !== "undefined" ? readStoredAppTheme(window.localStorage) : "light";
 
 if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
   const media = window.matchMedia("(prefers-color-scheme: dark)");

@@ -3817,6 +3817,18 @@
   --font-ui: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --topbar: #ffffff;
   --toolbar-bg: #ffffff;
+  /* Tool groups in a calm, cool palette that sits with the blue: no orange, yellow or coral. */
+  --group-home: #1f72d1;
+  --group-clipboard: #1596b8;
+  --group-history: #2e9e6b;
+  --group-shapes: #1f72d1;
+  --group-visibility: #5b6778;
+  --group-combine: #7b5ce0;
+  --group-modify: #4a63d8;
+  --group-arrange: #0f8f8a;
+  --group-manage: #3d7fd6;
+  --group-help: #5b6778;
+  --group-sketch: #b04fc4;
 }
 /* Group frames keep their colour, a little softer on the cool background. */
 :where(html[data-palette="classic"]) .toolbar-section-tools,
