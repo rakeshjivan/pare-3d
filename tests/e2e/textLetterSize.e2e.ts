@@ -35,6 +35,8 @@ afterEach(() => {
 });
 
 function mount(shape: WorkplaneShape, onUpdate: (patch: Partial<WorkplaneShape>) => void, onLayerText?: (patch: TextLayerPatch) => void) {
+  // The settings start folded up (Pare 3D build 21): open Properties, as a person would.
+  window.sessionStorage.setItem("layerling.editor.inspectorCards", JSON.stringify({ properties: true }));
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
