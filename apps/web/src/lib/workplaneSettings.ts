@@ -57,7 +57,8 @@ export const DEFAULT_WORKPLANE_WORKSPACE: WorkplaneWorkspaceSettings = {
   edgeColor: DEFAULT_EDGE_LINE_COLOR,
   showShadows: true,
   cameraInertia: true,
-  fastMode: false,
+  // Fork: Fast mode on by default - the smoothest view on any computer; Settings turns it off.
+  fastMode: true,
   shadeContrast: 0,
   shadowStrength: 100,
   shadowSoftness: 0,

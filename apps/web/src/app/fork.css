@@ -352,8 +352,11 @@ html:has([aria-modal="true"]) .empty-plate-hint { display: none; }
 .bambu-send-menu button:hover { background: var(--subbar); filter: none; }
 .bambu-send-menu button[aria-checked="true"] strong { color: var(--primary); }
 .bambu-send-menu span { font-weight: 500; color: var(--muted-strong); font-size: 12px; }
-@media (max-width: 1440px) {
-  .bambu-send-main span { display: none; }
+/* Always words, never just the icon: shorter on narrower windows. */
+.bambu-send-short { display: none; }
+@media (max-width: 1500px) {
+  .bambu-send-long { display: none; }
+  .bambu-send-short { display: inline; }
 }
 /* The design name keeps room to be read. */
 .toolbar-title-row label:has(input) { min-width: 150px; flex-shrink: 1; }

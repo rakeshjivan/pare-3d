@@ -1074,7 +1074,20 @@ export default function Home() {
     window.localStorage.removeItem("layerling.activeChallengeTutorial");
     // The design name stays in the toolbar; the old switch is gone.
     window.localStorage.removeItem("layerling.showProjectNameInToolbar");
-    const storedTheme = readStoredAppTheme(window.localStorage);
+    let storedTheme = readStoredAppTheme(window.localStorage);
+    // Fork: once, a "System" (or old "Classic") left from earlier versions becomes the blue light
+    // theme, the Pare 3D default; a theme chosen after this stays as chosen.
+    try {
+      if (window.localStorage.getItem("pare3d.themeMigrated") !== "1") {
+        if (storedTheme === "system" || storedTheme === "classic") {
+          storedTheme = "light";
+          storeAppTheme(window.localStorage, "light");
+        }
+        window.localStorage.setItem("pare3d.themeMigrated", "1");
+      }
+    } catch {
+      // Storage blocked: the stored theme stays.
+    }
     // A first visit takes the theme the server suggests (LAYERLING_DEFAULT_THEME), if it has one;
     // a browser that already has a theme on record keeps it. A static copy has no server to ask.
     const themeOnRecord = hasStoredAppTheme(window.localStorage);

@@ -67,11 +67,21 @@ else
   (cd "$WORK/mac" && zip -qry -9 "$OUT/Pare-3D-Mac.zip" "Pare 3D.app")
 fi
 
-# Windows
+# Windows. With the .NET SDK at hand the native window (windows/Program.cs) is built; the
+# browser launcher ("Pare 3D (browser).vbs", which opens Edge) always comes along as a fallback.
 WIN="$WORK/win/Pare 3D"
 mkdir -p "$WIN"
-cp "$ROOT/mac/serve.mjs" "$ROOT/mac/launch.mjs" "$ROOT/mac/Pare 3D.vbs" "$ROOT/mac/NOTICE.txt" "$WIN/"
-cp "$ROOT/mac/READ ME FIRST.txt" "$WIN/"
+cp "$ROOT/mac/serve.mjs" "$ROOT/mac/launch.mjs" "$ROOT/mac/NOTICE.txt" "$WIN/"
+cp "$ROOT/mac/Pare 3D.vbs" "$WIN/Pare 3D (browser).vbs"
+cp "$ROOT/windows/READ ME FIRST.txt" "$WIN/"
+if command -v dotnet >/dev/null 2>&1; then
+  if ! dotnet publish "$ROOT/windows/Pare3D.csproj" -c Release -o "$WORK/winbuild" > "$WORK/dotnet.log" 2>&1; then
+    grep -E "error|Error" "$WORK/dotnet.log" | sed 's/^/::error::/' | head -60
+    exit 1
+  fi
+  cp "$WORK/winbuild/Pare3D.exe" "$WIN/Pare 3D.exe"
+  cp "$ROOT/windows/Pare3D.ico" "$WIN/"
+fi
 cp "$ROOT/LICENSE" "$WIN/LICENSE.txt"
 cp "$(fetch_bun bun-windows-x64)/bun.exe" "$WIN/"
 copy_app "$WIN/app"

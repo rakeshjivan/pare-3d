@@ -28,7 +28,8 @@ export function BambuSendButton() {
     <div className="bambu-send" ref={ref}>
       <button type="button" className="bambu-send-main" onClick={send} title={`Export the design as ${format.toUpperCase()} and open it in Bambu Studio`}>
         <Printer size={16} aria-hidden="true" />
-        <span>Send to Bambu Studio</span>
+        <span className="bambu-send-long">Send to Bambu Studio</span>
+        <span className="bambu-send-short">Bambu Studio</span>
       </button>
       <button
         type="button"

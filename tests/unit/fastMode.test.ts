@@ -4,16 +4,16 @@ import { DEFAULT_WORKPLANE_WORKSPACE, effectiveViewSettings, normalizeWorkspaceS
 describe("camera inertia and fast mode (#188)", () => {
   it("keeps the old behaviour by default and reads the new switches", () => {
     expect(DEFAULT_WORKPLANE_WORKSPACE.cameraInertia).toBe(true);
-    expect(DEFAULT_WORKPLANE_WORKSPACE.fastMode).toBe(false);
+    expect(DEFAULT_WORKPLANE_WORKSPACE.fastMode).toBe(true); // fork: Fast mode on by default
     expect(normalizeWorkspaceSettings({ cameraInertia: false }).cameraInertia).toBe(false);
     expect(normalizeWorkspaceSettings({ fastMode: true }).fastMode).toBe(true);
     // Settings saved before these switches existed.
     expect(normalizeWorkspaceSettings({ showShadows: false }).cameraInertia).toBe(true);
-    expect(normalizeWorkspaceSettings({ fastMode: "yes" }).fastMode).toBe(false);
+    expect(normalizeWorkspaceSettings({ fastMode: "yes" }).fastMode).toBe(true); // falls back to the default
   });
 
   it("turns the costly parts off together, and leaves the user's own values alone", () => {
-    const own = { ...DEFAULT_WORKPLANE_WORKSPACE, showShadows: true, edgeLines: true, cameraInertia: true };
+    const own = { ...DEFAULT_WORKPLANE_WORKSPACE, fastMode: false, showShadows: true, edgeLines: true, cameraInertia: true };
     expect(effectiveViewSettings(own)).toBe(own);
     const fast = { ...own, fastMode: true };
     const view = effectiveViewSettings(fast);

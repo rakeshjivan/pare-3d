@@ -38,6 +38,9 @@ jobs:
           NEXT_PUBLIC_SUPPORT_HINT: "off"
           NEXT_PUBLIC_SOURCE_CODE_URL: https://github.com/${{ github.repository }}
         run: node scripts/build-static-export.mjs
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
       - name: Package for Mac and Windows
         run: bash scripts/package-desktop.sh
       - uses: softprops/action-gh-release@v2
@@ -68,7 +71,7 @@ jobs:
             **Download:** `Pare-3D-Mac.zip` for a Mac (Apple silicon or Intel), `Pare-3D-Windows.zip` for Windows 10/11.
 
             **Mac:** unzip, drag Pare 3D into Applications, open it. The first time, go to System Settings → Privacy & Security → Open Anyway.
-            **Windows:** extract the folder, double-click "Pare 3D.vbs". If SmartScreen warns, choose More info → Run anyway.
+            **Windows:** extract the folder, double-click "Pare 3D.exe". If SmartScreen warns, choose More info → Run anyway.
             Chrome or Edge gives Pare 3D its own window and automatic backup.
             Already installed (build 2 or later)? It updates itself: the next time you open it, or when it asks you to reload.
 
