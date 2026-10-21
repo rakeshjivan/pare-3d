@@ -228,6 +228,7 @@ import {
 import { MAX_HINGE_CLEARANCE, MAX_HINGE_KNUCKLES, MIN_HINGE_CLEARANCE, MIN_HINGE_KNUCKLES, hingePlan, minimumHingeDepth, normalizeHingeClearance, normalizeHingeKnuckles, normalizeHingeLeafThickness, normalizeHingePinDiameter } from "@/lib/hingeGeometry";
 import { useLanguage } from "@/lib/useLanguage";
 import { useMovablePanel, type MovablePanelOptions } from "@/lib/useMovablePanel";
+import { PrintFitCard } from "@/components/workplane/PrintFitCard";
 import { isNonSolidShapeKind, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeSupportsTaper, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
 import { MAX_SKETCH_REVOLVE_TURNS, normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
 import { roundSideCount } from "@/lib/roundSideCount";
@@ -2725,6 +2726,9 @@ export function ShapeInspector({
         ) : null}
       </div>
       ) : null}
+
+      {/* Fork: Print fit for holes. */}
+      {shape.hole && shape.groupOperation !== "bundle" ? <PrintFitCard shape={shape} locked={locked} onUpdate={(patch) => onUpdate(patch)} /> : null}
 
       {colorOpen ? (
         <div className="color-card" aria-label={t("inspector.shapeColor")} data-help-section-all="colorCard">

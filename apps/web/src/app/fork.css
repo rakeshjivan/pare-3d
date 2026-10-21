@@ -509,3 +509,36 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 @media (max-width: 1440px) {
   html:not([data-toolbar-size]) { --toolbar-scale: 0.88; }
 }
+
+/* Fork: Print fit for holes. */
+.print-fit-card {
+  margin: 0 12px 12px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: var(--font-ui);
+}
+.print-fit-heading { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.print-fit-heading strong { font-size: 14px; color: var(--foreground); }
+.print-fit-heading span { font-size: 12px; line-height: 1.35; color: var(--muted-strong); }
+.print-fit-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.print-fit-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 2px;
+  color: var(--foreground);
+  background: var(--subbar);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: 600 12.5px var(--font-ui);
+  cursor: pointer;
+}
+.print-fit-options button small { font-weight: 500; font-size: 10.5px; color: var(--muted-strong); }
+.print-fit-options button:hover:not(:disabled) { border-color: var(--primary); }
+.print-fit-options button.active { color: #fff; background: var(--primary); border-color: var(--primary); }
+.print-fit-options button.active small { color: rgba(255, 255, 255, 0.85); }
+.print-fit-status, .print-fit-note { margin: 8px 0 0; font: 500 12px/1.35 var(--font-ui); color: var(--muted-strong); }
+.print-fit-note { margin: 0 12px 12px; }
