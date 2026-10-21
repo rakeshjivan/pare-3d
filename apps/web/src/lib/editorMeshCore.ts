@@ -44,7 +44,8 @@ export type ShapeUpdatePatch = Partial<WorkplaneShape> & { bakeTransform?: boole
 
 export type ManifoldSolid = ReturnType<ManifoldToplevel["Manifold"]["cube"]>;
 
-export const CUTTER_PADDING = 0.05;
+/** What a hole reaches past its ends: enough to break an exact touch with a face (no skin left), too little to change a depth. Was 0.05 - a 5 mm blind hole cut 5.05 (Pare 3D build 23). */
+export const CUTTER_PADDING = 0.001;
 
 /** What a hole is wider than typed, on each side: the size stays, an exact touch with a wall does not. */
 export const CUTTER_LATERAL_PADDING = 0.001;
