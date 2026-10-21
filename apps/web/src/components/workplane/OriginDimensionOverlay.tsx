@@ -18,8 +18,10 @@ export function OriginDimensionOverlay({ overlay }: { overlay: OriginDimensionOv
           key={line.axis}
           className="dimension-label origin-dimension-value"
           style={styleForLine(line)}
+          title={t("originDimension.hint")}
         >
-          {line.label}
+          {/* Fork (build 15): say which way the number runs - the scene's z is the user's Y. */}
+          <span className="origin-dimension-axis">{line.axis === "x" ? "X" : "Y"}</span> {line.label}
         </span>
       ))}
     </div>

@@ -509,6 +509,17 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 @media (max-width: 1440px) {
   html:not([data-toolbar-size]) { --toolbar-scale: 0.88; }
 }
+@media (max-width: 1300px) {
+  html:not([data-toolbar-size]) { --toolbar-scale: 0.8; }
+}
+/* Build 15: the top bar fits a 1280-wide window - the theme and language switches show their icons only,
+   and the design name keeps room for a few words instead of being squeezed under the Bambu button. */
+@media (max-width: 1366px) {
+  .toolbar-title-row .theme-switch-label,
+  .toolbar-title-row .theme-chevron { display: none; }
+  .toolbar-title-row .theme-switch-button { padding: 0 6px; }
+}
+.toolbar-project-name { min-width: 150px; }
 
 /* Fork: Print fit for holes. */
 .print-fit-card {
@@ -801,3 +812,127 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 }
 .pare-version-status .spin { animation: pare-spin 1s linear infinite; }
 @keyframes pare-spin { to { transform: rotate(360deg); } }
+
+/* Fork (audit #4): one Help menu. */
+.help-menu { position: relative; display: inline-flex; }
+.help-menu-button { width: auto !important; gap: 4px; padding: 0 8px !important; }
+.help-menu-label { font: 600 13px var(--font-ui); }
+.help-menu-list {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 1200; width: 270px;
+  display: flex; flex-direction: column; padding: 6px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+.help-menu-list button, .help-menu-list a,
+.action-buttons .help-menu-list button {
+  display: flex; align-items: flex-start; justify-content: flex-start; gap: 10px; padding: 8px 10px; text-align: left;
+  width: 100%; height: auto; text-transform: none; line-height: 1.25; box-shadow: none;
+  color: var(--foreground); background: none; border: 0; border-radius: 8px; text-decoration: none; cursor: pointer;
+}
+.help-menu-list button:hover, .help-menu-list a:hover,
+.action-buttons .help-menu-list button:hover { background: var(--subbar); box-shadow: none; }
+.help-menu-list svg { margin-top: 2px; color: var(--primary); flex: none; }
+.help-menu-list span { display: flex; flex-direction: column; gap: 1px; }
+.help-menu-list strong { font: 600 13px var(--font-ui); }
+.help-menu-list small { font: 500 11.5px var(--font-ui); color: var(--muted-strong); }
+/* The help section's own label row has nothing to say about a single button. */
+.toolbar-actions-section[data-group="help"] .action-buttons { gap: 2px; }
+
+/* Build 15: Print fit and Mouse ears folded under the sizes. */
+.print-helpers .print-fit-card,
+.print-helpers .mouse-ears-card { margin: 0 0 4px; border: 0; background: transparent; }
+.origin-dimension-axis { opacity: 0.6; font-weight: 700; margin-right: 2px; }
+
+/* Build 16: the hover name carries the shortcut, and greyed-out tools still say what they are
+   (a click on them still does nothing - the button stays disabled). */
+.secondary-toolbar .toolbar-icon[data-tip]:hover::after { content: attr(data-tip); }
+.secondary-toolbar .toolbar-icon:disabled { pointer-events: auto; cursor: default; }
+.secondary-toolbar .toolbar-icon:disabled:hover { background: transparent; }
+
+/* Build 16: names under the icons - always in Simple mode (fewer tools, so they fit), and for
+   anyone who turns on "Show tool names" in the Help menu. */
+html[data-simple="on"] .secondary-toolbar .toolbar-icon:has(.tool-label),
+html[data-tool-names="on"] .secondary-toolbar .toolbar-icon:has(.tool-label) {
+  width: auto;
+  min-width: var(--toolbar-icon-size);
+  height: auto;
+  padding: 2px 3px 1px;
+  grid-template-rows: var(--toolbar-icon-size) auto;
+  row-gap: 0;
+}
+html[data-simple="on"] .secondary-toolbar .toolbar-icon .tool-label,
+html[data-tool-names="on"] .secondary-toolbar .toolbar-icon .tool-label {
+  display: block;
+  margin-top: -3px;
+  color: var(--foreground);
+  font: 600 10px/1.15 var(--font-ui);
+  white-space: nowrap;
+  opacity: 0.8;
+}
+html[data-simple="on"] .secondary-toolbar .toolbar-icon.disabled .tool-label,
+html[data-tool-names="on"] .secondary-toolbar .toolbar-icon.disabled .tool-label { opacity: 0.4; }
+
+/* Build 16/17: first-run question and starter designs on the home screen. */
+.first-run-card,
+.starter-designs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  color: var(--foreground);
+  background: var(--panel, #fff);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: var(--font-ui);
+  box-sizing: border-box;
+}
+.first-run-card { border-color: var(--primary); }
+.first-run-card > svg { color: var(--primary); flex: none; }
+.first-run-text, .starter-designs-heading { display: flex; flex-direction: column; gap: 3px; flex: 1 1 320px; min-width: 0; font-size: 13px; }
+.first-run-text strong, .starter-designs-heading strong { font-size: 15px; }
+.first-run-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.first-run-actions button {
+  padding: 7px 12px;
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: 600 13px var(--font-ui);
+  cursor: pointer;
+}
+.first-run-actions button.primary { color: #fff; background: var(--primary); border-color: var(--primary); }
+.starter-designs-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; width: 100%; }
+.starter-design {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  color: var(--foreground);
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.starter-design:hover { border-color: var(--primary); }
+.starter-design svg { color: var(--primary); flex: none; }
+.starter-design span { display: flex; flex-direction: column; gap: 2px; }
+.starter-design strong { font-size: 14px; }
+.starter-design small { font-size: 12px; opacity: 0.7; }
+
+/* Build 16: a narrower inspector on laptop screens, so the plate keeps more room. */
+@media (max-width: 1366px) and (min-width: 721px) {
+  .shape-inspector { width: 284px; }
+}
+
+/* Build 17: the sketch's "Make it 3D by" choice, and a Help menu without its word in the compact sketch ribbon. */
+.sketch-operation-button svg { width: 18px; height: 18px; }
+.sketch-operation-button.active { color: var(--primary); }
+.sketch-toolbar-ribbon .help-menu-label { display: none; }
+.sketch-toolbar-ribbon .help-menu-button { padding: 0 !important; width: var(--toolbar-icon-size) !important; }
+/* The title row is its own layer (z-index 2): while the Help menu is open it comes above the docked Shapes panel. */
+.toolbar-title-row:has(.help-menu-list) { z-index: 100; }
+.help-menu-button.active, .help-menu-button.active .help-menu-label { color: var(--primary) !important; }

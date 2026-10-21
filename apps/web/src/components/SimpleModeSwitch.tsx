@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { applyToolNames, readToolNames } from "@/lib/toolNames";
 
 /**
  * Fork: Simple mode hides the advanced tools (sketching, patterns, faces,
@@ -28,6 +29,7 @@ export function SimpleModeSwitch() {
     const stored = readSimpleMode();
     setOn(stored);
     applySimpleMode(stored);
+    applyToolNames(readToolNames());
   }, []);
   const toggle = () => {
     const next = !on;
@@ -45,7 +47,7 @@ export function SimpleModeSwitch() {
       className={`simple-mode-switch${on ? " active" : ""}`}
       role="switch"
       aria-checked={on}
-      title={on ? "Simple mode is on: advanced tools are hidden" : "Hide advanced tools"}
+      title={on ? "Simple mode is on: advanced tools are hidden and every tool shows its name" : "Simple mode: hide the advanced tools and show tool names"}
       onClick={toggle}
     >
       <span className="simple-mode-track" aria-hidden="true"><span className="simple-mode-thumb" /></span>

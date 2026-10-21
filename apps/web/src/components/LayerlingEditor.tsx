@@ -2,7 +2,7 @@
 
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { ShapeMenuPanel } from "@/components/workplane/ShapeMenuPanel";
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Blend, Check, CircleHelp, Percent, Circle as CircleIcon, CloudUpload, Download, Eye, EyeOff, FilePlus2, FolderOpen, Hexagon as HexagonIcon, Info, ListTree, MoreHorizontal, Pencil, Pentagon as PentagonIcon, Rotate3d, Route as RouteIcon, Search, Square as SquareIcon, Star as StarIcon, Triangle as TriangleIcon, X } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, PencilLine, Blend, Check, CircleHelp, Percent, Circle as CircleIcon, CloudUpload, Download, Eye, EyeOff, FilePlus2, FolderOpen, Hexagon as HexagonIcon, Info, ListTree, MoreHorizontal, Pencil, Pentagon as PentagonIcon, Rotate3d, Route as RouteIcon, Search, Square as SquareIcon, Star as StarIcon, Triangle as TriangleIcon, X } from "lucide-react";
 import { ObjectListPanel } from "@/components/workplane/ObjectListPanel";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useWheelField } from "@/lib/useWheelField";
@@ -128,6 +128,8 @@ import { arrayFollowingPivot, circleStepDegrees, clampArrayCount, moveAlongRadiu
 import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootprint, type BedOverhang } from "@/lib/printBed";
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
 import { ReadyPartsSection } from "./ReadyPartsSection";
+import { HelpMenu } from "./HelpMenu";
+import { MessageSquareText } from "lucide-react";
 import { PareBuildBadge } from "./PareVersionStatus";
 import { LithophanePanel, sampleImage, type LithophaneImage } from "./workplane/LithophanePanel";
 import { VoronoiPanel } from "./workplane/VoronoiPanel";
@@ -12501,6 +12503,11 @@ export function LayerlingEditor({
         sketchStrokeActive={sketchStrokePanelOpen || Boolean(sketchProfile.stroke)}
         onSketchStroke={() => setSketchStrokePanelOpen((open) => !open)}
         onStartSketch={(operation) => beginSketch(operation)}
+        sketchIsNew={editingSketchShapeId === null}
+        onSketchOperation={(operation) => {
+          setSketchOperation(operation);
+          setSketchRevolvePreview(null);
+        }}
         onEditSketch={beginSketchEdit}
         onSketchTool={chooseSketchTool}
         onSketchPrimitive={(primitive) => addSketchPrimitive(primitive, { x: 0, z: 0 })}
@@ -13506,6 +13513,8 @@ function SecondaryToolbar({
   sketchStrokeActive,
   onSketchStroke,
   onStartSketch,
+  sketchIsNew,
+  onSketchOperation,
   onEditSketch,
   onSketchTool,
   onSketchPrimitive,
@@ -13635,6 +13644,8 @@ function SecondaryToolbar({
   sketchStrokeActive?: boolean;
   onSketchStroke?: () => void;
   onStartSketch: (operation: SketchOperation) => void;
+  sketchIsNew: boolean;
+  onSketchOperation: (operation: SketchOperation) => void;
   onEditSketch: () => void;
   onSketchTool: (tool: SketchTool) => void;
   onSketchPrimitive: (primitive: SketchPrimitive) => void;
@@ -14040,7 +14051,8 @@ function SecondaryToolbar({
         key={id}
         data-layerling-tool={id}
         aria-label={label}
-        title={COMMAND_SHORTCUTS[id] ? `${label} (${COMMAND_SHORTCUTS[id]})` : label}
+        // Fork (build 16): the name and shortcut show at once on hover (fork.css), even on a greyed-out tool.
+        data-tip={COMMAND_SHORTCUTS[id] ? `${label} (${COMMAND_SHORTCUTS[id]})` : label}
         onClick={action}
         disabled={!enabled}
       >
@@ -14627,6 +14639,33 @@ function SecondaryToolbar({
                   </div>
                 </div>
                 <div className="toolbar-spacer" />
+                {/* Fork (build 17): draw first, then choose how the outline becomes 3D. */}
+                {sketchIsNew ? (
+                  <div className="toolbar-section sketch-operation-section" data-group="create">
+                    <div className="toolbar-section-label">{t("sketch.makeAs")}</div>
+                    <div className="toolbar-section-tools sketch-operation-choice" role="radiogroup" aria-label={t("sketch.makeAs")}>
+                      {([
+                        ["extrude", ArrowUpFromLine, "sketch.opExtrude", "sketch.opExtrudeHint"],
+                        ["revolve", Rotate3d, "sketch.opRevolve", "sketch.opRevolveHint"],
+                        ["sweep", RouteIcon, "sketch.opSweep", "sketch.opSweepHint"],
+                      ] as const).map(([operation, Icon, label, hint]) => (
+                        <button
+                          key={operation}
+                          type="button"
+                          role="radio"
+                          aria-checked={sketchOperation === operation}
+                          className={`sketch-command-button sketch-operation-button ${sketchOperation === operation ? "active" : ""}`}
+                          data-sketch-operation={operation}
+                          title={t(hint)}
+                          onClick={() => onSketchOperation(operation)}
+                        >
+                          <Icon aria-hidden="true" />
+                          <span>{t(label)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="toolbar-section sketch-finish-section" data-group="finish">
                   <div className="toolbar-section-label">{t("sketch.group.finish")}</div>
                   <div className="toolbar-section-tools">
@@ -14655,35 +14694,17 @@ function SecondaryToolbar({
               <div className="toolbar-section sketch-start-section" data-group="create">
                 <div className="toolbar-section-label">{t("sketch.group.create")}</div>
                 <div className="toolbar-section-tools">
+                  {/* Fork (build 17): one way in - draw first; Pull up, Spin round or Follow a path is chosen in the sketch. */}
                   <button
                     className="sketch-command-button primary"
                     type="button"
-                    aria-label={t("sketch.extrude")}
-                    title={`${t("sketch.extrude")} - ${t("sketch.extrudeHint")}`}
+                    aria-label={t("sketch.newSketch")}
+                    title={t("sketch.newSketchHint")}
+                    data-layerling-tool="sketch-new"
                     onClick={() => startSketch("extrude")}
                   >
-                    <ArrowUpFromLine aria-hidden="true" />
-                    <span>{t("sketch.extrude")}</span>
-                  </button>
-                  <button
-                    className="sketch-command-button primary"
-                    type="button"
-                    aria-label={t("sketch.revolve")}
-                    title={`${t("sketch.revolve")} - ${t("sketch.revolveHint")}`}
-                    onClick={() => startSketch("revolve")}
-                  >
-                    <Rotate3d aria-hidden="true" />
-                    <span>{t("sketch.revolve")}</span>
-                  </button>
-                  <button
-                    className="sketch-command-button primary"
-                    type="button"
-                    aria-label={t("sketch.sweep")}
-                    title={`${t("sketch.sweep")} - ${t("sketch.sweepHint")}`}
-                    onClick={() => startSketch("sweep")}
-                  >
-                    <RouteIcon aria-hidden="true" />
-                    <span>{t("sketch.sweep")}</span>
+                    <PencilLine aria-hidden="true" />
+                    <span>{t("sketch.newSketch")}</span>
                   </button>
                   <GuideHelpLink section="sketchToBody" />
                   <button className={`sketch-command-button ${canEditSketch ? "" : "disabled"}`} type="button" aria-label={t("sketch.editTo3d")} title={t("sketch.editTo3d")} onClick={onEditSketch} disabled={!canEditSketch}>
@@ -14700,15 +14721,8 @@ function SecondaryToolbar({
                 <button className="action-icon-button" aria-label={t("palette.open")} title={t("palette.open")} aria-haspopup="dialog" data-layerling-tool="command-search" onClick={openPalette}>
                   <Search className="toolbar-search-icon" aria-hidden="true" />
                 </button>
-                <button className="action-icon-button" aria-label={t("editor.guide")} title={t("editor.guide")} onClick={onGuide}>
-                  <ToolbarGuideIcon />
-                </button>
-                <button className="action-icon-button" aria-label={t("editor.keyboardShortcuts")} title={t("editor.keyboardShortcuts")} onClick={onShortcuts}>
-                  <ToolbarKeyboardIcon />
-                </button>
-                <button className={`action-icon-button ${interactiveHelpActive ? "active" : ""}`} type="button" aria-label={t("interactiveHelp.title")} title={`${t("interactiveHelp.title")} (${COMMAND_SHORTCUTS["interactive-help"]})`} aria-pressed={interactiveHelpActive} data-layerling-tool="interactive-help" data-help-exempt onClick={onInteractiveHelp}>
-                  <CircleHelp className="toolbar-search-icon" aria-hidden="true" />
-                </button>
+                {/* Fork: the quick guide, shortcuts, Interactive Help and the Tinkercad guide in one menu. */}
+                <HelpMenu interactiveHelpActive={interactiveHelpActive} onGuide={onGuide} onShortcuts={onShortcuts} onInteractiveHelp={onInteractiveHelp} />
               </div>
             </div>
           </div>
@@ -14789,7 +14803,7 @@ function SecondaryToolbar({
                   onClick={onNoteTool}
                   disabled={historyViewActive}
                 >
-                  <StickyNote className="title-icon" aria-hidden="true" />
+                  <MessageSquareText className="title-icon" aria-hidden="true" />
                 </button>
                 <button className="action-icon-button" aria-label={t("editor.import")} title={`${t("editor.import")} (${COMMAND_SHORTCUTS.import})`} onClick={() => onTopPanel("import")} disabled={historyViewActive}>
                   <Import className="title-icon" aria-hidden="true" />
@@ -14808,20 +14822,12 @@ function SecondaryToolbar({
                 <button className="action-icon-button" aria-label={t("palette.open")} title={t("palette.open")} aria-haspopup="dialog" data-layerling-tool="command-search" onClick={openPalette}>
                   <Search className="title-icon" aria-hidden="true" />
                 </button>
-                <button className="action-icon-button" aria-label={t("editor.guide")} title={t("editor.guide")} onClick={onGuide}>
-                  <BookOpen className="title-icon" aria-hidden="true" />
-                </button>
-                <button className="action-icon-button" aria-label={t("editor.keyboardShortcuts")} title={t("editor.keyboardShortcuts")} onClick={onShortcuts}>
-                  <Keyboard className="title-icon" aria-hidden="true" />
-                </button>
-                <button className={`action-icon-button ${interactiveHelpActive ? "active" : ""}`} type="button" aria-label={t("interactiveHelp.title")} title={`${t("interactiveHelp.title")} (${COMMAND_SHORTCUTS["interactive-help"]})`} aria-pressed={interactiveHelpActive} data-layerling-tool="interactive-help" data-help-exempt onClick={onInteractiveHelp}>
-                  <CircleHelp className="title-icon" aria-hidden="true" />
-                </button>
+                {/* Fork: the quick guide, shortcuts, Interactive Help and the Tinkercad guide in one menu. */}
+                <HelpMenu interactiveHelpActive={interactiveHelpActive} onGuide={onGuide} onShortcuts={onShortcuts} onInteractiveHelp={onInteractiveHelp} />
               </div>
             </div>
             </div>
           ) : null}
-          <TinkercadGuideButton />
           <SimpleModeSwitch />
           <ThemeSwitch />
           <LanguageSwitch />

@@ -229,6 +229,7 @@ import { MAX_HINGE_CLEARANCE, MAX_HINGE_KNUCKLES, MIN_HINGE_CLEARANCE, MIN_HINGE
 import { useLanguage } from "@/lib/useLanguage";
 import { useMovablePanel, type MovablePanelOptions } from "@/lib/useMovablePanel";
 import { PrintFitCard } from "@/components/workplane/PrintFitCard";
+import { PrintHelpers } from "@/components/workplane/PrintHelpers";
 import { MouseEarsCard } from "@/components/workplane/MouseEarsCard";
 import { isNonSolidShapeKind, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeSupportsTaper, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
 import { MAX_SKETCH_REVOLVE_TURNS, normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
@@ -2728,9 +2729,6 @@ export function ShapeInspector({
       </div>
       ) : null}
 
-      {/* Fork: Print fit for holes, mouse ears for solids. */}
-      {shape.hole && shape.groupOperation !== "bundle" ? <PrintFitCard shape={shape} locked={locked} onUpdate={(patch) => onUpdate(patch)} /> : null}
-      {!shape.hole && !isNonSolidShapeKind(shape.kind) ? <MouseEarsCard shape={shape} locked={locked} /> : null}
 
       {colorOpen ? (
         <div className="color-card" aria-label={t("inspector.shapeColor")} data-help-section-all="colorCard">
@@ -3092,6 +3090,12 @@ export function ShapeInspector({
             </div>
           ) : null}
         </div>
+      ) : null}
+      {/* Fork: Print fit for holes, mouse ears for solids - folded away under the sizes (build 15). */}
+      {shape.hole && shape.groupOperation !== "bundle" ? (
+        <PrintHelpers><PrintFitCard shape={shape} locked={locked} onUpdate={(patch) => onUpdate(patch)} /></PrintHelpers>
+      ) : !shape.hole && !isNonSolidShapeKind(shape.kind) ? (
+        <PrintHelpers><MouseEarsCard shape={shape} locked={locked} /></PrintHelpers>
       ) : null}
       {!movable.moved ? (
         <div className="inspector-snap-dock">

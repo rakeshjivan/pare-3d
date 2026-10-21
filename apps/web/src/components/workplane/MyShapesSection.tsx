@@ -79,7 +79,8 @@ export function MyShapesSection(props: MyShapesSectionProps) {
 
   useEffect(() => {
     try {
-      setCollapsed(window.localStorage.getItem(COLLAPSED_STORAGE_KEY) === "true");
+      // Fork (build 15): folded until the person opens it, so an empty box does not sit above the shapes.
+      setCollapsed(window.localStorage.getItem(COLLAPSED_STORAGE_KEY) !== "false");
       const open = JSON.parse(window.localStorage.getItem(OPEN_FOLDERS_STORAGE_KEY) ?? "[]") as unknown;
       if (Array.isArray(open)) setOpenFolders(open.filter((id): id is string => typeof id === "string"));
     } catch {

@@ -1,11 +1,16 @@
 "use client";
 
 import { PareBuildBadge, PareVersionStatus } from "@/components/PareVersionStatus";
-import { Archive, ArchiveRestore, ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { AppFooter } from "@/components/AppFooter";
 import { AutoBackupControl } from "@/components/AutoBackupControl";
 import { PareUpdateBanner } from "@/components/PareUpdateBanner";
+import { FirstRunCard } from "@/components/FirstRunCard";
+import { StarterDesigns } from "@/components/StarterDesigns";
+import { starterParts, type StarterId } from "@/lib/starterDesigns";
+import { buildReadyPart } from "@/lib/readyPartsBuild";
+import { placeCustomShape } from "@/lib/customShapePackage";
 import { OPEN_TINKERCAD_GUIDE_EVENT, TinkercadGuide } from "@/components/TinkercadGuide";
 import { AUTO_BACKUP_INTERVAL_MS, getAutoBackupStatus, initAutoBackup, subscribeAutoBackup, writeAutoBackup } from "@/lib/autoBackup";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
@@ -1609,21 +1614,40 @@ export default function Home() {
     });
   }, []);
 
-  const createAndOpenProject = (name?: string) => {
-    const project = newProject(name ?? t("dashboard.untitledDesign", { number: projects.length + 1 }), projects.length, 0, openFolderId);
+  const createAndOpenProject = (name?: string, shapes: WorkplaneShape[] = []) => {
+    const project = newProject(name ?? t("dashboard.untitledDesign", { number: projects.length + 1 }), projects.length, shapes.length, openFolderId);
     setProjectShapesById((current) => ({
       ...current,
-      [project.id]: projectShapeCacheEntry(project.revision ?? project.updatedAt, []),
+      [project.id]: projectShapeCacheEntry(project.revision ?? project.updatedAt, shapes),
     }));
     void saveProjectShapes(
       project.id,
-      projectShapeCacheEntry(project.revision ?? project.updatedAt, []),
+      projectShapeCacheEntry(project.revision ?? project.updatedAt, shapes),
       projectShapeSaveContext(project),
     ).catch(() => {
       setDashboardNotice(t("notice.projectShapesPrepareFailed"));
     });
     setProjects((current) => [project, ...current]);
     openEditor(project.id, { allowMissingFromStorage: true });
+  };
+
+  // Fork (build 17): a starter design - its parts built (grouped the way the Group tool does), then
+  // opened as a new design of its own.
+  const [starterBusy, setStarterBusy] = useState(false);
+  const createStarterProject = async (id: StarterId) => {
+    if (starterBusy) return;
+    setStarterBusy(true);
+    setDashboardNotice(t("starter.making"));
+    try {
+      const built = await Promise.all(starterParts(id).map((part) => buildReadyPart(part, 200_000)));
+      const { shapes } = placeCustomShape({ shapes: built }, { x: 0, y: 0, z: 0 }, []);
+      setDashboardNotice("");
+      createAndOpenProject(t(`starter.${id}`), shapes);
+    } catch (error) {
+      setDashboardNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setStarterBusy(false);
+    }
   };
 
   const openLylProjectFromFile = useCallback(async (file: File, sharedProject?: SharedProject, fileHandle?: LylFileHandle) => {
@@ -2630,6 +2654,7 @@ export default function Home() {
           sortMode={sortMode}
           viewMode={viewMode}
           onCreate={() => (sharedProjectsEnabled && newDesignsOnServer ? void createProjectInStoreFolder() : createAndOpenProject())}
+          onStarter={(id) => void createStarterProject(id)}
           newDesignsOnServer={newDesignsOnServer}
           newDesignsOnServerLocked={newDesignsOnServerLocked}
           onNewDesignsOnServerChange={changeNewDesignsOnServer}
@@ -2847,6 +2872,7 @@ function Dashboard({
   sortMode,
   viewMode,
   onCreate,
+  onStarter,
   onDeleteProject,
   onDeleteSharedProject,
   onDuplicateProject,
@@ -2904,6 +2930,7 @@ function Dashboard({
   sortMode: string;
   viewMode: ViewMode;
   onCreate: () => void;
+  onStarter: (id: StarterId) => void;
   onDeleteProject: (projectId: string) => void;
   onDeleteSharedProject: (project: SharedProject) => void;
   onDuplicateProject: (projectId: string) => void;
@@ -3530,6 +3557,8 @@ function Dashboard({
                 </div>
               ) : null}
               <PareUpdateBanner />
+              <FirstRunCard />
+              <StarterDesigns onStarter={onStarter} />
               <button type="button" className="tc-guide-card" onClick={() => window.dispatchEvent(new Event(OPEN_TINKERCAD_GUIDE_EVENT))}>
                 <GraduationCap size={22} aria-hidden="true" />
                 <span><strong>Coming from Tinkercad?</strong> See where everything is, what&apos;s new and which shortcuts are the same.</span>
@@ -3537,7 +3566,7 @@ function Dashboard({
               {/* The designs live in the browser, and a browser can fail or break with an update: said plainly and always (not to be closed). */}
               <aside className="storage-notice" aria-label={t("storageNotice.title")}>
                 <span className="storage-notice-icon" aria-hidden="true">
-                  <ShieldAlert size={24} strokeWidth={2.4} />
+                  <ShieldCheck size={24} strokeWidth={2.4} />
                 </span>
                 <div className="storage-notice-text">
                   <strong>{t("storageNotice.title")} <GuideHelpLink chapter="files" section="backingUp" className="storage-notice-help" iconSize={16} /></strong>

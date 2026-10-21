@@ -465,6 +465,22 @@ export function WorkspaceSettingsModal({
   const [defaultSaved, setDefaultSaved] = useState(false);
   useLanguage();
   const [activeSection, setActiveSection] = useState<WorkspaceSettingsSection>("appearance");
+  // Fork (build 17): Appearance shows the everyday choices; the rest wait behind "Show advanced settings".
+  const [showAdvanced, setShowAdvanced] = useState(() => {
+    try {
+      return window.localStorage.getItem("pare3d.settingsAdvanced") === "on";
+    } catch {
+      return false;
+    }
+  });
+  const toggleAdvanced = (on: boolean) => {
+    setShowAdvanced(on);
+    try {
+      window.localStorage.setItem("pare3d.settingsAdvanced", on ? "on" : "off");
+    } catch {
+      // Still applies while the window is open.
+    }
+  };
   const toolbarSize = useToolbarSize();
   const viewCubePosition = useViewCubePosition();
   const [selectedShapeKind, setSelectedShapeKind] = useState<ShapeKind>(toolbarShapeAssets[0].kind);
@@ -769,6 +785,8 @@ export function WorkspaceSettingsModal({
                       ))}
                     </select>
                   </label>
+                  {showAdvanced ? (
+                  <>
                   <ColorSettingControl
                     label={t("workspace.backgroundColor")}
                     color={backgroundColor}
@@ -835,6 +853,8 @@ export function WorkspaceSettingsModal({
                       {t("workspace.sketchMatch")}
                     </button>
                   </div>
+                  </>
+                  ) : null}
                   <hr className="workspace-divider" />
                   <WorkspaceToggle
                     label={t("workspace.showMoveDimensions")}
@@ -846,6 +866,14 @@ export function WorkspaceSettingsModal({
                     checked={originDimensionsEnabled}
                     onChange={onOriginDimensionsEnabledChange}
                   />
+                  <WorkspaceToggle
+                    label={t("settings.showAdvanced")}
+                    description={t("settings.advancedHint")}
+                    checked={showAdvanced}
+                    onChange={toggleAdvanced}
+                  />
+                  {showAdvanced ? (
+                  <>
                   <WorkspaceToggle
                     label={t("workspace.dimensionsAlwaysVisible")}
                     checked={workspace.dimensionsAlwaysVisible}
@@ -1070,6 +1098,8 @@ export function WorkspaceSettingsModal({
                     </label>
                   ) : null}
                   <p className="workspace-history-note">{t("workspace.booleanTriangleLimitNote")}</p>
+                  </>
+                  ) : null}
                 </>
               ) : null}
 
