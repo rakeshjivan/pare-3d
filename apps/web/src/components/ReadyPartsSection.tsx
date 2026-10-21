@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
+import { EnclosureCard, FitTestCard } from "@/components/ReadyPartsMore";
 import {
   DEFAULT_BOX_WITH_LID,
   INSERT_HOLES,
@@ -249,6 +250,9 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
               </button>
             </div>
           ) : null}
+          {/* Fork (build 21): the fit test and the enclosure maker. */}
+          <FitTestCard onInsert={onInsert} />
+          <EnclosureCard onInsert={onInsert} />
         </div>
       )}
     </section>
@@ -263,7 +267,7 @@ function SizePicker({ label, value, onChange }: { label: string; value: MetricSi
   );
 }
 
-function MmField({ label, value, onChange, unit = "mm" }: { label: string; value: number; onChange: (value: number) => void; unit?: string }) {
+export function MmField({ label, value, onChange, unit = "mm" }: { label: string; value: number; onChange: (value: number) => void; unit?: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
     if (draft !== null) {
@@ -296,7 +300,7 @@ function MmField({ label, value, onChange, unit = "mm" }: { label: string; value
   );
 }
 
-const iconProps = { width: 30, height: 30, viewBox: "0 0 32 32", fill: "none", stroke: "currentColor", strokeWidth: 1.6, "aria-hidden": true } as const;
+export const iconProps = { width: 30, height: 30, viewBox: "0 0 32 32", fill: "none", stroke: "currentColor", strokeWidth: 1.6, "aria-hidden": true } as const;
 
 function ParaboloidIcon() {
   return (

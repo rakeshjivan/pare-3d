@@ -128,6 +128,8 @@ import { arrayFollowingPivot, circleStepDegrees, clampArrayCount, moveAlongRadiu
 import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootprint, type BedOverhang } from "@/lib/printBed";
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
 import { ReadyPartsSection } from "./ReadyPartsSection";
+import { MoreShapesSection } from "./MoreShapesSection";
+import { moreShapePart } from "@/lib/moreShapes";
 import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
 import { BusyIndicator } from "./BusyIndicator";
@@ -135,8 +137,12 @@ import { beginBusy, setBusyCount } from "@/lib/busy";
 import { SaveStatus } from "./SaveStatus";
 import { WhatsNew } from "./WhatsNew";
 import { FastModeHint } from "./FastModeHint";
-import { checkBeforeSending, PRINT_CHECK_EVENT, PrintCheckPanel } from "./PrintCheckPanel";
+import { checkBeforeSending, PRINT_CHECK_EVENT, PrintCheckPanel, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
 import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
+import { tracedSolidPositions, type TraceOptions, type TraceResult } from "@/lib/photoTrace";
+import { TracePanel } from "@/components/workplane/TracePanel";
+import { layOutOnPlate, splitToFit } from "@/lib/splitToFit";
+import { whileBusy } from "@/lib/busy";
 import { MessageSquareText } from "lucide-react";
 import { PareBuildBadge } from "./PareVersionStatus";
 import { LithophanePanel, sampleImage, type LithophaneImage } from "./workplane/LithophanePanel";
@@ -185,7 +191,7 @@ import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, tra
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
-import { FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
+import { FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
 import { BookOpen, Import, Keyboard, Settings as LucideSettings, StickyNote, Upload } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
@@ -6418,7 +6424,7 @@ export function LayerlingEditor({
   }, [commitShapes]);
 
   // Fork: the lithophane and Voronoi makers.
-  const [makerPanel, setMakerPanel] = useState<"lithophane" | "voronoi" | null>(null);
+  const [makerPanel, setMakerPanel] = useState<"lithophane" | "voronoi" | "trace" | null>(null);
   const [makerBusy, setMakerBusy] = useState(false);
   const placeMade = useCallback((made: WorkplaneShape, notice: string) => {
     const { shapes: inserted } = placeCustomShape({ shapes: [made] }, placementWorkplaneRef.current.origin, []);
@@ -6469,6 +6475,27 @@ export function LayerlingEditor({
       const shape = meshShapeFromPositions(t(o.mode === "panel" ? "voronoi.panelName" : "voronoi.patternName"), o.mode === "panel" ? "#2f7de1" : "#999999", positions);
       setMakerPanel(null);
       placeMade(o.mode === "pattern" ? { ...shape, hole: true } : shape, t(o.mode === "panel" ? "voronoi.createdPanel" : "voronoi.createdPattern", { count: openings }));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMakerBusy(false);
+    }
+  }, [placeMade]);
+
+  // Fork (build 21): photo to outline - the traced outline as a cut-out (a hole) or a solid.
+  const createTrace = useCallback(async (trace: TraceResult, options: TraceOptions, name: string) => {
+    setMakerBusy(true);
+    try {
+      const runtime = await getManifoldRuntime();
+      const positions = tracedSolidPositions(runtime, trace, options);
+      if (!positions.length) {
+        setNotice(t("trace.notFound"));
+        return;
+      }
+      const label = name || t("trace.title");
+      const shape = meshShapeFromPositions(options.mode === "cutout" ? t("trace.cutoutName", { name: label }) : label, options.mode === "cutout" ? "#999999" : "#2f7de1", positions);
+      setMakerPanel(null);
+      placeMade(options.mode === "cutout" ? { ...shape, hole: true } : shape, t(options.mode === "cutout" ? "trace.createdCutout" : "trace.createdSolid"));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -11187,6 +11214,49 @@ export function LayerlingEditor({
   exportDesignRef.current = exportDesign;
   const projectNameForBambuRef = useRef(projectName);
   projectNameForBambuRef.current = projectName;
+  // Fork (build 21): Split to fit - parts too big for the printer cut into pieces that fit, with dowels.
+  const splitPartsToFit = useCallback(async (ids: readonly string[]) => {
+    const printer = printerPresetById(workspaceSettingsRef.current.printer);
+    const bed = {
+      width: printer?.width ?? workspaceSettingsRef.current.width,
+      depth: printer?.depth ?? workspaceSettingsRef.current.depth,
+      height: printer?.height ?? 250,
+    };
+    const targets = shapesRef.current.filter((shape) => ids.includes(shape.id) && !shape.locked && !shape.hole);
+    if (!targets.length) {
+      setNotice(t("status.selectShapeFirst"));
+      return;
+    }
+    setNotice(t("splitToFit.working"), true);
+    const replacements = new Map<string, WorkplaneShape[]>();
+    const extra: WorkplaneShape[] = [];
+    let pieces = 0;
+    let dowels = 0;
+    for (const shape of targets) {
+      const result = await whileBusy("combine", () => splitToFit(shape, bed));
+      if (result.status === "failed") {
+        setNotice(t("splitToFit.failed", { name: displayShapeName(shape), detail: result.error }), true);
+        return;
+      }
+      if (result.status === "fits") continue;
+      replacements.set(shape.id, result.pieces);
+      extra.push(...result.pins);
+      pieces += result.pieces.length;
+      dowels += result.pins.length;
+    }
+    if (!replacements.size) {
+      setNotice(t("splitToFit.alreadyFits"), true);
+      return;
+    }
+    const laid = layOutOnPlate([...[...replacements.values()].flat(), ...extra], bed.width);
+    const laidById = new Map(laid.map((shape) => [shape.id, shape]));
+    const next = [
+      ...shapesRef.current.flatMap((shape) => (replacements.get(shape.id) ?? [shape]).map((entry) => laidById.get(entry.id) ?? entry)),
+      ...extra.map((pin) => laidById.get(pin.id) ?? pin),
+    ];
+    commitShapes(next, laid.map((shape) => shape.id), t("splitToFit.done", { pieces, dowels }));
+  }, [commitShapes]);
+
   // Fork (build 19): "Ready to print?" - run before Send to Bambu Studio (unless turned off), or on its own.
   const [printCheck, setPrintCheck] = useState<{ issues: PrintIssue[]; sending: BambuSendFormat | null } | null>(null);
   const runPrintCheck = useCallback(() => {
@@ -11212,13 +11282,16 @@ export function LayerlingEditor({
       void exportDesignRef.current(format, projectNameForBambuRef.current, false, true);
     };
     const onCheck = () => setPrintCheck({ issues: runPrintCheck(), sending: null });
+    const onSplit = () => void splitPartsToFit(selectedIdsRef.current);
+    window.addEventListener(SPLIT_TO_FIT_EVENT, onSplit);
     window.addEventListener(SEND_TO_BAMBU_EVENT, onSend);
     window.addEventListener(PRINT_CHECK_EVENT, onCheck);
     return () => {
       window.removeEventListener(SEND_TO_BAMBU_EVENT, onSend);
       window.removeEventListener(PRINT_CHECK_EVENT, onCheck);
+      window.removeEventListener(SPLIT_TO_FIT_EVENT, onSplit);
     };
-  }, [runPrintCheck]);
+  }, [runPrintCheck, splitPartsToFit]);
 
   /**
    * The drawing of a set of bodies, from the same bodies as the export (visible solids, holes taken
@@ -12636,12 +12709,22 @@ export function LayerlingEditor({
         onLithophane={() => setMakerPanel((current) => (current === "lithophane" ? null : "lithophane"))}
         onVoronoi={() => setMakerPanel((current) => (current === "voronoi" ? null : "voronoi"))}
         lithophaneOpen={makerPanel === "lithophane"}
+        onTrace={() => setMakerPanel((current) => (current === "trace" ? null : "trace"))}
+        traceOpen={makerPanel === "trace"}
         voronoiOpen={makerPanel === "voronoi"}
         renderReadyParts={(close) => (
           <ReadyPartsSection
             onInsert={(parts, options) => {
               close();
               void insertReadyParts(parts, options).catch(noticeError);
+            }}
+          />
+        )}
+        renderMoreShapes={(close) => (
+          <MoreShapesSection
+            onAdd={(id) => {
+              close();
+              void insertReadyParts([moreShapePart(id, t(`moreShapes.${id}`))]).catch(noticeError);
             }}
           />
         )}
@@ -12941,6 +13024,10 @@ export function LayerlingEditor({
             setSelectedIds(ids);
             setPrintCheck(null);
           }}
+          onSplitToFit={(ids) => {
+            setPrintCheck(null);
+            void splitPartsToFit(ids);
+          }}
           onShowOverhangs={() => {
             if (!overhangsVisible) toggleOverhangsVisible();
             setPrintCheck(null);
@@ -13010,6 +13097,7 @@ export function LayerlingEditor({
         </div>
       ) : null}
       {makerPanel === "lithophane" ? <LithophanePanel busy={makerBusy} onCreate={(image, options) => void createLithophane(image, options)} onClose={() => setMakerPanel(null)} /> : null}
+      {makerPanel === "trace" ? <TracePanel busy={makerBusy} onCreate={(trace, options, name) => void createTrace(trace, options, name)} onClose={() => setMakerPanel(null)} /> : null}
       {makerPanel === "voronoi" ? <VoronoiPanel busy={makerBusy} onCreate={(options) => void createVoronoi(options)} onClose={() => setMakerPanel(null)} /> : null}
       {alignMode && selectedShapes.length >= 2 ? (
         <DistributePanel count={selectedShapes.length} onApply={distributeSelection} />
@@ -13665,8 +13753,11 @@ function SecondaryToolbar({
   overhangAngle,
   onToggleOverhangs,
   renderMyShapes,
+  renderMoreShapes,
   renderReadyParts,
   onLithophane,
+  onTrace,
+  traceOpen,
   onVoronoi,
   lithophaneOpen,
   voronoiOpen,
@@ -13797,10 +13888,13 @@ function SecondaryToolbar({
   onToggleOverhangs: () => void;
   /** Custom shapes above the library; gets the way to close the menu. */
   renderMyShapes?: (close: () => void) => ReactNode;
+  renderMoreShapes?: (close: () => void) => ReactNode;
   /** Fork: ready-made parts under the library; gets the way to close the menu. */
   renderReadyParts?: (close: () => void) => ReactNode;
   /** Fork: the lithophane and Voronoi makers. */
   onLithophane?: () => void;
+  onTrace?: () => void;
+  traceOpen?: boolean;
   onVoronoi?: () => void;
   lithophaneOpen?: boolean;
   voronoiOpen?: boolean;
@@ -14101,6 +14195,7 @@ function SecondaryToolbar({
   const makeTools = [
     { id: "readyParts", label: t("readyParts.title"), icon: ForkReadyPartsIcon, action: () => { setShapesOpen(true); chooseShapesTab("parts"); }, enabled: !historyViewActive, active: shapesOpen && shapesTab === "parts" },
     { id: "lithophane", label: t("lithophane.title"), icon: ForkLithophaneIcon, action: onLithophane, enabled: Boolean(onLithophane), active: Boolean(lithophaneOpen) },
+    { id: "trace", label: t("trace.title"), icon: ForkTraceIcon, action: onTrace, enabled: Boolean(onTrace), active: Boolean(traceOpen) },
     { id: "voronoi", label: t("voronoi.title"), icon: ForkVoronoiIcon, action: onVoronoi, enabled: Boolean(onVoronoi), active: Boolean(voronoiOpen) },
   ];
   const sketchClipboardTools = [
@@ -14254,6 +14349,7 @@ function SecondaryToolbar({
       plain("import", t("editor.import"), manageGroup, true, () => onTopPanel("import"), { icon: ToolbarImportIcon }),
       plain("export", t("editor.export"), manageGroup, true, () => onTopPanel("export"), { icon: ToolbarVectorExportIcon }),
       plain("print-check", t("printCheck.command"), manageGroup, true, () => window.dispatchEvent(new Event(PRINT_CHECK_EVENT))),
+      plain("split-to-fit", t("splitToFit.command"), manageGroup, true, () => window.dispatchEvent(new Event(SPLIT_TO_FIT_EVENT))),
       plain("settings", t("editor.workspaceSettings"), manageGroup, true, () => window.dispatchEvent(new Event("layerling:open-workspace-settings")), { icon: ToolbarSettingsIcon }),
       plain("mode-sketch", t("palette.switchSketch"), t("palette.group.mode"), true, () => selectToolbarMode("sketch")),
       ...helpCommands,
@@ -14420,6 +14516,7 @@ function SecondaryToolbar({
                   </button>
                 ))}
               </div>
+              {renderMoreShapes ? renderMoreShapes(closeShapesAfterPick) : null}
               </>)}
               </div>
             </ShapeMenuPanel>

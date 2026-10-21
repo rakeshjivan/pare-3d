@@ -267,6 +267,18 @@ export function ForkLithophaneIcon(props: IconProps) {
   );
 }
 
+/** Fork (build 21): photo to outline - a photo with a traced line round a spanner shape. */
+export function ForkTraceIcon(props: IconProps) {
+  return (
+    <ForkIcon {...props}>
+      <rect x="6" y="8" width="36" height="30" rx="3" {...SOFT} />
+      <rect x="6" y="8" width="36" height="30" rx="3" />
+      <path d="M14 30l11-11a5 5 0 1 1 5 5L19 35a3.5 3.5 0 0 1-5-5z" {...ACCENT} />
+      <path d="M12 28l11-11a7 7 0 1 1 8 8L20 36a5 5 0 0 1-8-8z" strokeDasharray="2.5 2" />
+    </ForkIcon>
+  );
+}
+
 export function ForkVoronoiIcon(props: IconProps) {
   return (
     <ForkIcon {...props}>
@@ -316,6 +328,7 @@ export const FORK_SHORT_LABELS_EN: Readonly<Record<string, string>> = {
   readyParts: "Parts",
   lithophane: "Lithophane",
   voronoi: "Voronoi",
+  trace: "Trace",
   spaceOut: "Space out",
   copy: "Copy",
   paste: "Paste",
@@ -402,5 +415,6 @@ export const FORK_TOOL_HINTS_EN: Readonly<Record<string, string>> = {
   readyParts: "boxes, inserts, clips, hinges and more",
   lithophane: "a photo that shows when light shines through",
   voronoi: "an organic web pattern for panels and vents",
+  trace: "photo of a tool or logo on paper to an outline at its real size",
   spaceOut: "space parts evenly or arrange them on the plate",
 };

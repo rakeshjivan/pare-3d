@@ -1132,3 +1132,17 @@ html[data-theme="dark"] { --toolbar-icon-disabled: #7f776d; }
 .settings-search-results .empty { padding: 7px 9px; font-size: 12px; opacity: 0.7; }
 @keyframes pare-hit { 0%, 100% { background: transparent; } 30% { background: color-mix(in srgb, var(--primary) 16%, transparent); } }
 .settings-search-hit { animation: pare-hit 1.6s ease; border-radius: 8px; }
+
+/* Build 21: enclosure maker ports. */
+.enclosure-port { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; margin: 0 0 6px; border: 1px solid var(--border); border-radius: 8px; position: relative; }
+.enclosure-port select { min-width: 0; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--background, #fff); color: inherit; font: 500 12px var(--font-ui); }
+.enclosure-port-remove { position: absolute; top: -8px; right: -8px; width: 20px; height: 20px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--panel, #fff); color: inherit; cursor: pointer; line-height: 1; }
+.enclosure-port-add { margin: 0 0 8px; padding: 5px 10px; border: 1px dashed var(--border); border-radius: 8px; background: none; color: var(--primary); font: 600 12px var(--font-ui); cursor: pointer; }
+
+/* Build 21: photo to outline. */
+.trace-preview { display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px; }
+.trace-preview svg { width: 100%; max-height: 220px; background: #f3f4f6; border: 1px solid var(--border); border-radius: 8px; }
+.trace-preview span { font: 500 12px var(--font-ui); opacity: 0.8; }
+/* Fork (build 21): the enclosure's mounting row wraps instead of squeezing its buttons. */
+.enclosure-mounting { flex-wrap: wrap; row-gap: 6px; }
+.enclosure-mounting button { white-space: nowrap; }

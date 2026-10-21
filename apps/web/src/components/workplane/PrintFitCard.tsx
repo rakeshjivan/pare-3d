@@ -1,6 +1,7 @@
 "use client";
 
 import { t } from "@/lib/i18n";
+import { readMyPrintFit } from "@/lib/fitTest";
 import { resizedShapeSize, shapeDepth, shapeHasTaper, shapeWidth } from "@/lib/workplaneShapes";
 import type { WorkplaneShape } from "@/types/layerling";
 
@@ -73,6 +74,7 @@ export function PrintFitCard({
     return <p className="print-fit-note">{t("printFit.unsupported")}</p>;
   }
   const current = currentClearance(shape);
+  const myFit = readMyPrintFit();
   const choose = (clearance: number) => onUpdate(applyPrintFit(shape, clearance));
   return (
     <div className="print-fit-card" role="group" aria-label={t("printFit.title")}>
@@ -95,7 +97,22 @@ export function PrintFitCard({
             <small>{fit.clearance ? `+${fit.clearance.toFixed(1)} mm` : t("printFit.asDrawn")}</small>
           </button>
         ))}
+        {/* Fork (build 21): the clearance this printer needs, found with the fit test. */}
+        {myFit !== null ? (
+          <button
+            type="button"
+            disabled={locked}
+            className={current === myFit ? "active" : ""}
+            aria-pressed={current === myFit}
+            title={t("printFit.mineHint")}
+            onClick={() => choose(myFit)}
+          >
+            <span>{t("printFit.mine")}</span>
+            <small>{`+${myFit.toFixed(2).replace(/0$/, "")} mm`}</small>
+          </button>
+        ) : null}
       </div>
+      {myFit === null ? <p className="print-fit-status">{t("printFit.findMine")}</p> : null}
       {current ? <p className="print-fit-status">{t("printFit.applied", { mm: current.toFixed(1) })}</p> : null}
     </div>
   );

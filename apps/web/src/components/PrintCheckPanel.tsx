@@ -5,6 +5,7 @@ import { t } from "@/lib/i18n";
 import type { PrintIssue } from "@/lib/printCheck";
 
 export const PRINT_CHECK_EVENT = "pare3d:print-check";
+export const SPLIT_TO_FIT_EVENT = "pare3d:split-to-fit";
 const CHECK_BEFORE_SEND_KEY = "pare3d.checkBeforeSend";
 
 export function checkBeforeSending() {
@@ -43,6 +44,7 @@ export function PrintCheckPanel({
   printer,
   sending,
   onSelect,
+  onSplitToFit,
   onShowOverhangs,
   onSend,
   onClose,
@@ -52,6 +54,7 @@ export function PrintCheckPanel({
   /** Set when the check ran because of Send to Bambu Studio. */
   sending: boolean;
   onSelect: (ids: string[]) => void;
+  onSplitToFit: (ids: string[]) => void;
   onShowOverhangs: () => void;
   onSend: () => void;
   onClose: () => void;
@@ -79,6 +82,9 @@ export function PrintCheckPanel({
                 <span>{message(issue, printer)}</span>
                 {issue.ids.length ? (
                   <button type="button" onClick={() => onSelect(issue.ids)}>{t("printCheck.select")}</button>
+                ) : null}
+                {issue.kind === "outside" ? (
+                  <button type="button" onClick={() => onSplitToFit(issue.ids)}>{t("splitToFit.button")}</button>
                 ) : null}
                 {issue.kind === "overhang" ? (
                   <button type="button" onClick={onShowOverhangs}>{t("printCheck.showOverhangs")}</button>

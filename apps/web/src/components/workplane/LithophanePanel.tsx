@@ -18,7 +18,7 @@ const RESOLUTIONS = [
 ] as const;
 
 /** Reads an image file into brightness values, at most READ_SIZE points on its long side. */
-async function readImage(file: File): Promise<LithophaneImage> {
+export async function readImage(file: File): Promise<LithophaneImage> {
   const url = URL.createObjectURL(file);
   try {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -209,7 +209,7 @@ export function LithophanePanel({ busy, onCreate, onClose }: { busy: boolean; on
   );
 }
 
-function Field({ label, value, onChange, unit = "mm" }: { label: string; value: number; onChange: (value: number) => void; unit?: string }) {
+export function Field({ label, value, onChange, unit = "mm" }: { label: string; value: number; onChange: (value: number) => void; unit?: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
     if (draft !== null) {
