@@ -159,7 +159,7 @@ import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, tra
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
-import { FORK_MORE_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_ICONS, ForkExportIcon, ForkHomeIcon, ForkImportIcon, ForkNoteIcon, ForkShapesIcon } from "@/components/forkToolbarIcons";
+import { FORK_SHORT_LABELS_EN, FORK_TOOL_ICONS, ForkExportIcon, ForkHomeIcon, ForkImportIcon, ForkNoteIcon, ForkShapesIcon } from "@/components/forkToolbarIcons";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -2580,6 +2580,8 @@ export function LayerlingEditor({
    * project), so undo and redo bring the bar back along with the parts.
    */
   const [openGroups, setOpenGroups] = useState<OpenGroupLevel[]>([]);
+  const openGroupsCountRef = useRef(0);
+  openGroupsCountRef.current = openGroups.length;
   const [openGroupBusy, setOpenGroupBusy] = useState(false);
   const openGroupsRef = useRef(openGroups);
   openGroupsRef.current = openGroups;
@@ -8266,6 +8268,8 @@ export function LayerlingEditor({
       setOpenGroupBusy(false);
     }
   }, [commitNotes, commitOpenGroupTransition, endOpenGroupLevelsWithoutStep, refuseOpenGroupStep]);
+  const finishOpenGroupRef = useRef(finishOpenGroup);
+  finishOpenGroupRef.current = finishOpenGroup;
 
   // Undo past an opening brings that group back, and deleting every part leaves
   // nothing to close: in both cases that level is over, with every level inside it.
@@ -11719,6 +11723,12 @@ export function LayerlingEditor({
           setScalePercentError(null);
           return;
         }
+        // Fork: in an open group, Esc with nothing selected finishes it (keeps the changes, as Done).
+        if (openGroupsCountRef.current > 0 && selectedIds.length === 0) {
+          event.preventDefault();
+          void finishOpenGroupRef.current();
+          return;
+        }
         setSelectedIds([]);
         setNotice(t("status.selectionCleared"));
         return;
@@ -13366,24 +13376,6 @@ function SecondaryToolbar({
   onSelectObject: (id: string) => void;
 }) {
   const [shapesOpen, setShapesOpen] = useState(false);
-  // Fork: the "More" menu of advanced tools.
-  const [moreToolsOpen, setMoreToolsOpen] = useState(false);
-  const moreToolsRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!moreToolsOpen) return;
-    const close = (event: PointerEvent) => {
-      if (!moreToolsRef.current?.contains(event.target as Node)) setMoreToolsOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMoreToolsOpen(false);
-    };
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", escape);
-    return () => {
-      window.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", escape);
-    };
-  }, [moreToolsOpen]);
   // The Shapes panel kept open while shapes are placed one after the other (#433); remembered in this browser.
   const [geometryShapesPinned, setGeometryShapesPinned] = useState(false);
   // The sketch's panel has its own pin, its own place and its own size (#577).
@@ -14060,38 +14052,15 @@ function SecondaryToolbar({
         </div>
         <div className="toolbar-section" data-group="combine">
           <div className="toolbar-section-label">{t("editor.group.combine")}</div>
-          <div className="toolbar-section-tools">{combineTools.filter((tool) => !FORK_MORE_TOOLS.has(tool.id)).map(renderToolButton)}</div>
+          <div className="toolbar-section-tools">{combineTools.map(renderToolButton)}</div>
         </div>
         <div className="toolbar-section" data-group="modify">
           <div className="toolbar-section-label">{t("editor.group.modify")}</div>
-          <div className="toolbar-section-tools">{modifyTools.filter((tool) => !FORK_MORE_TOOLS.has(tool.id)).map(renderToolButton)}</div>
+          <div className="toolbar-section-tools">{modifyTools.map(renderToolButton)}</div>
         </div>
         <div className="toolbar-section" data-group="arrange">
           <div className="toolbar-section-label">{t("editor.group.arrange")}</div>
-          <div className="toolbar-section-tools">{arrangeTools.filter((tool) => !FORK_MORE_TOOLS.has(tool.id)).map(renderToolButton)}</div>
-        </div>
-        {/* Fork: the advanced tools in one "More" menu, so the toolbar stays on one row with names. */}
-        <div className="toolbar-section fork-more-section" data-group="more" ref={moreToolsRef}>
-          <div className="toolbar-section-tools">
-            <button
-              type="button"
-              className={`toolbar-icon fork-more-button ${moreToolsOpen ? "active" : ""}`}
-              aria-label={t("editor.moreTools")}
-              aria-haspopup="menu"
-              aria-expanded={moreToolsOpen}
-              onClick={() => setMoreToolsOpen((open) => !open)}
-            >
-              <MoreHorizontal />
-              <span className="tool-label" aria-hidden="true">{t("editor.moreToolsShort")}</span>
-            </button>
-          </div>
-          {moreToolsOpen ? (
-            <div className="fork-more-menu" role="menu" onClick={(event) => {
-              if ((event.target as HTMLElement).closest(".toolbar-icon")) setMoreToolsOpen(false);
-            }}>
-              {[...combineTools, ...modifyTools, ...arrangeTools].filter((tool) => FORK_MORE_TOOLS.has(tool.id)).map(renderToolButton)}
-            </div>
-          ) : null}
+          <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>
         </div>
       </div>
           </>

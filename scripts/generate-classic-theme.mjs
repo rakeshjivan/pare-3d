@@ -220,32 +220,11 @@ const EXTRAS = `:root:where(html${CLASSIC}) {
   --font-ui: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --topbar: #ffffff;
   --toolbar-bg: #ffffff;
-  /* One quiet colour for every tool group instead of a spool colour each. */
-  --group-neutral: #4a5565;
-  --group-home: var(--group-neutral);
-  --group-clipboard: var(--group-neutral);
-  --group-history: var(--group-neutral);
-  --group-shapes: var(--group-neutral);
-  --group-visibility: var(--group-neutral);
-  --group-combine: var(--group-neutral);
-  --group-modify: var(--group-neutral);
-  --group-arrange: var(--group-neutral);
-  --group-manage: var(--group-neutral);
-  --group-help: var(--group-neutral);
-  --group-sketch: var(--group-neutral);
 }
-
-/* A flat toolbar: no coloured frame per group, small grey labels. */
+/* Group frames keep their colour, a little softer on the cool background. */
 :where(html${CLASSIC}) .toolbar-section-tools,
 :where(html${CLASSIC}) .toolbar-section .action-buttons {
-  background: transparent;
-  border-color: transparent;
-}
-
-:where(html${CLASSIC}) .toolbar-section-label {
-  color: #8a94a3;
-  font-weight: 600;
-  font-size: 11px;
+  background: color-mix(in srgb, var(--group-color) 5%, #ffffff);
 }`;
 
 export function classicThemeCss(sourceCss) {

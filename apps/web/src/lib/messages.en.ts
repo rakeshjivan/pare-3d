@@ -2504,7 +2504,7 @@ export const MESSAGES_EN = {
   "group.done": "Done",
   "group.noneOpen": "No group is being edited",
   "group.busy": "The group is being rebuilt",
-  "group.editing": "Editing {path}: change its parts, then Done.",
+  "group.editing": "Editing {path}: change its parts, then Done (or press Esc twice).",
   "group.editingEdgeWarning": " Fillets and chamfers on the whole group are lost when it is rebuilt.",
   "group.finishOpenFirst": "Only groups inside \"{name}\" can be edited now - finish it with Done first",
   "status.groupOpened": "Editing \"{name}\"",

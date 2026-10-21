@@ -4787,6 +4787,8 @@ export function WorkplaneViewport({
   onEditSketchRef.current = onEditSketch;
   const onOpenGroupRef = useRef(onOpenGroup);
   onOpenGroupRef.current = onOpenGroup;
+  const onSelectShapeRef = useRef(onSelectShape);
+  onSelectShapeRef.current = onSelectShape;
   useEffect(() => {
     const state = threeRef.current;
     // Pointer capture sends the clicks to the host, not to the canvas inside it.
@@ -4801,7 +4803,24 @@ export function WorkplaneViewport({
       if (selected.length !== 1 || selected[0] !== shape.id) return;
       const settings = workspaceRef.current;
       if (shape.sketchProfile && settings.doubleClickOpensSketch !== false) onEditSketchRef.current?.();
-      else if (shape.groupedShapes?.length && settings.doubleClickOpensGroup !== false) onOpenGroupRef.current?.(shape.id);
+      else if (shape.groupedShapes?.length && settings.doubleClickOpensGroup !== false) {
+        onOpenGroupRef.current?.(shape.id);
+        // Fork: once the group is open, the part that was double-clicked is the one selected, so it
+        // can be changed straight away (as in similar tools). The parts reach the scene a frame or
+        // two later; until then the pick still finds the group.
+        const { clientX, clientY } = event;
+        let tries = 0;
+        const selectPart = () => {
+          tries += 1;
+          const partId = pickShapeIdAt(state, clientX, clientY);
+          if (partId && partId !== shape.id && shapesRef.current.some((candidate) => candidate.id === partId)) {
+            onSelectShapeRef.current?.(partId);
+            return;
+          }
+          if (tries < 30) window.requestAnimationFrame(selectPart);
+        };
+        window.requestAnimationFrame(selectPart);
+      }
     };
     host.addEventListener("dblclick", openSketch);
     return () => host.removeEventListener("dblclick", openSketch);

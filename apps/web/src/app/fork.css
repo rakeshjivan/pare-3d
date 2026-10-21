@@ -77,22 +77,6 @@
 }
 .title-row-tools .action-icon-button svg { width: 22px; height: 22px; }
 
-.secondary-toolbar[data-selection="no"] .toolbar-section[data-group="combine"],
-.secondary-toolbar[data-selection="no"] .toolbar-section[data-group="modify"],
-.secondary-toolbar[data-selection="no"] .toolbar-section[data-group="arrange"] {
-  display: none;
-}
-
-/* A hint where the selection tools appear, while nothing is selected. */
-.secondary-toolbar[data-selection="no"] .tool-group.left::after {
-  content: "Select a shape to combine, modify or arrange it";
-  align-self: center;
-  margin: 18px 0 0 18px;
-  color: var(--muted-strong);
-  font: 500 12px var(--font-ui);
-  white-space: nowrap;
-}
-
 /* Tool names under the pointer, straight away instead of the slow browser tooltip. */
 .secondary-toolbar .toolbar-icon[aria-label],
 .secondary-toolbar .action-icon-button[aria-label] {
@@ -124,11 +108,12 @@
 
 .shape-menu-dropdown.shape-menu-docked {
   position: fixed !important;
-  top: var(--editor-toolbar-height) !important;
+  /* The panel lives inside the toolbar, which --toolbar-scale scales: undo that here. */
+  top: calc(var(--editor-toolbar-height) / var(--toolbar-scale, 1)) !important;
   right: 0 !important;
-  bottom: var(--editor-footer-height) !important;
+  bottom: calc(var(--editor-footer-height) / var(--toolbar-scale, 1)) !important;
   left: auto !important;
-  width: var(--shape-dock-width) !important;
+  width: calc(var(--shape-dock-width) / var(--toolbar-scale, 1)) !important;
   max-width: none !important;
   height: auto !important;
   max-height: none !important;
@@ -400,71 +385,14 @@ html:has([aria-modal="true"]) .empty-plate-hint { display: none; }
 .toolbar-icon.disabled .fork-accent,
 .toolbar-icon:disabled .fork-accent { fill: currentColor; opacity: 0.22; }
 
-.secondary-toolbar .toolbar-mode-content.geometry .toolbar-section-label { display: none; }
-.secondary-toolbar .toolbar-mode-content.geometry .toolbar-section-tools {
-  height: calc(var(--editor-toolbar-tools-height) - 6px);
-  margin-top: 3px;
-}
-.secondary-toolbar .toolbar-mode-content.geometry .toolbar-section + .toolbar-section {
-  border-left: 1px solid var(--border);
-  padding-left: 4px;
-}
-.secondary-toolbar .toolbar-icon:has(.tool-label),
-.secondary-toolbar .shape-menu-trigger:has(.tool-label) {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  width: auto;
-  min-width: 42px;
-  height: auto;
-  padding: 4px 3px 3px;
-}
-.secondary-toolbar .toolbar-icon:has(.tool-label) svg,
-.secondary-toolbar .shape-menu-trigger:has(.tool-label) svg {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-}
-.tool-label {
-  display: block;
-  max-width: 54px;
-  overflow: hidden;
-  color: var(--toolbar-label);
-  font: 600 10px/1.15 var(--font-ui);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.toolbar-icon.disabled .tool-label { opacity: 0.55; }
-.toolbar-icon.active .tool-label { color: var(--primary); }
+/* Names under the icons do not fit with every tool on show; the instant hover name gives each
+   tool's name and shortcut instead. The spans stay for screen readers' sake (aria-hidden) and
+   for a wider layout later. */
+.tool-label { display: none; }
 /* With names visible, the instant hover name only adds the full name and shortcut. */
 .secondary-toolbar .toolbar-icon:has(.tool-label):hover::after { top: calc(100% + 4px); }
 
-/* Fork: the "More" menu of advanced tools. */
-.fork-more-section { position: relative; }
-.fork-more-menu {
-  position: absolute;
-  top: calc(100% - 2px);
-  right: 0;
-  z-index: 70;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(64px, auto));
-  gap: 4px;
-  padding: 8px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(20, 30, 45, 0.18);
-}
-.fork-more-menu .toolbar-icon { min-width: 64px; }
-.fork-more-menu .tool-label { max-width: 76px; }
-.secondary-toolbar:has(.fork-more-menu) { z-index: 90; }
-/* Simple mode hides every tool in the menu, so the menu goes too. */
-html[data-simple="on"] .fork-more-section { display: none !important; }
-.secondary-toolbar[data-selection="no"] .fork-more-section { display: none; }
 
-.fork-more-button[aria-expanded="true"]::after { display: none !important; }
 
 /* Fork: "Coming from Tinkercad?" guide. */
 .tc-guide-card {
@@ -558,3 +486,10 @@ html[data-simple="on"] .fork-more-section { display: none !important; }
   cursor: pointer;
 }
 html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
+
+/* Each icon's accent takes its group's colour, so it sits with the coloured frames. */
+.toolbar-section { --fork-accent: var(--group-color, var(--primary)); }
+/* Narrower windows: icons a touch smaller so every tool still fits on one row. */
+@media (max-width: 1440px) {
+  html:not([data-toolbar-size]) { --toolbar-scale: 0.88; }
+}
