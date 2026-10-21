@@ -15,7 +15,7 @@ type Row = { tinkercad: string; pare: string; keys?: string };
 
 const SAME: Row[] = [
   { tinkercad: "Basic Shapes panel", pare: "Shapes panel on the right: drag a shape onto the plate, or click it and then the plate" },
-  { tinkercad: "Paraboloid", pare: "Ready-made parts, under the basic shapes in the Shapes panel" },
+  { tinkercad: "Paraboloid", pare: "Ready-made parts: its own button in the Make group of the toolbar" },
   { tinkercad: "Solid / Hole", pare: "Solid / Hole at the top of the shape's panel", keys: "S / H" },
   { tinkercad: "Group", pare: "Group in the toolbar: the parts take one colour, as in Tinkercad; Multicolor (Shift+M) keeps theirs. Double-click to edit one part, click away to regroup", keys: "Ctrl+G" },
   { tinkercad: "Ungroup", pare: "Ungroup in the toolbar", keys: "Ctrl+Shift+G" },
@@ -42,7 +42,7 @@ const NEW: Row[] = [
   { tinkercad: "Fillet and chamfer", pare: "Round or bevel any edge, and take it off again later", keys: "B / Shift+B" },
   { tinkercad: "Hollow and split", pare: "Shell a body with an even wall, or cut it in two with a plane (under More)" },
   { tinkercad: "Cut with connectors", pare: "Split a part too big for the plate and add plugs or dowels, with a print-fit clearance; place them yourself or let Pare 3D spread them" },
-  { tinkercad: "Ready-made parts", pare: "Heat-set insert holes and nut traps (M2 to M5) and a box with a lid that fits, under the basic shapes" },
+  { tinkercad: "Ready-made parts", pare: "Heat-set insert holes and nut traps (M2 to M5) and a box with a lid that fits, in Ready-made parts (Make group)" },
   { tinkercad: "Text on a face", pare: "Ready-made parts: type it, choose Raised or Cut in, click a face, then Group it with the part" },
   { tinkercad: "Snap-fit clip, living hinge", pare: "Ready-made parts: a hook with its slot (it tells you if it will bend safely in PLA), and a hinge that folds at a thin web" },
   { tinkercad: "Mouse ears", pare: "On a solid's panel: thin discs under sharp bottom corners so they don't warp" },

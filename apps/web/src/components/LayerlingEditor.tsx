@@ -14026,19 +14026,27 @@ function SecondaryToolbar({
     onTopPanel(null);
     onToolbarModeChange(mode);
   };
-  const [shapesTab, setShapesTab] = useState<"shapes" | "parts">(() => {
-    try {
-      return window.localStorage.getItem("pare3d.shapesTab") === "parts" ? "parts" : "shapes";
-    } catch {
-      return "shapes";
+  // Fork (build 21): Ready-made parts is a window of its own, opened and closed from its toolbar
+  // button. It shares the right-hand dock with Shapes - one at a time - so the two never stack.
+  const [shapesTab, setShapesTab] = useState<"shapes" | "parts">("shapes");
+  const toggleShapesWindow = () => {
+    setVisibilityOpen(false);
+    if (shapesOpen && shapesTab === "shapes") {
+      setShapesOpen(false);
+    } else {
+      setShapesTab("shapes");
+      setShapesOpen(true);
     }
-  });
-  const chooseShapesTab = (tab: "shapes" | "parts") => {
-    setShapesTab(tab);
-    try {
-      window.localStorage.setItem("pare3d.shapesTab", tab);
-    } catch {
-      // Remembered for this session only.
+  };
+  const togglePartsWindow = () => {
+    setVisibilityOpen(false);
+    if (shapesOpen && shapesTab === "parts") {
+      // Closing it puts a pinned Shapes panel back, as it stood before.
+      setShapesTab("shapes");
+      if (!shapesPinnedRef.current) setShapesOpen(false);
+    } else {
+      setShapesTab("parts");
+      setShapesOpen(true);
     }
   };
   const addShapeFromMenu = (shape: ShapeAsset) => {
@@ -14087,6 +14095,8 @@ function SecondaryToolbar({
     if (!shapesOpen) return;
     // Pinned open, a click elsewhere is the click that puts the shape, and Esc cancels the placing: neither closes the panel.
     const closeOnPointerDown = (event: PointerEvent) => {
+      // Fork: the Ready-made parts button opens and closes its window itself.
+      if ((event.target as Element | null)?.closest?.('[data-layerling-tool="readyParts"]')) return;
       if (!shapesPinnedRef.current && !shapesMenuRef.current?.contains(event.target as Node)) setShapesOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -14210,7 +14220,7 @@ function SecondaryToolbar({
   ];
   // Fork: the makers - each opens its own panel.
   const makeTools = [
-    { id: "readyParts", label: t("readyParts.title"), icon: ForkReadyPartsIcon, action: () => { setShapesOpen(true); chooseShapesTab("parts"); }, enabled: !historyViewActive, active: shapesOpen && shapesTab === "parts" },
+    { id: "readyParts", label: t("readyParts.title"), icon: ForkReadyPartsIcon, action: togglePartsWindow, enabled: !historyViewActive, active: shapesOpen && shapesTab === "parts" },
     { id: "lithophane", label: t("lithophane.title"), icon: ForkLithophaneIcon, action: onLithophane, enabled: Boolean(onLithophane), active: Boolean(lithophaneOpen) },
     { id: "trace", label: t("trace.title"), icon: ForkTraceIcon, action: onTrace, enabled: Boolean(onTrace), active: Boolean(traceOpen) },
     { id: "voronoi", label: t("voronoi.title"), icon: ForkVoronoiIcon, action: onVoronoi, enabled: Boolean(onVoronoi), active: Boolean(voronoiOpen) },
@@ -14427,13 +14437,10 @@ function SecondaryToolbar({
           <div className="toolbar-section-label">{t("editor.group.shapes")}</div>
           <div className="toolbar-section-tools">
             <button
-              className={`shape-menu-trigger ${shapesOpen ? "active" : ""}`}
+              className={`shape-menu-trigger ${shapesOpen && shapesTab === "shapes" ? "active" : ""}`}
               aria-label={t("editor.addShape")}
-              aria-expanded={shapesOpen}
-              onClick={() => {
-                setVisibilityOpen(false);
-                setShapesOpen((value) => !value);
-              }}
+              aria-expanded={shapesOpen && shapesTab === "shapes"}
+              onClick={toggleShapesWindow}
             >
               <ForkShapesIcon />
               <span className="tool-label" aria-hidden="true">{t("editor.group.shapes")}</span>
@@ -14442,30 +14449,13 @@ function SecondaryToolbar({
           {shapesOpen ? (
             <ShapeMenuPanel
               className={shapesPinned ? "shape-menu-docked" : ""}
-              title={t("shape.basicShapes")}
+              title={renderReadyParts && shapesTab === "parts" ? t("readyParts.title") : t("shape.basicShapes")}
               helpSection="addShape"
               pinned={shapesPinned}
               onTogglePinned={toggleShapesPinned}
               resizable
             >
               <div className="shape-menu-body">
-              {/* Fork: basic shapes and ready-made parts on two tabs. */}
-              {renderReadyParts ? (
-                <div className="shape-menu-tabs" role="tablist" aria-label={t("shape.basicShapes")}>
-                  {(["shapes", "parts"] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      type="button"
-                      role="tab"
-                      aria-selected={shapesTab === tab}
-                      className={shapesTab === tab ? "active" : ""}
-                      onClick={() => chooseShapesTab(tab)}
-                    >
-                      {t(tab === "shapes" ? "shapeMenu.tabShapes" : "readyParts.title")}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
               {renderReadyParts && shapesTab === "parts" ? renderReadyParts(closeShapesAfterPick) : (<>
               {renderMyShapes ? (
                 <>

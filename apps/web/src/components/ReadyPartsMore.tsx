@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { t } from "@/lib/i18n";
-import { MmField, iconProps } from "@/components/ReadyPartsSection";
+import { MmField } from "@/components/ReadyPartsSection";
+import { EnclosurePartIcon, FitTestPartIcon } from "@/components/readyPartIcons";
 import { FIT_TEST_CLEARANCES, fitTestParts, readMyPrintFit, saveMyPrintFit } from "@/lib/fitTest";
 import { DEFAULT_ENCLOSURE, enclosureParts, normalizeEnclosure, PORT_SIZES, type EnclosureOptions, type EnclosurePort, type EnclosureSide, type PortPreset } from "@/lib/enclosure";
 import { METRIC_SIZES, type MetricSize, type ReadyPart } from "@/lib/readyParts";
@@ -16,10 +17,7 @@ export function FitTestCard({ onInsert }: { onInsert: Insert }) {
   return (
     <>
       <div className="ready-part ready-part-box">
-        <svg {...iconProps} className="ready-part-icon">
-          <rect x="3" y="12" width="26" height="9" rx="2" fill="currentColor" fillOpacity="0.18" />
-          <circle cx="8" cy="16.5" r="2" /><circle cx="14" cy="16.5" r="2.3" /><circle cx="20.5" cy="16.5" r="2.6" /><circle cx="26.5" cy="16.5" r="1.6" />
-        </svg>
+        <FitTestPartIcon />
         <div>
           <strong>{t("fitTest.title")}</strong>
           <span>{t("fitTest.hint")}</span>
@@ -78,12 +76,7 @@ export function EnclosureCard({ onInsert }: { onInsert: Insert }) {
   return (
     <>
       <div className="ready-part ready-part-box">
-        <svg {...iconProps} className="ready-part-icon">
-          <path d="M4 12h24v14H4z" fill="currentColor" fillOpacity="0.18" />
-          <path d="M3 9h26v3H3z" />
-          <rect x="8" y="17" width="16" height="5" rx="0.6" />
-          <path d="M4 20h3" />
-        </svg>
+        <EnclosurePartIcon />
         <div>
           <strong>{t("enclosure.title")}</strong>
           <span>{t("enclosure.hint")}</span>

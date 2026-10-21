@@ -11,6 +11,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Electronics enclosure in Ready-made parts: a box for a circuit board with standoffs, port cut-outs and a vented lid.",
       "Fit test: print it once, pick the hole that fits, and Print fit offers it as \"My printer\".",
       "Split to fit: a part too big for the plate is cut into pieces with dowel holes, from Ready to print?",
+      "Ready-made parts has its own window: its button in the Make group opens and closes it, with clearer pictures.",
+      "A part's settings start folded up: open only the sections you need.",
     ],
   },
   {

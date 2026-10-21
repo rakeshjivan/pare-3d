@@ -2564,15 +2564,15 @@ export function ShapeInspector({
   // Docked at the right edge until its title bar is dragged; then it floats where it was dropped.
   const movable = useMovablePanel<HTMLElement>("layerling.editor.inspectorPosition", INSPECTOR_PANEL);
   const inspectorRef = movable.panelRef;
-  const [propertiesOpen, setPropertiesOpen] = useInspectorCard("properties", true);
+  const [propertiesOpen, setPropertiesOpen] = useInspectorCard("properties", false);
   const [textFillMoreOpen, setTextFillMoreOpen] = useState(false);
   const [positionOpen, setPositionOpen] = useInspectorCard("position", false);
   const [rotationOpen, setRotationOpen] = useInspectorCard("rotation", false);
   const [taperOpen, setTaperOpen] = useInspectorCard("taper", false);
   const [twistOpen, setTwistOpen] = useInspectorCard("twist", false);
-  const [gearTeethOpen, setGearTeethOpen] = useInspectorCard("gearTeeth", true);
-  const [threadOpen, setThreadOpen] = useInspectorCard("thread", true);
-  const [gearHelixOpen, setGearHelixOpen] = useInspectorCard("gearHelix", true);
+  const [gearTeethOpen, setGearTeethOpen] = useInspectorCard("gearTeeth", false);
+  const [threadOpen, setThreadOpen] = useInspectorCard("thread", false);
+  const [gearHelixOpen, setGearHelixOpen] = useInspectorCard("gearHelix", false);
   const [colorOpen, setColorOpen] = useState(false);
   const { colors: recentColors, remember: rememberColor } = useRecentColors(SOLID_COLORS);
   const { colors: keptColors, toggle: toggleKeptColor } = useKeptColors();
@@ -3359,7 +3359,7 @@ function NameTagCard({
   onTextTags: (names: string[], gap: number) => void;
   onInteractionActiveChange?: (active: boolean) => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const { source, layers, keyring } = stack;
   const writeLayers = (next: TextLayer[]) => onLayerText({ layers: next });
   const changeLayer = (index: number, changes: Partial<TextLayer>) => writeLayers(layers.map((entry, position) => (position === index ? { ...entry, ...changes } : entry)));
@@ -3476,7 +3476,7 @@ export type QrCodeControls = {
  * it - where it stands, as wide as it is now. The other choices stay as they were made.
  */
 function QrCodeCard({ shapeId, controls, disabled }: { shapeId: string; controls: QrCodeControls; disabled: boolean }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [text, setText] = useState(controls.settings.text);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -3564,7 +3564,7 @@ function IconTagCard({ shapeId, controls, workspace, disabled, onInteractionActi
   disabled: boolean;
   onInteractionActiveChange?: (active: boolean) => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [count, setCount] = useState(1);
   const [fitNote, setFitNote] = useState(false);
   const [replacing, setReplacing] = useState(false);
@@ -3736,7 +3736,7 @@ function BentTubeSegmentsCard({
   onInteractionActiveChange?: (active: boolean) => void;
   onSegmentChange?: (shapeId: string, segment: number | null) => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(0);
   const fields = normalizedBentTubeFields(shape);
   const segments = fields.bentTubeSegments;
@@ -3889,7 +3889,7 @@ function GridfinityCompartmentsCard({
   onUpdate: ShapeInspectorUpdate;
   onInteractionActiveChange?: (active: boolean) => void;
 }) {
-  const [open, setOpen] = useInspectorCard("gridfinityCompartments", true);
+  const [open, setOpen] = useInspectorCard("gridfinityCompartments", false);
   const [chosen, setChosen] = useState({ x: 0, z: 0, row: 0, column: 0 });
 
   useEffect(() => setChosen({ x: 0, z: 0, row: 0, column: 0 }), [shape.id]);

@@ -1,5 +1,6 @@
 "use client";
 
+import { BoxPartIcon, HingePartIcon, InsertPartIcon, NutPartIcon, ParaboloidPartIcon, SnapPartIcon, TextPartIcon } from "@/components/readyPartIcons";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -53,7 +54,7 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
       {(
         <div className="ready-parts-list">
           <div className="ready-part">
-            <ParaboloidIcon />
+            <ParaboloidPartIcon />
             <div>
               <strong>{t("readyParts.paraboloid")}</strong>
               <span>{t("readyParts.paraboloidHint")}</span>
@@ -62,7 +63,7 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
           </div>
 
           <div className="ready-part has-size">
-            <InsertIcon />
+            <InsertPartIcon />
             <div>
               <strong>{t("readyParts.insert")}</strong>
               <span>{t("readyParts.insertHint", { diameter: insert.diameter.toFixed(1), depth: insert.depth.toFixed(1) })}</span>
@@ -78,7 +79,7 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
           </div>
 
           <div className="ready-part has-size">
-            <NutIcon />
+            <NutPartIcon />
             <div>
               <strong>{t("readyParts.nutTrap")}</strong>
               <span>{t("readyParts.nutTrapHint", { flats: nut.acrossFlats.toFixed(1), bolt: nut.clearance.toFixed(1) })}</span>
@@ -94,7 +95,7 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
           </div>
 
           <div className="ready-part ready-part-box">
-            <BoxIcon />
+            <BoxPartIcon />
             <div>
               <strong>{t("readyParts.box")}</strong>
               <span>{t("readyParts.boxHint")}</span>
@@ -104,7 +105,7 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
             </button>
           </div>
           <div className="ready-part ready-part-box">
-            <TextIcon />
+            <TextPartIcon />
             <div>
               <strong>{t("readyParts.faceText")}</strong>
               <span>{t("readyParts.faceTextHint")}</span>
@@ -146,7 +147,7 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
           ) : null}
 
           <div className="ready-part ready-part-box">
-            <SnapIcon />
+            <SnapPartIcon />
             <div>
               <strong>{t("readyParts.snapFit")}</strong>
               <span>{t("readyParts.snapFitHint")}</span>
@@ -173,7 +174,7 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
           ) : null}
 
           <div className="ready-part ready-part-box">
-            <HingeIcon />
+            <HingePartIcon />
             <div>
               <strong>{t("readyParts.livingHinge")}</strong>
               <span>{t("readyParts.livingHingeHint")}</span>
@@ -300,70 +301,3 @@ export function MmField({ label, value, onChange, unit = "mm" }: { label: string
   );
 }
 
-export const iconProps = { width: 30, height: 30, viewBox: "0 0 32 32", fill: "none", stroke: "currentColor", strokeWidth: 1.6, "aria-hidden": true } as const;
-
-function ParaboloidIcon() {
-  return (
-    <svg {...iconProps} className="ready-part-icon">
-      <path d="M4 26 C 7 4, 25 4, 28 26 Z" fill="currentColor" fillOpacity="0.18" />
-      <ellipse cx="16" cy="26" rx="12" ry="2.5" />
-    </svg>
-  );
-}
-
-function InsertIcon() {
-  return (
-    <svg {...iconProps} className="ready-part-icon">
-      <rect x="10" y="5" width="12" height="22" rx="1.5" fill="currentColor" fillOpacity="0.18" />
-      <path d="M10 10h12M10 14h12M10 18h12M10 22h12" />
-      <circle cx="16" cy="5.5" r="2.2" />
-    </svg>
-  );
-}
-
-function NutIcon() {
-  return (
-    <svg {...iconProps} className="ready-part-icon">
-      <path d="M16 3 27 9.5v13L16 29 5 22.5v-13Z" fill="currentColor" fillOpacity="0.18" />
-      <circle cx="16" cy="16" r="5" />
-    </svg>
-  );
-}
-
-function TextIcon() {
-  return (
-    <svg {...iconProps} className="ready-part-icon">
-      <rect x="3" y="9" width="26" height="15" rx="2" fill="currentColor" fillOpacity="0.18" />
-      <path d="M9 13h8M13 13v8M19 21l2.5-8 2.5 8M20 18.5h3" />
-    </svg>
-  );
-}
-
-function SnapIcon() {
-  return (
-    <svg {...iconProps} className="ready-part-icon">
-      <path d="M8 28V6h4v14h3l-3 5" fill="currentColor" fillOpacity="0.18" />
-      <path d="M20 4v10M20 18v10M24 4v10M24 18v10" />
-    </svg>
-  );
-}
-
-function HingeIcon() {
-  return (
-    <svg {...iconProps} className="ready-part-icon">
-      <path d="M3 20h11v4H3ZM18 20h11v4H18Z" fill="currentColor" fillOpacity="0.18" />
-      <path d="M14 23.3h4" strokeWidth="1" />
-      <path d="M8 16c4-6 12-6 16 0" strokeDasharray="2 2" />
-    </svg>
-  );
-}
-
-function BoxIcon() {
-  return (
-    <svg {...iconProps} className="ready-part-icon">
-      <path d="M5 13h22v14H5Z" fill="currentColor" fillOpacity="0.18" />
-      <path d="M3.5 8h25v3.5h-25Z" />
-      <path d="M8 11.5V13M24 11.5V13" />
-    </svg>
-  );
-}

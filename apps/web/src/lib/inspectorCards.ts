@@ -28,9 +28,11 @@ export function writeInspectorCard(storage: Pick<Storage, "getItem" | "setItem">
   }
 }
 
+// Fork: kept for this visit only (sessionStorage): every card starts closed when Pare 3D opens, so a
+// part's settings never greet anyone as a long wall of fields; one opened stays open while working.
 function browserStorage(): Storage | null {
   try {
-    return typeof window === "undefined" ? null : window.localStorage;
+    return typeof window === "undefined" ? null : window.sessionStorage;
   } catch {
     return null;
   }
