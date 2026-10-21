@@ -1,5 +1,5 @@
 // Drives the real Windows app's window (WebView2) through its debugging port: the home screen
-// must show, a starter design must open in the editor, and no page errors may happen.
+// must show, a new design must open in the editor, and no page errors may happen.
 // Screenshots go to the folder given as the first argument.
 import { chromium } from "playwright-core";
 
@@ -25,7 +25,8 @@ await page.waitForSelector(".dashboard-actions-band", { timeout: 120000 });
 await page.screenshot({ path: `${out}/windows-home.png` });
 const build = await page.locator(".pare-build-badge, [class*=build-badge]").first().textContent().catch(() => "");
 console.log(`::notice::Windows app shows \"${(build || "").trim()}\"`);
-await page.locator('[data-starter="box"]').click();
+// Build 22: the examples panel is gone from the home screen; a new design opens the editor.
+await page.locator(".dashboard-action-tile.create").click();
 await page.waitForSelector(".toolbar-section", { timeout: 120000 });
 await page.waitForTimeout(6000);
 await page.screenshot({ path: `${out}/windows-editor.png` });
