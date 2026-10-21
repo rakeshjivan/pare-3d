@@ -128,6 +128,7 @@ import { arrayFollowingPivot, circleStepDegrees, clampArrayCount, moveAlongRadiu
 import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootprint, type BedOverhang } from "@/lib/printBed";
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
 import { ReadyPartsSection } from "./ReadyPartsSection";
+import { sweepPlan } from "@/lib/cadSketchSweep";
 import { DistributePanel, type DistributeAction } from "./workplane/DistributePanel";
 import { arrangeOnPlate, spaceEvenly, spaceWithGap, type Footprint } from "@/lib/distribute";
 import { addFreehandStroke } from "@/lib/freehandStroke";
@@ -5288,6 +5289,7 @@ export function LayerlingEditor({
     const existing = editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null;
     const height = existing?.height ?? 10;
     let resolved: WorkplaneShape | null;
+    let sweptAsExtrusion = false;
     try {
       if (sketchOperation === "revolve") {
         setNotice(t("status.buildingSketch"), true);
@@ -5318,7 +5320,10 @@ export function LayerlingEditor({
       } else {
         setNotice(t("status.buildingSketch"), true);
         // A sweep is built like an extrusion, from the outlines along the construction line (#400).
-        const extrusion = sketchOperation === "sweep"
+        // Fork: a sweep without its path line is built as an extrusion instead of leaving the user stuck.
+        const plan = sketchOperation === "sweep" ? sweepPlan(sketchProfile) : null;
+        sweptAsExtrusion = Boolean(plan && "problem" in plan && plan.problem === "no-path");
+        const extrusion = sketchOperation === "sweep" && !sweptAsExtrusion
           ? await cadShapeFromSketchSweep(sketchProfile, existing)
           : await cadShapeFromSketchProfile(sketchProfile, height, existing);
         resolved = placeSketchShape(extrusion, activeSketchWorkplane, existing);
@@ -5350,11 +5355,13 @@ export function LayerlingEditor({
       resolved.id,
       existing
         ? t(sketchOperation === "revolve" ? "status.revolveUpdated" : sketchOperation === "sweep" ? "status.sweepUpdated" : "status.sketchUpdated")
-        : sketchOperation === "revolve"
-          ? t("status.revolveCreated")
-          : sketchOperation === "sweep"
-            ? t("status.sweepCreated")
-            : t("status.exactSketchCreated"),
+        : sweptAsExtrusion
+          ? t("status.sweepWithoutPath")
+          : sketchOperation === "revolve"
+            ? t("status.revolveCreated")
+            : sketchOperation === "sweep"
+              ? t("status.sweepCreated")
+              : t("status.exactSketchCreated"),
     );
     setSketchActive(false);
     setSketchStrokePanelOpen(false);
@@ -13744,6 +13751,21 @@ function SecondaryToolbar({
     onTopPanel(null);
     onToolbarModeChange(mode);
   };
+  const [shapesTab, setShapesTab] = useState<"shapes" | "parts">(() => {
+    try {
+      return window.localStorage.getItem("pare3d.shapesTab") === "parts" ? "parts" : "shapes";
+    } catch {
+      return "shapes";
+    }
+  });
+  const chooseShapesTab = (tab: "shapes" | "parts") => {
+    setShapesTab(tab);
+    try {
+      window.localStorage.setItem("pare3d.shapesTab", tab);
+    } catch {
+      // Remembered for this session only.
+    }
+  };
   const addShapeFromMenu = (shape: ShapeAsset) => {
     onAddShape({ ...shape, name: shapeAssetLabel(shape) });
     closeShapesAfterPick();
@@ -14132,6 +14154,24 @@ function SecondaryToolbar({
               resizable
             >
               <div className="shape-menu-body">
+              {/* Fork: basic shapes and ready-made parts on two tabs. */}
+              {renderReadyParts ? (
+                <div className="shape-menu-tabs" role="tablist" aria-label={t("shape.basicShapes")}>
+                  {(["shapes", "parts"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      role="tab"
+                      aria-selected={shapesTab === tab}
+                      className={shapesTab === tab ? "active" : ""}
+                      onClick={() => chooseShapesTab(tab)}
+                    >
+                      {t(tab === "shapes" ? "shapeMenu.tabShapes" : "readyParts.title")}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {renderReadyParts && shapesTab === "parts" ? renderReadyParts(closeShapesAfterPick) : (<>
               {renderMyShapes ? (
                 <>
                   {renderMyShapes(closeShapesAfterPick)}
@@ -14206,7 +14246,7 @@ function SecondaryToolbar({
                   </button>
                 ))}
               </div>
-              {renderReadyParts ? renderReadyParts(closeShapesAfterPick) : null}
+              </>)}
               </div>
             </ShapeMenuPanel>
           ) : null}

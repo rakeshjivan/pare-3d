@@ -707,3 +707,28 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 .distribute-actions button { display: inline-flex; align-items: center; gap: 5px; }
 .distribute-actions button:hover:not(:disabled) { border-color: var(--primary); }
 .distribute-actions button:disabled { opacity: 0.45; cursor: default; }
+
+/* Fork: Shapes | Ready-made parts tabs in the Shapes panel. */
+.shape-menu-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin: 2px 0 10px;
+  padding: 3px;
+  background: var(--subbar);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.shape-menu-tabs button {
+  padding: 7px 6px;
+  color: var(--muted-strong);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  font: 700 12.5px var(--font-ui);
+  cursor: pointer;
+}
+.shape-menu-tabs button.active { color: #fff; background: var(--primary); }
+.shape-menu-tabs button:not(.active):hover { color: var(--foreground); }
+.ready-parts { margin-top: 0; border-top: 0; padding-top: 0; }
+.ready-parts-intro { margin: 0 2px 8px; font: 500 12px/1.35 var(--font-ui); color: var(--muted-strong); }

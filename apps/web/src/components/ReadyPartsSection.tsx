@@ -1,6 +1,5 @@
 "use client";
 
-import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -35,7 +34,6 @@ import {
 /** Fork: the Shapes panel's "Ready-made parts" - built from ordinary shapes, placed with a click. */
 export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[], options?: { sink?: number; carry?: boolean }) => void }) {
   useLanguage();
-  const [open, setOpen] = useState(true);
   const [insertSize, setInsertSize] = useState<MetricSize>("M3");
   const [nutSize, setNutSize] = useState<MetricSize>("M3");
   const [boxOpen, setBoxOpen] = useState(false);
@@ -50,11 +48,8 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
   const nut = NUTS[nutSize];
   return (
     <section className="ready-parts" aria-label={t("readyParts.title")}>
-      <button type="button" className="ready-parts-heading" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {open ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}
-        {t("readyParts.title")}
-      </button>
-      {open ? (
+      <p className="ready-parts-intro">{t("readyParts.intro")}</p>
+      {(
         <div className="ready-parts-list">
           <div className="ready-part">
             <ParaboloidIcon />
@@ -255,7 +250,7 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
             </div>
           ) : null}
         </div>
-      ) : null}
+      )}
     </section>
   );
 }
