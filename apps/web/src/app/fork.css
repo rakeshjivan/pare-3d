@@ -732,3 +732,72 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 .shape-menu-tabs button:not(.active):hover { color: var(--foreground); }
 .ready-parts { margin-top: 0; border-top: 0; padding-top: 0; }
 .ready-parts-intro { margin: 0 2px 8px; font: 500 12px/1.35 var(--font-ui); color: var(--muted-strong); }
+
+/* Fork: the MAKE toolbar section. */
+.toolbar-section[data-group="make"] { --group-color: #c2255c; }
+
+/* Fork: lithophane and Voronoi panels. */
+.lithophane-panel, .voronoi-panel { max-height: calc(100vh - 160px); overflow-y: auto; }
+.lithophane-pick {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+  padding: 9px; color: var(--primary); background: var(--subbar); border: 1px dashed var(--primary);
+  border-radius: 9px; font: 700 13px var(--font-ui); cursor: pointer;
+}
+.lithophane-preview { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; background: #1f2937; border-radius: 10px; }
+.lithophane-preview canvas { max-width: 100%; border-radius: 4px; box-shadow: 0 0 22px rgba(255, 214, 150, 0.35); }
+.lithophane-preview span { font: 500 11px var(--font-ui); color: #d1d5db; }
+.voronoi-preview { background: var(--subbar); }
+.voronoi-plate { fill: var(--primary); opacity: 0.9; }
+.voronoi-cell { fill: var(--panel); stroke: var(--primary); }
+.voronoi-border { fill: none; stroke: var(--primary); }
+.lithophane-field { display: flex; flex-direction: column; gap: 4px; font: 600 12px var(--font-ui); color: var(--muted-strong); }
+.lithophane-choice { display: flex; gap: 4px; }
+.lithophane-choice button {
+  flex: 1; padding: 6px 4px; color: var(--foreground); background: var(--subbar);
+  border: 1px solid var(--border); border-radius: 7px; font: 600 12px var(--font-ui); cursor: pointer;
+}
+.lithophane-choice button.active { color: #fff; background: var(--primary); border-color: var(--primary); }
+.lithophane-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.lithophane-number { display: flex; flex-direction: column; gap: 2px; font: 600 11.5px var(--font-ui); color: var(--muted-strong); }
+.lithophane-number > span:last-child { display: flex; align-items: center; gap: 4px; }
+.lithophane-number input {
+  width: 100%; padding: 5px 6px; text-align: right; font: 600 12.5px var(--font-ui); color: var(--foreground);
+  background: var(--subbar); border: 1px solid var(--border); border-radius: 6px;
+}
+.lithophane-number small { font-size: 11px; }
+.lithophane-slider { display: grid; grid-template-columns: 82px 1fr; align-items: center; gap: 8px; font: 600 12px var(--font-ui); color: var(--muted-strong); }
+.lithophane-check { display: flex; align-items: center; gap: 6px; font: 600 12px var(--font-ui); color: var(--foreground); }
+.lithophane-info { margin: 0; font: 500 11.5px/1.4 var(--font-ui); color: var(--muted-strong); }
+.lithophane-info.warning { color: #c2410c; }
+
+/* Fork: the build number by the tagline, and the update line on the home screen. */
+.pare-build-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  font: 700 10px/16px var(--font-ui);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-radius: 6px;
+  vertical-align: 1px;
+}
+.pare-version-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font: 600 12.5px var(--font-ui);
+  color: var(--muted-strong);
+  background: var(--subbar);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.pare-version-status.current svg { color: #16a34a; }
+.pare-version-status.ready, .pare-version-status.download { color: var(--foreground); border-color: var(--primary); }
+.pare-version-status button, .pare-version-status a {
+  margin-left: 2px; padding: 3px 9px; color: #fff; background: var(--primary); border: 0; border-radius: 999px;
+  font: 700 12px var(--font-ui); text-decoration: none; cursor: pointer;
+}
+.pare-version-status .spin { animation: pare-spin 1s linear infinite; }
+@keyframes pare-spin { to { transform: rotate(360deg); } }

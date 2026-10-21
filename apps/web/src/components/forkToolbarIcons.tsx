@@ -244,7 +244,57 @@ export function ForkShapesIcon(props: IconProps) {
 }
 
 /** Tool id (as in data-layerling-tool) to its Pare 3D icon. */
+export function ForkReadyPartsIcon(props: IconProps) {
+  return (
+    <ForkIcon {...props}>
+      <rect x="7" y="20" width="22" height="18" rx="2" {...SOFT} />
+      <rect x="7" y="20" width="22" height="18" rx="2" />
+      <path d="M7 26h22M18 20v18" />
+      <path d="M32 10l8 4.5v9L32 28l-8-4.5v-9Z" {...ACCENT} />
+    </ForkIcon>
+  );
+}
+
+export function ForkLithophaneIcon(props: IconProps) {
+  return (
+    <ForkIcon {...props}>
+      <rect x="9" y="7" width="26" height="32" rx="2" {...SOFT} />
+      <rect x="9" y="7" width="26" height="32" rx="2" />
+      <path d="M13 33l7-9 5 6 3-4 5 7" />
+      <circle cx="26" cy="15" r="3" {...ACCENT} />
+      <path d="M40 14l4-3M41 22h4M40 30l4 3" />
+    </ForkIcon>
+  );
+}
+
+export function ForkVoronoiIcon(props: IconProps) {
+  return (
+    <ForkIcon {...props}>
+      <rect x="6" y="8" width="36" height="32" rx="3" {...SOFT} />
+      <rect x="6" y="8" width="36" height="32" rx="3" />
+      <path d="M6 20l9-2 6-10M15 18l4 10 9 2 14-6M28 30l-3 10M19 28l-13 6M28 30l5-22" />
+      <path d="M21 21l5-1 2 6-6 1Z" {...ACCENT} />
+    </ForkIcon>
+  );
+}
+
+export function ForkSpaceOutIcon(props: IconProps) {
+  return (
+    <ForkIcon {...props}>
+      <rect x="5" y="16" width="9" height="16" rx="1.5" {...ACCENT} />
+      <rect x="20" y="16" width="9" height="16" rx="1.5" {...SOFT} />
+      <rect x="20" y="16" width="9" height="16" rx="1.5" />
+      <rect x="35" y="16" width="8" height="16" rx="1.5" />
+      <path d="M14 38h6M29 38h6M14 36v4M20 36v4M29 36v4M35 36v4" strokeWidth="2.4" />
+    </ForkIcon>
+  );
+}
+
 export const FORK_TOOL_ICONS: Readonly<Record<string, ComponentType<IconProps>>> = {
+  readyParts: ForkReadyPartsIcon,
+  lithophane: ForkLithophaneIcon,
+  voronoi: ForkVoronoiIcon,
+  spaceOut: ForkSpaceOutIcon,
   copy: ForkCopyIcon,
   paste: ForkPasteIcon,
   duplicate: ForkDuplicateIcon,
@@ -263,6 +313,10 @@ export const FORK_TOOL_ICONS: Readonly<Record<string, ComponentType<IconProps>>>
 
 /** Short names under the icons (English; other languages show their full name, shortened). */
 export const FORK_SHORT_LABELS_EN: Readonly<Record<string, string>> = {
+  readyParts: "Parts",
+  lithophane: "Lithophane",
+  voronoi: "Voronoi",
+  spaceOut: "Space out",
   copy: "Copy",
   paste: "Paste",
   duplicate: "Duplicate",

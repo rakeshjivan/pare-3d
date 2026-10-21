@@ -1,5 +1,6 @@
 "use client";
 
+import { PareBuildBadge, PareVersionStatus } from "@/components/PareVersionStatus";
 import { Archive, ArchiveRestore, ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { AppFooter } from "@/components/AppFooter";
@@ -3162,7 +3163,7 @@ function Dashboard({
           <img src="/assets/pare3d/pare3d-icon.svg" alt="" />
           <span className="dashboard-brand-text">
             <span className="dashboard-brand-name">Pare 3D</span>
-            <span className="dashboard-tagline">{t("brand.tagline")}</span>
+            <span className="dashboard-tagline">{t("brand.tagline")} <PareBuildBadge /></span>
           </span>
         </a>
         <div className="dashboard-search">
@@ -3170,6 +3171,7 @@ function Dashboard({
           <input value={query} onChange={(event) => onQueryChange(event.currentTarget.value)} placeholder={t("dashboard.searchPlaceholder")} aria-label={t("dashboard.searchLabel")} />
         </div>
         <div className="dashboard-topbar-actions">
+          <PareVersionStatus />
           <ThemeSwitch />
           <LanguageSwitch />
         </div>

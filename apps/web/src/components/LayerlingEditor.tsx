@@ -128,6 +128,11 @@ import { arrayFollowingPivot, circleStepDegrees, clampArrayCount, moveAlongRadiu
 import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootprint, type BedOverhang } from "@/lib/printBed";
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
 import { ReadyPartsSection } from "./ReadyPartsSection";
+import { PareBuildBadge } from "./PareVersionStatus";
+import { LithophanePanel, sampleImage, type LithophaneImage } from "./workplane/LithophanePanel";
+import { VoronoiPanel } from "./workplane/VoronoiPanel";
+import { LITHOPHANE_STAND, lithophanePositions, lithophaneThicknessMap, meshShapeFromPositions, normalizeLithophane, type LithophaneOptions } from "@/lib/lithophane";
+import { normalizeVoronoi, voronoiPositions, type VoronoiOptions } from "@/lib/voronoi";
 import { sweepPlan } from "@/lib/cadSketchSweep";
 import { DistributePanel, type DistributeAction } from "./workplane/DistributePanel";
 import { arrangeOnPlate, spaceEvenly, spaceWithGap, type Footprint } from "@/lib/distribute";
@@ -170,7 +175,7 @@ import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, tra
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
-import { FORK_SHORT_LABELS_EN, FORK_TOOL_ICONS, ForkHomeIcon, ForkShapesIcon } from "@/components/forkToolbarIcons";
+import { FORK_SHORT_LABELS_EN, FORK_TOOL_ICONS, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
 import { BookOpen, Import, Keyboard, Settings as LucideSettings, StickyNote, Upload } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
@@ -6400,6 +6405,65 @@ export function LayerlingEditor({
     return () => window.removeEventListener(MOUSE_EARS_EVENT, onMouseEars);
   }, [commitShapes]);
 
+  // Fork: the lithophane and Voronoi makers.
+  const [makerPanel, setMakerPanel] = useState<"lithophane" | "voronoi" | null>(null);
+  const [makerBusy, setMakerBusy] = useState(false);
+  const placeMade = useCallback((made: WorkplaneShape, notice: string) => {
+    const { shapes: inserted } = placeCustomShape({ shapes: [made] }, placementWorkplaneRef.current.origin, []);
+    commitShapes([...shapesRef.current, ...inserted], inserted.map((shape) => shape.id), notice);
+    if (workspaceSettingsRef.current.clickToPlaceShapes && inserted.length) {
+      setCruiseAsset(null);
+      setCarryIds(inserted.map((shape) => shape.id));
+      setNotice(t("status.carryPlace"));
+    }
+  }, [commitShapes]);
+  const createLithophane = useCallback(async (image: LithophaneImage, raw: LithophaneOptions) => {
+    setMakerBusy(true);
+    try {
+      // Let the button show it is working before the heavy part.
+      await new Promise((resolve) => window.setTimeout(resolve, 30));
+      const o = normalizeLithophane(raw);
+      const map = lithophaneThicknessMap(o, image.width, image.height, (u, v) => sampleImage(image, u, v));
+      const plate = meshShapeFromPositions(t("lithophane.name", { name: image.name }), "#f4f1ea", lithophanePositions(map, o));
+      let made = plate;
+      if (o.shape === "flat" && o.stand) {
+        // The plate stands sunk into a foot, so it stays upright on a shelf.
+        const foot = makeShapeFromAsset(libraryShapeAssets.find((asset) => asset.id === "box")!, { x: 0, z: 0, elevation: 0 }, {
+          width: plate.width + 2 * LITHOPHANE_STAND.margin,
+          depth: plate.depth + 2 * LITHOPHANE_STAND.margin,
+          height: LITHOPHANE_STAND.height,
+        });
+        const raised = { ...plate, elevation: LITHOPHANE_STAND.height - LITHOPHANE_STAND.sink };
+        made = await buildReadyPart({ name: plate.name, shapes: [{ ...foot, color: plate.color }, raised], group: true }, workspaceSettingsRef.current.booleanTriangleLimit);
+      }
+      setMakerPanel(null);
+      placeMade(made, t("lithophane.created", { triangles: Math.round((plate.importedMesh?.triangleCount ?? 0) / 1000) }));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMakerBusy(false);
+    }
+  }, [placeMade]);
+  const createVoronoi = useCallback(async (raw: VoronoiOptions) => {
+    setMakerBusy(true);
+    try {
+      const runtime = await getManifoldRuntime();
+      const o = normalizeVoronoi(raw);
+      const { positions, openings } = voronoiPositions(runtime, o);
+      if (!positions.length) {
+        setNotice(t("voronoi.noOpenings"));
+        return;
+      }
+      const shape = meshShapeFromPositions(t(o.mode === "panel" ? "voronoi.panelName" : "voronoi.patternName"), o.mode === "panel" ? "#2f7de1" : "#999999", positions);
+      setMakerPanel(null);
+      placeMade(o.mode === "pattern" ? { ...shape, hole: true } : shape, t(o.mode === "panel" ? "voronoi.createdPanel" : "voronoi.createdPattern", { count: openings }));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMakerBusy(false);
+    }
+  }, [placeMade]);
+
   const applySplit = useCallback(async () => {
     const session = splitSession;
     const plane = splitPlane;
@@ -12521,6 +12585,10 @@ export function LayerlingEditor({
         }}
         objects={shapes.map((shape) => ({ id: shape.id, name: displayShapeName(shape), kind: shape.kind, hidden: Boolean(shape.hidden) }))}
         onSelectObject={(id) => selectShape(id)}
+        onLithophane={() => setMakerPanel((current) => (current === "lithophane" ? null : "lithophane"))}
+        onVoronoi={() => setMakerPanel((current) => (current === "voronoi" ? null : "voronoi"))}
+        lithophaneOpen={makerPanel === "lithophane"}
+        voronoiOpen={makerPanel === "voronoi"}
         renderReadyParts={(close) => (
           <ReadyPartsSection
             onInsert={(parts, options) => {
@@ -12860,6 +12928,8 @@ export function LayerlingEditor({
           </button>
         </div>
       ) : null}
+      {makerPanel === "lithophane" ? <LithophanePanel busy={makerBusy} onCreate={(image, options) => void createLithophane(image, options)} onClose={() => setMakerPanel(null)} /> : null}
+      {makerPanel === "voronoi" ? <VoronoiPanel busy={makerBusy} onCreate={(options) => void createVoronoi(options)} onClose={() => setMakerPanel(null)} /> : null}
       {alignMode && selectedShapes.length >= 2 ? (
         <DistributePanel count={selectedShapes.length} onApply={distributeSelection} />
       ) : null}
@@ -13513,6 +13583,10 @@ function SecondaryToolbar({
   onToggleOverhangs,
   renderMyShapes,
   renderReadyParts,
+  onLithophane,
+  onVoronoi,
+  lithophaneOpen,
+  voronoiOpen,
   objects,
   onSelectObject,
 }: {
@@ -13640,6 +13714,11 @@ function SecondaryToolbar({
   renderMyShapes?: (close: () => void) => ReactNode;
   /** Fork: ready-made parts under the library; gets the way to close the menu. */
   renderReadyParts?: (close: () => void) => ReactNode;
+  /** Fork: the lithophane and Voronoi makers. */
+  onLithophane?: () => void;
+  onVoronoi?: () => void;
+  lithophaneOpen?: boolean;
+  voronoiOpen?: boolean;
   /** The bodies of the design, so the command search can find them by name. */
   objects: ReadonlyArray<{ id: string; name: string; kind: string; hidden: boolean }>;
   onSelectObject: (id: string) => void;
@@ -13930,6 +14009,14 @@ function SecondaryToolbar({
     { id: "layFlat", label: t("editor.tool.layFlat"), icon: ToolbarLayFlatIcon, action: onLayFlat, enabled: canModifySelection, active: layFlatActive },
     { id: "mateFaces", label: t("editor.tool.mateFaces"), icon: ToolbarMateFacesIcon, action: onMateFaces, enabled: canModifySelection, active: mateFacesActive },
     { id: "center", label: t("editor.tool.centerOnWorkplane"), icon: ToolbarCenterOnWorkplaneIcon, action: onCenterOnWorkplane, enabled: canModifySelection },
+    // Fork: spacing parts out has its own button (it opens Align with the Space out panel).
+    { id: "spaceOut", label: t("distribute.title"), icon: ForkSpaceOutIcon, action: onAlign, enabled: canAlign, active: alignMode },
+  ];
+  // Fork: the makers - each opens its own panel.
+  const makeTools = [
+    { id: "readyParts", label: t("readyParts.title"), icon: ForkReadyPartsIcon, action: () => { setShapesOpen(true); chooseShapesTab("parts"); }, enabled: !historyViewActive, active: shapesOpen && shapesTab === "parts" },
+    { id: "lithophane", label: t("lithophane.title"), icon: ForkLithophaneIcon, action: onLithophane, enabled: Boolean(onLithophane), active: Boolean(lithophaneOpen) },
+    { id: "voronoi", label: t("voronoi.title"), icon: ForkVoronoiIcon, action: onVoronoi, enabled: Boolean(onVoronoi), active: Boolean(voronoiOpen) },
   ];
   const sketchClipboardTools = [
     { id: "sketch-copy", label: t("editor.tool.copy"), icon: ToolbarCopyIcon, action: onSketchCopy, enabled: sketchHasSelection },
@@ -13937,7 +14024,7 @@ function SecondaryToolbar({
     { id: "sketch-duplicate", label: t("editor.tool.duplicate"), icon: ToolbarDuplicateIcon, action: onSketchDuplicate, enabled: sketchHasSelection },
     { id: "sketch-delete", label: t("editor.tool.delete"), icon: ToolbarTrashIcon, action: onSketchDelete, enabled: sketchHasSelection },
   ];
-  const renderToolButton = (tool: (typeof leftTools)[number] | (typeof visibilityTools)[number] | (typeof combineTools)[number] | (typeof modifyTools)[number] | (typeof arrangeTools)[number]) => {
+  const renderToolButton = (tool: (typeof leftTools)[number] | (typeof visibilityTools)[number] | (typeof combineTools)[number] | (typeof modifyTools)[number] | (typeof arrangeTools)[number] | (typeof makeTools)[number]) => {
     const { id, action, label } = tool;
     // Fork: Pare 3D's own icon where there is one, and a short name under it.
     const Icon = FORK_TOOL_ICONS[id] ?? tool.icon;
@@ -14366,6 +14453,10 @@ function SecondaryToolbar({
           <div className="toolbar-section-label">{t("editor.group.arrange")}</div>
           <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>
         </div>
+        <div className="toolbar-section" data-group="make">
+          <div className="toolbar-section-label">{t("editor.group.make")}</div>
+          <div className="toolbar-section-tools">{makeTools.map(renderToolButton)}</div>
+        </div>
       </div>
           </>
         ) : (
@@ -14630,7 +14721,7 @@ function SecondaryToolbar({
           <img src="/assets/pare3d/pare3d-icon.svg" alt="Pare 3D" />
           <span className="toolbar-brand-text">
             <span className="toolbar-brand-name">Pare 3D</span>
-            <span className="toolbar-brand-tagline">{t("brand.tagline")}</span>
+            <span className="toolbar-brand-tagline">{t("brand.tagline")} <PareBuildBadge /></span>
           </span>
         </div>
         <div className="toolbar-workspace-tabs" role="tablist" aria-label={t("editor.modeLabel")}>

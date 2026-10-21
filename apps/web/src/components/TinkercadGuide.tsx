@@ -47,6 +47,8 @@ const NEW: Row[] = [
   { tinkercad: "Snap-fit clip, living hinge", pare: "Ready-made parts: a hook with its slot (it tells you if it will bend safely in PLA), and a hinge that folds at a thin web" },
   { tinkercad: "Mouse ears", pare: "On a solid's panel: thin discs under sharp bottom corners so they don't warp" },
   { tinkercad: "Spacing parts evenly", pare: "Align (L) with several parts selected shows Space out: equal gaps, an exact gap, or arrange them all on the plate. Pattern does rows and grids with a gap between copies" },
+  { tinkercad: "Lithophane", pare: "Make, then Lithophane: choose a photo, pick flat, curved or a lamp shade, and print it standing up in white PLA" },
+  { tinkercad: "Voronoi pattern", pare: "Make, then Voronoi: a panel with organic openings, or the openings alone to cut into any part" },
   { tinkercad: "Print fit for holes", pare: "Make a hole a little bigger in one click so pegs, lids and axles fit: Press, Snug or Loose" },
   { tinkercad: "Sketch", pare: "Draw a 2D outline with exact sizes, then extrude, revolve or sweep it (the Sketch tab)" },
   { tinkercad: "Threads, gears, springs", pare: "Ready-made shapes in the Shapes panel" },
