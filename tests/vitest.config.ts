@@ -18,5 +18,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/unit/**/*.test.ts"],
+    // Fork: GitHub's shared machines are slower; the heavy geometry tests (Gridfinity) ran past
+    // the 5 s default there now and then. Locally the default stays.
+    testTimeout: process.env.CI ? 30_000 : 5_000,
   },
 });
