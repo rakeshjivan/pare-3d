@@ -69,3 +69,33 @@ export function objectSnapOffset(moving: SnapBox, targets: SnapBox[], threshold:
   if (dz !== null) addGuides("z");
   return { dx, dz, guides };
 }
+
+/** The gap from the moving box to its nearest neighbour beside it, as a line on the plate. */
+export type ObjectGap = { axis: "x" | "z"; from: number; to: number; at: number; distance: number };
+
+/**
+ * Fork (build 20): the nearest gap between `moving` and a target it lines up with across the
+ * other axis (so the two face each other), up to `maxDistance` - shown as "12.0 mm" while dragging.
+ */
+export function nearestObjectGap(moving: SnapBox, targets: SnapBox[], maxDistance = 60): ObjectGap | null {
+  let best: ObjectGap | null = null;
+  const consider = (gap: ObjectGap) => {
+    if (gap.distance <= 1e-3 || gap.distance > maxDistance) return;
+    if (!best || gap.distance < best.distance) best = gap;
+  };
+  targets.forEach((target) => {
+    const overlapZ = Math.min(moving.maxZ, target.maxZ) - Math.max(moving.minZ, target.minZ);
+    const overlapX = Math.min(moving.maxX, target.maxX) - Math.max(moving.minX, target.minX);
+    if (overlapZ > 0) {
+      const at = (Math.max(moving.minZ, target.minZ) + Math.min(moving.maxZ, target.maxZ)) / 2;
+      if (target.minX >= moving.maxX) consider({ axis: "x", from: moving.maxX, to: target.minX, at, distance: target.minX - moving.maxX });
+      if (target.maxX <= moving.minX) consider({ axis: "x", from: target.maxX, to: moving.minX, at, distance: moving.minX - target.maxX });
+    }
+    if (overlapX > 0) {
+      const at = (Math.max(moving.minX, target.minX) + Math.min(moving.maxX, target.maxX)) / 2;
+      if (target.minZ >= moving.maxZ) consider({ axis: "z", from: moving.maxZ, to: target.minZ, at, distance: target.minZ - moving.maxZ });
+      if (target.maxZ <= moving.minZ) consider({ axis: "z", from: target.maxZ, to: moving.minZ, at, distance: moving.minZ - target.maxZ });
+    }
+  });
+  return best;
+}

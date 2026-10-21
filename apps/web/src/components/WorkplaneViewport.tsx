@@ -3,7 +3,7 @@
 import { markEscapeHandled } from "@/lib/escapeHandled";
 import { ArrowDownToLine, Check, ChevronLeft, ChevronRight, Crosshair, Cuboid, Download, Eye, EyeOff, FlipHorizontal, GripVertical, Home, Layers, Minus, MousePointer2, PanelsTopLeft, Plus, Rotate3d, RotateCcw, Ruler, RulerDimensionLine, Slice, Spline, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type DragEvent, type MouseEvent as ReactMouseEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction, type WheelEvent as ReactWheelEvent } from "react";
-import { objectSnapOffset, shiftSnapBox, type ObjectSnapGuide, type SnapBox } from "@/lib/objectSnap";
+import { nearestObjectGap, objectSnapOffset, shiftSnapBox, type ObjectGap, type ObjectSnapGuide, type SnapBox } from "@/lib/objectSnap";
 import { useMovablePanel, type MovablePanelOptions } from "@/lib/useMovablePanel";
 import { computeSectionPlaneVector, DEFAULT_SECTION_SETTINGS, getSectionBounds, SECTION_AXES_SHOWN, sectionAxisLetter, sectionAxisVector, sectionFineWindow, sectionFrameFromView, sectionFrameFromWorkplane, sectionPlacementWorkplane, sectionPointFromFrame, sectionPointToFrame, type SectionFrame, type SectionOrientation, type SectionPlaneAxis, type SectionPlaneSettings } from "@/lib/sectionView";
 import { projectSectionPoint, type SectionBody, type SectionLoop, type SectionPoint } from "@/lib/sectionSvg";
@@ -2269,6 +2269,49 @@ function syncObjectSnapGuides(state: ThreeState, guides: ObjectSnapGuide[], y: n
   lines.geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   lines.visible = true;
   state.needsRender = true;
+}
+
+/**
+ * Fork (build 20): while dragging, the gap to the nearest part beside the dragged one - a line on
+ * the plate between them and its length in mm. Cleared with null.
+ */
+function syncObjectGap(state: ThreeState, gap: ObjectGap | null, y: number) {
+  let line = state.scene.getObjectByName("ObjectSnapGap") as THREE.Line | undefined;
+  const container = state.renderer.domElement.parentElement;
+  let label = container?.querySelector<HTMLDivElement>(".object-gap-label") ?? null;
+  if (!gap) {
+    if (line?.visible) {
+      line.visible = false;
+      state.needsRender = true;
+    }
+    if (label) label.style.display = "none";
+    return;
+  }
+  if (!line) {
+    line = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: "#e0347c", dashSize: 1.2, gapSize: 0.8, depthTest: false, transparent: true, opacity: 0.9 }));
+    line.name = "ObjectSnapGap";
+    line.renderOrder = 1000;
+    line.frustumCulled = false;
+    state.scene.add(line);
+  }
+  const start = gap.axis === "x" ? new THREE.Vector3(gap.from, y, gap.at) : new THREE.Vector3(gap.at, y, gap.from);
+  const end = gap.axis === "x" ? new THREE.Vector3(gap.to, y, gap.at) : new THREE.Vector3(gap.at, y, gap.to);
+  line.geometry.dispose();
+  line.geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+  line.computeLineDistances();
+  line.visible = true;
+  state.needsRender = true;
+  if (!container) return;
+  if (!label) {
+    label = document.createElement("div");
+    label.className = "object-gap-label";
+    container.appendChild(label);
+  }
+  const middle = projectToScreen(start.clone().lerp(end, 0.5), state);
+  label.textContent = `${Number(gap.distance.toFixed(gap.distance < 10 ? 2 : 1))} mm`;
+  label.style.display = "block";
+  label.style.left = `${middle.x}px`;
+  label.style.top = `${middle.y}px`;
 }
 
 /** Bounding-Box einer Form auf drei vorgegebene Achsen projiziert, relativ zu `origin` - Kern sowohl fuer die Zieh-Griff-Rahmen als auch fuer die Abstands-zum-Ursprung-Anzeige. */
@@ -7931,6 +7974,7 @@ export function WorkplaneViewport({
           }
         }
         syncObjectSnapGuides(state, guides, drag.workplane.origin.y + 0.06);
+        syncObjectGap(state, nearestObjectGap(shiftSnapBox(drag.snapMoving, deltaX, deltaZ), drag.snapTargets), drag.workplane.origin.y + 0.07);
       }
       const moveDimensionSession = moveDimensionSessionRef.current;
       if (moveDimensionSession) {
@@ -8056,6 +8100,7 @@ export function WorkplaneViewport({
       clearMoveDimensions();
       if (state) {
         syncObjectSnapGuides(state, [], 0);
+        syncObjectGap(state, null, 0);
       }
     }
     if (state) state.needsRender = true;
@@ -8229,7 +8274,10 @@ export function WorkplaneViewport({
         event.currentTarget.releasePointerCapture(drag.pointerId);
       }
 
-      if (state) syncObjectSnapGuides(state, [], 0);
+      if (state) {
+        syncObjectSnapGuides(state, [], 0);
+        syncObjectGap(state, null, 0);
+      }
       let movedShape = false;
       if (drag.duplicate) {
         drag.duplicate.standIns.forEach((standIn) => standIn.removeFromParent());
@@ -8332,33 +8380,35 @@ export function WorkplaneViewport({
 
     const center = bounds.getCenter(new THREE.Vector3());
     const radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 0.5) * margin;
-    const canvas = state.renderer.domElement;
-    const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
-    const offset = state.camera.position.clone().sub(state.controls.target);
-    const direction = offset.lengthSq() > 0
-      ? offset.clone().normalize()
-      : CAMERA_HOME.clone().sub(CAMERA_TARGET).normalize();
+    // Fork (build 20): glides there (animateCamera), and ends exactly on this view.
+    animateCamera(state, () => {
+      const canvas = state.renderer.domElement;
+      const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
+      const offset = state.camera.position.clone().sub(state.controls.target);
+      const direction = offset.lengthSq() > 0
+        ? offset.clone().normalize()
+        : CAMERA_HOME.clone().sub(CAMERA_TARGET).normalize();
 
-    if (state.camera instanceof THREE.OrthographicCamera) {
-      const halfHeight = Math.max(0.001, (state.camera.top - state.camera.bottom) / 2);
-      const zoom = orthographicFramingZoom(radius, halfHeight, aspect);
-      const range = orthographicZoomRange(state.camera);
-      if (zoom) state.camera.zoom = clamp(zoom, range.min, range.max);
-      state.camera.position.copy(center).add(direction.multiplyScalar(clamp(offset.length(), CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE)));
-    } else {
-      const distance = clamp(perspectiveFramingDistance(radius, CAMERA_FOV, aspect), CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE);
-      state.camera.position.copy(center).add(direction.multiplyScalar(distance));
-    }
+      if (state.camera instanceof THREE.OrthographicCamera) {
+        const halfHeight = Math.max(0.001, (state.camera.top - state.camera.bottom) / 2);
+        const zoom = orthographicFramingZoom(radius, halfHeight, aspect);
+        const range = orthographicZoomRange(state.camera);
+        if (zoom) state.camera.zoom = clamp(zoom, range.min, range.max);
+        state.camera.position.copy(center).add(direction.multiplyScalar(clamp(offset.length(), CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE)));
+      } else {
+        const distance = clamp(perspectiveFramingDistance(radius, CAMERA_FOV, aspect), CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE);
+        state.camera.position.copy(center).add(direction.multiplyScalar(distance));
+      }
 
-    // constrainCamera keeps the orbit target on the plate on every frame, as far out as this
-    // part: one parked beyond the plate edge is centred too, as in Tinkercad (#352). The house
-    // button takes the allowance back.
-    state.focusReach = bounds.clone();
-    state.controls.target.copy(center);
-    state.camera.lookAt(center);
-    state.camera.updateProjectionMatrix();
-    state.controls.update();
-    syncViewCube(state, viewCubeRef.current);
+      // constrainCamera keeps the orbit target on the plate on every frame, as far out as this
+      // part: one parked beyond the plate edge is centred too, as in Tinkercad (#352). The house
+      // button takes the allowance back.
+      state.focusReach = bounds.clone();
+      state.controls.target.copy(center);
+      state.camera.lookAt(center);
+      state.camera.updateProjectionMatrix();
+      state.controls.update();
+    }, () => syncViewCube(state, viewCubeRef.current));
     state.needsRender = true;
     return true;
   }, []);
@@ -8388,7 +8438,7 @@ export function WorkplaneViewport({
   const resetView = useCallback(() => {
     const state = threeRef.current;
     if (state) {
-      resetCamera(state);
+      animateCamera(state, () => resetCamera(state), () => syncViewCube(state, viewCubeRef.current));
       state.needsRender = true;
     }
   }, []);
@@ -8398,8 +8448,7 @@ export function WorkplaneViewport({
     if (!state) {
       return;
     }
-    setCameraToViewFace(state, face);
-    syncViewCube(state, viewCubeRef.current);
+    animateCamera(state, () => setCameraToViewFace(state, face), () => syncViewCube(state, viewCubeRef.current));
   }, []);
 
   // The bands along a face's sides and its corners look from that edge or corner (#202).
@@ -8418,8 +8467,8 @@ export function WorkplaneViewport({
         event.stopPropagation();
         const state = threeRef.current;
         if (!state) return;
-        setCameraToViewDirection(state, viewCubeZoneDirection(face, column, row));
-        syncViewCube(state, viewCubeRef.current);
+        const direction = viewCubeZoneDirection(face, column, row);
+        animateCamera(state, () => setCameraToViewDirection(state, direction.clone()), () => syncViewCube(state, viewCubeRef.current));
       }}
     />
   ));
@@ -10108,6 +10157,85 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
   };
   rebuildWorkplane(state, DEFAULT_WORKSPACE);
   return state;
+}
+
+/**
+ * Fork (build 20): the camera glides to a new view instead of jumping - for the view cube, Home
+ * and "Center view". `change` sets the end view; the camera then travels there from where it was
+ * (round the target, so it orbits rather than cutting through the model), and ends exactly on
+ * the view `change` sets. Turning the view by hand stops it; "reduce motion" skips it.
+ */
+const cameraAnimations = new WeakMap<object, number>();
+function animateCamera(state: ThreeState, change: () => void, onFrame?: () => void, duration = 320) {
+  const running = cameraAnimations.get(state);
+  if (running) cancelAnimationFrame(running);
+  const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const camera = state.camera;
+  const startTarget = state.controls.target.clone();
+  const startPosition = camera.position.clone();
+  const startZoom = camera.zoom;
+  const startUp = camera.up.clone();
+  change();
+  if (reduce) {
+    onFrame?.();
+    return;
+  }
+  const endTarget = state.controls.target.clone();
+  const endPosition = camera.position.clone();
+  const endZoom = camera.zoom;
+  const startOffset = startPosition.clone().sub(startTarget);
+  const endOffset = endPosition.clone().sub(endTarget);
+  if (startOffset.distanceTo(endOffset) < 1e-4 && startTarget.distanceTo(endTarget) < 1e-4 && Math.abs(startZoom - endZoom) < 1e-4) {
+    onFrame?.();
+    return;
+  }
+  const startDistance = startOffset.length();
+  const endDistance = endOffset.length();
+  const turn = new THREE.Quaternion().setFromUnitVectors(startOffset.clone().normalize(), endOffset.clone().normalize());
+  const identity = new THREE.Quaternion();
+  const began = performance.now();
+  let stopped = false;
+  const stop = () => {
+    stopped = true;
+    state.controls.removeEventListener("start", stop);
+    const id = cameraAnimations.get(state);
+    if (id) cancelAnimationFrame(id);
+    cameraAnimations.delete(state);
+  };
+  state.controls.addEventListener("start", stop);
+  const step = (now: number) => {
+    if (stopped) return;
+    const linear = Math.min(1, (now - began) / duration);
+    const t = 1 - Math.pow(1 - linear, 3);
+    if (linear >= 1) {
+      cameraAnimations.delete(state);
+      state.controls.removeEventListener("start", stop);
+      change();
+      state.needsRender = true;
+      onFrame?.();
+      return;
+    }
+    const target = startTarget.clone().lerp(endTarget, t);
+    const direction = startOffset.clone().normalize().applyQuaternion(identity.clone().slerp(turn, t));
+    camera.up.copy(startUp).lerp(new THREE.Vector3(0, 1, 0), t).normalize();
+    camera.position.copy(target).add(direction.multiplyScalar(THREE.MathUtils.lerp(startDistance, endDistance, t)));
+    camera.zoom = THREE.MathUtils.lerp(startZoom, endZoom, t);
+    state.controls.target.copy(target);
+    camera.lookAt(target);
+    camera.updateProjectionMatrix();
+    state.controls.update();
+    state.needsRender = true;
+    onFrame?.();
+    cameraAnimations.set(state, requestAnimationFrame(step));
+  };
+  // Back to the start, then on the way.
+  camera.position.copy(startPosition);
+  camera.zoom = startZoom;
+  camera.up.copy(startUp);
+  state.controls.target.copy(startTarget);
+  camera.lookAt(startTarget);
+  camera.updateProjectionMatrix();
+  cameraAnimations.set(state, requestAnimationFrame(step));
 }
 
 function resetCamera(state: ThreeState) {

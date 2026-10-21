@@ -1,5 +1,6 @@
 "use client";
 
+import { SettingsSearch } from "@/components/workplane/SettingsSearch";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MAX_OVERHANG_ANGLE, MIN_OVERHANG_ANGLE } from "@/lib/overhangLimits";
 import { Box as BoxIcon, ChevronDown, Grid3X3, History, Palette, Plus, RotateCcw, Ruler, Trash2, X } from "lucide-react";
@@ -710,6 +711,22 @@ export function WorkspaceSettingsModal({
 
         <div className="workspace-modal-layout">
           <nav className="workspace-settings-nav" aria-label={t("workspace.sections")}>
+            <SettingsSearch
+              onPick={(section, advanced, label) => {
+                setActiveSection(section);
+                if (advanced) toggleAdvanced(true);
+                // Once the section is drawn: scroll to the setting and flash it.
+                window.setTimeout(() => {
+                  const body = document.querySelector(".workspace-modal-body");
+                  const match = [...(body?.querySelectorAll("span, strong, label") ?? [])].find((element) => element.textContent?.trim() === label);
+                  const row = (match?.closest("label, .workspace-toggle, .color-setting, .workspace-select, .workspace-range") ?? match) as HTMLElement | null;
+                  if (!row) return;
+                  row.scrollIntoView({ block: "center", behavior: "smooth" });
+                  row.classList.add("settings-search-hit");
+                  window.setTimeout(() => row.classList.remove("settings-search-hit"), 1600);
+                }, 60);
+              }}
+            />
             <button className={activeSection === "appearance" ? "active" : ""} aria-current={activeSection === "appearance" ? "page" : undefined} onClick={() => setActiveSection("appearance")}>
               <Palette size={18} />
               <span>{t("workspace.appearance")}</span>

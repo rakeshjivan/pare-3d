@@ -10,7 +10,7 @@ import { getLanguage } from "@/lib/i18n";
  */
 const HINTS_EN: Readonly<Record<string, string>> = {
   "Home": "back to the starting view",
-  "Center view on selection": "zoom to the selected parts",
+  "Centre view on selection": "zoom to the selected parts",
   "Zoom in": "closer",
   "Zoom out": "further away",
   "Orthographic view": "no perspective - handy for lining things up",

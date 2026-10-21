@@ -1,12 +1,15 @@
 "use client";
 
-import { BookOpen, CircleHelp, GraduationCap, Keyboard, LibraryBig, MousePointerClick, Tags } from "lucide-react";
+import { BookOpen, CircleHelp, GraduationCap, Keyboard, LibraryBig, MessageSquareHeart, MousePointerClick, Sparkles, Tags } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import { guideHref } from "@/lib/guideLinks";
 import { OPEN_TINKERCAD_GUIDE_EVENT } from "@/components/TinkercadGuide";
 import { readToolNames, setToolNames } from "@/lib/toolNames";
+import { OPEN_WHATS_NEW_EVENT } from "@/components/WhatsNew";
+
+const FEEDBACK_URL = "https://github.com/rakeshjivan/pare-3d/issues/new";
 
 /**
  * Fork: one Help button for everything that explains the app, instead of five icons side by side
@@ -93,6 +96,14 @@ export function HelpMenu({
             <Tags size={17} aria-hidden="true" />
             <span><strong>{t("helpMenu.toolNames")}{toolNames ? " ✓" : ""}</strong><small>{t("helpMenu.toolNamesHint")}</small></span>
           </button>
+          <button type="button" role="menuitem" onClick={pick(() => window.dispatchEvent(new Event(OPEN_WHATS_NEW_EVENT)))}>
+            <Sparkles size={17} aria-hidden="true" />
+            <span><strong>{t("helpMenu.whatsNew")}</strong><small>{t("helpMenu.whatsNewHint")}</small></span>
+          </button>
+          <a role="menuitem" href={FEEDBACK_URL} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
+            <MessageSquareHeart size={17} aria-hidden="true" />
+            <span><strong>{t("helpMenu.feedback")}</strong><small>{t("helpMenu.feedbackHint")}</small></span>
+          </a>
           <a role="menuitem" href={guideHref(language)} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
             <LibraryBig size={17} aria-hidden="true" />
             <span><strong>{t("dashboard.userGuide")}</strong><small>{t("helpMenu.userGuideHint")}</small></span>

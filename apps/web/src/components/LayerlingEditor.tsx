@@ -130,6 +130,10 @@ import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel
 import { ReadyPartsSection } from "./ReadyPartsSection";
 import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
+import { BusyIndicator } from "./BusyIndicator";
+import { beginBusy, setBusyCount } from "@/lib/busy";
+import { SaveStatus } from "./SaveStatus";
+import { WhatsNew } from "./WhatsNew";
 import { FastModeHint } from "./FastModeHint";
 import { checkBeforeSending, PRINT_CHECK_EVENT, PrintCheckPanel } from "./PrintCheckPanel";
 import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
@@ -2991,6 +2995,7 @@ export function LayerlingEditor({
         pending.reject(new Error(message));
       });
       cadModifierPendingRef.current.clear();
+      setBusyCount("cad", 0);
     };
     const reportWorkerFailure = (worker: Worker | null) => {
       if (worker && cadModifierWorkerRef.current !== worker) return;
@@ -3038,6 +3043,7 @@ export function LayerlingEditor({
       if (pending) {
         window.clearTimeout(pending.timer);
         cadModifierPendingRef.current.delete(message.requestId);
+        setBusyCount("cad", cadModifierPendingRef.current.size);
         if (message.type === "error") {
           pending.reject(new Error(message.message));
         } else {
@@ -6607,6 +6613,8 @@ export function LayerlingEditor({
         if (!cadModifierPendingRef.current.has(requestId)) return;
         const pendingRequests = [...cadModifierPendingRef.current.values()];
         cadModifierPendingRef.current.clear();
+        setBusyCount("cad", 0);
+      setBusyCount("cad", 0);
         pendingRequests.forEach((pending) => window.clearTimeout(pending.timer));
         cadModifierWorkerRef.current?.terminate();
         cadModifierWorkerRef.current = null;
@@ -6623,11 +6631,13 @@ export function LayerlingEditor({
         pendingRequests.forEach((pending) => pending.reject(new Error("Timed out waiting for the CAD worker; the worker was restarted")));
       }, timeoutMs);
       cadModifierPendingRef.current.set(requestId, { resolve, reject, timer });
+      setBusyCount("cad", cadModifierPendingRef.current.size);
       try {
         worker.postMessage({ ...request, requestId } as CadModifierWorkerRequest, transfer);
       } catch (error) {
         window.clearTimeout(timer);
         cadModifierPendingRef.current.delete(requestId);
+        setBusyCount("cad", cadModifierPendingRef.current.size);
         reject(error instanceof Error ? error : new Error("The CAD worker rejected the request"));
       }
     });
@@ -11071,11 +11081,13 @@ export function LayerlingEditor({
     };
     if (format === "svg") {
       setNotice(t("status.buildingSvg"), true);
+      const endExportBusy = beginBusy("export");
       void exportBodiesWithLooseHoles(sourceShapes)
         .then(({ solids: cutSolids, meshes, cut }) => toSvg(cutSolids, exportName.trim() || projectName, meshes.map((mesh, index) => (cut[index] ? mesh : null))))
         .then((content) => downloadTextFile(projectExportFileName(exportName, "svg"), content, "image/svg+xml;charset=utf-8"))
         .then(() => finishNotice("SVG"))
-        .catch((error: unknown) => failNotice("SVG", error));
+        .catch((error: unknown) => failNotice("SVG", error))
+        .finally(() => endExportBusy());
       return;
     }
     const label = format === "stl" ? "STL" : format === "3mf" ? "3MF" : "OBJ";
@@ -11119,6 +11131,7 @@ export function LayerlingEditor({
       }
     }
     const savedFile = target === "download" ? null : target;
+    const endExportBusy = beginBusy("export");
     void exportBodiesWithLooseHoles(sourceShapes)
       .then(async ({ solids: cutSolids, meshes, cut: wasCut, holeCutsFailed }) => {
         bodiesWritten = cutSolids;
@@ -11166,7 +11179,8 @@ export function LayerlingEditor({
         else if (splinters > 0) setNotice(t("status.exportSplinters", { count: splinters }));
         else finishNotice(label);
       })
-      .catch((error: unknown) => failNotice(label, error));
+      .catch((error: unknown) => failNotice(label, error))
+      .finally(() => endExportBusy());
   }, [bedPrinter, exportSource, projectId, projectName]);
   // Fork: the "Send to Bambu Studio" button in the title row asks for an export through this event.
   const exportDesignRef = useRef(exportDesign);
@@ -12939,6 +12953,8 @@ export function LayerlingEditor({
           onClose={() => setPrintCheck(null)}
         />
       ) : null}
+      <WhatsNew />
+      <BusyIndicator />
       <FastModeHint
         fastMode={workspaceSettings.fastMode}
         onTurnOn={() => {
@@ -14845,6 +14861,7 @@ function SecondaryToolbar({
             />
             <Pencil size={13} strokeWidth={2.4} aria-hidden="true" />
           </label>
+          <SaveStatus />
         </div>
         <div className="toolbar-title-row-actions">
           {/* Fork: Manage and Help sit in the title row, in line, so the tools stay on one row. */}

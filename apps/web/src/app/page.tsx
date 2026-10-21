@@ -7,6 +7,8 @@ import { AppFooter } from "@/components/AppFooter";
 import { AutoBackupControl } from "@/components/AutoBackupControl";
 import { PareUpdateBanner } from "@/components/PareUpdateBanner";
 import { FirstRunCard, useFirstRunAnswered } from "@/components/FirstRunCard";
+import { SAVE_STATE_EVENT } from "@/components/SaveStatus";
+import { WhatsNew } from "@/components/WhatsNew";
 import { StarterDesigns } from "@/components/StarterDesigns";
 import { starterParts, type StarterId } from "@/lib/starterDesigns";
 import { buildReadyPart } from "@/lib/readyPartsBuild";
@@ -642,7 +644,29 @@ async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntr
 /** The newest revision of each project that the editor has asked to be saved. */
 const newestRequestedRevision = new Map<string, number>();
 
+/** Fork (build 20): tells the editor's "Saved" line when a save starts, ends or fails. */
+let pendingSaves = 0;
+function announceSaveState(state: "saving" | "saved" | "error") {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(SAVE_STATE_EVENT, { detail: state }));
+}
 function saveProjectShapesWhenIdle(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext): Promise<ProjectShapesSaveResult | void> {
+  pendingSaves += 1;
+  announceSaveState("saving");
+  return saveProjectShapesWhenIdleInner(projectId, entry, context).then(
+    (result) => {
+      pendingSaves = Math.max(0, pendingSaves - 1);
+      if (pendingSaves === 0) announceSaveState("saved");
+      return result;
+    },
+    (error: unknown) => {
+      pendingSaves = Math.max(0, pendingSaves - 1);
+      announceSaveState("error");
+      throw error;
+    },
+  );
+}
+
+function saveProjectShapesWhenIdleInner(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext): Promise<ProjectShapesSaveResult | void> {
   // Saves of one project run one after another. Each change queues one, so a
   // run of quick changes would otherwise be written once per change, and a
   // dense design takes over a second to write. An older state whose newer one
@@ -3571,6 +3595,7 @@ function Dashboard({
               ) : null}
               <PareUpdateBanner />
               <FirstRunCard />
+              <WhatsNew />
               <StarterDesigns onStarter={onStarter} />
               {/* Fork: on a first visit the "New to 3D design?" question already offers the Tinkercad guide. */}
               {firstRunAnswered ? (

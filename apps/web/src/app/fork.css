@@ -1024,3 +1024,111 @@ html[data-tool-names="on"] .secondary-toolbar .toolbar-icon.disabled .tool-label
 .print-check footer button { padding: 8px 14px; border-radius: 9px; font: 600 13px var(--font-ui); cursor: pointer; border: 1px solid var(--border); background: none; color: var(--foreground); }
 .print-check footer button.primary { color: #fff; background: var(--primary); border-color: var(--primary); }
 .bambu-send-menu strong svg { vertical-align: -2px; }
+
+/* ---------------------------------------------------------------------------
+ * Build 20: a calmer toolbar. One quiet tile per group instead of a coloured frame, group
+ * names in sentence case and a muted grey; the group colour stays only on the icons.
+ * ------------------------------------------------------------------------ */
+.secondary-toolbar .toolbar-section-tools,
+.secondary-toolbar .toolbar-section .action-buttons {
+  background: var(--toolbar-tile);
+  border: 1px solid color-mix(in srgb, var(--foreground, #333) 11%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 1px 1px rgba(20, 30, 45, 0.04);
+}
+.secondary-toolbar .toolbar-section-label {
+  color: color-mix(in srgb, var(--foreground, #333) 58%, transparent);
+  font: 600 11px/16px var(--font-ui);
+  text-transform: none;
+  text-shadow: none;
+  letter-spacing: 0;
+}
+.secondary-toolbar .toolbar-section-label::first-letter { text-transform: uppercase; }
+html[data-theme="dark"] .secondary-toolbar .toolbar-section-tools,
+html[data-theme="dark"] .secondary-toolbar .toolbar-section .action-buttons {
+  border-color: rgba(255, 255, 255, 0.09);
+}
+html[data-theme="dark"] .secondary-toolbar .toolbar-section-label { color: rgba(240, 232, 222, 0.6); text-shadow: none; }
+/* The group a tool is in still shows: a hairline of its colour under each tile. */
+.secondary-toolbar .toolbar-section-tools::after,
+.secondary-toolbar .toolbar-section .action-buttons::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--group-color);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.secondary-toolbar .toolbar-section .action-buttons { position: relative; }
+
+/* Build 20: "Saved" beside the design name; just the tick on laptop widths. */
+.save-status { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; flex: none; color: color-mix(in srgb, var(--foreground, #333) 55%, transparent); font: 600 12px var(--font-ui); white-space: nowrap; }
+.save-status.saved svg { color: #2f9e44; }
+.save-status.error { color: #c0392b; }
+.save-status .spin { animation: pare-spin 0.9s linear infinite; }
+@keyframes pare-spin { to { transform: rotate(360deg); } }
+@media (max-width: 1366px) { .save-status-text { display: none; } .save-status { margin-left: 6px; } }
+
+/* Build 20: menus and panels ease in instead of popping (off for "reduce motion"). */
+@keyframes pare-pop { from { opacity: 0; transform: translateY(-4px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes pare-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pare-rise { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: no-preference) {
+  .help-menu-list, .bambu-send-menu, .project-card-menu, .theme-dropdown-menu, .viewport-context-menu, .shape-context-menu { animation: pare-pop 140ms ease-out both; transform-origin: top right; }
+  .print-check { animation: pare-pop 180ms ease-out both; }
+  .print-check-backdrop, .workspace-modal-backdrop { animation: pare-fade 160ms ease-out both; }
+  .shape-inspector:not(.moving) { animation: pare-fade 140ms ease-out both; }
+  .fast-mode-hint { animation: pare-rise 220ms ease-out both; }
+  .first-run-card, .starter-designs { animation: pare-fade 240ms ease-out both; }
+  .toolbar-icon, .action-icon-button, .starter-design, .dashboard-action-tile { transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease; }
+  .starter-design:hover, .dashboard-action-tile:not(:disabled):hover { transform: translateY(-1px); }
+}
+
+/* Build 20: What's new. */
+.whats-new-build { padding: 0 20px 4px; }
+.whats-new-build h3 { margin: 6px 0 6px; font: 700 13px var(--font-ui); color: var(--primary); }
+.whats-new-build ul { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 5px; font-size: 13px; line-height: 1.45; }
+.whats-new .print-check ul, .whats-new-build ul li { border: 0; padding: 0; display: list-item; }
+.object-gap-label {
+  position: absolute; z-index: 6; transform: translate(-50%, -140%); padding: 2px 7px; pointer-events: none;
+  color: #fff; background: #e0347c; border-radius: 6px; font: 700 11px/1.4 var(--font-ui); white-space: nowrap; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+/* Build 20: "Working…" while slow jobs run. */
+.busy-indicator {
+  position: fixed; left: 50%; top: 132px; z-index: 950; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; color: #fff; background: rgba(32, 42, 56, 0.92);
+  border-radius: 999px; font: 600 13px var(--font-ui); box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25); pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Build 20: accessibility basics - greyed-out tools still readable, and a clear ring
+ * round whatever has the keyboard focus (only when using the keyboard).
+ * ------------------------------------------------------------------------ */
+:root { --toolbar-icon-disabled: #9aa3ad; }
+html[data-theme="dark"] { --toolbar-icon-disabled: #7f776d; }
+.toolbar-icon.disabled .fork-accent,
+.toolbar-icon:disabled .fork-accent { opacity: 0.38; }
+.toolbar-icon.disabled svg, .toolbar-icon:disabled svg { opacity: 0.85; }
+:where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.toolbar-icon:focus-visible, .action-icon-button:focus-visible { outline-offset: 1px; }
+
+/* Build 20: search in Settings. */
+.settings-search { position: relative; margin: 0 0 10px; }
+.settings-search label { display: flex; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 9px; background: var(--background, #fff); }
+.settings-search label svg { opacity: 0.6; flex: none; }
+.settings-search input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; color: inherit; font: 500 13px var(--font-ui); }
+.settings-search-results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; margin: 0; padding: 4px; list-style: none; background: var(--panel, #fff); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16); }
+.settings-search-results button { width: 100%; padding: 7px 9px; text-align: left; color: inherit; background: none; border: 0; border-radius: 7px; font: 500 13px var(--font-ui); cursor: pointer; }
+.settings-search-results button:hover { background: var(--subbar); }
+.settings-search-results .empty { padding: 7px 9px; font-size: 12px; opacity: 0.7; }
+@keyframes pare-hit { 0%, 100% { background: transparent; } 30% { background: color-mix(in srgb, var(--primary) 16%, transparent); } }
+.settings-search-hit { animation: pare-hit 1.6s ease; border-radius: 8px; }

@@ -1,3 +1,4 @@
+import { whileBusy } from "@/lib/busy";
 
 import { removeLooseSplinters } from "@/lib/meshSplinters";
 import type { ManifoldToplevel } from "manifold-3d";
@@ -2320,6 +2321,11 @@ function withMulticolorGroupsOpened(selection: WorkplaneShape[]): WorkplaneShape
 }
 
 export async function buildGroupedShapeFromSelection(selected: WorkplaneShape[], triangleLimit: number): Promise<GroupBuildResult> {
+  // Fork (build 20): the editor shows "Combining parts…" while this runs.
+  return whileBusy("combine", () => buildGroupedShapeFromSelectionNow(selected, triangleLimit));
+}
+
+async function buildGroupedShapeFromSelectionNow(selected: WorkplaneShape[], triangleLimit: number): Promise<GroupBuildResult> {
   // What the group carries as its parts; the cut itself is made from what was selected.
   const groupable = withMulticolorGroupsOpened(selected);
   const booleanSelection = expandGroupsForBoolean(selected);
