@@ -130,3 +130,21 @@ jobs:
             Already installed (build 2 or later)? It updates itself: the next time you open it, or when it asks you to reload.
 
             Pare 3D is based on [layerling](https://github.com/henmedia/layerling) (AGPL-3.0-only); this release's source is this repository at this tag.
+      # The releases page lists tags as text (pare-9 before pare-21), so only the newest build and
+      # the one before it (to roll back to) are kept; older builds and test builds are removed.
+      # Their tags stay, so every build's source is still in the repository.
+      - name: Keep only the newest two builds on the releases page
+        if: github.ref_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          releases=$(gh api "repos/$REPO/releases?per_page=100" --paginate --jq '.[] | "\(.id) \(.tag_name)"')
+          keep=$(echo "$releases" | awk '$2 ~ /^pare-[0-9]+$/ { sub("pare-", "", $2); print $2 }' | sort -n | tail -2 | sed 's/^/pare-/')
+          echo "Keeping: $keep"
+          echo "$releases" | while read -r id tag; do
+            [ -z "$id" ] && continue
+            if ! echo "$keep" | grep -qx "$tag"; then
+              gh api -X DELETE "repos/$REPO/releases/$id" && echo "Removed the $tag release page (the tag stays)"
+            fi
+          done
