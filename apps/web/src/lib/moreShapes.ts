@@ -13,6 +13,34 @@ import type { WorkplaneShape } from "@/types/layerling";
 export type MoreShapeId = "roundedCylinder" | "chamferedCylinder" | "pieSlice" | "ringSegment" | "gusset" | "arrow" | "spiralRamp" | "geodesicBall";
 export const MORE_SHAPE_IDS: readonly MoreShapeId[] = ["roundedCylinder", "chamferedCylinder", "pieSlice", "ringSegment", "gusset", "arrow", "spiralRamp", "geodesicBall"];
 
+/** Where each sits in the shape panel: after the library shape it is a variant of. */
+export const MORE_SHAPE_AFTER: Record<MoreShapeId, string> = {
+  roundedCylinder: "cylinder",
+  chamferedCylinder: "cylinder",
+  geodesicBall: "sphere",
+  gusset: "wedge",
+  pieSlice: "tube",
+  ringSegment: "tube",
+  spiralRamp: "spring",
+  arrow: "heart",
+};
+
+/** The panel picture, rendered from the shape itself in the style of the library's own. */
+export function moreShapeIcon(id: MoreShapeId) {
+  return `assets/editor/shape-icons-gray/more-${id}.png`;
+}
+
+const DRAG_PREFIX = "pare-more:";
+/** Dragged onto the plate through the my-shapes drop path, under an id that cannot clash with one. */
+export function moreShapeDragId(id: MoreShapeId) {
+  return DRAG_PREFIX + id;
+}
+export function moreShapeFromDragId(dragId: string): MoreShapeId | null {
+  if (!dragId.startsWith(DRAG_PREFIX)) return null;
+  const id = dragId.slice(DRAG_PREFIX.length) as MoreShapeId;
+  return MORE_SHAPE_IDS.includes(id) ? id : null;
+}
+
 const COLORS: Record<MoreShapeId, string> = {
   roundedCylinder: "#d97813",
   chamferedCylinder: "#c76a10",

@@ -4,7 +4,7 @@ import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { ShapeMenuPanel } from "@/components/workplane/ShapeMenuPanel";
 import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, PencilLine, Blend, Check, CircleHelp, Percent, Circle as CircleIcon, CloudUpload, Download, Eye, EyeOff, FilePlus2, FolderOpen, Hexagon as HexagonIcon, Info, ListTree, MoreHorizontal, Pencil, Pentagon as PentagonIcon, Rotate3d, Route as RouteIcon, Search, Square as SquareIcon, Star as StarIcon, Triangle as TriangleIcon, X } from "lucide-react";
 import { ObjectListPanel } from "@/components/workplane/ObjectListPanel";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useWheelField } from "@/lib/useWheelField";
 import { wheelNextValue } from "@/lib/wheelValueStep";
 import * as THREE from "three";
@@ -129,7 +129,7 @@ import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootpr
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
 import { ReadyPartsSection } from "./ReadyPartsSection";
 import { MoreShapesSection } from "./MoreShapesSection";
-import { moreShapePart } from "@/lib/moreShapes";
+import { MORE_SHAPE_IDS, moreShapeFromDragId, moreShapeIcon, moreShapePart, type MoreShapeId } from "@/lib/moreShapes";
 import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
 import { BusyIndicator } from "./BusyIndicator";
@@ -299,6 +299,9 @@ export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 type TopPanel = "import" | "export" | null;
 
 /** Die Befehle der Suche, die im Verlaufsblick wach bleiben: sie aendern nichts am Entwurf. */
+/** Fork (build 21): which library shapes are on show, so a new shape whose neighbour is missing still appears. */
+const libraryShapeIds: ReadonlySet<string> = new Set(libraryShapeAssets.map((shape) => shape.id));
+
 const HISTORY_VIEW_COMMANDS = new Set(["history", "export", "guide", "shortcuts"]);
 
 /** MCP actions that only read or change the view, so they still work while the history view is open. */
@@ -6373,13 +6376,13 @@ export function LayerlingEditor({
   }, [splitTargetPoints]);
 
   /** Fork: ready-made parts, built and placed like a saved custom shape (they hang on the pointer when that is on). */
-  const insertReadyParts = useCallback(async (parts: ReadyPart[], options: { sink?: number; carry?: boolean } = {}) => {
+  const insertReadyParts = useCallback(async (parts: ReadyPart[], options: { sink?: number; carry?: boolean; at?: PlacementPoint } = {}) => {
     const sourceProjectId = splitProjectIdRef.current;
     const built = await Promise.all(parts.map((part) => buildReadyPart(part, workspaceSettingsRef.current.booleanTriangleLimit)));
     if (splitProjectIdRef.current !== sourceProjectId) return;
-    const { shapes: inserted } = placeCustomShape({ shapes: built }, placementWorkplaneRef.current.origin, []);
+    const { shapes: inserted } = placeCustomShape({ shapes: built }, options.at ?? placementWorkplaneRef.current.origin, []);
     commitShapes([...shapesRef.current, ...inserted], inserted.map((shape) => shape.id), t("readyParts.inserted", { name: parts.map((part) => part.name).join(" + ") }));
-    if ((options.carry || workspaceSettingsRef.current.clickToPlaceShapes) && inserted.length) {
+    if (!options.at && (options.carry || workspaceSettingsRef.current.clickToPlaceShapes) && inserted.length) {
       setCruiseAsset(null);
       // Cut-in text goes into the face it is set down on by its depth (dropCarried).
       carrySinkRef.current = options.sink ? new Map(inserted.map((shape) => [shape.id, options.sink!])) : new Map();
@@ -12720,14 +12723,18 @@ export function LayerlingEditor({
             }}
           />
         )}
-        renderMoreShapes={(close) => (
+        renderMoreShapes={(close, after, present) => (
           <MoreShapesSection
+            after={after}
+            present={present}
+            onDragDone={close}
             onAdd={(id) => {
               close();
               void insertReadyParts([moreShapePart(id, t(`moreShapes.${id}`))]).catch(noticeError);
             }}
           />
         )}
+        addMoreShape={(id) => void insertReadyParts([moreShapePart(id, t(`moreShapes.${id}`))]).catch(noticeError)}
         renderMyShapes={(close) => (
           <MyShapesSection
             shapes={customShapeEntries}
@@ -12928,7 +12935,15 @@ export function LayerlingEditor({
           onCarryDrop={dropCarried}
           onCancelCruise={stopCruise}
           onAddShape={addShape}
-          onDropMyShape={(id, point) => void insertMyShape(id, point).catch(noticeError)}
+          onDropMyShape={(id, point) => {
+            // Fork (build 21): a new basic shape dragged onto the plate lands where it is dropped.
+            const more = moreShapeFromDragId(id);
+            if (more) {
+              void insertReadyParts([moreShapePart(more, t(`moreShapes.${more}`))], { at: point }).catch(noticeError);
+              return;
+            }
+            void insertMyShape(id, point).catch(noticeError);
+          }}
           onAlignAnchorChange={chooseAlignAnchor}
           onAlignPreview={previewAlignSelection}
           onAlignPreviewClear={clearAlignPreview}
@@ -13754,6 +13769,7 @@ function SecondaryToolbar({
   onToggleOverhangs,
   renderMyShapes,
   renderMoreShapes,
+  addMoreShape,
   renderReadyParts,
   onLithophane,
   onTrace,
@@ -13888,7 +13904,8 @@ function SecondaryToolbar({
   onToggleOverhangs: () => void;
   /** Custom shapes above the library; gets the way to close the menu. */
   renderMyShapes?: (close: () => void) => ReactNode;
-  renderMoreShapes?: (close: () => void) => ReactNode;
+  renderMoreShapes?: (close: () => void, after: string | undefined, present: ReadonlySet<string>) => ReactNode;
+  addMoreShape?: (id: MoreShapeId) => void;
   /** Fork: ready-made parts under the library; gets the way to close the menu. */
   renderReadyParts?: (close: () => void) => ReactNode;
   /** Fork: the lithophane and Voronoi makers. */
@@ -14329,6 +14346,14 @@ function SecondaryToolbar({
         () => addShapeFromMenu(shape),
         { image: shape.menuIcon, keywords: [shape.id, shape.name, ...(SHAPE_KEYWORDS[shape.id] ?? [])] },
       )),
+      ...(addMoreShape ? MORE_SHAPE_IDS.map((id) => plain(
+        `shape-${id}`,
+        t("palette.addShape", { shape: t(`moreShapes.${id}`) }),
+        shapesGroup,
+        true,
+        () => addMoreShape(id),
+        { image: moreShapeIcon(id), keywords: [id, t(`moreShapes.${id}Hint`)] },
+      )) : []),
       ...visibilityTools.map((tool) => fromTool(tool, visibilityGroup)),
       plain(
         "show-hidden",
@@ -14450,9 +14475,9 @@ function SecondaryToolbar({
               ) : null}
               <div className="shape-menu-list">
                 {libraryShapeAssets.map((shape) => (
+                  <Fragment key={shape.id}>
                   <button
                     className="shape-menu-item"
-                    key={shape.id}
                     type="button"
                     title={shapeAssetMenuLabel(shape).replace(/\s+/g, " ")}
                     aria-label={shapeAssetMenuLabel(shape).replace(/\s+/g, " ")}
@@ -14514,9 +14539,11 @@ function SecondaryToolbar({
                     <img src={shape.menuIcon} alt="" draggable={false} />
                     <span className={shapeAssetMenuLabel(shape).split(/\s+/).some((word) => word.length > 13) ? "long-word" : undefined}>{shapeAssetMenuLabel(shape)}</span>
                   </button>
+                  {renderMoreShapes ? renderMoreShapes(closeShapesAfterPick, shape.id, libraryShapeIds) : null}
+                  </Fragment>
                 ))}
+                {renderMoreShapes ? renderMoreShapes(closeShapesAfterPick, undefined, libraryShapeIds) : null}
               </div>
-              {renderMoreShapes ? renderMoreShapes(closeShapesAfterPick) : null}
               </>)}
               </div>
             </ShapeMenuPanel>

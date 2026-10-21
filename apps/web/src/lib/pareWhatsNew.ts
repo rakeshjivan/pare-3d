@@ -6,7 +6,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
   {
     build: 21,
     items: [
-      "Eight new shapes under More shapes: rounded and bevelled cylinders, pie slice, ring segment, gusset, arrow, spiral ramp and a geodesic ball.",
+      "Eight new basic shapes, each next to its nearest relative: rounded and bevelled cylinders, pie slice, ring segment, gusset, arrow, spiral ramp and a geodesic ball.",
       "Photo to outline (Make > Trace): turn a photo of a tool or template into a cut-out for a tray, or a solid shape.",
       "Electronics enclosure in Ready-made parts: a box for a circuit board with standoffs, port cut-outs and a vented lid.",
       "Fit test: print it once, pick the hole that fits, and Print fit offers it as \"My printer\".",
