@@ -245,47 +245,49 @@ export function ForkShapesIcon(props: IconProps) {
 
 /** Tool id (as in data-layerling-tool) to its Pare 3D icon. */
 export function ForkReadyPartsIcon(props: IconProps) {
+  // Fork (build 22): finer - a box and a nut, drawn in line; the nut's hole carries the colour.
   return (
-    <ForkIcon {...props}>
-      <rect x="7" y="20" width="22" height="18" rx="2" {...SOFT} />
-      <rect x="7" y="20" width="22" height="18" rx="2" />
-      <path d="M7 26h22M18 20v18" />
-      <path d="M32 10l8 4.5v9L32 28l-8-4.5v-9Z" {...ACCENT} />
+    <ForkIcon strokeWidth="2.4" {...props}>
+      <rect x="6" y="21" width="24" height="18" rx="3" {...SOFT} />
+      <rect x="6" y="21" width="24" height="18" rx="3" />
+      <path d="M6 27h24" />
+      <path d="M34 7.5 41.5 12v9L34 25.5 26.5 21v-9Z" />
+      <circle cx="34" cy="16.5" r="3.2" {...ACCENT} />
     </ForkIcon>
   );
 }
 
 export function ForkLithophaneIcon(props: IconProps) {
+  // Fork (build 22): finer - a framed picture with a hill line and a sun.
   return (
-    <ForkIcon {...props}>
-      <rect x="9" y="7" width="26" height="32" rx="2" {...SOFT} />
-      <rect x="9" y="7" width="26" height="32" rx="2" />
-      <path d="M13 33l7-9 5 6 3-4 5 7" />
-      <circle cx="26" cy="15" r="3" {...ACCENT} />
-      <path d="M40 14l4-3M41 22h4M40 30l4 3" />
+    <ForkIcon strokeWidth="2.4" {...props}>
+      <rect x="8" y="8" width="32" height="32" rx="3.5" {...SOFT} />
+      <rect x="8" y="8" width="32" height="32" rx="3.5" />
+      <path d="M12 34l8.5-10 6 7 4-4.5L36 33" />
+      <circle cx="30" cy="17" r="3.4" {...ACCENT} />
     </ForkIcon>
   );
 }
 
 /** Fork (build 21): photo to outline - a photo with a traced line round a spanner shape. */
 export function ForkTraceIcon(props: IconProps) {
+  // Fork (build 22): finer - crop corners round a spanner outline traced in the accent colour.
   return (
-    <ForkIcon {...props}>
-      <rect x="6" y="8" width="36" height="30" rx="3" {...SOFT} />
-      <rect x="6" y="8" width="36" height="30" rx="3" />
-      <path d="M14 30l11-11a5 5 0 1 1 5 5L19 35a3.5 3.5 0 0 1-5-5z" {...ACCENT} />
-      <path d="M12 28l11-11a7 7 0 1 1 8 8L20 36a5 5 0 0 1-8-8z" strokeDasharray="2.5 2" />
+    <ForkIcon strokeWidth="2.4" {...props}>
+      <path d="M7 15V10a3 3 0 0 1 3-3h5M33 7h5a3 3 0 0 1 3 3v5M41 33v5a3 3 0 0 1-3 3h-5M15 41h-5a3 3 0 0 1-3-3v-5" />
+      <path d="M15.5 30.5 25 21a6 6 0 1 1 3 3l-9.5 9.5a2.1 2.1 0 0 1-3-3Z" className="fork-accent-line" />
     </ForkIcon>
   );
 }
 
 export function ForkVoronoiIcon(props: IconProps) {
+  // Fork (build 22): finer - a panel of cells, one of them coloured.
   return (
-    <ForkIcon {...props}>
-      <rect x="6" y="8" width="36" height="32" rx="3" {...SOFT} />
-      <rect x="6" y="8" width="36" height="32" rx="3" />
-      <path d="M6 20l9-2 6-10M15 18l4 10 9 2 14-6M28 30l-3 10M19 28l-13 6M28 30l5-22" />
-      <path d="M21 21l5-1 2 6-6 1Z" {...ACCENT} />
+    <ForkIcon strokeWidth="2.4" {...props}>
+      <rect x="7" y="8" width="34" height="32" rx="3.5" {...SOFT} />
+      <rect x="7" y="8" width="34" height="32" rx="3.5" />
+      <path d="M7 21l9-2 5-11M16 19l4 9 9 2 12-5M29 30l-3 10M20 28L7 33M29 30l4-22" strokeWidth="1.8" />
+      <path d="M21.5 21.5 26 20.6l2 5.4-5.2.9Z" {...ACCENT} />
     </ForkIcon>
   );
 }

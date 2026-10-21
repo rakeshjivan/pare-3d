@@ -1,9 +1,10 @@
 "use client";
 
 import { SettingsSearch } from "@/components/workplane/SettingsSearch";
+import { FilesSettings } from "@/components/FilesSettings";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MAX_OVERHANG_ANGLE, MIN_OVERHANG_ANGLE } from "@/lib/overhangLimits";
-import { Box as BoxIcon, ChevronDown, Grid3X3, History, Palette, Plus, RotateCcw, Ruler, Trash2, X } from "lucide-react";
+import { Box as BoxIcon, ChevronDown, FolderOpen, Grid3X3, History, Palette, Plus, RotateCcw, Ruler, Trash2, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMovablePanel } from "@/lib/useMovablePanel";
 import { createPortal } from "react-dom";
@@ -83,7 +84,7 @@ import { DEFAULT_LOFT } from "@/lib/loftGeometry";
 import { selectWholeValue } from "@/lib/numberField";
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;
-type WorkspaceSettingsSection = "appearance" | "measurement" | "workplane" | "shapes" | "history";
+type WorkspaceSettingsSection = "appearance" | "measurement" | "workplane" | "shapes" | "history" | "files";
 
 const MIN_WORKSPACE_SIZE = 60;
 const MAX_WORKSPACE_SIZE = 2000;
@@ -746,6 +747,11 @@ export function WorkspaceSettingsModal({
             <button className={activeSection === "history" ? "active" : ""} data-help={t("workspace.savedHistory")} aria-current={activeSection === "history" ? "page" : undefined} onClick={() => setActiveSection("history")}>
               <History size={18} />
               <span>{t("workspace.history")}</span>
+            </button>
+            {/* Fork (build 22): where exports and backups go. */}
+            <button className={activeSection === "files" ? "active" : ""} aria-current={activeSection === "files" ? "page" : undefined} onClick={() => setActiveSection("files")}>
+              <FolderOpen size={18} />
+              <span>{t("files.section")}</span>
             </button>
           </nav>
 
@@ -1481,6 +1487,15 @@ export function WorkspaceSettingsModal({
                 </>
               ) : null}
 
+              {activeSection === "files" ? (
+                <>
+                  <div className="workspace-section-heading">
+                    <strong>{t("files.section")}</strong>
+                    <span>{t("files.sectionHint")}</span>
+                  </div>
+                  <FilesSettings />
+                </>
+              ) : null}
               {activeSection === "history" ? (
                 <>
                   <div className="workspace-section-heading">

@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 22,
+    items: [
+      "A calmer home screen: the backup box is now one quiet line, and the examples panel is gone.",
+      "Choose where exports and backups are saved (Settings > Files), or have Pare 3D ask each time. After a save, \"Show in folder\" takes you there.",
+      "The Shapes panel is open whenever a design opens.",
+      "Round shapes start with \"Sides follow the size\" off, so the Sides slider works straight away for smoother curves.",
+    ],
+  },
+  {
     build: 21,
     items: [
       "Eight new basic shapes, each next to its nearest relative: rounded and bevelled cylinders, pie slice, ring segment, gusset, arrow, spiral ramp and a geodesic ball.",

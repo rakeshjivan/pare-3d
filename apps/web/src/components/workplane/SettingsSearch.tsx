@@ -5,7 +5,7 @@ import { useState } from "react";
 import { t } from "@/lib/i18n";
 import type { MessageKey } from "@/lib/messages.en";
 
-export type SettingsSection = "appearance" | "measurement" | "workplane" | "shapes" | "history";
+export type SettingsSection = "appearance" | "measurement" | "workplane" | "shapes" | "history" | "files";
 
 /** Where each setting lives, and whether it is behind "Show advanced settings". */
 const INDEX: ReadonlyArray<{ key: MessageKey; section: SettingsSection; advanced?: boolean }> = [
@@ -27,6 +27,7 @@ const INDEX: ReadonlyArray<{ key: MessageKey; section: SettingsSection; advanced
     "workspace.gridColor", "workspace.gridMajorEvery", "workspace.gridMajorColor"] as const).map((key) => ({ key, section: "workplane" as const })),
   ...(["workspace.shapeDefaults", "workspace.customLimit"] as const).map((key) => ({ key, section: "shapes" as const })),
   ...(["workspace.savedHistory", "workspace.actionsToRetain", "workspace.customSnapGrids"] as const).map((key) => ({ key, section: "history" as const })),
+  ...(["files.exportsTitle", "files.backupsTitle", "files.askEachTime"] as const).map((key) => ({ key, section: "files" as const })),
 ];
 
 function fold(text: string) {

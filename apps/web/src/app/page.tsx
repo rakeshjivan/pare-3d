@@ -1,15 +1,13 @@
 "use client";
 
 import { PareBuildBadge, PareVersionStatus } from "@/components/PareVersionStatus";
-import { Archive, ArchiveRestore, ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { AppFooter } from "@/components/AppFooter";
-import { AutoBackupControl } from "@/components/AutoBackupControl";
 import { PareUpdateBanner } from "@/components/PareUpdateBanner";
 import { FirstRunCard, useFirstRunAnswered } from "@/components/FirstRunCard";
 import { SAVE_STATE_EVENT } from "@/components/SaveStatus";
 import { WhatsNew } from "@/components/WhatsNew";
-import { StarterDesigns } from "@/components/StarterDesigns";
 import { starterParts, type StarterId } from "@/lib/starterDesigns";
 import { buildReadyPart } from "@/lib/readyPartsBuild";
 import { placeCustomShape } from "@/lib/customShapePackage";
@@ -86,6 +84,10 @@ import { designsToRecover, isInlineThumbnail, orphanedProjectIds, projectListFor
 import { deleteDesignThumbnail, loadDesignThumbnails, saveDesignThumbnail } from "@/lib/designThumbnailStore";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, readWorkspaceDefault, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
 import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
+import { saveUserFile } from "@/lib/pareFiles";
+import { BackupStrip } from "@/components/BackupStrip";
+import { OlderAppNotice } from "@/components/OlderAppNotice";
+import { SavedFileToast } from "@/components/SavedFileToast";
 
 type AppView = "dashboard" | "editor";
 type ViewMode = "grid" | "list";
@@ -2204,12 +2206,11 @@ export default function Home() {
       const emptyFolders = designFolders.filter((folder) => !holding.has(folder.id) && !designFolders.some((other) => other.parentId === folder.id));
       backupFolderPaths(emptyFolders.map((folder) => folderPathNames(designFolders, folder.id))).forEach((name) => entries.push({ name, bytes: new Uint8Array() }));
       const fileName = backupFileName(new Date());
-      const url = URL.createObjectURL(new Blob([packBackup(entries) as BlobPart], { type: "application/zip" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      // Fork (build 22): into the chosen folder in the app, or a download in a browser.
+      if ((await saveUserFile(fileName, new Blob([packBackup(entries) as BlobPart], { type: "application/zip" }), t("files.saveBackup"))) === "cancelled") {
+        setDashboardNotice("");
+        return;
+      }
       setDashboardNotice(shapeCount
         ? t("notice.backupDoneWithShapes", { count: projects.length, shapes: shapeCount, name: fileName })
         : t("notice.backupDone", { count: projects.length, name: fileName }));
@@ -2901,7 +2902,6 @@ function Dashboard({
   sortMode,
   viewMode,
   onCreate,
-  onStarter,
   onDeleteProject,
   onDeleteSharedProject,
   onDuplicateProject,
@@ -3594,9 +3594,9 @@ function Dashboard({
                 </div>
               ) : null}
               <PareUpdateBanner />
+              <OlderAppNotice dismissible />
               <FirstRunCard />
               <WhatsNew />
-              <StarterDesigns onStarter={onStarter} />
               {/* Fork: on a first visit the "New to 3D design?" question already offers the Tinkercad guide. */}
               {firstRunAnswered ? (
               <button type="button" className="tc-guide-card" onClick={() => window.dispatchEvent(new Event(OPEN_TINKERCAD_GUIDE_EVENT))}>
@@ -3604,30 +3604,10 @@ function Dashboard({
                 <span><strong>Coming from Tinkercad?</strong> See where everything is, what&apos;s new and which shortcuts are the same.</span>
               </button>
               ) : null}
-              {/* The designs live in the browser, and a browser can fail or break with an update: said plainly and always (not to be closed). */}
-              <aside className="storage-notice" aria-label={t("storageNotice.title")}>
-                <span className="storage-notice-icon" aria-hidden="true">
-                  <ShieldCheck size={24} strokeWidth={2.4} />
-                </span>
-                <div className="storage-notice-text">
-                  <strong>{t("storageNotice.title")} <GuideHelpLink chapter="files" section="backingUp" className="storage-notice-help" iconSize={16} /></strong>
-                  <span>{t("storageNotice.body")}</span>
-                  <AutoBackupControl />
-                </div>
-                <div className="storage-notice-actions">
-                  {projects.length > 0 ? (
-                    <button className="storage-notice-button" type="button" title={t("dashboard.backupAllTitle")} onClick={onBackupAll}>
-                      <Archive size={16} strokeWidth={2.6} />
-                      <span>{t("dashboard.backupAll")}</span>
-                    </button>
-                  ) : null}
-                  {/* Also shown on a new computer with no designs yet: that is where a backup is restored. */}
-                  <button className="storage-notice-button secondary" type="button" title={t("dashboard.restoreBackupTitle")} onClick={onRestoreBackup}>
-                    <ArchiveRestore size={16} strokeWidth={2.6} />
-                    <span>{t("dashboard.restoreBackup")}</span>
-                  </button>
-                </div>
-              </aside>
+              {/* The designs live in the browser, and a browser can fail or break with an update: said always,
+                  but (build 22) as one quiet line rather than a big box. */}
+              <BackupStrip hasDesigns={projects.length > 0} onBackupAll={onBackupAll} onRestore={onRestoreBackup} />
+              <SavedFileToast />
 
               <div className="dashboard-section-header">
                 <div>

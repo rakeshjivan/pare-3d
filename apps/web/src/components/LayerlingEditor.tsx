@@ -129,6 +129,9 @@ import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootpr
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
 import { ReadyPartsSection } from "./ReadyPartsSection";
 import { MoreShapesSection } from "./MoreShapesSection";
+import { cachedFileSettings, getFileSettings, saveUserFile } from "@/lib/pareFiles";
+import { withFixedSides } from "@/lib/fixedSides";
+import { SavedFileToast } from "@/components/SavedFileToast";
 import { MORE_SHAPE_IDS, moreShapeFromDragId, moreShapeIcon, moreShapePart, type MoreShapeId } from "@/lib/moreShapes";
 import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
@@ -1463,33 +1466,20 @@ async function toSvg(shapes: WorkplaneShape[], title: string, cutMeshes: Readonl
   return toSvgProjection(layers, title);
 }
 
+// Fork (build 22): known before the first export click, which may not wait for it.
+if (typeof window !== "undefined") void getFileSettings();
+
 function triggerBrowserDownload(filename: string, content: string, type: string) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  void saveUserFile(filename, new Blob([content], { type }), t("files.saveExport"));
 }
 
 async function downloadTextFile(filename: string, content: string, type: string) {
-  triggerBrowserDownload(filename, content, type);
+  await saveUserFile(filename, new Blob([content], { type }), t("files.saveExport"));
 }
 
 async function downloadBlobFile(filename: string, blob: Blob) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // Fork (build 22): into the folder chosen in Settings, or where the save dialog says.
+  await saveUserFile(filename, blob, t("files.saveExport"));
 }
 
 
@@ -2056,7 +2046,7 @@ function canWrapAroundCylinder(shape: WorkplaneShape | null | undefined) {
 
 /** A shape fresh from the library as it is placed: the name tag (#215) comes as a text "Name" in the default layers. */
 function prepareNewShape(asset: ShapeAsset, shape: WorkplaneShape): WorkplaneShape {
-  if (asset.id !== nameTagAsset.id || shape.kind !== "text") return shape;
+  if (asset.id !== nameTagAsset.id || shape.kind !== "text") return withFixedSides(shape);
   const source = nameTagSource(shape, { text: t("nameTag.defaultText"), letterSize: NAME_TAG_LETTER_SIZE });
   return layeredTextShape(source, NAME_TAG_LAYERS, [], shape.id, { locked: false, hidden: false, name: "Text" });
 }
@@ -11143,7 +11133,8 @@ export function LayerlingEditor({
     let target: LylFileHandle | "download" = "download";
     // Fork: "Send to Bambu Studio" never asks for a file; the file goes to the server or a download.
     let bambuNote = "";
-    if (format === "stl" && lylFileAccessSupported() && !toBambu) {
+    // Fork (build 22): in the app, the folder chosen in Settings > Files decides instead.
+    if (format === "stl" && lylFileAccessSupported() && !toBambu && !cachedFileSettings()) {
       try {
         const linkedBefore = linkedStlFile(designId);
         // A name typed in the window that is not the linked file's asks for a file of its own (reported by mail, 15.10.2026).
@@ -13057,6 +13048,7 @@ export function LayerlingEditor({
       ) : null}
       <WhatsNew />
       <BusyIndicator />
+      <SavedFileToast />
       <FastModeHint
         fastMode={workspaceSettings.fastMode}
         onTurnOn={() => {
@@ -13934,7 +13926,8 @@ function SecondaryToolbar({
       setGeometryShapesPinned(pinned);
       setSketchShapesPinned(window.localStorage.getItem("layerling.sketch.shapeMenuPinned") === "true");
       // A pinned panel is there again at the next start, not only its pin (forum, prmod3d).
-      if (pinned) setShapesOpen(true);
+      // Fork (build 22): like Tinkercad, the Shapes panel is open whenever a design opens, pinned or not.
+      setShapesOpen(true);
     } catch {
       // Blocked storage: the panel closes after each shape, as it always did.
     }

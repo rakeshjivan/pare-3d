@@ -745,7 +745,13 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 .ready-parts-intro { margin: 0 2px 8px; font: 500 12px/1.35 var(--font-ui); color: var(--muted-strong); }
 
 /* Fork: the MAKE toolbar section. */
-.toolbar-section[data-group="make"] { --group-color: #c2255c; }
+/* Build 22: dark lines like the other tools, one soft indigo highlight - no more solid crimson. */
+.toolbar-section[data-group="make"] { --group-color: #6366c9; }
+.toolbar-section[data-group="make"] .toolbar-icon:not(.disabled):not(:disabled) { color: var(--toolbar-icon); }
+.toolbar-section[data-group="make"] .toolbar-icon:not(.disabled):not(:disabled):hover { color: var(--group-color); }
+.fork-accent-line { stroke: var(--fork-accent); }
+.toolbar-icon.disabled .fork-accent-line,
+.toolbar-icon:disabled .fork-accent-line { stroke: currentColor; opacity: 0.4; }
 
 /* Fork: lithophane and Voronoi panels. */
 .lithophane-panel, .voronoi-panel { max-height: calc(100vh - 160px); overflow-y: auto; }
@@ -1146,3 +1152,69 @@ html[data-theme="dark"] { --toolbar-icon-disabled: #7f776d; }
 /* Fork (build 21): the enclosure's mounting row wraps instead of squeezing its buttons. */
 .enclosure-mounting { flex-wrap: wrap; row-gap: 6px; }
 .enclosure-mounting button { white-space: nowrap; }
+
+/* Fork (build 22): the home screen's backup line - one quiet row, not a big box. */
+.backup-strip {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 18px; padding: 7px 10px 7px 12px;
+  font: 500 12.5px var(--font-ui); color: var(--muted-strong);
+  background: var(--subbar); border: 1px solid var(--border); border-radius: 8px;
+}
+.backup-strip > svg { flex: none; color: #16a34a; }
+.backup-strip.attention > svg { color: #d97706; }
+.backup-strip-text { min-width: 0; }
+.backup-strip-help { display: inline-flex; opacity: 0.7; }
+.backup-strip-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+.backup-strip-actions button,
+.files-row-actions button,
+.saved-file-toast button {
+  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px;
+  font: 600 12px var(--font-ui); color: var(--primary);
+  background: transparent; border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+}
+.backup-strip-actions button:hover,
+.files-row-actions button:hover,
+.saved-file-toast button:hover { background: color-mix(in srgb, var(--primary) 9%, transparent); border-color: color-mix(in srgb, var(--primary) 22%, transparent); }
+.backup-strip-actions button.quiet,
+.files-row-actions button.quiet { color: var(--muted-strong); }
+
+/* Fork (build 22): an app installed before build 22 - one small line with the link. */
+.older-app-notice {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 7px 10px 7px 12px;
+  font: 500 12.5px var(--font-ui); color: #7c4a03;
+  background: #fff8eb; border: 1px solid #f3d39b; border-radius: 8px;
+}
+.older-app-notice a { font-weight: 700; color: #9a5b00; white-space: nowrap; }
+.older-app-notice button { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: auto; color: inherit; background: none; border: 0; border-radius: 5px; cursor: pointer; }
+.older-app-notice button:hover { background: rgba(124, 74, 3, 0.1); }
+:root[data-theme="dark"] .older-app-notice { color: #fcd9a0; background: #3a2a10; border-color: #6b4a14; }
+:root[data-theme="dark"] .older-app-notice a { color: #ffd28a; }
+
+/* Fork (build 22): Settings > Files. */
+.files-settings { display: flex; flex-direction: column; gap: 10px; }
+.files-row {
+  display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--subbar); border: 1px solid var(--border); border-radius: 9px;
+}
+.files-row > svg { color: var(--muted-strong); }
+.files-row-text { display: flex; flex-direction: column; min-width: 0; }
+.files-row-text strong { font-size: 13px; color: var(--foreground); }
+.files-row-text span { font-size: 12.5px; color: var(--muted-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files-row-actions { display: flex; gap: 4px; }
+.files-ask { display: flex; align-items: center; gap: 8px; margin: -2px 0 4px 12px; font-size: 13px; color: var(--foreground); }
+.files-settings-note { margin: 2px 0 0; font-size: 12px; color: var(--muted-strong); }
+
+/* Fork (build 22): "Saved to …" after an export or backup. */
+.saved-file-toast {
+  position: fixed; left: 50%; bottom: 22px; z-index: 80; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; max-width: min(560px, calc(100vw - 32px));
+  padding: 7px 8px 7px 14px; font: 500 13px var(--font-ui); color: var(--foreground);
+  background: var(--panel, #fff); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
+  animation: saved-file-in 180ms ease-out;
+}
+.saved-file-toast > svg { flex: none; color: #16a34a; }
+.saved-file-toast > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-file-toast .saved-file-close { width: 26px; padding: 0; justify-content: center; color: var(--muted-strong); }
+@keyframes saved-file-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .saved-file-toast { animation: none; } }

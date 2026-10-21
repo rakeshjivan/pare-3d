@@ -1,3 +1,4 @@
+import { friendlyFolder } from "@/lib/pareFiles";
 /**
  * Fork: automatic backups into a folder the user picks (File System Access
  * API: Chrome and Edge). Every few minutes, when a design has changed, the
@@ -33,14 +34,16 @@ export type AutoBackupStatus =
  * no folder has to be picked and it works in any browser engine. On by default there.
  */
 const SERVER_SETTING_KEY = "pare3d.autoBackupServer";
-const SERVER_FOLDER_LABEL = "Documents › Pare 3D Backups";
+let SERVER_FOLDER_LABEL = "Documents › Pare 3D Backups";
 let serverMode = false;
 
 async function serverBackupAvailable(): Promise<boolean> {
   try {
     const response = await fetch("/__backup", { cache: "no-store" });
     if (!response.ok) return false;
-    const info = (await response.json()) as { runtime?: number };
+    const info = (await response.json()) as { runtime?: number; folder?: string };
+    // Fork (build 22): the folder can be chosen; it is shown as people say it.
+    if (typeof info.folder === "string" && info.folder) SERVER_FOLDER_LABEL = friendlyFolder(info.folder, homeOf(info.folder));
     return Number(info.runtime) >= 2;
   } catch {
     return false;
@@ -61,6 +64,19 @@ function storeServerSetting(on: boolean) {
   } catch {
     // Applies for this visit.
   }
+}
+
+/** The home folder, from a path under it (macOS /Users/name, Windows C:\\Users\\name). */
+function homeOf(path: string) {
+  const match = /^(\/Users\/[^/]+|[A-Za-z]:\\Users\\[^\\]+|\/home\/[^/]+)/.exec(path);
+  return match ? match[1] : "";
+}
+
+/** After a new backup folder was chosen: the status shows it. */
+export async function refreshAutoBackupFolder() {
+  if (!serverMode) return;
+  await serverBackupAvailable();
+  if (status.state === "on") setStatus({ ...status, folder: SERVER_FOLDER_LABEL });
 }
 
 let status: AutoBackupStatus = { state: "off" };

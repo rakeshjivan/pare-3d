@@ -6,6 +6,8 @@
 //  - Auto-update: newer app files published as a GitHub release are downloaded,
 //    checked and unpacked into the app's data folder, then served from there.
 //    /__pare3d/update tells the page what happened.
+//  - /__files: where exports and backups go, chosen with the system's own folder picker (runtime 3);
+//    POST /__files/save writes an export there, or asks where with the system's save dialog.
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -17,7 +19,7 @@ import { fileURLToPath } from "node:url";
 const bundledRoot = join(fileURLToPath(new URL(".", import.meta.url)), "app");
 const port = Number(process.env.PORT || 47177);
 /** Raise when the launcher or this server change in a way new app files depend on. */
-const RUNTIME_VERSION = 2;
+const RUNTIME_VERSION = 3;
 const RELEASES_API = process.env.PARE3D_RELEASES_API || "https://api.github.com/repos/rakeshjivan/pare-3d/releases/latest";
 // Only for the automated tests: lets a local test server stand in for GitHub.
 const TEST_ORIGIN = process.env.PARE3D_TEST_ORIGIN || "";
@@ -161,15 +163,16 @@ async function writeBackup(req, res) {
   try {
     const body = await readBody(req);
     if (body.length < 22 || body[0] !== 0x50 || body[1] !== 0x4b) throw new Error("not a backup file");
-    await mkdir(BACKUP_DIR, { recursive: true });
+    const backupDir = (await readFileSettings()).backups;
+    await mkdir(backupDir, { recursive: true });
     const now = new Date();
     const pad = (value) => String(value).padStart(2, "0");
     const name = `Pare 3D backup ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.zip`;
-    const file = join(BACKUP_DIR, name);
+    const file = join(backupDir, name);
     await writeFile(file, body);
-    const old = (await readdir(BACKUP_DIR)).filter((entry) => /^Pare 3D backup \d{4}-\d{2}-\d{2}\.zip$/.test(entry)).sort().reverse().slice(BACKUP_KEEP_DAYS);
-    for (const entry of old) await rm(join(BACKUP_DIR, entry), { force: true }).catch(() => {});
-    json(res, 200, { path: file, folder: BACKUP_DIR, at: now.getTime() });
+    const old = (await readdir(backupDir)).filter((entry) => /^Pare 3D backup \d{4}-\d{2}-\d{2}\.zip$/.test(entry)).sort().reverse().slice(BACKUP_KEEP_DAYS);
+    for (const entry of old) await rm(join(backupDir, entry), { force: true }).catch(() => {});
+    json(res, 200, { path: file, folder: backupDir, at: now.getTime() });
   } catch (error) {
     json(res, 500, { error: error instanceof Error ? error.message : String(error) });
   }
@@ -308,6 +311,182 @@ async function checkForUpdate() {
   }
 }
 
+/*
+ * Where files go (runtime 3). Exports go to Downloads and backups to Documents/Pare 3D Backups until
+ * the person picks other folders; the choice is kept in the app's data folder. The pickers are the
+ * system's own (macOS through osascript, Windows through PowerShell), so they look like every other
+ * app's. Text for them travels in environment variables, never inside the script.
+ */
+const SETTINGS_FILE = join(DATA_DIR, "files.json");
+const DOWNLOADS_DIR = join(homedir(), "Downloads");
+
+async function readFileSettings() {
+  let saved = {};
+  try {
+    saved = JSON.parse(await readFile(SETTINGS_FILE, "utf8"));
+  } catch {
+    // Nothing chosen yet.
+  }
+  const folder = (value, fallback) => (typeof value === "string" && value.trim() ? value : fallback);
+  return { exports: folder(saved.exports, DOWNLOADS_DIR), backups: folder(saved.backups, BACKUP_DIR), ask: saved.ask === true };
+}
+
+async function writeFileSettings(patch) {
+  const next = { ...(await readFileSettings()), ...patch };
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(SETTINGS_FILE, JSON.stringify(next, null, 2));
+  return next;
+}
+
+/** Runs a picker; its answer is what it printed, or null when the person cancelled. */
+function runPicker(command, args, env) {
+  return new Promise((resolve) => {
+    let out = "";
+    let child;
+    try {
+      child = spawn(command, args, { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
+    } catch {
+      resolve(null);
+      return;
+    }
+    child.stdout.on("data", (chunk) => { out += chunk.toString("utf8"); });
+    child.on("error", () => resolve(null));
+    child.on("close", (code) => {
+      const value = out.trim();
+      // A folder comes back with a trailing slash on macOS; a drive root (C:\\, /) keeps its own.
+      resolve(code === 0 && value ? (/^([A-Za-z]:[\\/]|\/)$/.test(value) ? value : value.replace(/[\\/]+$/, "")) : null);
+    });
+  });
+}
+
+const PS_HEAD = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; Add-Type -AssemblyName System.Windows.Forms; $owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false };";
+
+function chooseFolder(prompt, start) {
+  if (platform() === "darwin") {
+    return runPicker("osascript", [
+      "-e", "activate",
+      "-e", 'set startAt to system attribute "PARE_START"',
+      "-e", 'set chosen to choose folder with prompt (system attribute "PARE_PROMPT") default location (POSIX file startAt)',
+      "-e", "POSIX path of chosen",
+    ], { PARE_PROMPT: prompt, PARE_START: start });
+  }
+  if (platform() === "win32") {
+    return runPicker("powershell.exe", ["-NoProfile", "-STA", "-Command",
+      `${PS_HEAD} $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = $env:PARE_PROMPT; $d.SelectedPath = $env:PARE_START; $d.ShowNewFolderButton = $true; if ($d.ShowDialog($owner) -eq 'OK') { [Console]::Out.Write($d.SelectedPath) }`,
+    ], { PARE_PROMPT: prompt, PARE_START: start });
+  }
+  return Promise.resolve(null);
+}
+
+function chooseSaveFile(prompt, start, name) {
+  if (platform() === "darwin") {
+    return runPicker("osascript", [
+      "-e", "activate",
+      "-e", 'set startAt to system attribute "PARE_START"',
+      "-e", 'set chosen to choose file name with prompt (system attribute "PARE_PROMPT") default name (system attribute "PARE_NAME") default location (POSIX file startAt)',
+      "-e", "POSIX path of chosen",
+    ], { PARE_PROMPT: prompt, PARE_START: start, PARE_NAME: name });
+  }
+  if (platform() === "win32") {
+    return runPicker("powershell.exe", ["-NoProfile", "-STA", "-Command",
+      `${PS_HEAD} $d = New-Object System.Windows.Forms.SaveFileDialog; $d.Title = $env:PARE_PROMPT; $d.InitialDirectory = $env:PARE_START; $d.FileName = $env:PARE_NAME; $d.OverwritePrompt = $true; if ($d.ShowDialog($owner) -eq 'OK') { [Console]::Out.Write($d.FileName) }`,
+    ], { PARE_PROMPT: prompt, PARE_START: start, PARE_NAME: name });
+  }
+  return Promise.resolve(null);
+}
+
+/** A file name from the page, made safe: no folders, no characters the systems refuse. */
+function safeFileName(raw) {
+  const name = basename(String(raw || "")).replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").trim().slice(0, 180);
+  return name && name !== "." && name !== ".." ? name : "Pare 3D export";
+}
+
+async function freeName(folder, name) {
+  const ext = extname(name);
+  const stem = ext ? name.slice(0, -ext.length) : name;
+  for (let number = 1; ; number += 1) {
+    const candidate = join(folder, number === 1 ? name : `${stem} ${number}${ext}`);
+    try {
+      await stat(candidate);
+    } catch {
+      return candidate;
+    }
+  }
+}
+
+function showInFolder(target, isFile) {
+  if (platform() === "darwin") spawn("open", isFile ? ["-R", target] : [target], { stdio: "ignore", detached: true }).unref();
+  else if (platform() === "win32") spawn("explorer.exe", isFile ? [`/select,${target}`] : [target], { stdio: "ignore", detached: true }).unref();
+}
+
+/** Files saved through /__files/save this session: these may be shown in their folder wherever they are. */
+const savedPaths = new Set();
+
+async function handleFiles(req, res, url) {
+  const action = url.pathname.slice("/__files".length) || "/";
+  if (req.method === "GET" && action === "/") {
+    json(res, 200, { ...(await readFileSettings()), downloads: DOWNLOADS_DIR, home: homedir(), platform: platform(), runtime: RUNTIME_VERSION });
+    return;
+  }
+  if (req.method !== "POST" || !allowedLocalWrite(req)) {
+    json(res, 403, { error: "not allowed" });
+    return;
+  }
+  try {
+    if (action === "/choose") {
+      const which = url.searchParams.get("which") === "backups" ? "backups" : "exports";
+      const current = await readFileSettings();
+      const prompt = url.searchParams.get("prompt") || (which === "backups" ? "Choose where Pare 3D keeps backups" : "Choose where Pare 3D saves exports");
+      const chosen = await chooseFolder(prompt, current[which]);
+      json(res, 200, chosen ? { ...(await writeFileSettings({ [which]: chosen })), chosen: true } : { ...current, chosen: false });
+      return;
+    }
+    if (action === "/reset") {
+      const which = url.searchParams.get("which") === "backups" ? "backups" : "exports";
+      json(res, 200, await writeFileSettings({ [which]: which === "backups" ? BACKUP_DIR : DOWNLOADS_DIR }));
+      return;
+    }
+    if (action === "/ask") {
+      json(res, 200, await writeFileSettings({ ask: url.searchParams.get("on") === "1" }));
+      return;
+    }
+    if (action === "/show") {
+      const which = url.searchParams.get("which") === "backups" ? "backups" : "exports";
+      const settings = await readFileSettings();
+      await mkdir(settings[which], { recursive: true }).catch(() => {});
+      const file = url.searchParams.get("file");
+      // Only a file inside one of the chosen folders is revealed.
+      if (file && (savedPaths.has(file) || file.startsWith(settings.exports) || file.startsWith(settings.backups))) showInFolder(file, true);
+      else showInFolder(settings[which], false);
+      json(res, 200, { ok: true });
+      return;
+    }
+    if (action === "/save") {
+      const body = await readBody(req);
+      const name = safeFileName(url.searchParams.get("name"));
+      const settings = await readFileSettings();
+      let target;
+      if (settings.ask || url.searchParams.get("ask") === "1") {
+        target = await chooseSaveFile(url.searchParams.get("prompt") || "Save", settings.exports, name);
+        if (!target) {
+          json(res, 200, { cancelled: true });
+          return;
+        }
+      } else {
+        await mkdir(settings.exports, { recursive: true });
+        target = await freeName(settings.exports, name);
+      }
+      await writeFile(target, body);
+      savedPaths.add(target);
+      json(res, 200, { path: target, folder: target.slice(0, target.length - basename(target).length).replace(/[\\/]+$/, ""), name: basename(target) });
+      return;
+    }
+    json(res, 404, { error: "unknown" });
+  } catch (error) {
+    json(res, 500, { error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
 await chooseRoots();
 
 createServer(async (req, res) => {
@@ -324,7 +503,11 @@ createServer(async (req, res) => {
   }
   if (path === "/__backup") {
     if (req.method === "POST") await writeBackup(req, res);
-    else json(res, 200, { folder: BACKUP_DIR, runtime: RUNTIME_VERSION });
+    else json(res, 200, { folder: (await readFileSettings()).backups, runtime: RUNTIME_VERSION });
+    return;
+  }
+  if (path === "/__files" || path.startsWith("/__files/")) {
+    await handleFiles(req, res, url);
     return;
   }
   if (path === "/__send-to-bambu") {
