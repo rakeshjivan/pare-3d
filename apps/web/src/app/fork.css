@@ -542,3 +542,49 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 .print-fit-options button.active small { color: rgba(255, 255, 255, 0.85); }
 .print-fit-status, .print-fit-note { margin: 8px 0 0; font: 500 12px/1.35 var(--font-ui); color: var(--muted-strong); }
 .print-fit-note { margin: 0 12px 12px; }
+
+/* Fork: cut connectors in the Split panel. */
+.split-connectors {
+  margin: 4px 0 0;
+  padding: 10px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.split-connectors legend { padding: 0; font: 700 13px var(--font-ui); color: var(--foreground); }
+.split-connector-choice { display: flex; gap: 4px; }
+.split-connector-choice button {
+  flex: 1;
+  padding: 6px 8px;
+  color: var(--foreground);
+  background: var(--subbar);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: 600 12.5px var(--font-ui);
+  cursor: pointer;
+}
+.split-connector-choice button:hover:not(:disabled) { border-color: var(--primary); }
+.split-connector-choice button.active { color: #fff; background: var(--primary); border-color: var(--primary); }
+.split-connector-hint, .split-connector-status { margin: 0; font: 500 12px/1.35 var(--font-ui); color: var(--muted-strong); }
+.split-connector-status.warning { color: #c2410c; }
+.split-connector-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.split-connector-number { display: flex; flex-direction: column; gap: 3px; font: 600 12px var(--font-ui); color: var(--muted-strong); }
+.split-connector-number input { width: 100%; }
+.split-connector-row { display: flex; align-items: center; gap: 8px; font: 600 12px var(--font-ui); color: var(--muted-strong); }
+.split-connector-row > span { flex: 0 0 92px; }
+.split-connector-row .split-connector-choice { flex: 1; }
+.split-connector-flip { display: flex; align-items: center; gap: 6px; font: 500 12.5px var(--font-ui); color: var(--foreground); }
+/* With connectors the panel can outgrow the window: Cancel and Split model stay in view. */
+.split-panel .split-panel-footer {
+  position: sticky;
+  bottom: -1px;
+  z-index: 1;
+  margin-top: 4px;
+  padding-top: 10px;
+  padding-bottom: 4px;
+  background: var(--panel);
+  /* The second, solid shadow fills the panel's own padding below, so nothing shows under the buttons. */
+  box-shadow: 0 -8px 12px -10px rgba(15, 23, 42, 0.25), 0 24px 0 0 var(--panel);
+}

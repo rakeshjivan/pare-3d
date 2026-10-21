@@ -357,6 +357,8 @@ type WorkplaneViewportProps = {
   /** With `splitActive`: objects can still be picked and show the selection outline, but nothing can be edited (History view). */
   pickOnly?: PickOnlySelection | null;
   splitPlane?: ModelSplitPlane | null;
+  /** Fork: where the cut's connectors will go, drawn as rings on the split plane. */
+  splitConnectorPoints?: { points: [number, number, number][]; radius: number } | null;
   /** Dragging the plane's arrow head moves the plane along its normal. */
   onSplitPositionChange?: (position: number) => void;
   /** The next click on a face sets the split plane there; a blue plane follows the faces under the pointer. */
@@ -3314,6 +3316,7 @@ export function WorkplaneViewport({
   splitActive = false,
   pickOnly = null,
   splitPlane = null,
+  splitConnectorPoints = null,
   onSplitPositionChange,
   splitSurfacePick = false,
   onSplitSurfacePick,
@@ -4452,8 +4455,8 @@ export function WorkplaneViewport({
   }, [splitSurfacePick]);
 
   useEffect(() => {
-    syncSplitPlane(threeRef.current, splitPlane, splitHandleState !== null, selectedIds);
-  }, [splitHandleState, splitPlane, selectedIds]);
+    syncSplitPlane(threeRef.current, splitPlane, splitHandleState !== null, selectedIds, splitConnectorPoints);
+  }, [splitHandleState, splitPlane, selectedIds, splitConnectorPoints]);
 
   useLayoutEffect(() => {
     // The plane label carries the project name, so a rename has to redraw it.
@@ -14155,7 +14158,7 @@ function splitCutOutlinePoints(state: ThreeState, plane: ModelSplitPlane, ids: r
   return planeCrossingSegments(meshes, plane.origin, plane.normal);
 }
 
-function syncSplitPlane(state: ThreeState | null, plane: ModelSplitPlane | null, handleActive = false, selectedIds: readonly string[] = []) {
+function syncSplitPlane(state: ThreeState | null, plane: ModelSplitPlane | null, handleActive = false, selectedIds: readonly string[] = [], connectors: { points: [number, number, number][]; radius: number } | null = null) {
   if (!state) return;
   disposeChildren(state.splitLayer);
   if (!plane) {
@@ -14241,6 +14244,26 @@ function syncSplitPlane(state: ThreeState | null, plane: ModelSplitPlane | null,
     outline.renderOrder = 905;
     outline.layers.set(RENDER_LAYER_PREVIEWS);
     state.splitLayer.add(outline);
+  }
+  // Fork: a ring and a dot for each connector the cut will get.
+  if (connectors?.points.length) {
+    const facing = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(...plane.normal).normalize());
+    const ringGeometry = new THREE.RingGeometry(Math.max(0.2, connectors.radius - 0.35), connectors.radius + 0.35, 40);
+    const dotGeometry = new THREE.CircleGeometry(Math.max(0.3, connectors.radius * 0.25), 20);
+    const ringMaterial = new THREE.MeshBasicMaterial({ color: "#1477d2", side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.95 });
+    const dotMaterial = new THREE.MeshBasicMaterial({ color: "#ffffff", side: THREE.DoubleSide, depthTest: false });
+    connectors.points.forEach((point) => {
+      const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+      const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+      [ring, dot].forEach((mesh, index) => {
+        mesh.position.set(...point);
+        mesh.quaternion.copy(facing);
+        mesh.renderOrder = 906 + index;
+        mesh.layers.set(RENDER_LAYER_PREVIEWS);
+        mesh.name = "SplitConnector";
+        state.splitLayer.add(mesh);
+      });
+    });
   }
   state.splitLayer.visible = true;
   state.needsRender = true;

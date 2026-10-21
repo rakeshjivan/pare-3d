@@ -127,6 +127,7 @@ import { SHELL_SIDES, shellMaxThickness, shellOpeningsFor, shellOpenSides } from
 import { arrayFollowingPivot, circleStepDegrees, clampArrayCount, moveAlongRadius, rotateAroundVertical, rowOffset, singleAxisSpacing, type ArraySettings } from "@/lib/shapeArray";
 import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootprint, type BedOverhang } from "@/lib/printBed";
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
+import { DEFAULT_CUT_CONNECTORS, normalizeCutConnectors, type CutConnectorOptions } from "@/lib/cutConnectors";
 import { NO_SPLIT_ROTATION, modelSplitPlane, snapSplitPositionToVertices, splitOrientationForNormal, splitAxisFromLabel, splitAxisLabel, splitRotationAxes, type SplitRotation } from "@/lib/modelSplit";
 import { GuideModal } from "./workplane/GuideModal";
 import { HistoryViewOverlay, historyStateNameSuffix } from "./workplane/HistoryViewOverlay";
@@ -252,7 +253,7 @@ import { getSectionBounds, sectionAxisLetter, sectionMeshInFrame, sectionPlaceme
 import { projectSectionPoint, SECTION_VIEW_FACE, sectionSvgDocument, sliceMeshContours } from "@/lib/sectionSvg";
 import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ParametricSource, ProjectAsset, ShapeAsset, ShapeCustomization, ShapeKind, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, ShellEdges, ShellOpenings, ShellSide, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
 import { type Vec3, type MeshData, type Cuboid, type ShapeUpdatePatch, type ManifoldSolid, MIN_SHAPE_DIMENSION, resetManifoldRuntime, cleanModelDimension, getManifoldRuntime, meshForShape, meshReachAlong, appendMeshData, formatTriangleCount, shapeAabb, boundsForShapes, boundsForCuboids, meshAabb, boundsForPositions, quantizedPointKey } from "@/lib/editorMeshCore";
-import { cloneAsGroupChild, meshDataToManifoldMesh, shapeToManifoldSolid, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, exportSolidVolume, type ExportSolidVolume, PRINT_MATERIAL_STORAGE_KEY, PRINT_INFILL_STORAGE_KEY, PRINT_WALLS_STORAGE_KEY, formatEstimateNumber, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, disposeManifold, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
+import { planCutConnectors, cloneAsGroupChild, meshDataToManifoldMesh, shapeToManifoldSolid, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, exportSolidVolume, type ExportSolidVolume, PRINT_MATERIAL_STORAGE_KEY, PRINT_INFILL_STORAGE_KEY, PRINT_WALLS_STORAGE_KEY, formatEstimateNumber, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, disposeManifold, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { handleViewArrowKey } from "@/lib/viewArrowKeys";
 import { escapeWasHandled } from "@/lib/escapeHandled";
 import { booleanAutomationScene } from "@/lib/editorAutomation";
@@ -2612,6 +2613,24 @@ export function LayerlingEditor({
   const [alignPreview, setAlignPreview] = useState<{ axis: AlignAxis; target: AlignTarget } | null>(null);
   const [mirrorMode, setMirrorMode] = useState(false);
   const [splitSession, setSplitSession] = useState<SplitSession | null>(null);
+  // Fork: connectors for the cut, remembered between splits.
+  const [splitConnectors, setSplitConnectorsState] = useState<CutConnectorOptions>(() => {
+    try {
+      return normalizeCutConnectors(JSON.parse(window.localStorage.getItem("pare3d.cutConnectors") ?? "null"));
+    } catch {
+      return DEFAULT_CUT_CONNECTORS;
+    }
+  });
+  const setSplitConnectors = useCallback((next: CutConnectorOptions) => {
+    const normalized = normalizeCutConnectors(next);
+    setSplitConnectorsState(normalized);
+    try {
+      window.localStorage.setItem("pare3d.cutConnectors", JSON.stringify(normalized));
+    } catch {
+      // Remembered for this session only.
+    }
+  }, []);
+  const [splitConnectorPreview, setSplitConnectorPreview] = useState<{ points: [number, number, number][]; tooSmall: boolean } | null>(null);
   const [mirrorPreviewAxis, setMirrorPreviewAxis] = useState<AlignAxis | null>(null);
   // The pivot belongs to the selection it was set for; another selection
   // turns around its own centre again.
@@ -3292,6 +3311,24 @@ export function LayerlingEditor({
     () => splitSession ? modelSplitPlane(splitTargetPoints, splitSession.axis, splitSession.position, splitSession.rotation) : null,
     [splitSession?.axis, splitSession?.position, splitSession?.rotation[0], splitSession?.rotation[1], splitTargetPoints],
   );
+  // Fork: where the connectors will go, worked out shortly after the plane or the options stop changing.
+  useEffect(() => {
+    if (!splitPlane || splitConnectors.type === "none" || !splitTargetShapes.length) {
+      setSplitConnectorPreview(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void planCutConnectors(splitTargetShapes, splitPlane, splitConnectors)
+        .then((plan) => { if (!cancelled) setSplitConnectorPreview(plan); })
+        .catch(() => { if (!cancelled) setSplitConnectorPreview(null); });
+    }, 150);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [splitPlane, splitConnectors, splitTargetShapes]);
+
   // Another tool opening ends a split in progress, without a notice of its own.
   const closeSplit = useCallback(() => {
     splitRunRef.current += 1;
@@ -6207,7 +6244,7 @@ export function LayerlingEditor({
     const runId = splitRunRef.current + 1;
     splitRunRef.current = runId;
     setSplitSession({ ...session, busy: true, error: null, picking: false });
-    const outcome = await splitShapesByPlane(splitTargetShapes, plane, () => splitRunRef.current === runId && sourceContextIsCurrent());
+    const outcome = await splitShapesByPlane(splitTargetShapes, plane, () => splitRunRef.current === runId && sourceContextIsCurrent(), splitConnectors);
     if (splitRunRef.current !== runId) return;
     if (outcome.status === "stale" || !sourceContextIsCurrent()) {
       splitRunRef.current += 1;
@@ -6233,16 +6270,42 @@ export function LayerlingEditor({
     }
 
     const nextShapes = shapesRef.current.flatMap((shape) => replacements.get(shape.id) ?? [shape]);
-    const nextSelection = [...replacements.values()].flat().map((shape) => shape.id);
+    // Fork: dowel pins stand in a row beside the cut parts.
+    const pins = outcome.pins;
+    if (pins.length) {
+      const parts = [...replacements.values()].flat();
+      let maxX = Number.NEGATIVE_INFINITY;
+      let minZ = Number.POSITIVE_INFINITY;
+      let maxZ = Number.NEGATIVE_INFINITY;
+      parts.forEach((part) => {
+        const points = meshForShape(part).vertices;
+        points.forEach(([px, , pz]) => {
+          maxX = Math.max(maxX, px);
+          minZ = Math.min(minZ, pz);
+          maxZ = Math.max(maxZ, pz);
+        });
+      });
+      const centreZ = Number.isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
+      let x = Number.isFinite(maxX) ? maxX + 8 : 0;
+      pins.forEach((pin) => {
+        x += pin.width / 2;
+        nextShapes.push({ ...pin, x, z: centreZ, elevation: 0 });
+        x += pin.width / 2 + 4;
+      });
+    }
+    const nextSelection = [...[...replacements.values()].flat(), ...pins].map((shape) => shape.id);
     setSplitSession(null);
+    const splitMessage = splitCount === 1
+      ? t("status.splitOne", { count: nextSelection.length - pins.length })
+      : t("status.splitMany", { count: splitCount, bodies: nextSelection.length - pins.length });
     commitShapes(
       nextShapes,
       nextSelection,
-      splitCount === 1
-        ? t("status.splitOne", { count: nextSelection.length })
-        : t("status.splitMany", { count: splitCount, bodies: nextSelection.length }),
+      outcome.connectorCount > 0
+        ? `${splitMessage}${/[.!?]$/.test(splitMessage) ? "" : "."} ${t(pins.length ? "connectors.addedDowels" : "connectors.addedPlugs", { count: outcome.connectorCount })}`
+        : splitMessage,
     );
-  }, [commitShapes, splitPlane, splitSession, splitTargetShapes]);
+  }, [commitShapes, splitConnectors, splitPlane, splitSession, splitTargetShapes]);
 
   useEffect(() => {
     if (!splitSession) return;
@@ -12453,6 +12516,7 @@ export function LayerlingEditor({
           mirrorReferenceShapes={shapes}
           splitActive={Boolean(splitSession) || historyViewState !== null}
           splitPlane={splitPlane}
+          splitConnectorPoints={splitSession && splitConnectorPreview?.points.length ? { points: splitConnectorPreview.points, radius: splitConnectors.diameter / 2 } : null}
           onSplitPositionChange={changeSplitPosition}
           splitSurfacePick={Boolean(splitSession?.picking)}
           onSplitSurfacePick={pickSplitSurface}
@@ -12779,6 +12843,10 @@ export function LayerlingEditor({
           onPositionChange={changeSplitPosition}
           onApply={() => void applySplit()}
           onCancel={cancelSplit}
+          connectors={splitConnectors}
+          onConnectorsChange={setSplitConnectors}
+          connectorCount={splitConnectorPreview?.points.length ?? null}
+          connectorsTooSmall={Boolean(splitConnectorPreview?.tooSmall)}
         />
       ) : null}
       {edgeModifier ? (
