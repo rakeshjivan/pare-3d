@@ -229,6 +229,7 @@ import { MAX_HINGE_CLEARANCE, MAX_HINGE_KNUCKLES, MIN_HINGE_CLEARANCE, MIN_HINGE
 import { useLanguage } from "@/lib/useLanguage";
 import { useMovablePanel, type MovablePanelOptions } from "@/lib/useMovablePanel";
 import { PrintFitCard } from "@/components/workplane/PrintFitCard";
+import { MouseEarsCard } from "@/components/workplane/MouseEarsCard";
 import { isNonSolidShapeKind, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeSupportsTaper, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
 import { MAX_SKETCH_REVOLVE_TURNS, normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
 import { roundSideCount } from "@/lib/roundSideCount";
@@ -2727,8 +2728,9 @@ export function ShapeInspector({
       </div>
       ) : null}
 
-      {/* Fork: Print fit for holes. */}
+      {/* Fork: Print fit for holes, mouse ears for solids. */}
       {shape.hole && shape.groupOperation !== "bundle" ? <PrintFitCard shape={shape} locked={locked} onUpdate={(patch) => onUpdate(patch)} /> : null}
+      {!shape.hole && !isNonSolidShapeKind(shape.kind) ? <MouseEarsCard shape={shape} locked={locked} /> : null}
 
       {colorOpen ? (
         <div className="color-card" aria-label={t("inspector.shapeColor")} data-help-section-all="colorCard">

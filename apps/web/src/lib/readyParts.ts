@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { createLocalId } from "@/lib/localIds";
 import { libraryShapeAssets, makeShapeFromAsset } from "@/lib/shapeCatalog";
 import type { WorkplaneShape } from "@/types/layerling";
@@ -295,4 +296,226 @@ export function paraboloidPart(name: string, color: string, size = 20, height = 
     hidden: false,
   };
   return { name, shapes: [shape], group: false };
+}
+
+/*
+ * Fork: profile parts - a side view, pushed out sideways by a width - built as meshes the way the
+ * paraboloid is: a snap-fit hook and a living hinge. Resizing them later stretches them.
+ */
+
+type Point2D = [number, number];
+
+/** A closed solid from a side-view outline (x across, y up, counter-clockwise) pushed out `width` along z. */
+export function profileMeshShape(name: string, color: string, outline: Point2D[], width: number): WorkplaneShape {
+  const shape = new THREE.Shape(outline.map(([x, y]) => new THREE.Vector2(x, y)));
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: width, bevelEnabled: false, curveSegments: 1 }).toNonIndexed();
+  const source = geometry.getAttribute("position");
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let index = 0; index < source.count; index += 1) {
+    minX = Math.min(minX, source.getX(index));
+    maxX = Math.max(maxX, source.getX(index));
+    minY = Math.min(minY, source.getY(index));
+    maxY = Math.max(maxY, source.getY(index));
+  }
+  const positions: number[] = [];
+  for (let index = 0; index < source.count; index += 1) {
+    positions.push(source.getX(index) - (minX + maxX) / 2, source.getY(index) - minY, source.getZ(index) - width / 2);
+  }
+  geometry.dispose();
+  const sizeX = round(maxX - minX);
+  const sizeY = round(maxY - minY);
+  return {
+    id: createLocalId("profile-part"),
+    name,
+    kind: "mesh",
+    color,
+    x: 0,
+    z: 0,
+    elevation: 0,
+    size: Math.max(sizeX, width),
+    width: sizeX,
+    depth: width,
+    height: sizeY,
+    rotation: 0,
+    importedMesh: { positions, baseWidth: sizeX, baseDepth: width, baseHeight: sizeY, triangleCount: positions.length / 9, sourceFormat: "json" },
+    locked: false,
+    hidden: false,
+  };
+}
+
+export type SnapFitOptions = {
+  /** Height of the flexing arm, from where it stands to the top of the hook. */
+  length: number;
+  /** The arm's thickness: thicker is stiffer and bends less before it breaks. */
+  thickness: number;
+  width: number;
+  /** How far the hook reaches out: what holds the parts together. */
+  catchDepth: number;
+  clearance: number;
+};
+
+export const DEFAULT_SNAP_FIT: SnapFitOptions = { length: 15, thickness: 2, width: 6, catchDepth: 1, clearance: 0.2 };
+
+/**
+ * How far the arm's tip can bend before PLA is at risk, in mm: a cantilever's deflection at a
+ * strain of 2 % (PLA tolerates about 2.5 to 3 %, a margin is kept): y = strain * L^2 / (1.5 * t).
+ */
+export function snapFitSafeBend(o: SnapFitOptions, strain = 0.02) {
+  return (strain * o.length * o.length) / (1.5 * o.thickness);
+}
+
+export function normalizeSnapFit(raw: Partial<SnapFitOptions>): SnapFitOptions {
+  const merged = { ...DEFAULT_SNAP_FIT, ...raw };
+  const clamp = (value: number, min: number, max: number, fallback: number) => (Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback);
+  const length = clamp(merged.length, 4, 100, DEFAULT_SNAP_FIT.length);
+  return {
+    length,
+    thickness: clamp(merged.thickness, 0.8, 10, DEFAULT_SNAP_FIT.thickness),
+    width: clamp(merged.width, 2, 100, DEFAULT_SNAP_FIT.width),
+    catchDepth: clamp(merged.catchDepth, 0.2, 5, DEFAULT_SNAP_FIT.catchDepth),
+    clearance: clamp(merged.clearance, 0, 1, DEFAULT_SNAP_FIT.clearance),
+  };
+}
+
+/**
+ * A snap-fit hook (stands on the plate; set it down on one part) and the window it clicks into (a
+ * hole for the other part). The hook's top slopes so it slides in; its underside is square, so it holds.
+ */
+export function snapFitParts(raw: Partial<SnapFitOptions>, names: { hook: string; slot: string }): ReadyPart[] {
+  const o = normalizeSnapFit(raw);
+  // The catch's lead-in: three times as tall as it reaches out, so the arm bends gently on the way in.
+  const lead = Math.min(o.length * 0.45, Math.max(1.5, o.catchDepth * 3));
+  const outline: Point2D[] = [
+    [0, 0],
+    [o.thickness, 0],
+    [o.thickness, o.length - lead],
+    [o.thickness + o.catchDepth, o.length - lead],
+    [o.thickness, o.length],
+    [0, o.length],
+  ];
+  const hook = profileMeshShape(names.hook, "#33983d", outline, o.width);
+  const slotWidth = round(o.width + 2 * o.clearance);
+  const slotReach = round(o.thickness + o.catchDepth + 2 * o.clearance);
+  const slot = makeShapeFromAsset(asset("box"), { x: round(hook.width / 2 + 8 + slotReach / 2), z: 0, elevation: 0 }, { width: slotReach, depth: slotWidth, height: 10 });
+  return [
+    { name: names.hook, shapes: [hook], group: false },
+    { name: names.slot, shapes: [{ ...slot, name: names.slot, hole: true }], group: false },
+  ];
+}
+
+export type LivingHingeOptions = {
+  /** Each leaf, along the hinge's length (x). */
+  leaf: number;
+  width: number;
+  thickness: number;
+  /** The gap the thin web spans. */
+  gap: number;
+  /** The web that bends: thinner flexes more and lasts longer, if it prints well. */
+  web: number;
+};
+
+export const DEFAULT_LIVING_HINGE: LivingHingeOptions = { leaf: 20, width: 20, thickness: 3, gap: 3, web: 0.4 };
+
+export function normalizeLivingHinge(raw: Partial<LivingHingeOptions>): LivingHingeOptions {
+  const merged = { ...DEFAULT_LIVING_HINGE, ...raw };
+  const clamp = (value: number, min: number, max: number, fallback: number) => (Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback);
+  const thickness = clamp(merged.thickness, 0.8, 20, DEFAULT_LIVING_HINGE.thickness);
+  return {
+    leaf: clamp(merged.leaf, 3, 300, DEFAULT_LIVING_HINGE.leaf),
+    width: clamp(merged.width, 3, 300, DEFAULT_LIVING_HINGE.width),
+    thickness,
+    gap: clamp(merged.gap, 0.5, 20, DEFAULT_LIVING_HINGE.gap),
+    web: clamp(merged.web, 0.2, thickness * 0.8, DEFAULT_LIVING_HINGE.web),
+  };
+}
+
+/** Two leaves joined by a thin web along the bottom: printed flat, it folds at the web. */
+export function livingHingePart(raw: Partial<LivingHingeOptions>, name: string): ReadyPart {
+  const o = normalizeLivingHinge(raw);
+  const total = 2 * o.leaf + o.gap;
+  const outline: Point2D[] = [
+    [0, 0],
+    [total, 0],
+    [total, o.thickness],
+    [o.leaf + o.gap, o.thickness],
+    [o.leaf + o.gap, o.web],
+    [o.leaf, o.web],
+    [o.leaf, o.thickness],
+    [0, o.thickness],
+  ];
+  return { name, shapes: [profileMeshShape(name, "#3f8f6b", outline, o.width)], group: false };
+}
+
+export type FaceTextOptions = { text: string; letterHeight: number; depth: number; mode: "raised" | "engraved" };
+export const DEFAULT_FACE_TEXT: FaceTextOptions = { text: "PARE", letterHeight: 8, depth: 1, mode: "engraved" };
+/** Cut-in letters reach this far out of the face too, so the cut is clean. */
+export const ENGRAVE_OVERSHOOT = 1;
+
+/**
+ * Text to set down on a face: raised letters sit on it; cut-in letters are a hole that reaches
+ * `depth` into the face (the editor sinks it that far as it sets it down) - group it with the part.
+ */
+export function faceTextPart(raw: Partial<FaceTextOptions>, name: string): ReadyPart & { sink: number } {
+  const o = { ...DEFAULT_FACE_TEXT, ...raw };
+  const text = (o.text || "TEXT").slice(0, 24);
+  const letterHeight = Math.min(200, Math.max(2, Number.isFinite(o.letterHeight) ? o.letterHeight : DEFAULT_FACE_TEXT.letterHeight));
+  const depth = Math.min(20, Math.max(0.2, Number.isFinite(o.depth) ? o.depth : DEFAULT_FACE_TEXT.depth));
+  const width = round(Math.max(letterHeight, text.length * letterHeight * 0.8));
+  const engraved = o.mode === "engraved";
+  const shape = makeShapeFromAsset(asset("text"), { x: 0, z: 0, elevation: 0 }, { text, width, depth: letterHeight, height: engraved ? depth + ENGRAVE_OVERSHOOT : depth });
+  return { name, shapes: [{ ...shape, text, name, hole: engraved || undefined }], group: false, sink: engraved ? depth : 0 };
+}
+
+/**
+ * Mouse ears: where the bottom outline of a part has a sharp corner (90 degrees or tighter by
+ * default), a thin disc under it, so the corner holds to the bed instead of lifting.
+ */
+export function mouseEarCorners(bottom: readonly Point2D[], maxAngle = 120): Point2D[] {
+  // The outline's convex hull (monotone chain): ears go on the outside corners.
+  const points = [...bottom].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (points.length < 3) return [];
+  const cross = (o: Point2D, a: Point2D, b: Point2D) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: Point2D[] = [];
+  for (const point of points) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 1e-9) lower.pop();
+    lower.push(point);
+  }
+  const upper: Point2D[] = [];
+  for (const point of [...points].reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 1e-9) upper.pop();
+    upper.push(point);
+  }
+  const hull = [...lower.slice(0, -1), ...upper.slice(0, -1)];
+  const corners: Point2D[] = [];
+  hull.forEach((point, index) => {
+    const previous = hull[(index - 1 + hull.length) % hull.length];
+    const next = hull[(index + 1) % hull.length];
+    const a = [previous[0] - point[0], previous[1] - point[1]];
+    const b = [next[0] - point[0], next[1] - point[1]];
+    const lengths = Math.hypot(a[0], a[1]) * Math.hypot(b[0], b[1]);
+    if (lengths < 1e-12) return;
+    const angle = (Math.acos(Math.max(-1, Math.min(1, (a[0] * b[0] + a[1] * b[1]) / lengths))) * 180) / Math.PI;
+    if (angle <= maxAngle) corners.push(point);
+  });
+  return corners;
+}
+
+export const MOUSE_EAR_THICKNESS = 0.4;
+export const MOUSE_EAR_SIZES = [8, 12, 16] as const;
+
+/** Discs on the plate under a part's sharp bottom corners, grouped as one body; null when it has none. */
+export function mouseEarsPart(bottom: readonly Point2D[], elevation: number, diameter: number, name: string, color?: string): ReadyPart | null {
+  const corners = mouseEarCorners(bottom);
+  // Corners closer than half an ear share one.
+  const kept: Point2D[] = [];
+  corners.forEach((corner) => {
+    if (!kept.some((other) => Math.hypot(other[0] - corner[0], other[1] - corner[1]) < diameter / 2)) kept.push(corner);
+  });
+  if (!kept.length) return null;
+  const ears = kept.map(([x, z], index) => ({
+    ...makeShapeFromAsset(asset("cylinder"), { x: round(x), z: round(z), elevation }, { width: diameter, depth: diameter, height: MOUSE_EAR_THICKNESS, sides: 48 }),
+    name: `${name} ${index + 1}`,
+    ...(color ? { color } : {}),
+  }));
+  return { name, shapes: ears, group: ears.length > 1 };
 }

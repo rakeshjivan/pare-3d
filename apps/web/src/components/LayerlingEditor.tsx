@@ -132,7 +132,8 @@ import { addFreehandStroke } from "@/lib/freehandStroke";
 import { Signature } from "lucide-react";
 import { placeCustomShape } from "@/lib/customShapePackage";
 import { buildReadyPart } from "@/lib/readyPartsBuild";
-import type { ReadyPart } from "@/lib/readyParts";
+import { mouseEarsPart, type ReadyPart } from "@/lib/readyParts";
+import { MOUSE_EARS_EVENT, type MouseEarsRequest } from "./workplane/MouseEarsCard";
 import { CUT_CONNECTOR_LIMITS, DEFAULT_CUT_CONNECTORS, normalizeCutConnectors, type CutConnectorOptions } from "@/lib/cutConnectors";
 import { NO_SPLIT_ROTATION, modelSplitPlane, snapSplitPositionToVertices, splitOrientationForNormal, splitAxisFromLabel, splitAxisLabel, splitRotationAxes, type SplitRotation } from "@/lib/modelSplit";
 import { GuideModal } from "./workplane/GuideModal";
@@ -2619,6 +2620,10 @@ export function LayerlingEditor({
   const [alignPreview, setAlignPreview] = useState<{ axis: AlignAxis; target: AlignTarget } | null>(null);
   const [mirrorMode, setMirrorMode] = useState(false);
   const [splitSession, setSplitSession] = useState<SplitSession | null>(null);
+  /** Fork: how far each carried part goes into the face it is set down on (cut-in text). */
+  const carrySinkRef = useRef(new Map<string, number>());
+  /** Fork: what to say once the carried parts are set down, instead of the usual line. */
+  const carryAfterNoticeRef = useRef<string | null>(null);
   // Fork: connectors for the cut, remembered between splits.
   const [splitConnectors, setSplitConnectorsState] = useState<CutConnectorOptions>(() => {
     try {
@@ -5484,11 +5489,22 @@ export function LayerlingEditor({
     setCarryIds(null);
     if (!ids?.length) return;
     const patches = carriedOntoFace(shapes, ids, target, ids[0]);
+    // Fork: parts that go into the face (cut-in text) move that far along the face's normal, inwards.
+    const sinks = carrySinkRef.current;
+    carrySinkRef.current = new Map();
+    const length = Math.hypot(target.normal.x, target.normal.y, target.normal.z) || 1;
     const next = shapes.map((shape) => {
       const patch = patches.get(shape.id);
-      return patch ? canonicalizeShape({ ...shape, ...patch }) : shape;
+      if (!patch) return shape;
+      const sink = sinks.get(shape.id) ?? 0;
+      const placed = { ...shape, ...patch };
+      return canonicalizeShape(sink
+        ? { ...placed, x: placed.x - (target.normal.x / length) * sink, z: placed.z - (target.normal.z / length) * sink, elevation: (placed.elevation ?? 0) - (target.normal.y / length) * sink }
+        : placed);
     });
-    commitShapes(next, ids, t("status.carryPlaced", { count: ids.length }));
+    const after = carryAfterNoticeRef.current;
+    carryAfterNoticeRef.current = null;
+    commitShapes(next, ids, after ?? t("status.carryPlaced", { count: ids.length }));
   }, [commitShapes, shapes]);
 
   /*
@@ -6278,17 +6294,54 @@ export function LayerlingEditor({
   }, [splitTargetPoints]);
 
   /** Fork: ready-made parts, built and placed like a saved custom shape (they hang on the pointer when that is on). */
-  const insertReadyParts = useCallback(async (parts: ReadyPart[]) => {
+  const insertReadyParts = useCallback(async (parts: ReadyPart[], options: { sink?: number; carry?: boolean } = {}) => {
     const sourceProjectId = splitProjectIdRef.current;
     const built = await Promise.all(parts.map((part) => buildReadyPart(part, workspaceSettingsRef.current.booleanTriangleLimit)));
     if (splitProjectIdRef.current !== sourceProjectId) return;
     const { shapes: inserted } = placeCustomShape({ shapes: built }, placementWorkplaneRef.current.origin, []);
     commitShapes([...shapesRef.current, ...inserted], inserted.map((shape) => shape.id), t("readyParts.inserted", { name: parts.map((part) => part.name).join(" + ") }));
-    if (workspaceSettingsRef.current.clickToPlaceShapes && inserted.length) {
+    if ((options.carry || workspaceSettingsRef.current.clickToPlaceShapes) && inserted.length) {
       setCruiseAsset(null);
+      // Cut-in text goes into the face it is set down on by its depth (dropCarried).
+      carrySinkRef.current = options.sink ? new Map(inserted.map((shape) => [shape.id, options.sink!])) : new Map();
+      carryAfterNoticeRef.current = options.carry ? t("readyParts.textPlaced") : null;
       setCarryIds(inserted.map((shape) => shape.id));
-      setNotice(t("status.carryPlace"));
+      setNotice(t(options.carry ? "readyParts.textPlaceHint" : "status.carryPlace"));
     }
+  }, [commitShapes]);
+
+  // Fork: a placement that ends (set down or Esc) forgets how far its parts were to go in.
+  useEffect(() => {
+    if (!carryIds) {
+      carrySinkRef.current = new Map();
+      carryAfterNoticeRef.current = null;
+    }
+  }, [carryIds]);
+
+  // Fork: mouse ears under the selected part's sharp bottom corners, asked for from its panel.
+  useEffect(() => {
+    const onMouseEars = (event: Event) => {
+      const { id, diameter } = (event as CustomEvent<MouseEarsRequest>).detail;
+      const shape = shapesRef.current.find((entry) => entry.id === id);
+      if (!shape) return;
+      const vertices = meshForShape(shape).vertices;
+      const bottom = Math.min(...vertices.map(([, y]) => y));
+      if (bottom > 0.5) {
+        setNotice(t("mouseEars.notOnPlate"));
+        return;
+      }
+      const footprint = vertices.filter(([, y]) => y <= bottom + 0.05).map(([x, , z]) => [x, z] as [number, number]);
+      const part = mouseEarsPart(footprint, bottom, diameter, t("mouseEars.name"), shape.color);
+      if (!part) {
+        setNotice(t("mouseEars.noCorners"));
+        return;
+      }
+      void buildReadyPart(part, workspaceSettingsRef.current.booleanTriangleLimit).then((ears) => {
+        commitShapes([...shapesRef.current, ears], [ears.id], t("mouseEars.added", { count: part.shapes.length }));
+      }).catch((error) => setNotice(error instanceof Error ? error.message : String(error)));
+    };
+    window.addEventListener(MOUSE_EARS_EVENT, onMouseEars);
+    return () => window.removeEventListener(MOUSE_EARS_EVENT, onMouseEars);
   }, [commitShapes]);
 
   const applySplit = useCallback(async () => {
@@ -12411,9 +12464,9 @@ export function LayerlingEditor({
         onSelectObject={(id) => selectShape(id)}
         renderReadyParts={(close) => (
           <ReadyPartsSection
-            onInsert={(parts) => {
+            onInsert={(parts, options) => {
               close();
-              void insertReadyParts(parts).catch(noticeError);
+              void insertReadyParts(parts, options).catch(noticeError);
             }}
           />
         )}

@@ -9,8 +9,20 @@ import {
   INSERT_HOLES,
   METRIC_SIZES,
   NUTS,
+  DEFAULT_FACE_TEXT,
+  DEFAULT_LIVING_HINGE,
+  DEFAULT_SNAP_FIT,
   boxWithLidParts,
   dividerDrop,
+  faceTextPart,
+  livingHingePart,
+  normalizeLivingHinge,
+  normalizeSnapFit,
+  snapFitParts,
+  snapFitSafeBend,
+  type FaceTextOptions,
+  type LivingHingeOptions,
+  type SnapFitOptions,
   insertHolePart,
   normalizeBoxWithLid,
   nutTrapPart,
@@ -21,13 +33,19 @@ import {
 } from "@/lib/readyParts";
 
 /** Fork: the Shapes panel's "Ready-made parts" - built from ordinary shapes, placed with a click. */
-export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[]) => void }) {
+export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[], options?: { sink?: number; carry?: boolean }) => void }) {
   useLanguage();
   const [open, setOpen] = useState(true);
   const [insertSize, setInsertSize] = useState<MetricSize>("M3");
   const [nutSize, setNutSize] = useState<MetricSize>("M3");
   const [boxOpen, setBoxOpen] = useState(false);
   const [box, setBox] = useState<BoxWithLidOptions>(DEFAULT_BOX_WITH_LID);
+  const [openForm, setOpenForm] = useState<"snap" | "hinge" | "text" | null>(null);
+  const [snap, setSnap] = useState<SnapFitOptions>(DEFAULT_SNAP_FIT);
+  const [hinge, setHinge] = useState<LivingHingeOptions>(DEFAULT_LIVING_HINGE);
+  const [faceText, setFaceText] = useState<FaceTextOptions>(DEFAULT_FACE_TEXT);
+  const toggleForm = (form: "snap" | "hinge" | "text") => setOpenForm(openForm === form ? null : form);
+  const safeBend = snapFitSafeBend(snap);
   const insert = INSERT_HOLES[insertSize];
   const nut = NUTS[nutSize];
   return (
@@ -89,6 +107,101 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[])
               {boxOpen ? t("readyParts.hide") : t("readyParts.setUp")}
             </button>
           </div>
+          <div className="ready-part ready-part-box">
+            <TextIcon />
+            <div>
+              <strong>{t("readyParts.faceText")}</strong>
+              <span>{t("readyParts.faceTextHint")}</span>
+            </div>
+            <button type="button" className="ready-part-add" aria-expanded={openForm === "text"} onClick={() => toggleForm("text")}>
+              {openForm === "text" ? t("readyParts.hide") : t("readyParts.setUp")}
+            </button>
+          </div>
+          {openForm === "text" ? (
+            <div className="ready-part-form">
+              <label className="ready-part-field">
+                <span>{t("readyParts.textLabel")}</span>
+                <span className="ready-part-input">
+                  <input type="text" aria-label={t("readyParts.textLabel")} value={faceText.text} maxLength={24} onKeyDown={(event) => event.stopPropagation()} onChange={(event) => setFaceText({ ...faceText, text: event.currentTarget.value })} style={{ textAlign: "left" }} />
+                </span>
+              </label>
+              <div className="ready-part-fields">
+                <MmField label={t("readyParts.letterHeight")} value={faceText.letterHeight} onChange={(letterHeight) => setFaceText({ ...faceText, letterHeight: Math.max(2, Math.min(200, letterHeight)) })} />
+                <MmField label={t("readyParts.textDepth")} value={faceText.depth} onChange={(depth) => setFaceText({ ...faceText, depth: Math.max(0.2, Math.min(20, depth)) })} />
+              </div>
+              <div className="ready-part-fit" role="group" aria-label={t("readyParts.textMode")}>
+                {(["engraved", "raised"] as const).map((mode) => (
+                  <button type="button" key={mode} className={faceText.mode === mode ? "active" : ""} aria-pressed={faceText.mode === mode} onClick={() => setFaceText({ ...faceText, mode })}>
+                    {t(mode === "engraved" ? "readyParts.engraved" : "readyParts.raised")}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="ready-part-make"
+                onClick={() => {
+                  const part = faceTextPart(faceText, faceText.text || "TEXT");
+                  onInsert([part], { sink: part.sink, carry: true });
+                }}
+              >
+                {t("readyParts.placeText")}
+              </button>
+            </div>
+          ) : null}
+
+          <div className="ready-part ready-part-box">
+            <SnapIcon />
+            <div>
+              <strong>{t("readyParts.snapFit")}</strong>
+              <span>{t("readyParts.snapFitHint")}</span>
+            </div>
+            <button type="button" className="ready-part-add" aria-expanded={openForm === "snap"} onClick={() => toggleForm("snap")}>
+              {openForm === "snap" ? t("readyParts.hide") : t("readyParts.setUp")}
+            </button>
+          </div>
+          {openForm === "snap" ? (
+            <div className="ready-part-form">
+              <div className="ready-part-fields">
+                <MmField label={t("readyParts.snapLength")} value={snap.length} onChange={(length) => setSnap(normalizeSnapFit({ ...snap, length }))} />
+                <MmField label={t("readyParts.snapThickness")} value={snap.thickness} onChange={(thickness) => setSnap(normalizeSnapFit({ ...snap, thickness }))} />
+                <MmField label={t("readyParts.snapWidth")} value={snap.width} onChange={(width) => setSnap(normalizeSnapFit({ ...snap, width }))} />
+                <MmField label={t("readyParts.snapCatch")} value={snap.catchDepth} onChange={(catchDepth) => setSnap(normalizeSnapFit({ ...snap, catchDepth }))} />
+              </div>
+              <p className={`ready-part-note ${snap.catchDepth > safeBend ? "warning" : ""}`}>
+                {t(snap.catchDepth > safeBend ? "readyParts.snapTooStiff" : "readyParts.snapOk", { bend: safeBend.toFixed(1), catch: snap.catchDepth.toFixed(1) })}
+              </p>
+              <button type="button" className="ready-part-make" onClick={() => onInsert(snapFitParts(snap, { hook: t("readyParts.snapHook"), slot: t("readyParts.snapSlot") }))}>
+                {t("readyParts.makeSnapFit")}
+              </button>
+            </div>
+          ) : null}
+
+          <div className="ready-part ready-part-box">
+            <HingeIcon />
+            <div>
+              <strong>{t("readyParts.livingHinge")}</strong>
+              <span>{t("readyParts.livingHingeHint")}</span>
+            </div>
+            <button type="button" className="ready-part-add" aria-expanded={openForm === "hinge"} onClick={() => toggleForm("hinge")}>
+              {openForm === "hinge" ? t("readyParts.hide") : t("readyParts.setUp")}
+            </button>
+          </div>
+          {openForm === "hinge" ? (
+            <div className="ready-part-form">
+              <div className="ready-part-fields">
+                <MmField label={t("readyParts.hingeLeaf")} value={hinge.leaf} onChange={(leaf) => setHinge(normalizeLivingHinge({ ...hinge, leaf }))} />
+                <MmField label={t("readyParts.snapWidth")} value={hinge.width} onChange={(width) => setHinge(normalizeLivingHinge({ ...hinge, width }))} />
+                <MmField label={t("readyParts.snapThickness")} value={hinge.thickness} onChange={(thickness) => setHinge(normalizeLivingHinge({ ...hinge, thickness }))} />
+                <MmField label={t("readyParts.hingeGap")} value={hinge.gap} onChange={(gap) => setHinge(normalizeLivingHinge({ ...hinge, gap }))} />
+                <MmField label={t("readyParts.hingeWeb")} value={hinge.web} onChange={(web) => setHinge(normalizeLivingHinge({ ...hinge, web }))} />
+              </div>
+              <p className="ready-part-note">{t("readyParts.hingeNote")}</p>
+              <button type="button" className="ready-part-make" onClick={() => onInsert([livingHingePart(hinge, t("readyParts.livingHinge"))])}>
+                {t("readyParts.makeHinge")}
+              </button>
+            </div>
+          ) : null}
+
           {boxOpen ? (
             <div className="ready-part-form">
               <p>{t("readyParts.boxInside")}</p>
@@ -214,6 +327,34 @@ function NutIcon() {
     <svg {...iconProps} className="ready-part-icon">
       <path d="M16 3 27 9.5v13L16 29 5 22.5v-13Z" fill="currentColor" fillOpacity="0.18" />
       <circle cx="16" cy="16" r="5" />
+    </svg>
+  );
+}
+
+function TextIcon() {
+  return (
+    <svg {...iconProps} className="ready-part-icon">
+      <rect x="3" y="9" width="26" height="15" rx="2" fill="currentColor" fillOpacity="0.18" />
+      <path d="M9 13h8M13 13v8M19 21l2.5-8 2.5 8M20 18.5h3" />
+    </svg>
+  );
+}
+
+function SnapIcon() {
+  return (
+    <svg {...iconProps} className="ready-part-icon">
+      <path d="M8 28V6h4v14h3l-3 5" fill="currentColor" fillOpacity="0.18" />
+      <path d="M20 4v10M20 18v10M24 4v10M24 18v10" />
+    </svg>
+  );
+}
+
+function HingeIcon() {
+  return (
+    <svg {...iconProps} className="ready-part-icon">
+      <path d="M3 20h11v4H3ZM18 20h11v4H18Z" fill="currentColor" fillOpacity="0.18" />
+      <path d="M14 23.3h4" strokeWidth="1" />
+      <path d="M8 16c4-6 12-6 16 0" strokeDasharray="2 2" />
     </svg>
   );
 }

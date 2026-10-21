@@ -666,3 +666,11 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 .sketch-freehand-icon { width: 22px; height: 22px; stroke-width: 1.8; }
 .ready-part-check { display: flex; align-items: center; gap: 6px; font: 600 12px var(--font-ui); color: var(--foreground); }
 .ready-part-note { margin: 0; font: 500 11px/1.35 var(--font-ui) !important; color: var(--muted-strong) !important; }
+.ready-part-note.warning { color: #c2410c !important; }
+
+/* Fork: mouse ears on a solid's panel. */
+.mouse-ears-card { margin: 0 12px 12px; padding: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; font-family: var(--font-ui); }
+.mouse-ears-row { display: flex; gap: 6px; margin-top: 8px; }
+.mouse-ears-row select { flex: 1; padding: 6px; font: 600 12.5px var(--font-ui); color: var(--foreground); background: var(--subbar); border: 1px solid var(--border); border-radius: 8px; }
+.mouse-ears-row button { padding: 6px 12px; color: #fff; background: var(--primary); border: 1px solid var(--primary); border-radius: 8px; font: 600 12.5px var(--font-ui); cursor: pointer; }
+.mouse-ears-row button:disabled { opacity: 0.5; cursor: default; }
