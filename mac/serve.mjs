@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 const bundledRoot = join(fileURLToPath(new URL(".", import.meta.url)), "app");
 const port = Number(process.env.PORT || 47177);
 /** Raise when the launcher or this server change in a way new app files depend on. */
-const RUNTIME_VERSION = 1;
+const RUNTIME_VERSION = 2;
 const RELEASES_API = process.env.PARE3D_RELEASES_API || "https://api.github.com/repos/rakeshjivan/pare-3d/releases/latest";
 // Only for the automated tests: lets a local test server stand in for GitHub.
 const TEST_ORIGIN = process.env.PARE3D_TEST_ORIGIN || "";
@@ -32,6 +32,8 @@ const UPDATES_DIR = join(DATA_DIR, "updates");
 let roots = [bundledRoot];
 const updateState = { serving: 0, bundled: 0, ready: 0, needsReinstall: 0, checking: false, error: "" };
 const EXPORT_DIR = join(homedir(), "Documents", "Pare 3D Exports");
+const BACKUP_DIR = join(homedir(), "Documents", "Pare 3D Backups");
+const BACKUP_KEEP_DAYS = 14;
 const MAX_UPLOAD = 512 * 1024 * 1024;
 const types = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript",
@@ -138,6 +140,39 @@ async function openInBambuStudio(file) {
 function json(res, status, value) {
   res.writeHead(status, { "content-type": "application/json", "x-pare3d": "1" });
   res.end(JSON.stringify(value));
+}
+
+/** Same rule as for Bambu: only the app's own page, with the custom header. */
+function allowedLocalWrite(req) {
+  const origin = req.headers.origin;
+  const ownOrigins = [`http://localhost:${port}`, `http://127.0.0.1:${port}`];
+  return req.headers["x-pare3d-send"] === "1" && (!origin || ownOrigins.includes(origin));
+}
+
+/**
+ * Automatic backup: the page hands over the same ZIP "Back up all" makes; it is kept as one file
+ * per day in Documents/Pare 3D Backups, the newest BACKUP_KEEP_DAYS days.
+ */
+async function writeBackup(req, res) {
+  if (!allowedLocalWrite(req)) {
+    json(res, 403, { error: "not allowed" });
+    return;
+  }
+  try {
+    const body = await readBody(req);
+    if (body.length < 22 || body[0] !== 0x50 || body[1] !== 0x4b) throw new Error("not a backup file");
+    await mkdir(BACKUP_DIR, { recursive: true });
+    const now = new Date();
+    const pad = (value) => String(value).padStart(2, "0");
+    const name = `Pare 3D backup ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.zip`;
+    const file = join(BACKUP_DIR, name);
+    await writeFile(file, body);
+    const old = (await readdir(BACKUP_DIR)).filter((entry) => /^Pare 3D backup \d{4}-\d{2}-\d{2}\.zip$/.test(entry)).sort().reverse().slice(BACKUP_KEEP_DAYS);
+    for (const entry of old) await rm(join(BACKUP_DIR, entry), { force: true }).catch(() => {});
+    json(res, 200, { path: file, folder: BACKUP_DIR, at: now.getTime() });
+  } catch (error) {
+    json(res, 500, { error: error instanceof Error ? error.message : String(error) });
+  }
 }
 
 async function sendToBambu(req, res, url) {
@@ -285,6 +320,11 @@ createServer(async (req, res) => {
   }
   if (path === "/__pare3d/update") {
     json(res, 200, { ...updateState, runtime: RUNTIME_VERSION });
+    return;
+  }
+  if (path === "/__backup") {
+    if (req.method === "POST") await writeBackup(req, res);
+    else json(res, 200, { folder: BACKUP_DIR, runtime: RUNTIME_VERSION });
     return;
   }
   if (path === "/__send-to-bambu") {

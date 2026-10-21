@@ -32,18 +32,40 @@ copy_app() { # destination
 
 rm -rf "$OUT" && mkdir -p "$OUT"
 
-# Mac
+# Mac. On a Mac the native window (mac/native/main.swift) is compiled for Apple silicon and Intel;
+# elsewhere the script launcher (mac/Pare3D), which opens the app in Chrome or Edge, stands in.
+VERSION=$(node -p "require('$ROOT/package.json').version")
 APP="$WORK/mac/Pare 3D.app/Contents"
 mkdir -p "$APP/MacOS" "$APP/Resources"
-cp "$ROOT/mac/Info.plist" "$APP/"
-cp "$ROOT/mac/Pare3D" "$APP/MacOS/" && chmod +x "$APP/MacOS/Pare3D"
+NATIVE=0
+if [ "$(uname -s)" = "Darwin" ] && command -v swiftc >/dev/null 2>&1; then
+  NATIVE=1
+  for arch in arm64 x86_64; do
+    if ! swiftc -O -target "$arch-apple-macos12" "$ROOT/mac/native/main.swift" -o "$WORK/pare3d-$arch" > "$WORK/swift-$arch.log" 2>&1; then
+      # As annotations, so the failure is readable on GitHub.
+      sed 's/^/::error::/' "$WORK/swift-$arch.log" | head -60
+      exit 1
+    fi
+  done
+  lipo -create "$WORK/pare3d-arm64" "$WORK/pare3d-x86_64" -output "$APP/MacOS/Pare 3D"
+  sed -e "s/__BUILD__/$BUILD/" -e "s/__VERSION__/$VERSION/" "$ROOT/mac/native/Info.plist" > "$APP/Info.plist"
+else
+  cp "$ROOT/mac/Info.plist" "$APP/"
+  cp "$ROOT/mac/Pare3D" "$APP/MacOS/" && chmod +x "$APP/MacOS/Pare3D"
+fi
 cp "$ROOT/mac/serve.mjs" "$ROOT/mac/AppIcon.icns" "$ROOT/mac/NOTICE.txt" "$APP/Resources/"
 cp "$ROOT/LICENSE" "$APP/Resources/LICENSE.txt"
 cp "$(fetch_bun bun-darwin-aarch64)/bun" "$APP/Resources/bun-arm64"
 cp "$(fetch_bun bun-darwin-x64)/bun" "$APP/Resources/bun-x64"
 chmod +x "$APP/Resources/bun-arm64" "$APP/Resources/bun-x64"
 copy_app "$APP/Resources/app"
-(cd "$WORK/mac" && zip -qry -9 "$OUT/Pare-3D-Mac.zip" "Pare 3D.app")
+if [ "$NATIVE" = 1 ]; then
+  # An ad-hoc signature holds the bundle together (Apple silicon needs one); still "Open Anyway" once.
+  codesign --force --deep --sign - "$WORK/mac/Pare 3D.app"
+  (cd "$WORK/mac" && ditto -c -k --keepParent "Pare 3D.app" "$OUT/Pare-3D-Mac.zip")
+else
+  (cd "$WORK/mac" && zip -qry -9 "$OUT/Pare-3D-Mac.zip" "Pare 3D.app")
+fi
 
 # Windows
 WIN="$WORK/win/Pare 3D"
@@ -57,9 +79,8 @@ copy_app "$WIN/app"
 
 # Update package: the app folder's contents at the top of the archive.
 copy_app "$WORK/update"
-tar -czf "$OUT/Pare-3D-app.tar.gz" -C "$WORK/update" .
-SHA=$(sha256sum "$OUT/Pare-3D-app.tar.gz" | cut -d' ' -f1)
-VERSION=$(node -p "require('$ROOT/package.json').version")
+COPYFILE_DISABLE=1 tar -czf "$OUT/Pare-3D-app.tar.gz" -C "$WORK/update" .
+if command -v sha256sum >/dev/null 2>&1; then SHA=$(sha256sum "$OUT/Pare-3D-app.tar.gz" | cut -d' ' -f1); else SHA=$(shasum -a 256 "$OUT/Pare-3D-app.tar.gz" | cut -d' ' -f1); fi
 printf '{"build":%s,"version":"%s","minRuntime":%s,"sha256":"%s"}\n' "$BUILD" "$VERSION" "$MIN_RUNTIME" "$SHA" > "$OUT/pare3d-update.json"
 cat "$OUT/pare3d-update.json"
 

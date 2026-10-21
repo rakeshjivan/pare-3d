@@ -26,7 +26,7 @@ export function AutoBackupControl() {
       ) : status.state === "off" ? (
         <>
           <span>Automatic backup is off.</span>
-          <button type="button" onClick={() => void chooseAutoBackupFolder().catch(() => undefined)}>Choose a backup folder…</button>
+          <button type="button" onClick={() => void chooseAutoBackupFolder().catch(() => undefined)}>{status.server ? "Turn on" : "Choose a backup folder…"}</button>
         </>
       ) : status.state === "paused" ? (
         <>
@@ -41,7 +41,7 @@ export function AutoBackupControl() {
             {time ? ` · last backup ${time}` : ""}
             {status.error ? ` · last attempt failed: ${status.error}` : ""}
           </span>
-          <button type="button" className="quiet" onClick={() => void chooseAutoBackupFolder().catch(() => undefined)}>Change folder</button>
+          {status.server ? null : <button type="button" className="quiet" onClick={() => void chooseAutoBackupFolder().catch(() => undefined)}>Change folder</button>}
           <button type="button" className="quiet" onClick={() => void turnOffAutoBackup()}>Turn off</button>
         </>
       )}

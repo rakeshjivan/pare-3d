@@ -6,7 +6,9 @@ name: Pare 3D release
 
 on:
   push:
-    branches: [release]
+    # "release" publishes the latest release; "native-preview" publishes a test build (a
+    # pre-release the installed apps ignore).
+    branches: [release, native-preview]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +16,8 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    # A Mac, so the native app can be compiled.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,6 +41,19 @@ jobs:
       - name: Package for Mac and Windows
         run: bash scripts/package-desktop.sh
       - uses: softprops/action-gh-release@v2
+        if: github.ref_name == 'native-preview'
+        with:
+          tag_name: pare-preview-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          name: Pare 3D test build ${{ github.run_number }}
+          files: |
+            dist/Pare-3D-Mac.zip
+            dist/Pare-3D-Windows.zip
+          body: Test build for checking before release. Installed copies do not update to it.
+      - uses: softprops/action-gh-release@v2
+        if: github.ref_name == 'release'
         with:
           tag_name: pare-${{ steps.build.outputs.number }}
           target_commitish: ${{ github.sha }}
