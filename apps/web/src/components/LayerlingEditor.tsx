@@ -127,7 +127,7 @@ import { SHELL_SIDES, shellMaxThickness, shellOpeningsFor, shellOpenSides } from
 import { arrayFollowingPivot, circleStepDegrees, clampArrayCount, moveAlongRadius, rotateAroundVertical, rowOffset, singleAxisSpacing, type ArraySettings } from "@/lib/shapeArray";
 import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootprint, type BedOverhang } from "@/lib/printBed";
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
-import { DEFAULT_CUT_CONNECTORS, normalizeCutConnectors, type CutConnectorOptions } from "@/lib/cutConnectors";
+import { CUT_CONNECTOR_LIMITS, DEFAULT_CUT_CONNECTORS, normalizeCutConnectors, type CutConnectorOptions } from "@/lib/cutConnectors";
 import { NO_SPLIT_ROTATION, modelSplitPlane, snapSplitPositionToVertices, splitOrientationForNormal, splitAxisFromLabel, splitAxisLabel, splitRotationAxes, type SplitRotation } from "@/lib/modelSplit";
 import { GuideModal } from "./workplane/GuideModal";
 import { HistoryViewOverlay, historyStateNameSuffix } from "./workplane/HistoryViewOverlay";
@@ -253,7 +253,7 @@ import { getSectionBounds, sectionAxisLetter, sectionMeshInFrame, sectionPlaceme
 import { projectSectionPoint, SECTION_VIEW_FACE, sectionSvgDocument, sliceMeshContours } from "@/lib/sectionSvg";
 import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ParametricSource, ProjectAsset, ShapeAsset, ShapeCustomization, ShapeKind, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, ShellEdges, ShellOpenings, ShellSide, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
 import { type Vec3, type MeshData, type Cuboid, type ShapeUpdatePatch, type ManifoldSolid, MIN_SHAPE_DIMENSION, resetManifoldRuntime, cleanModelDimension, getManifoldRuntime, meshForShape, meshReachAlong, appendMeshData, formatTriangleCount, shapeAabb, boundsForShapes, boundsForCuboids, meshAabb, boundsForPositions, quantizedPointKey } from "@/lib/editorMeshCore";
-import { planCutConnectors, cloneAsGroupChild, meshDataToManifoldMesh, shapeToManifoldSolid, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, exportSolidVolume, type ExportSolidVolume, PRINT_MATERIAL_STORAGE_KEY, PRINT_INFILL_STORAGE_KEY, PRINT_WALLS_STORAGE_KEY, formatEstimateNumber, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, disposeManifold, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
+import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, meshDataToManifoldMesh, shapeToManifoldSolid, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, exportSolidVolume, type ExportSolidVolume, PRINT_MATERIAL_STORAGE_KEY, PRINT_INFILL_STORAGE_KEY, PRINT_WALLS_STORAGE_KEY, formatEstimateNumber, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, disposeManifold, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { handleViewArrowKey } from "@/lib/viewArrowKeys";
 import { escapeWasHandled } from "@/lib/escapeHandled";
 import { booleanAutomationScene } from "@/lib/editorAutomation";
@@ -2621,8 +2621,15 @@ export function LayerlingEditor({
       return DEFAULT_CUT_CONNECTORS;
     }
   });
+  // Placed by hand: the points clicked on the plane, in scene coordinates, for this split only.
+  const [splitConnectorPoints, setSplitConnectorPoints] = useState<[number, number, number][]>([]);
+  const splitConnectorPreviewRef = useRef<CutConnectorPlan | null>(null);
   const setSplitConnectors = useCallback((next: CutConnectorOptions) => {
     const normalized = normalizeCutConnectors(next);
+    // Switching to placing by hand starts from where they would go on their own.
+    if (normalized.placement === "manual") {
+      setSplitConnectorPoints((current) => current.length ? current : [...(splitConnectorPreviewRef.current?.points ?? [])]);
+    }
     setSplitConnectorsState(normalized);
     try {
       window.localStorage.setItem("pare3d.cutConnectors", JSON.stringify(normalized));
@@ -2630,7 +2637,8 @@ export function LayerlingEditor({
       // Remembered for this session only.
     }
   }, []);
-  const [splitConnectorPreview, setSplitConnectorPreview] = useState<{ points: [number, number, number][]; tooSmall: boolean } | null>(null);
+  const [splitConnectorPreview, setSplitConnectorPreview] = useState<CutConnectorPlan | null>(null);
+  splitConnectorPreviewRef.current = splitConnectorPreview;
   const [mirrorPreviewAxis, setMirrorPreviewAxis] = useState<AlignAxis | null>(null);
   // The pivot belongs to the selection it was set for; another selection
   // turns around its own centre again.
@@ -3319,7 +3327,7 @@ export function LayerlingEditor({
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void planCutConnectors(splitTargetShapes, splitPlane, splitConnectors)
+      void planCutConnectors(splitTargetShapes, splitPlane, splitConnectors, splitConnectorPoints)
         .then((plan) => { if (!cancelled) setSplitConnectorPreview(plan); })
         .catch(() => { if (!cancelled) setSplitConnectorPreview(null); });
     }, 150);
@@ -3327,7 +3335,33 @@ export function LayerlingEditor({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [splitPlane, splitConnectors, splitTargetShapes]);
+  }, [splitPlane, splitConnectors, splitTargetShapes, splitConnectorPoints]);
+
+  /** A click on the split plane: removes the connector under it, or adds one there. */
+  const toggleSplitConnectorAt = useCallback((point: [number, number, number]) => {
+    const plane = splitPlane;
+    if (!plane) return;
+    const [nx, ny, nz] = plane.normal;
+    const along = (p: readonly number[]) => p[0] * nx + p[1] * ny + p[2] * nz;
+    const onPlane = (p: readonly number[]): [number, number, number] => {
+      const off = along(p) - plane.position;
+      return [p[0] - nx * off, p[1] - ny * off, p[2] - nz * off];
+    };
+    const target = onPlane(point);
+    const reach = Math.max(1.5, (splitConnectors.diameter + splitConnectors.clearance) / 2 + 0.5);
+    setSplitConnectorPoints((current) => {
+      const index = current.findIndex((existing) => {
+        const p = onPlane(existing);
+        return Math.hypot(p[0] - target[0], p[1] - target[1], p[2] - target[2]) <= reach;
+      });
+      if (index >= 0) return current.filter((_, i) => i !== index);
+      if (current.length >= CUT_CONNECTOR_LIMITS.maxCount) {
+        setNotice(t("connectors.limit", { count: CUT_CONNECTOR_LIMITS.maxCount }));
+        return current;
+      }
+      return [...current, target];
+    });
+  }, [splitConnectors.clearance, splitConnectors.diameter, splitPlane]);
 
   // Another tool opening ends a split in progress, without a notice of its own.
   const closeSplit = useCallback(() => {
@@ -6128,6 +6162,7 @@ export function LayerlingEditor({
     setPivotPickMode(false);
     setLayFlatPickMode(false);
     setCruiseAsset(null);
+    setSplitConnectorPoints([]);
     setSplitSession({
       targetIds: selectedShapes.map((shape) => shape.id),
       axis: plane.axis,
@@ -6244,7 +6279,7 @@ export function LayerlingEditor({
     const runId = splitRunRef.current + 1;
     splitRunRef.current = runId;
     setSplitSession({ ...session, busy: true, error: null, picking: false });
-    const outcome = await splitShapesByPlane(splitTargetShapes, plane, () => splitRunRef.current === runId && sourceContextIsCurrent(), splitConnectors);
+    const outcome = await splitShapesByPlane(splitTargetShapes, plane, () => splitRunRef.current === runId && sourceContextIsCurrent(), splitConnectors, splitConnectorPoints);
     if (splitRunRef.current !== runId) return;
     if (outcome.status === "stale" || !sourceContextIsCurrent()) {
       splitRunRef.current += 1;
@@ -6305,7 +6340,7 @@ export function LayerlingEditor({
         ? `${splitMessage}${/[.!?]$/.test(splitMessage) ? "" : "."} ${t(pins.length ? "connectors.addedDowels" : "connectors.addedPlugs", { count: outcome.connectorCount })}`
         : splitMessage,
     );
-  }, [commitShapes, splitConnectors, splitPlane, splitSession, splitTargetShapes]);
+  }, [commitShapes, splitConnectorPoints, splitConnectors, splitPlane, splitSession, splitTargetShapes]);
 
   useEffect(() => {
     if (!splitSession) return;
@@ -12516,7 +12551,9 @@ export function LayerlingEditor({
           mirrorReferenceShapes={shapes}
           splitActive={Boolean(splitSession) || historyViewState !== null}
           splitPlane={splitPlane}
-          splitConnectorPoints={splitSession && splitConnectorPreview?.points.length ? { points: splitConnectorPreview.points, radius: splitConnectors.diameter / 2 } : null}
+          splitConnectorPoints={splitSession && splitConnectorPreview && (splitConnectorPreview.points.length || splitConnectorPreview.invalid.length) ? { points: splitConnectorPreview.points, invalid: splitConnectorPreview.invalid, radius: splitConnectors.diameter / 2 } : null}
+          splitConnectorPick={Boolean(splitSession && !splitSession.busy && !splitSession.picking && splitConnectors.type !== "none" && splitConnectors.placement === "manual")}
+          onSplitConnectorPick={toggleSplitConnectorAt}
           onSplitPositionChange={changeSplitPosition}
           splitSurfacePick={Boolean(splitSession?.picking)}
           onSplitSurfacePick={pickSplitSurface}
@@ -12846,7 +12883,9 @@ export function LayerlingEditor({
           connectors={splitConnectors}
           onConnectorsChange={setSplitConnectors}
           connectorCount={splitConnectorPreview?.points.length ?? null}
+          connectorsInvalid={splitConnectorPreview?.invalid.length ?? 0}
           connectorsTooSmall={Boolean(splitConnectorPreview?.tooSmall)}
+          onClearConnectors={() => setSplitConnectorPoints([])}
         />
       ) : null}
       {edgeModifier ? (

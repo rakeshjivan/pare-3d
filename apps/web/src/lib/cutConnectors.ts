@@ -18,6 +18,8 @@ import type { ManifoldSolid } from "@/lib/manifoldSplit";
  */
 
 export type CutConnectorType = "none" | "plug" | "dowel";
+/** Auto: the editor spreads them over the cut face. Manual: where the user clicked on it. */
+export type CutConnectorPlacement = "auto" | "manual";
 
 export type CutConnectorOptions = {
   type: CutConnectorType;
@@ -27,7 +29,8 @@ export type CutConnectorOptions = {
   depth: number;
   /** Added to the socket's diameter: 0.1 press, 0.2 snug, 0.4 loose. */
   clearance: number;
-  /** Connectors on each separate piece of the cut face. */
+  placement: CutConnectorPlacement;
+  /** Auto placement: connectors on each separate piece of the cut face. */
   perPiece: 1 | 2;
   /**
    * Plug: put the peg on the + half instead. By default it goes on the - half (below, behind or
@@ -42,6 +45,7 @@ export const DEFAULT_CUT_CONNECTORS: CutConnectorOptions = {
   diameter: 5,
   depth: 5,
   clearance: 0.2,
+  placement: "auto",
   perPiece: 1,
   flip: false,
 };
@@ -77,6 +81,7 @@ export function normalizeCutConnectors(options: Partial<CutConnectorOptions> | n
     diameter: clamp(merged.diameter, CUT_CONNECTOR_LIMITS.minDiameter, CUT_CONNECTOR_LIMITS.maxDiameter, DEFAULT_CUT_CONNECTORS.diameter),
     depth: clamp(merged.depth, CUT_CONNECTOR_LIMITS.minDepth, CUT_CONNECTOR_LIMITS.maxDepth, DEFAULT_CUT_CONNECTORS.depth),
     clearance: clamp(merged.clearance, 0, CUT_CONNECTOR_LIMITS.maxClearance, DEFAULT_CUT_CONNECTORS.clearance),
+    placement: merged.placement === "manual" ? "manual" : "auto",
     perPiece: merged.perPiece === 2 ? 2 : 1,
     flip: Boolean(merged.flip),
   };
@@ -159,6 +164,77 @@ function interiorPoint(runtime: ManifoldToplevel, region: CrossSection): Point2 
     }
   }
   return best;
+}
+
+/** Where a scene point lands in the plane's frame (its distance along the normal dropped). */
+export function worldPointToPlane(frame: ReturnType<typeof planeFrame>, point: readonly number[]): Point2 {
+  return [
+    frame.u[0] * point[0] + frame.u[1] * point[1] + frame.u[2] * point[2],
+    frame.v[0] * point[0] + frame.v[1] * point[1] + frame.v[2] * point[2],
+  ];
+}
+
+/** The minimum distance between two connectors' centres: two sockets and a wall between them. */
+export function connectorSpacing(options: CutConnectorOptions) {
+  return options.diameter + options.clearance + CONNECTOR_WALL;
+}
+
+export type ManualConnectorCheck = {
+  /** Points with room for a connector on this body's cut face. */
+  fits: Point2[];
+  /** Indexes (into the points given) that fit on this body. */
+  fitIndexes: number[];
+};
+
+/**
+ * Which of the user's points have room for a connector on this body's cut face, with a wall
+ * around the socket. Points on the cut face of another body, or off it, are left out.
+ */
+export function checkManualConnectors(
+  runtime: ManifoldToplevel,
+  solid: ManifoldSolid,
+  normal: readonly number[],
+  position: number,
+  options: CutConnectorOptions,
+  points: readonly Point2[],
+): ManualConnectorCheck {
+  const frame = planeFrame(normal);
+  const created: { delete(): void }[] = [];
+  try {
+    const local = solid.transform(frame.toLocal);
+    created.push(local);
+    const face = local.slice(position);
+    created.push(face);
+    if (face.isEmpty()) return { fits: [], fitIndexes: [] };
+    const allowed = face.offset(-((options.diameter + options.clearance) / 2 + CONNECTOR_WALL), "Round", 2, SEGMENTS);
+    created.push(allowed);
+    const fits: Point2[] = [];
+    const fitIndexes: number[] = [];
+    points.forEach((point, index) => {
+      if (!allowed.isEmpty() && contains(runtime, allowed, point)) {
+        fits.push([point[0], point[1]]);
+        fitIndexes.push(index);
+      }
+    });
+    return { fits, fitIndexes };
+  } finally {
+    created.forEach((entry) => entry.delete());
+  }
+}
+
+/** Pairs of points closer than two sockets and a wall, as indexes. */
+export function crowdedConnectors(points: readonly Point2[], options: CutConnectorOptions) {
+  const spacing = connectorSpacing(options);
+  const crowded = new Set<number>();
+  for (let a = 0; a < points.length; a += 1) {
+    for (let b = a + 1; b < points.length; b += 1) {
+      if (Math.hypot(points[a][0] - points[b][0], points[a][1] - points[b][1]) < spacing - 1e-6) {
+        crowded.add(a);
+        crowded.add(b);
+      }
+    }
+  }
+  return crowded;
 }
 
 export type ConnectorPlacement =

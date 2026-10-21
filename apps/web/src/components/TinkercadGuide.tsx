@@ -39,6 +39,8 @@ const SAME: Row[] = [
 const NEW: Row[] = [
   { tinkercad: "Fillet and chamfer", pare: "Round or bevel any edge, and take it off again later", keys: "B / Shift+B" },
   { tinkercad: "Hollow and split", pare: "Shell a body with an even wall, or cut it in two with a plane (under More)" },
+  { tinkercad: "Cut with connectors", pare: "Split a part too big for the plate and add plugs or dowels, with a print-fit clearance; place them yourself or let Pare 3D spread them" },
+  { tinkercad: "Print fit for holes", pare: "Make a hole a little bigger in one click so pegs, lids and axles fit: Press, Snug or Loose" },
   { tinkercad: "Sketch", pare: "Draw a 2D outline with exact sizes, then extrude, revolve or sweep it (the Sketch tab)" },
   { tinkercad: "Threads, gears, springs", pare: "Ready-made shapes in the Shapes panel" },
   { tinkercad: "Your printer's plate", pare: "Bambu Lab A1 mini by default, overhang warnings, any of about 220 printers in Settings" },

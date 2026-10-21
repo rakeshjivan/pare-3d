@@ -43,7 +43,9 @@ export function SplitPanel({
   connectors,
   onConnectorsChange,
   connectorCount,
+  connectorsInvalid,
   connectorsTooSmall,
+  onClearConnectors,
 }: {
   axis: AlignAxis;
   rotation: SplitRotation;
@@ -68,7 +70,10 @@ export function SplitPanel({
   connectors?: CutConnectorOptions;
   onConnectorsChange?: (next: CutConnectorOptions) => void;
   connectorCount?: number | null;
+  /** Placed by hand: points with no room, or too close to another (red on the plane). */
+  connectorsInvalid?: number;
   connectorsTooSmall?: boolean;
+  onClearConnectors?: () => void;
 }) {
   useLanguage();
   // A cut across Y counts towards the back like the position fields (#182); inside it runs along z.
@@ -238,8 +243,10 @@ export function SplitPanel({
           value={connectors}
           busy={busy}
           count={connectorCount ?? null}
+          invalid={connectorsInvalid ?? 0}
           tooSmall={Boolean(connectorsTooSmall)}
           onChange={onConnectorsChange}
+          onClear={onClearConnectors}
         />
       ) : null}
 
@@ -371,15 +378,20 @@ function CutConnectorControls({
   value,
   busy,
   count,
+  invalid,
   tooSmall,
   onChange,
+  onClear,
 }: {
   value: CutConnectorOptions;
   busy: boolean;
   count: number | null;
+  invalid: number;
   tooSmall: boolean;
   onChange: (next: CutConnectorOptions) => void;
+  onClear?: () => void;
 }) {
+  const manual = value.placement === "manual";
   const set = (patch: Partial<CutConnectorOptions>) => onChange({ ...value, ...patch });
   return (
     <fieldset className="split-connectors" disabled={busy}>
@@ -435,6 +447,30 @@ function CutConnectorControls({
             </div>
           </div>
           <div className="split-connector-row">
+            <span>{t("connectors.placement")}</span>
+            <div className="split-connector-choice" role="group" aria-label={t("connectors.placement")}>
+              {(["auto", "manual"] as const).map((placement) => (
+                <button
+                  type="button"
+                  key={placement}
+                  className={value.placement === placement ? "active" : ""}
+                  aria-pressed={value.placement === placement}
+                  title={t(placement === "auto" ? "connectors.autoHint" : "connectors.manualHint")}
+                  onClick={() => set({ placement })}
+                >
+                  {t(placement === "auto" ? "connectors.auto" : "connectors.manual")}
+                </button>
+              ))}
+            </div>
+          </div>
+          {manual ? (
+            <div className="split-connector-manual">
+              <p>{t("connectors.manualHint")}</p>
+              {onClear ? <button type="button" className="split-connector-clear" onClick={onClear}>{t("connectors.clear")}</button> : null}
+            </div>
+          ) : null}
+          {!manual ? (
+          <div className="split-connector-row">
             <span>{t("connectors.perPiece")}</span>
             <div className="split-connector-choice" role="group" aria-label={t("connectors.perPiece")}>
               {([1, 2] as const).map((perPiece) => (
@@ -450,18 +486,25 @@ function CutConnectorControls({
               ))}
             </div>
           </div>
+          ) : null}
           {value.type === "plug" ? (
             <label className="split-connector-flip">
               <input type="checkbox" checked={value.flip} onChange={(event) => set({ flip: event.currentTarget.checked })} />
               {t("connectors.flip")}
             </label>
           ) : null}
-          <p className={`split-connector-status ${tooSmall && !count ? "warning" : ""}`} role="status">
-            {tooSmall && !count
-              ? t("connectors.tooSmallPreview")
-              : count
-                ? t(value.type === "plug" ? "connectors.previewPlugs" : "connectors.previewDowels", { count })
-                : t("connectors.working")}
+          <p className={`split-connector-status ${(tooSmall && !count) || invalid ? "warning" : ""}`} role="status">
+            {manual
+              ? invalid
+                ? t("connectors.manualInvalid", { count: count ?? 0, invalid })
+                : count
+                  ? t("connectors.manualCount", { count })
+                  : t("connectors.manualEmpty")
+              : tooSmall && !count
+                ? t("connectors.tooSmallPreview")
+                : count
+                  ? t(value.type === "plug" ? "connectors.previewPlugs" : "connectors.previewDowels", { count })
+                  : t("connectors.working")}
           </p>
         </>
       ) : null}

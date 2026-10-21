@@ -80,4 +80,42 @@ describe("cut connectors", () => {
     const long = await splitShapesByPlane([box()], plane, () => true, normalizeCutConnectors({ type: "dowel", diameter: 5, depth: 40 }));
     expect(long.status).toBe("failed");
   });
+
+  describe("placed by hand", () => {
+    // The cut face is the 20 x 20 square at x = 0: y 0..20 (up), z -10..10.
+    const manual = (extra: Parameters<typeof normalizeCutConnectors>[0] = {}) => normalizeCutConnectors({ type: "plug", diameter: 4, placement: "manual", ...extra });
+
+    it("puts plugs exactly where they were clicked", async () => {
+      const points: [number, number, number][] = [[0, 5, -5], [0, 15, 5], [0, 10, 0]];
+      const outcome = await splitShapesByPlane([box()], plane, () => true, manual(), points);
+      expect(outcome.status).toBe("done");
+      if (outcome.status === "done") expect(outcome.connectorCount).toBe(3);
+      const plan = await planCutConnectors([box()], plane, manual(), points);
+      expect(plan.points).toHaveLength(3);
+      expect(plan.invalid).toHaveLength(0);
+    });
+
+    it("marks a point with no room for its socket, and refuses the split", async () => {
+      const points: [number, number, number][] = [[0, 10, 0], [0, 1, 0]];
+      const plan = await planCutConnectors([box()], plane, manual(), points);
+      expect(plan.points).toHaveLength(1);
+      expect(plan.invalid).toHaveLength(1);
+      const outcome = await splitShapesByPlane([box()], plane, () => true, manual(), points);
+      expect(outcome.status).toBe("failed");
+    });
+
+    it("marks two points too close for a wall between their sockets", async () => {
+      const points: [number, number, number][] = [[0, 10, 0], [0, 10, 4]];
+      const plan = await planCutConnectors([box()], plane, manual(), points);
+      expect(plan.invalid).toHaveLength(2);
+      expect((await splitShapesByPlane([box()], plane, () => true, manual(), points)).status).toBe("failed");
+      // 6 mm apart leaves room: 4.2 mm socket plus a 1.2 mm wall.
+      const apart = await planCutConnectors([box()], plane, manual(), [[0, 10, -3], [0, 10, 3]]);
+      expect(apart.points).toHaveLength(2);
+    });
+
+    it("refuses to split with none placed", async () => {
+      expect((await splitShapesByPlane([box()], plane, () => true, manual(), [])).status).toBe("failed");
+    });
+  });
 });

@@ -358,7 +358,10 @@ type WorkplaneViewportProps = {
   pickOnly?: PickOnlySelection | null;
   splitPlane?: ModelSplitPlane | null;
   /** Fork: where the cut's connectors will go, drawn as rings on the split plane. */
-  splitConnectorPoints?: { points: [number, number, number][]; radius: number } | null;
+  splitConnectorPoints?: { points: [number, number, number][]; invalid?: [number, number, number][]; radius: number } | null;
+  /** Fork: a click on the split plane adds a connector there, or removes the one under it. */
+  splitConnectorPick?: boolean;
+  onSplitConnectorPick?: (point: [number, number, number]) => void;
   /** Dragging the plane's arrow head moves the plane along its normal. */
   onSplitPositionChange?: (position: number) => void;
   /** The next click on a face sets the split plane there; a blue plane follows the faces under the pointer. */
@@ -3317,6 +3320,8 @@ export function WorkplaneViewport({
   pickOnly = null,
   splitPlane = null,
   splitConnectorPoints = null,
+  splitConnectorPick = false,
+  onSplitConnectorPick,
   onSplitPositionChange,
   splitSurfacePick = false,
   onSplitSurfacePick,
@@ -3706,6 +3711,10 @@ export function WorkplaneViewport({
   splitPlaneRef.current = splitPlane;
   const onSplitPositionChangeRef = useRef(onSplitPositionChange);
   onSplitPositionChangeRef.current = onSplitPositionChange;
+  const splitConnectorPickRef = useRef(splitConnectorPick);
+  splitConnectorPickRef.current = splitConnectorPick;
+  const onSplitConnectorPickRef = useRef(onSplitConnectorPick);
+  onSplitConnectorPickRef.current = onSplitConnectorPick;
   const splitSurfacePickRef = useRef(splitSurfacePick);
   splitSurfacePickRef.current = splitSurfacePick;
   const onSplitSurfacePickRef = useRef(onSplitSurfacePick);
@@ -7260,7 +7269,20 @@ export function WorkplaneViewport({
           return;
         }
         const plane = splitPlaneRef.current;
-        if (!plane || !pickSplitPlaneHandle(state, event.clientX, event.clientY)) return;
+        if (!plane) return;
+        if (!pickSplitPlaneHandle(state, event.clientX, event.clientY)) {
+          // Fork: placing connectors - where the pointer's ray meets the split plane.
+          if (splitConnectorPickRef.current) {
+            const ray = pointerRayFor(state, event.clientX, event.clientY);
+            const normal = new THREE.Vector3(...plane.normal).normalize();
+            const hit = ray.intersectPlane(new THREE.Plane(normal, -plane.position), new THREE.Vector3());
+            if (hit) {
+              event.preventDefault();
+              onSplitConnectorPickRef.current?.([hit.x, hit.y, hit.z]);
+            }
+          }
+          return;
+        }
         const axisOrigin = new THREE.Vector3(...plane.origin);
         const axisNormal = new THREE.Vector3(...plane.normal).normalize();
         const startParameter = splitAxisParameter(state, event.clientX, event.clientY, axisOrigin, axisNormal);
@@ -9435,7 +9457,7 @@ export function WorkplaneViewport({
         )}
       </div>
 
-      <section className={`workplane-wrap ${noteMode ? "note-mode" : ""} ${workplaneMode ? "placing-workplane" : ""} ${splitActive ? "split-mode" : ""} ${splitHandleState ? `split-handle-${splitHandleState}` : ""} ${splitSurfacePick ? "split-picking" : ""} ${splitSurfacePick && splitPickOverFace ? "split-pick-over-face" : ""} ${cruiseAsset || carryIds?.length ? "cruising" : ""} ${tapeMode ? "tape-mode" : ""} ${tapeDeleteMode ? "tape-delete-mode" : ""} ${tapeMoveMode ? "tape-move-mode" : ""} ${cornerRulerMode ? "corner-ruler-mode" : ""} ${pivotPickMode || layFlatPickMode || mateFacePick || cadFacePick ? "pivot-pick-mode" : ""} ${modifierActive ? "modifier-edge-pick" : ""} ${sectionMeasureMode && sectionSettings.enabled ? "section-measure-mode" : ""}`} aria-label={t("aria.workplane")}>
+      <section className={`workplane-wrap ${noteMode ? "note-mode" : ""} ${workplaneMode ? "placing-workplane" : ""} ${splitActive ? "split-mode" : ""} ${splitHandleState ? `split-handle-${splitHandleState}` : ""} ${splitSurfacePick ? "split-picking" : ""} ${splitConnectorPick ? "split-connector-pick" : ""} ${splitSurfacePick && splitPickOverFace ? "split-pick-over-face" : ""} ${cruiseAsset || carryIds?.length ? "cruising" : ""} ${tapeMode ? "tape-mode" : ""} ${tapeDeleteMode ? "tape-delete-mode" : ""} ${tapeMoveMode ? "tape-move-mode" : ""} ${cornerRulerMode ? "corner-ruler-mode" : ""} ${pivotPickMode || layFlatPickMode || mateFacePick || cadFacePick ? "pivot-pick-mode" : ""} ${modifierActive ? "modifier-edge-pick" : ""} ${sectionMeasureMode && sectionSettings.enabled ? "section-measure-mode" : ""}`} aria-label={t("aria.workplane")}>
         <div className="workplane-plane">
           <div
             className="three-workplane-host"
@@ -14158,7 +14180,7 @@ function splitCutOutlinePoints(state: ThreeState, plane: ModelSplitPlane, ids: r
   return planeCrossingSegments(meshes, plane.origin, plane.normal);
 }
 
-function syncSplitPlane(state: ThreeState | null, plane: ModelSplitPlane | null, handleActive = false, selectedIds: readonly string[] = [], connectors: { points: [number, number, number][]; radius: number } | null = null) {
+function syncSplitPlane(state: ThreeState | null, plane: ModelSplitPlane | null, handleActive = false, selectedIds: readonly string[] = [], connectors: { points: [number, number, number][]; invalid?: [number, number, number][]; radius: number } | null = null) {
   if (!state) return;
   disposeChildren(state.splitLayer);
   if (!plane) {
@@ -14246,14 +14268,16 @@ function syncSplitPlane(state: ThreeState | null, plane: ModelSplitPlane | null,
     state.splitLayer.add(outline);
   }
   // Fork: a ring and a dot for each connector the cut will get.
-  if (connectors?.points.length) {
+  if (connectors && (connectors.points.length || connectors.invalid?.length)) {
     const facing = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(...plane.normal).normalize());
     const ringGeometry = new THREE.RingGeometry(Math.max(0.2, connectors.radius - 0.35), connectors.radius + 0.35, 40);
     const dotGeometry = new THREE.CircleGeometry(Math.max(0.3, connectors.radius * 0.25), 20);
     const ringMaterial = new THREE.MeshBasicMaterial({ color: "#1477d2", side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.95 });
+    const badMaterial = new THREE.MeshBasicMaterial({ color: "#dc2626", side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.95 });
     const dotMaterial = new THREE.MeshBasicMaterial({ color: "#ffffff", side: THREE.DoubleSide, depthTest: false });
-    connectors.points.forEach((point) => {
-      const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    const all = [...connectors.points.map((point) => ({ point, ok: true })), ...(connectors.invalid ?? []).map((point) => ({ point, ok: false }))];
+    all.forEach(({ point, ok }) => {
+      const ring = new THREE.Mesh(ringGeometry, ok ? ringMaterial : badMaterial);
       const dot = new THREE.Mesh(dotGeometry, dotMaterial);
       [ring, dot].forEach((mesh, index) => {
         mesh.position.set(...point);

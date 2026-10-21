@@ -9,7 +9,7 @@ import { groupShowsPartColors } from "@/lib/groupColors";
 import { acceleratedRaycast, computeBoundsTree } from "three-mesh-bvh";
 import { groupedContentScale, groupedPartSizeScale, scaleGroupedVertices } from "@/lib/groupScale";
 import { dropSplitSlivers, unionSplitManifoldComponents } from "@/lib/manifoldSplit";
-import { connectCutHalves, dowelPinSize, placeCutConnectors, planeFrame, planePointToWorld, type CutConnectorOptions } from "@/lib/cutConnectors";
+import { checkManualConnectors, connectCutHalves, crowdedConnectors, dowelPinSize, placeCutConnectors, planeFrame, planePointToWorld, worldPointToPlane, type CutConnectorOptions } from "@/lib/cutConnectors";
 import { splitAxisLabel, splitPlaneIntersectsPoints, splitShapeFromWorldPositions, type ModelSplitPlane } from "@/lib/modelSplit";
 import { canonicalizeShape, cleanRotationDegrees, isNonSolidShapeKind, meshYawDegrees, mirrorSign, normalizeDegrees, resizedImportedCoordinates, resizedShapeSize, shapeDepth, shapeHasShapeDeform, shapeWidth, withHoleMode } from "@/lib/workplaneShapes";
 import { closedMeshVolume } from "@/lib/cadProfileExtrusion";
@@ -746,7 +746,7 @@ function shapesToManifoldUnion(runtime: ManifoldToplevel, shapes: WorkplaneShape
   return union.status() === "NoError" && union.numTri() > 0 ? union : null;
 }
 
-async function splitShapeByPlane(shape: WorkplaneShape, plane: Pick<ModelSplitPlane, "axis" | "normal" | "position">, connectors?: CutConnectorOptions) {
+async function splitShapeByPlane(shape: WorkplaneShape, plane: Pick<ModelSplitPlane, "axis" | "normal" | "position">, connectors?: CutConnectorOptions, manualPoints?: readonly [number, number][]) {
   const created: ManifoldSolid[] = [];
   try {
     const runtime = await getManifoldRuntime();
@@ -779,13 +779,23 @@ async function splitShapeByPlane(shape: WorkplaneShape, plane: Pick<ModelSplitPl
     // Fork: connectors on the cut face (plugs or dowels), not on a split hole.
     let connectorCount = 0;
     const pins: WorkplaneShape[] = [];
+    let usedPoints: number[] = [];
     if (connectors && connectors.type !== "none" && !shape.hole) {
-      const placement = placeCutConnectors(runtime, solid, plane.normal, plane.position, connectors);
-      if (placement.status === "tooSmall") {
-        return { parts: null, error: t("connectors.error.tooSmall", { size: connectors.diameter }) };
+      let centres: [number, number][] | null = null;
+      if (connectors.placement === "manual") {
+        // The user's points that land on this body's cut face; the others belong to other bodies.
+        const check = checkManualConnectors(runtime, solid, plane.normal, plane.position, connectors, manualPoints ?? []);
+        usedPoints = check.fitIndexes;
+        centres = check.fits.length ? check.fits : null;
+      } else {
+        const placement = placeCutConnectors(runtime, solid, plane.normal, plane.position, connectors);
+        if (placement.status === "tooSmall") {
+          return { parts: null, error: t("connectors.error.tooSmall", { size: connectors.diameter }) };
+        }
+        if (placement.status === "ok") centres = placement.centres;
       }
-      if (placement.status === "ok") {
-        const joined = connectCutHalves(runtime, positive, negative, plane.normal, plane.position, placement.centres, connectors);
+      if (centres) {
+        const joined = connectCutHalves(runtime, positive, negative, plane.normal, plane.position, centres, connectors);
         if ("error" in joined) return { parts: null, error: t("connectors.error.breaksThrough") };
         created.push(...joined.created, joined.positive, joined.negative);
         if (joined.positive.status() !== "NoError" || joined.negative.status() !== "NoError") {
@@ -824,7 +834,7 @@ async function splitShapeByPlane(shape: WorkplaneShape, plane: Pick<ModelSplitPl
         `${shape.name} (${label}-)`,
       );
       return positiveShape && negativeShape
-        ? { parts: [canonicalizeShape(positiveShape), canonicalizeShape(negativeShape)] as [WorkplaneShape, WorkplaneShape], pins, connectorCount }
+        ? { parts: [canonicalizeShape(positiveShape), canonicalizeShape(negativeShape)] as [WorkplaneShape, WorkplaneShape], pins, connectorCount, usedPoints }
         : { parts: null, error: t("split.error.store") };
     } finally {
       disposeManifold(positiveMesh);
@@ -867,12 +877,16 @@ export async function planCutConnectors(
   targets: readonly WorkplaneShape[],
   plane: Pick<ModelSplitPlane, "normal" | "position">,
   connectors: CutConnectorOptions,
-): Promise<{ points: [number, number, number][]; tooSmall: boolean }> {
-  if (connectors.type === "none") return { points: [], tooSmall: false };
+  manualPoints: readonly [number, number, number][] = [],
+): Promise<CutConnectorPlan> {
+  if (connectors.type === "none") return { points: [], invalid: [], tooSmall: false };
   const runtime = await getManifoldRuntime();
   const frame = planeFrame(plane.normal);
   const points: [number, number, number][] = [];
   let tooSmall = false;
+  const manual = connectors.placement === "manual";
+  const planePoints = manual ? manualPoints.map((point) => worldPointToPlane(frame, point)) : [];
+  const fits = new Set<number>();
   for (const shape of targets) {
     if (shape.hole || !splitPlaneIntersectsPoints(meshForShape(shape).vertices, plane.normal, plane.position)) continue;
     const created: ManifoldSolid[] = [];
@@ -883,6 +897,10 @@ export async function planCutConnectors(
       const normalized = unionSplitManifoldComponents(runtime, solid);
       created.push(...normalized.created);
       if (!normalized.solid) continue;
+      if (manual) {
+        checkManualConnectors(runtime, normalized.solid, plane.normal, plane.position, connectors, planePoints).fitIndexes.forEach((index) => fits.add(index));
+        continue;
+      }
       const placement = placeCutConnectors(runtime, normalized.solid, plane.normal, plane.position, connectors);
       if (placement.status === "tooSmall") tooSmall = true;
       if (placement.status === "ok") placement.centres.forEach(([x, y]) => points.push(planePointToWorld(frame, x, y, plane.position)));
@@ -892,8 +910,18 @@ export async function planCutConnectors(
       Array.from(new Set(created)).forEach(disposeManifold);
     }
   }
-  return { points, tooSmall };
+  if (!manual) return { points, invalid: [], tooSmall };
+  // A point with no room, or too close to another, shows red; the split refuses until it moves.
+  const crowded = crowdedConnectors(planePoints, connectors);
+  const invalid: [number, number, number][] = [];
+  planePoints.forEach(([x, y], index) => {
+    const onPlane = planePointToWorld(frame, x, y, plane.position);
+    if (fits.has(index) && !crowded.has(index)) points.push(onPlane); else invalid.push(onPlane);
+  });
+  return { points, invalid, tooSmall: false };
 }
+
+export type CutConnectorPlan = { points: [number, number, number][]; invalid: [number, number, number][]; tooSmall: boolean };
 
 /** Splits every target the plane crosses; `stillCurrent` is asked after each one. */
 export async function splitShapesByPlane(
@@ -901,20 +929,34 @@ export async function splitShapesByPlane(
   plane: Pick<ModelSplitPlane, "axis" | "normal" | "position">,
   stillCurrent: () => boolean,
   connectors?: CutConnectorOptions,
+  /** Manual placement: the points the user clicked, in scene coordinates. */
+  manualPoints: readonly [number, number, number][] = [],
 ): Promise<SplitShapesOutcome> {
   const replacements = new Map<string, WorkplaneShape[]>();
   let splitCount = 0;
   const pins: WorkplaneShape[] = [];
   let connectorCount = 0;
+  const manual = connectors && connectors.type !== "none" && connectors.placement === "manual";
+  const frame = planeFrame(plane.normal);
+  const planePoints = manual ? manualPoints.map((point) => worldPointToPlane(frame, point)) : [];
+  if (manual) {
+    if (!planePoints.length) return { status: "failed", shape: targets[0], error: t("connectors.error.nonePlaced") };
+    if (crowdedConnectors(planePoints, connectors).size) return { status: "failed", shape: targets[0], error: t("connectors.error.crowded") };
+  }
+  const used = new Set<number>();
   for (const shape of targets) {
     if (!splitPlaneIntersectsPoints(meshForShape(shape).vertices, plane.normal, plane.position)) continue;
-    const result = await splitShapeByPlane(shape, plane, connectors);
+    const result = await splitShapeByPlane(shape, plane, connectors, planePoints);
     if (!stillCurrent()) return { status: "stale" };
     if (!result.parts) return { status: "failed", shape, error: result.error ?? t("split.error.failedDefault") };
     replacements.set(shape.id, result.parts);
     pins.push(...(result.pins ?? []));
     connectorCount += result.connectorCount ?? 0;
+    (result.usedPoints ?? []).forEach((index) => used.add(index));
     splitCount += 1;
+  }
+  if (manual && used.size < planePoints.length) {
+    return { status: "failed", shape: targets[0], error: t("connectors.error.noRoom", { count: planePoints.length - used.size }) };
   }
   return { status: "done", replacements, splitCount, pins, connectorCount };
 }
