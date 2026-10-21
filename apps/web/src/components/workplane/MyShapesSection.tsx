@@ -536,6 +536,8 @@ export function MyShapesSection(props: MyShapesSectionProps) {
           <span>{t("myShapes.title")}</span>
           {shapes.length > 0 ? <span className="my-shapes-count">{shapes.length}</span> : null}
         </button>
+        {/* Fork: folded, the section is just its heading - the buttons come back when it is opened. */}
+        {!collapsed ? (
         <div className="my-shapes-actions">
           <GuideHelpLink section="myShapes" iconSize={16} />
           <button
@@ -558,6 +560,7 @@ export function MyShapesSection(props: MyShapesSectionProps) {
             <Upload aria-hidden="true" />
           </button>
         </div>
+        ) : null}
       </div>
       {!collapsed ? (
         <div className="my-shapes-body">

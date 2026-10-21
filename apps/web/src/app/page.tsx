@@ -6,7 +6,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragE
 import { AppFooter } from "@/components/AppFooter";
 import { AutoBackupControl } from "@/components/AutoBackupControl";
 import { PareUpdateBanner } from "@/components/PareUpdateBanner";
-import { FirstRunCard } from "@/components/FirstRunCard";
+import { FirstRunCard, useFirstRunAnswered } from "@/components/FirstRunCard";
 import { StarterDesigns } from "@/components/StarterDesigns";
 import { starterParts, type StarterId } from "@/lib/starterDesigns";
 import { buildReadyPart } from "@/lib/readyPartsBuild";
@@ -1642,6 +1642,11 @@ export default function Home() {
       const built = await Promise.all(starterParts(id).map((part) => buildReadyPart(part, 200_000)));
       const { shapes } = placeCustomShape({ shapes: built }, { x: 0, y: 0, z: 0 }, []);
       setDashboardNotice("");
+      try {
+        window.sessionStorage.setItem("pare3d.frameOnOpen", "1");
+      } catch {
+        // Opens with the usual view.
+      }
       createAndOpenProject(t(`starter.${id}`), shapes);
     } catch (error) {
       setDashboardNotice(error instanceof Error ? error.message : String(error));
@@ -2956,6 +2961,7 @@ function Dashboard({
   onWorkspace: () => void;
 }) {
   const language = useLanguage();
+  const firstRunAnswered = useFirstRunAnswered();
   const offlineOk = useOfflineAvailable();
   const { update, isDismissed, dismiss: dismissUpdate } = useAppUpdate(LYL_CREATED_WITH_VERSION);
   const whatsNew = useWhatsNew(LYL_CREATED_WITH_VERSION);
@@ -3566,10 +3572,13 @@ function Dashboard({
               <PareUpdateBanner />
               <FirstRunCard />
               <StarterDesigns onStarter={onStarter} />
+              {/* Fork: on a first visit the "New to 3D design?" question already offers the Tinkercad guide. */}
+              {firstRunAnswered ? (
               <button type="button" className="tc-guide-card" onClick={() => window.dispatchEvent(new Event(OPEN_TINKERCAD_GUIDE_EVENT))}>
                 <GraduationCap size={22} aria-hidden="true" />
                 <span><strong>Coming from Tinkercad?</strong> See where everything is, what&apos;s new and which shortcuts are the same.</span>
               </button>
+              ) : null}
               {/* The designs live in the browser, and a browser can fail or break with an update: said plainly and always (not to be closed). */}
               <aside className="storage-notice" aria-label={t("storageNotice.title")}>
                 <span className="storage-notice-icon" aria-hidden="true">

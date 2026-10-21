@@ -130,6 +130,9 @@ import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel
 import { ReadyPartsSection } from "./ReadyPartsSection";
 import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
+import { FastModeHint } from "./FastModeHint";
+import { checkBeforeSending, PRINT_CHECK_EVENT, PrintCheckPanel } from "./PrintCheckPanel";
+import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
 import { MessageSquareText } from "lucide-react";
 import { PareBuildBadge } from "./PareVersionStatus";
 import { LithophanePanel, sampleImage, type LithophaneImage } from "./workplane/LithophanePanel";
@@ -228,7 +231,7 @@ import { exportMeshesToStl } from "@/lib/stlExport";
 import { exportMeshesTo3mf, THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
-import { DEFAULT_TAPER_DIMENSION_MAX, keyboardNudgeCoarseFactor, keyboardNudgeStep, normalizeShapeCustomizations, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
+import { DEFAULT_TAPER_DIMENSION_MAX, readWorkspaceDefault, saveWorkspaceDefault, keyboardNudgeCoarseFactor, keyboardNudgeStep, normalizeShapeCustomizations, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
 import { MCP_GRIDFINITY_LIST_KEYS, mcpGridfinityListParams, mcpThreadSizeParams } from "@/lib/mcpShapeSettings";
 import { createNoteId, normalizeNotes, NOTE_COUNT_LIMIT, patchNote, referencePoints } from "@/lib/workplaneNotes";
 import { notesAfterShapeChange, notesPinnedTo, notesPutBack } from "@/lib/noteAnchoring";
@@ -11170,15 +11173,38 @@ export function LayerlingEditor({
   exportDesignRef.current = exportDesign;
   const projectNameForBambuRef = useRef(projectName);
   projectNameForBambuRef.current = projectName;
+  // Fork (build 19): "Ready to print?" - run before Send to Bambu Studio (unless turned off), or on its own.
+  const [printCheck, setPrintCheck] = useState<{ issues: PrintIssue[]; sending: BambuSendFormat | null } | null>(null);
+  const runPrintCheck = useCallback(() => {
+    const printer = printerPresetById(workspaceSettingsRef.current.printer);
+    return checkForPrinting(shapesRef.current, {
+      bed: printer ? { width: printer.width, depth: printer.depth, height: printer.height } : null,
+      overhangAngle: workspaceSettingsRef.current.overhangAngle,
+      meshFor: meshForShape,
+    });
+  }, []);
   useEffect(() => {
     const onSend = (event: Event) => {
-      const format = (event as CustomEvent<{ format?: BambuSendFormat }>).detail?.format === "3mf" ? "3mf" : "stl";
+      const detail = (event as CustomEvent<{ format?: BambuSendFormat; skipCheck?: boolean }>).detail;
+      const format = detail?.format === "3mf" ? "3mf" : "stl";
+      if (!detail?.skipCheck && checkBeforeSending()) {
+        const issues = runPrintCheck();
+        if (issues.length > 0) {
+          setPrintCheck({ issues, sending: format });
+          return;
+        }
+      }
       setNotice(t("bambu.preparing", { format: format.toUpperCase() }), true);
       void exportDesignRef.current(format, projectNameForBambuRef.current, false, true);
     };
+    const onCheck = () => setPrintCheck({ issues: runPrintCheck(), sending: null });
     window.addEventListener(SEND_TO_BAMBU_EVENT, onSend);
-    return () => window.removeEventListener(SEND_TO_BAMBU_EVENT, onSend);
-  }, []);
+    window.addEventListener(PRINT_CHECK_EVENT, onCheck);
+    return () => {
+      window.removeEventListener(SEND_TO_BAMBU_EVENT, onSend);
+      window.removeEventListener(PRINT_CHECK_EVENT, onCheck);
+    };
+  }, [runPrintCheck]);
 
   /**
    * The drawing of a set of bodies, from the same bodies as the export (visible solids, holes taken
@@ -12892,6 +12918,37 @@ export function LayerlingEditor({
           onClose={closeShapeContextMenu}
         />
       ) : null}
+      {printCheck ? (
+        <PrintCheckPanel
+          issues={printCheck.issues}
+          printer={bedPrinter ? `${bedPrinter.vendor} ${bedPrinter.model}` : ""}
+          sending={printCheck.sending !== null}
+          onSelect={(ids) => {
+            setSelectedIds(ids);
+            setPrintCheck(null);
+          }}
+          onShowOverhangs={() => {
+            if (!overhangsVisible) toggleOverhangsVisible();
+            setPrintCheck(null);
+          }}
+          onSend={() => {
+            const format = printCheck.sending;
+            setPrintCheck(null);
+            if (format) window.dispatchEvent(new CustomEvent(SEND_TO_BAMBU_EVENT, { detail: { format, skipCheck: true } }));
+          }}
+          onClose={() => setPrintCheck(null)}
+        />
+      ) : null}
+      <FastModeHint
+        fastMode={workspaceSettings.fastMode}
+        onTurnOn={() => {
+          updateProjectWorkspaceSettings({ workspace: { ...workspaceSettingsRef.current, fastMode: true }, snap: snapGridRef.current });
+          // New designs on this computer start in Fast mode too.
+          const saved = readWorkspaceDefault();
+          saveWorkspaceDefault({ ...(saved?.workspace ?? workspaceSettingsRef.current), fastMode: true }, saved?.snap ?? snapGridRef.current);
+          setNotice(t("fastModeHint.done"));
+        }}
+      />
       <AppFooter variant="editor" version={LYL_CREATED_WITH_VERSION} onBugReport={() => void saveBugReport()} />
       {historyViewState && toolbarMode === "geometry" ? (
         <HistoryViewOverlay
@@ -14180,6 +14237,7 @@ function SecondaryToolbar({
       plain("note", t("editor.tool.note"), manageGroup, true, onNoteTool, { icon: ToolbarNoteIcon, active: noteMode }),
       plain("import", t("editor.import"), manageGroup, true, () => onTopPanel("import"), { icon: ToolbarImportIcon }),
       plain("export", t("editor.export"), manageGroup, true, () => onTopPanel("export"), { icon: ToolbarVectorExportIcon }),
+      plain("print-check", t("printCheck.command"), manageGroup, true, () => window.dispatchEvent(new Event(PRINT_CHECK_EVENT))),
       plain("settings", t("editor.workspaceSettings"), manageGroup, true, () => window.dispatchEvent(new Event("layerling:open-workspace-settings")), { icon: ToolbarSettingsIcon }),
       plain("mode-sketch", t("palette.switchSketch"), t("palette.group.mode"), true, () => selectToolbarMode("sketch")),
       ...helpCommands,

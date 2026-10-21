@@ -968,3 +968,59 @@ html[data-tool-names="on"] .secondary-toolbar .toolbar-icon.disabled .tool-label
   }
   html[data-theme="dark"] .shape-inspector:not(.floating) { border-color: rgba(255, 255, 255, 0.08); }
 }
+
+/* Build 19: "Simple mode" where the top bar has room; just "Simple" on laptop widths. */
+@media (max-width: 1366px) { .simple-mode-word { display: none; } }
+
+/* Build 19: overall size of a multi-selection. */
+.selection-size-card { padding: 12px 14px; }
+.selection-size-heading { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; font-family: var(--font-ui); }
+.selection-size-heading strong { font-size: 15px; }
+.selection-size-heading span { font-size: 12px; opacity: 0.75; }
+.selection-size-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.selection-size-field { display: flex; flex-direction: column; gap: 3px; font: 600 12px var(--font-ui); position: relative; }
+.selection-size-field input {
+  width: 100%; box-sizing: border-box; padding: 6px 26px 6px 8px; font: 700 14px var(--font-ui);
+  color: inherit; background: var(--background, #fff); border: 1px solid var(--border); border-radius: 8px;
+}
+.selection-size-field small { position: absolute; right: 8px; bottom: 8px; font-size: 10px; opacity: 0.6; }
+.selection-size-error { margin: 8px 0 0; color: #c0392b; font: 600 12px var(--font-ui); }
+
+/* Build 19: the one-time Fast mode suggestion. */
+.fast-mode-hint {
+  position: fixed; left: 50%; bottom: 44px; z-index: 900; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; max-width: min(620px, calc(100vw - 32px));
+  padding: 10px 12px 10px 14px; color: var(--foreground); background: var(--panel, #fff);
+  border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18); font-family: var(--font-ui);
+}
+.fast-mode-hint > svg { color: var(--primary); flex: none; }
+.fast-mode-hint span { display: flex; flex-direction: column; gap: 2px; }
+.fast-mode-hint strong { font-size: 14px; }
+.fast-mode-hint small { font-size: 12px; opacity: 0.75; }
+.fast-mode-hint button.primary { flex: none; padding: 7px 12px; color: #fff; background: var(--primary); border: 0; border-radius: 8px; font: 600 13px var(--font-ui); cursor: pointer; }
+.fast-mode-hint-close { flex: none; display: grid; place-items: center; width: 28px; height: 28px; color: inherit; background: none; border: 0; border-radius: 6px; cursor: pointer; }
+.fast-mode-hint-close:hover { background: var(--subbar); }
+
+/* Build 19: "Ready to print?" */
+.print-check-backdrop { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; background: rgba(15, 23, 42, 0.28); }
+.print-check {
+  width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 80px); overflow: auto; color: var(--foreground);
+  background: var(--panel, #fff); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3); font-family: var(--font-ui);
+}
+.print-check header { display: flex; align-items: center; gap: 12px; padding: 16px 16px 12px; }
+.print-check header div { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.print-check header strong { font-size: 17px; }
+.print-check header span { font-size: 13px; opacity: 0.75; }
+.print-check header .ok { color: #2f9e44; } .print-check header .warn { color: #d9822b; } .print-check header .bad { color: #c0392b; }
+.print-check-close { display: grid; place-items: center; width: 30px; height: 30px; color: inherit; background: none; border: 0; border-radius: 8px; cursor: pointer; }
+.print-check-close:hover { background: var(--subbar); }
+.print-check ul { list-style: none; margin: 0; padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+.print-check li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; line-height: 1.4; }
+.print-check li > svg { flex: none; margin-top: 2px; }
+.print-check li.problem > svg { color: #c0392b; } .print-check li.advice > svg { color: #d9822b; }
+.print-check li span { flex: 1; }
+.print-check li button { flex: none; padding: 4px 10px; color: var(--primary); background: none; border: 1px solid var(--border); border-radius: 7px; font: 600 12px var(--font-ui); cursor: pointer; }
+.print-check footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 16px 16px; }
+.print-check footer button { padding: 8px 14px; border-radius: 9px; font: 600 13px var(--font-ui); cursor: pointer; border: 1px solid var(--border); background: none; color: var(--foreground); }
+.print-check footer button.primary { color: #fff; background: var(--primary); border-color: var(--primary); }
+.bambu-send-menu strong svg { vertical-align: -2px; }

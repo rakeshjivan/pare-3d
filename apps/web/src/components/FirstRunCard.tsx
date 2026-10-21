@@ -8,6 +8,27 @@ import { OPEN_TINKERCAD_GUIDE_EVENT } from "@/components/TinkercadGuide";
 import { setToolNames } from "@/lib/toolNames";
 
 const STORAGE_KEY = "pare3d.firstRunAnswered";
+const ANSWERED_EVENT = "pare3d:first-run-answered";
+
+function answeredAlready() {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) !== null;
+  } catch {
+    return true;
+  }
+}
+
+/** Whether the first-run question has been answered - the home screen waits with the Tinkercad card till then. */
+export function useFirstRunAnswered() {
+  const [answered, setAnswered] = useState(true);
+  useEffect(() => {
+    setAnswered(answeredAlready());
+    const onAnswer = () => setAnswered(true);
+    window.addEventListener(ANSWERED_EVENT, onAnswer);
+    return () => window.removeEventListener(ANSWERED_EVENT, onAnswer);
+  }, []);
+  return answered;
+}
 
 /**
  * Fork (build 16): asked once, on the home screen - "New to 3D design?". A beginner gets Simple
@@ -35,6 +56,7 @@ export function FirstRunCard() {
     setToolNames(choice !== "experienced");
     if (choice === "tinkercad") window.dispatchEvent(new Event(OPEN_TINKERCAD_GUIDE_EVENT));
     setShow(false);
+    window.dispatchEvent(new Event(ANSWERED_EVENT));
   };
   return (
     <section className="first-run-card" aria-label={t("firstRun.title")}>

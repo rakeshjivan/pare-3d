@@ -230,6 +230,7 @@ import { useLanguage } from "@/lib/useLanguage";
 import { useMovablePanel, type MovablePanelOptions } from "@/lib/useMovablePanel";
 import { PrintFitCard } from "@/components/workplane/PrintFitCard";
 import { PrintHelpers } from "@/components/workplane/PrintHelpers";
+import { SelectionSizeCard } from "@/components/workplane/SelectionSizeCard";
 import { MouseEarsCard } from "@/components/workplane/MouseEarsCard";
 import { isNonSolidShapeKind, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeSupportsTaper, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
 import { MAX_SKETCH_REVOLVE_TURNS, normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
@@ -4893,6 +4894,7 @@ export function SelectionInspector({
           {t("inspector.gearPairFitApply")}
         </button>
       ) : null}
+      {onUpdateShapes ? <SelectionSizeCard shapes={shapes} units={workspace.units} disabled={allLocked} onUpdateShapes={onUpdateShapes} /> : null}
       <p className="selection-inspector-hint">{t("inspector.selectionHint")}</p>
       {!movable.moved ? (
         <div className="inspector-snap-dock">

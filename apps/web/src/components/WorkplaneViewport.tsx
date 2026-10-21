@@ -8318,20 +8318,20 @@ export function WorkplaneViewport({
   );
 
   /** Zooms to the selection; false when there is none to look at. */
-  const focusSelection = useCallback((): boolean => {
+  const focusSelection = useCallback((ids?: readonly string[], margin = 1): boolean => {
     const state = threeRef.current;
     if (!state) return false;
     // The real selection, not renderSelectionIds: the workplane and edge tools hide
     // the outline while they are open, but the objects are still what to look at.
     const bounds = new THREE.Box3();
-    selectedIdsRef.current.forEach((id) => {
+    (ids ?? selectedIdsRef.current).forEach((id) => {
       const record = state.shapeRecords.get(id);
       if (record) bounds.expandByObject(record.object);
     });
     if (bounds.isEmpty()) return false;
 
     const center = bounds.getCenter(new THREE.Vector3());
-    const radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 0.5);
+    const radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 0.5) * margin;
     const canvas = state.renderer.domElement;
     const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
     const offset = state.camera.position.clone().sub(state.controls.target);
@@ -8362,6 +8362,28 @@ export function WorkplaneViewport({
     state.needsRender = true;
     return true;
   }, []);
+
+  // Fork: a design opened from a starter example is framed whole once its parts are drawn.
+  useEffect(() => {
+    let wanted = false;
+    try {
+      wanted = window.sessionStorage.getItem("pare3d.frameOnOpen") === "1";
+    } catch {
+      wanted = false;
+    }
+    if (!wanted || shapes.length === 0) return;
+    const timer = window.setTimeout(() => {
+      const ids = shapesRef.current.filter((shape) => !shape.hidden).map((shape) => shape.id);
+      if (focusSelection(ids, 1.25)) {
+        try {
+          window.sessionStorage.removeItem("pare3d.frameOnOpen");
+        } catch {
+          // Nothing to tidy.
+        }
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [focusSelection, shapes.length]);
 
   const resetView = useCallback(() => {
     const state = threeRef.current;

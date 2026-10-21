@@ -51,7 +51,7 @@ export function SimpleModeSwitch() {
       onClick={toggle}
     >
       <span className="simple-mode-track" aria-hidden="true"><span className="simple-mode-thumb" /></span>
-      <span>Simple</span>
+      <span>Simple<span className="simple-mode-word"> mode</span></span>
     </button>
   );
 }
