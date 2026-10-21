@@ -15,9 +15,12 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build:
     # A Mac, so the native app can be compiled.
     runs-on: macos-latest
+    outputs:
+      number: ${{ steps.build.outputs.number }}
+      version: ${{ steps.build.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,6 +46,49 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Package for Mac and Windows
         run: bash scripts/package-desktop.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: downloads
+          path: dist/
+          retention-days: 14
+
+  # The Windows download, tried on a real Windows machine: its server, its updater, and
+  # "Pare 3D.exe" opening the app in its window (scripts/windows-check). A release waits for it.
+  windows-check:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+      - uses: actions/download-artifact@v4
+        with:
+          name: downloads
+          path: dist
+      - name: Tools for driving the app window
+        working-directory: scripts/windows-check
+        run: npm install --no-save --no-package-lock playwright-core@1.48.2
+      - name: Check the Windows app
+        shell: pwsh
+        run: ./scripts/windows-check/check.ps1 -Dist dist -Out windows-check-output
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-check
+          path: windows-check-output/
+
+  publish:
+    needs: [build, windows-check]
+    # A test build is published even if the Windows check fails (so the Mac app can be tried);
+    # a real release only when it passed.
+    if: always() && needs.build.result == 'success' && (github.ref_name == 'native-preview' || needs.windows-check.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: downloads
+          path: dist
       - uses: softprops/action-gh-release@v2
         if: github.ref_name == 'native-preview'
         with:
@@ -58,10 +104,10 @@ jobs:
       - uses: softprops/action-gh-release@v2
         if: github.ref_name == 'release'
         with:
-          tag_name: pare-${{ steps.build.outputs.number }}
+          tag_name: pare-${{ needs.build.outputs.number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
-          name: Pare 3D build ${{ steps.build.outputs.number }} (layerling ${{ steps.build.outputs.version }})
+          name: Pare 3D build ${{ needs.build.outputs.number }} (layerling ${{ needs.build.outputs.version }})
           files: |
             dist/Pare-3D-Mac.zip
             dist/Pare-3D-Windows.zip
@@ -71,7 +117,7 @@ jobs:
             **Download:** `Pare-3D-Mac.zip` for a Mac (Apple silicon or Intel), `Pare-3D-Windows.zip` for Windows 10/11.
 
             **Mac:** unzip, drag Pare 3D into Applications, open it. The first time, go to System Settings → Privacy & Security → Open Anyway.
-            **Windows:** extract the folder, double-click "Pare 3D.exe". If SmartScreen warns, choose More info → Run anyway. The native Windows window is new and has not yet been tried on a real PC; if it does not start, double-click "Pare 3D (browser).vbs" instead and please report it.
+            **Windows:** extract the folder, double-click "Pare 3D.exe". If SmartScreen warns, choose More info → Run anyway. If the window does not start, double-click "Pare 3D (browser).vbs" instead and please report it.
             Chrome or Edge gives Pare 3D its own window and automatic backup.
             Already installed (build 2 or later)? It updates itself: the next time you open it, or when it asks you to reload.
 
