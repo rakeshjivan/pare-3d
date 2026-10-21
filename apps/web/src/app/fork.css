@@ -1218,3 +1218,12 @@ html[data-theme="dark"] { --toolbar-icon-disabled: #7f776d; }
 .saved-file-toast .saved-file-close { width: 26px; padding: 0; justify-content: center; color: var(--muted-strong); }
 @keyframes saved-file-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .saved-file-toast { animation: none; } }
+
+/* Fork (build 23): the depth beside the pointer while a face is pulled. */
+.face-pull-readout {
+  position: absolute; z-index: 30; pointer-events: none;
+  padding: 3px 8px; font: 700 12.5px var(--font-ui); color: #fff;
+  background: #2f6fd6; border-radius: 6px; box-shadow: 0 3px 10px rgba(15, 23, 42, 0.25);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.face-pull-readout.pocket { background: #d9480f; }

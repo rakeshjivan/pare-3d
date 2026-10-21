@@ -107,7 +107,8 @@ import { mateMotion, type FacePick, type MateMode } from "@/lib/mateFaces";
 import { carriedOntoFace } from "@/lib/carryOntoFace";
 import { HolePatternPanel } from "./workplane/HolePatternPanel";
 import { FaceToolPanel } from "./workplane/FaceToolPanel";
-import { DEFAULT_FACE_TOOL, faceToolSettingsOn, normalizeFaceTool, type FaceToolSettings } from "@/lib/faceTool";
+import { DEFAULT_FACE_TOOL, FACE_TOOL_MIN_DEPTH, faceToolSettingsOn, normalizeFaceTool, type FaceToolSettings } from "@/lib/faceTool";
+import { pullToFaceTool } from "@/lib/facePull";
 import { faceToolBody } from "@/lib/faceToolBody";
 import { DEFAULT_HOLE_PATTERN, normalizeHolePattern, type HolePatternSettings } from "@/lib/holePattern";
 import { holePatternShapes, readPerforableFace, type PerforableFace } from "@/lib/holePatternShapes";
@@ -8028,8 +8029,8 @@ export function LayerlingEditor({
     return () => window.clearTimeout(timer);
   }, [faceTool?.face, faceTool?.settings, faceTool?.sourceId]);
 
-  const applyFaceTool = useCallback(async () => {
-    const tool = faceTool;
+  const applyFaceTool = useCallback(async (override?: NonNullable<typeof faceTool>) => {
+    const tool = override ?? faceTool;
     if (!tool?.face || tool.busy) return;
     const source = shapesRef.current.find((shape) => shape.id === tool.sourceId);
     if (!source) return;
@@ -8071,6 +8072,62 @@ export function LayerlingEditor({
       t(tool.settings.direction === "in" ? "status.faceToolPocketCreated" : "status.faceToolCreated", { depth: Number(faceToolSettingsOn(tool.face, tool.settings).depth.toFixed(2)) }),
     );
   }, [commitShapes, faceTool]);
+
+  // Fork (build 23): push/pull by dragging the face. The press picks the face (any face of the body,
+  // at either step); the drag sets out/in and the depth; letting go creates it, as one undo step.
+  const faceToolRef = useRef(faceTool);
+  faceToolRef.current = faceTool;
+  const facePullBeforeRef = useRef<NonNullable<typeof faceTool> | null>(null);
+  const startFacePull = useCallback((pick: LayFlatPick): boolean => {
+    const tool = faceToolRef.current;
+    if (!tool || tool.busy) return false;
+    const source = shapesRef.current.find((shape) => shape.id === tool.sourceId);
+    if (!source || pick.shapeId !== source.id) {
+      setNotice(t("status.faceToolMissed"));
+      return false;
+    }
+    const read = readPerforableFace(worldTrianglePositions(source), pick.point, pick.normal);
+    if (!read.ok) {
+      setNotice(t(read.reason === "curved" ? "status.faceToolCurved" : "status.faceToolMissed"));
+      return false;
+    }
+    facePullBeforeRef.current = tool;
+    const next = { ...tool, step: "ready" as const, face: read.face, settings: faceToolSettingsOn(read.face, tool.settings) };
+    faceToolRef.current = next;
+    setFaceTool(next);
+    setNotice(t("status.facePullHint"));
+    return true;
+  }, []);
+  const dragFacePull = useCallback((distance: number) => {
+    const tool = faceToolRef.current;
+    if (!tool?.face) return;
+    const settings = faceToolSettingsOn(tool.face, normalizeFaceTool({ ...tool.settings, ...pullToFaceTool(distance, FACE_TOOL_MIN_DEPTH) }));
+    const next = { ...tool, settings };
+    faceToolRef.current = next;
+    setFaceTool(next);
+  }, []);
+  const endFacePull = useCallback((distance: number | null) => {
+    const tool = faceToolRef.current;
+    facePullBeforeRef.current = null;
+    if (!tool?.face) return;
+    // A press without a drag only picks the face: the panel takes it from there.
+    if (distance === null) {
+      setNotice(t("status.faceToolReady"));
+      return;
+    }
+    const settings = faceToolSettingsOn(tool.face, normalizeFaceTool({ ...tool.settings, ...pullToFaceTool(distance, FACE_TOOL_MIN_DEPTH) }));
+    void applyFaceTool({ ...tool, settings });
+  }, [applyFaceTool]);
+  const cancelFacePull = useCallback(() => {
+    const before = facePullBeforeRef.current;
+    facePullBeforeRef.current = null;
+    if (before) {
+      faceToolRef.current = before;
+      setFaceTool(before);
+    }
+    setNotice(t("status.facePullCancelled"));
+  }, []);
+
 
   // Like the hole pattern, the tool belongs to the body it was started for and gives way to the other tools.
   useEffect(() => {
@@ -12981,9 +13038,14 @@ export function LayerlingEditor({
             ? { shapeIds: mateTool.step === "source" ? [mateTool.sourceId] : shapes.filter((shape) => shape.id !== mateTool.sourceId && !shape.hidden).map((shape) => shape.id) }
             : holePatternTool?.step === "pick"
               ? { shapeIds: [holePatternTool.sourceId] }
-              : faceTool?.step === "pick"
+              : faceTool && !faceTool.busy
                 ? { shapeIds: [faceTool.sourceId] }
                 : null}
+          facePull={faceTool && !faceTool.busy && !mateTool && !holePatternTool ? { shapeId: faceTool.sourceId } : null}
+          onFacePullStart={startFacePull}
+          onFacePullDrag={dragFacePull}
+          onFacePullEnd={endFacePull}
+          onFacePullCancel={cancelFacePull}
           onMateFacePick={mateTool ? pickMateFace : faceTool ? pickFaceToolFace : pickHolePatternFace}
           cadFacePick={historyViewState ? null : cadFacePick}
           onCadFacePick={toggleDeleteFace}

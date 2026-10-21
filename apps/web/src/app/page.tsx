@@ -86,7 +86,6 @@ import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, norm
 import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
 import { saveUserFile } from "@/lib/pareFiles";
 import { BackupStrip } from "@/components/BackupStrip";
-import { OlderAppNotice } from "@/components/OlderAppNotice";
 import { SavedFileToast } from "@/components/SavedFileToast";
 
 type AppView = "dashboard" | "editor";
@@ -3594,7 +3593,6 @@ function Dashboard({
                 </div>
               ) : null}
               <PareUpdateBanner />
-              <OlderAppNotice dismissible />
               <FirstRunCard />
               <WhatsNew />
               {/* Fork: on a first visit the "New to 3D design?" question already offers the Tinkercad guide. */}

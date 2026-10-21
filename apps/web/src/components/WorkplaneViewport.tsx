@@ -163,6 +163,7 @@ import { axisLockedPoint, circleOfEdgePoints, perpendicularFootOnPlane, perpendi
 import { syncHistoryPickHighlight } from "@/components/workplane/historyPickHighlight";
 import { orbitViewBy, panViewBy } from "@/lib/viewArrowKeys";
 import { useViewportKeyboardHooks } from "@/components/workplane/viewportKeyboard";
+import { pullDistanceAlongNormal, snapPullDistance, typedPull } from "@/lib/facePull";
 import { aimPickRay, firstShapeHit, pickLayFlatFace, pickRotationPivot, pickShapeAt, pickShapeIdAt, pointerRayFor, rayPointOnRotationPlane, RENDER_LAYER_SHAPES, splitAxisParameter, usePickOnlyPointer, type LayFlatPick, type PickOnlySelection } from "@/components/workplane/viewportPicking";
 export type { LayFlatPick } from "@/components/workplane/viewportPicking";
 import { RENDER_LAYER_HELPERS, sharedOverlayLineMaterial, sharedShapeGeometryCache, sharedEdgesGeometryCache, sharedShapeMaterialCache, type PointCardOffset, type ShapeRenderRecord, type ThreeState, type MoveDimensionSession, type NoteOverlayState, type TapePoint, type TapeAttachment, type TapeEdgeAttachment, type TapeModel, type TapeOverlayState, type TapeCandidate, type RotationHandleSide, type RotationHandleSides, type DragItem, quaternionForShape, projectToScreen, syncMoveDimensionWorldLines, syncTransformGuideWorldLines, tapeShapeDimensions, tapePointWorld, tapeEdgeWorldPoints, tapeSegmentWorldPoints, syncTapeOverlay, syncNoteOverlay, NoteOverlay, TapeOverlay, type RulerDimensionOverlayItem, type RulerDimensionOverlayState, syncRulerDimensionOverlay, RulerDimensionOverlay, type CornerRulerInstance, type CornerRulerOverlayState, syncCornerRulerToolOverlay, CornerRulerToolOverlay, syncOriginDimensionWorldLines, shapeCenter, shapeLocalExtents, projectShapeExtent, projectShapesExtent, type OriginDimensionFrame, setObjectRenderLayer, freezeStaticObjectMatrices, formatMeasure, findShapeObject, trimSharedShapeGeometryCache, releaseSharedShapeGeometry, trimSharedShapeMaterialCache, releaseSharedShapeMaterials, disposeMaterialResource, disposeChildren, disposeObject } from "@/components/workplane/ViewportOverlays";
@@ -449,6 +450,16 @@ type WorkplaneViewportProps = {
   /** "Align faces" waiting for a click on a face of one of these bodies. */
   mateFacePick?: { shapeIds: string[] } | null;
   onMateFacePick?: (pick: LayFlatPick | null) => void;
+  /**
+   * Fork (build 23): push/pull by dragging. Pressing on a face of this body grabs it; dragging pulls it
+   * out (positive) or pushes it in (negative) along its normal, snapped to the grid (Shift: finely).
+   * Typing a number sets the depth; Enter takes it, Esc gives up. A press without a drag is a pick.
+   */
+  facePull?: { shapeId: string } | null;
+  onFacePullStart?: (pick: LayFlatPick) => boolean;
+  onFacePullDrag?: (distance: number) => void;
+  onFacePullEnd?: (distance: number | null) => void;
+  onFacePullCancel?: () => void;
   /** "Delete face" waiting for clicks on faces of the prepared body; a click toggles the face. */
   cadFacePick?: CadFacePick | null;
   onCadFacePick?: (faceId: number) => void;
@@ -3427,6 +3438,11 @@ export function WorkplaneViewport({
   onLayFlatPick,
   mateFacePick = null,
   onMateFacePick,
+  facePull = null,
+  onFacePullStart,
+  onFacePullDrag,
+  onFacePullEnd,
+  onFacePullCancel,
   cadFacePick = null,
   onCadFacePick,
   onNoteAdd,
@@ -3471,6 +3487,12 @@ export function WorkplaneViewport({
   const [hoverMeasureKey, setHoverMeasureKey] = useState<string | null>(null);
   const [pinnedMeasureKey, setPinnedMeasureKey] = useState<string | null>(null);
   const [rotationReadout, setRotationReadout] = useState<RotationReadout>(null);
+  // Fork (build 23): the depth beside the pointer while a face is pulled.
+  const [facePullReadout, setFacePullReadout] = useState<{ x: number; y: number; text: string; pocket: boolean } | null>(null);
+  const facePullRef = useRef(facePull);
+  facePullRef.current = facePull;
+  const facePullCallbacksRef = useRef({ onFacePullStart, onFacePullDrag, onFacePullEnd, onFacePullCancel });
+  facePullCallbacksRef.current = { onFacePullStart, onFacePullDrag, onFacePullEnd, onFacePullCancel };
   // A turned body's angles under it, named like its position: Y across the
   // plate, Z up.
   const angleBadge = useMemo(() => {
@@ -7252,6 +7274,144 @@ export function WorkplaneViewport({
     };
   }, []);
 
+  /** Fork (build 23): grabs the face under the pointer and pulls it until the button is let go. */
+  const beginFacePull = useCallback((event: ReactPointerEvent<HTMLDivElement>, state: ThreeState) => {
+    const target = facePullRef.current;
+    const callbacks = facePullCallbacksRef.current;
+    const pick = pickLayFlatFace(state, event.clientX, event.clientY);
+    if (!target || !pick || pick.shapeId !== target.shapeId) {
+      onMateFacePick?.(pick);
+      return;
+    }
+    if (!callbacks.onFacePullStart?.(pick)) return;
+    const element = event.currentTarget;
+    const view = element.ownerDocument.defaultView ?? window;
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const origin = pick.point;
+    const normal = pick.normal;
+    let moved = false;
+    let distance = 0;
+    let typed = "";
+    let shift = event.shiftKey;
+    let lastX = startX;
+    let lastY = startY;
+    capturePointer(element, pointerId);
+    state.controls.enabled = false;
+    onInteractionActiveChange?.(true);
+    // Looking straight at the face, the ray says nothing about depth: then the pointer's way up the screen does.
+    const screenScale = () => {
+      const rect = state.renderer.domElement.getBoundingClientRect();
+      const camera = state.camera as THREE.PerspectiveCamera & THREE.OrthographicCamera;
+      if ((camera as THREE.OrthographicCamera).isOrthographicCamera) return (camera.top - camera.bottom) / camera.zoom / Math.max(1, rect.height);
+      const far = camera.position.distanceTo(new THREE.Vector3(origin.x, origin.y, origin.z));
+      return (2 * far * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / Math.max(1, rect.height);
+    };
+    const show = () => {
+      const rect = state.renderer.domElement.getBoundingClientRect();
+      const typedValue = typedPull(typed);
+      const value = typedValue ?? distance;
+      const text = typed
+        ? `${typed}${typedValue === null ? "" : " mm"} ↵`
+        : `${value > 0 ? "+" : value < 0 ? "−" : ""}${formatMeasure(Math.abs(value), workspaceRef.current.accuracy)}`;
+      setFacePullReadout({ x: lastX - rect.left + 20, y: lastY - rect.top - 30, text, pocket: value < 0 });
+    };
+    const update = (clientX: number, clientY: number) => {
+      lastX = clientX;
+      lastY = clientY;
+      if (!moved && Math.hypot(clientX - startX, clientY - startY) < 4) return;
+      moved = true;
+      const ray = pointerRayFor(state, clientX, clientY);
+      const raw = pullDistanceAlongNormal(origin, normal, ray.origin, ray.direction) ?? (startY - clientY) * screenScale();
+      const next = snapPullDistance(raw, snapStep(snapRef.current), shift);
+      if (next !== distance || typed) {
+        distance = next;
+        if (!typed) callbacks.onFacePullDrag?.(distance);
+      }
+      show();
+    };
+    const stop = () => {
+      view.removeEventListener("pointermove", move, true);
+      view.removeEventListener("pointerup", up, true);
+      view.removeEventListener("pointercancel", cancel, true);
+      view.removeEventListener("keydown", key, true);
+      view.removeEventListener("keyup", keyUp, true);
+      state.controls.enabled = true;
+      setFacePullReadout(null);
+      onInteractionActiveChange?.(false);
+    };
+    const move = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      shift = moveEvent.shiftKey;
+      update(moveEvent.clientX, moveEvent.clientY);
+    };
+    const up = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      stop();
+      const typedValue = typedPull(typed);
+      if (typedValue !== null) callbacks.onFacePullEnd?.(typedValue);
+      else callbacks.onFacePullEnd?.(moved && distance !== 0 ? distance : null);
+    };
+    const cancel = (cancelEvent: PointerEvent) => {
+      if (cancelEvent.pointerId !== pointerId) return;
+      stop();
+      callbacks.onFacePullCancel?.();
+    };
+    const key = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key === "Escape") {
+        keyEvent.preventDefault();
+        keyEvent.stopPropagation();
+        stop();
+        callbacks.onFacePullCancel?.();
+        return;
+      }
+      if (keyEvent.key === "Enter") {
+        const typedValue = typedPull(typed);
+        if (typedValue === null) return;
+        keyEvent.preventDefault();
+        keyEvent.stopPropagation();
+        stop();
+        callbacks.onFacePullEnd?.(typedValue);
+        return;
+      }
+      if (keyEvent.key === "Shift") {
+        shift = true;
+        update(lastX, lastY);
+        return;
+      }
+      if (/^[0-9.]$/.test(keyEvent.key) || (keyEvent.key === "-" && !typed)) {
+        keyEvent.preventDefault();
+        keyEvent.stopPropagation();
+        // A number typed without a sign keeps the way the drag was going: in stays in.
+        typed = !typed && keyEvent.key !== "-" && distance < 0 ? `-${keyEvent.key}` : typed + keyEvent.key;
+        const typedValue = typedPull(typed);
+        if (typedValue !== null) callbacks.onFacePullDrag?.(typedValue);
+        show();
+        return;
+      }
+      if (keyEvent.key === "Backspace" && typed) {
+        keyEvent.preventDefault();
+        keyEvent.stopPropagation();
+        typed = typed.slice(0, -1);
+        const typedValue = typedPull(typed);
+        callbacks.onFacePullDrag?.(typedValue ?? distance);
+        show();
+      }
+    };
+    const keyUp = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key === "Shift") {
+        shift = false;
+        update(lastX, lastY);
+      }
+    };
+    view.addEventListener("pointermove", move, true);
+    view.addEventListener("pointerup", up, true);
+    view.addEventListener("pointercancel", cancel, true);
+    view.addEventListener("keydown", key, true);
+    view.addEventListener("keyup", keyUp, true);
+  }, [onInteractionActiveChange, onMateFacePick]);
+
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       // Wer auf die Arbeitsflaeche klickt, ist mit dem Schreiben fertig. Von
@@ -7393,6 +7553,12 @@ export function WorkplaneViewport({
       if (layFlatPickModeRef.current) {
         event.preventDefault();
         onLayFlatPick?.(pickLayFlatFace(state, event.clientX, event.clientY));
+        return;
+      }
+
+      if (facePullRef.current && event.button === 0) {
+        event.preventDefault();
+        beginFacePull(event, state);
         return;
       }
 
@@ -7779,6 +7945,7 @@ export function WorkplaneViewport({
       onInteractionActiveChange?.(true);
     },
     [
+      beginFacePull,
       clearMoveDimensions,
       modifierActive,
       onAlignAnchorChange,
@@ -9547,6 +9714,11 @@ export function WorkplaneViewport({
             onPointerLeave={handlePointerLeave}
           />
           {!workplaneMode && !splitActive ? <SelectionCounter count={selectedIds.length} hostRef={hostRef} /> : null}
+          {facePullReadout ? (
+            <div className={`face-pull-readout ${facePullReadout.pocket ? "pocket" : ""}`} style={{ left: facePullReadout.x, top: facePullReadout.y }} aria-live="polite">
+              {facePullReadout.text}
+            </div>
+          ) : null}
           {!workplaneMode && !splitActive && marqueeRect ? <div className={marqueeTouching ? "selection-marquee touching" : "selection-marquee"} style={marqueeRect} /> : null}
           {!workplaneMode && !splitActive && moveDimensionsEnabled && moveDimensionOverlay ? (
             <MoveDimensionOverlay

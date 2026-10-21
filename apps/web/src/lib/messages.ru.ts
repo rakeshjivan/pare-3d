@@ -3271,7 +3271,7 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "files.bambuNote": "\"Send to Bambu Studio\" keeps its own copy in Documents › Pare 3D Exports.",
   "files.saved": "Saved \"{name}\" to {folder}",
   "files.showInFolder": "Show in folder",
-  "olderApp.message": "You're using an older Pare 3D app. To get every new feature, use \"Back up all\", then delete the app and download the latest version.",
+  "olderApp.message": "Choosing folders needs the newest Pare 3D app. Until then, files go to Downloads. When it suits you: \"Back up all\", delete the app and download it again.",
   "olderApp.download": "Download the latest",
   "olderApp.hide": "Hide",
   "backupStrip.on": "Backing up to {folder} every 5 minutes while designs change",
@@ -3287,4 +3287,6 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "backupStrip.restore": "Restore…",
   "backupStrip.changeFolder": "Change folder",
   "backupStrip.turnOff": "Turn off",
+  "status.facePullHint": "Drag out to add material, in to cut a pocket. Shift: fine steps. Type a number for an exact depth, Esc to stop.",
+  "status.facePullCancelled": "Push/pull stopped - nothing changed.",
 };

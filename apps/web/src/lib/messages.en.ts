@@ -946,8 +946,8 @@ export const MESSAGES_EN = {
   "faceTool.title": "Push/pull face",
   "faceTool.subtitle": "Push a flat face out or in",
   "faceTool.cancel": "Close face tool",
-  "faceTool.step.pick": "Click a flat face of the body.",
-  "faceTool.step.ready": "Set the inset, the corner radius and the depth, then click Create.",
+  "faceTool.step.pick": "Press on a flat face and drag: out adds material, in cuts a pocket. Or click the face and set it below.",
+  "faceTool.step.ready": "Drag the face again, or set the inset, corner radius and depth, then click Create.",
   "faceTool.empty": "The inset and the corner radius leave nothing of this face. Make them smaller.",
   "faceTool.direction": "Direction",
   "faceTool.direction.out": "Out: add material",
@@ -959,7 +959,7 @@ export const MESSAGES_EN = {
   "faceTool.apply": "Create",
   "faceTool.bodyName": "Face extrusion",
   "faceTool.pocketName": "Face pocket",
-  "status.faceToolStart": "Face: click a flat face of the body.",
+  "status.faceToolStart": "Push/pull: press on a flat face of the body and drag it out or in.",
   "status.faceToolCancelled": "Face tool cancelled",
   "status.faceToolSelectOne": "Select exactly one body for the face tool.",
   "status.faceToolNeedsSolid": "The face tool works on a solid body, not on a hole.",
@@ -3285,7 +3285,7 @@ export const MESSAGES_EN = {
   "files.bambuNote": "\"Send to Bambu Studio\" keeps its own copy in Documents › Pare 3D Exports.",
   "files.saved": "Saved \"{name}\" to {folder}",
   "files.showInFolder": "Show in folder",
-  "olderApp.message": "You're using an older Pare 3D app. To get every new feature, use \"Back up all\", then delete the app and download the latest version.",
+  "olderApp.message": "Choosing folders needs the newest Pare 3D app. Until then, files go to Downloads. When it suits you: \"Back up all\", delete the app and download it again.",
   "olderApp.download": "Download the latest",
   "olderApp.hide": "Hide",
   "backupStrip.on": "Backing up to {folder} every 5 minutes while designs change",
@@ -3301,6 +3301,8 @@ export const MESSAGES_EN = {
   "backupStrip.restore": "Restore…",
   "backupStrip.changeFolder": "Change folder",
   "backupStrip.turnOff": "Turn off",
+  "status.facePullHint": "Drag out to add material, in to cut a pocket. Shift: fine steps. Type a number for an exact depth, Esc to stop.",
+  "status.facePullCancelled": "Push/pull stopped - nothing changed.",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;
