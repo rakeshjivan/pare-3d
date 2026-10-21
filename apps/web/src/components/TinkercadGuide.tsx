@@ -15,6 +15,7 @@ type Row = { tinkercad: string; pare: string; keys?: string };
 
 const SAME: Row[] = [
   { tinkercad: "Basic Shapes panel", pare: "Shapes panel on the right: drag a shape onto the plate, or click it and then the plate" },
+  { tinkercad: "Paraboloid", pare: "Ready-made parts, under the basic shapes in the Shapes panel" },
   { tinkercad: "Solid / Hole", pare: "Solid / Hole at the top of the shape's panel", keys: "S / H" },
   { tinkercad: "Group", pare: "Group in the toolbar", keys: "Ctrl+G" },
   { tinkercad: "Ungroup", pare: "Ungroup in the toolbar", keys: "Ctrl+Shift+G" },
@@ -40,6 +41,7 @@ const NEW: Row[] = [
   { tinkercad: "Fillet and chamfer", pare: "Round or bevel any edge, and take it off again later", keys: "B / Shift+B" },
   { tinkercad: "Hollow and split", pare: "Shell a body with an even wall, or cut it in two with a plane (under More)" },
   { tinkercad: "Cut with connectors", pare: "Split a part too big for the plate and add plugs or dowels, with a print-fit clearance; place them yourself or let Pare 3D spread them" },
+  { tinkercad: "Ready-made parts", pare: "Heat-set insert holes and nut traps (M2 to M5) and a box with a lid that fits, under the basic shapes" },
   { tinkercad: "Print fit for holes", pare: "Make a hole a little bigger in one click so pegs, lids and axles fit: Press, Snug or Loose" },
   { tinkercad: "Sketch", pare: "Draw a 2D outline with exact sizes, then extrude, revolve or sweep it (the Sketch tab)" },
   { tinkercad: "Threads, gears, springs", pare: "Ready-made shapes in the Shapes panel" },

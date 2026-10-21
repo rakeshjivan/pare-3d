@@ -99,7 +99,7 @@ export const SHAPE_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
   polygon: ["triangle", "roof", "hexagon", "dreieck", "dach", "sechskant", "vieleck", "mehrkant"],
   "round-roof": ["roof", "dach", "arch"],
   pyramid: ["pyramide", "triangle", "dreieck"],
-  slot: ["capsule", "kapsel", "langloch", "oblong"],
+  slot: ["slot", "capsule", "kapsel", "langloch", "oblong", "stadium", "adjustable"],
   "half-sphere": ["dome", "halbkugel", "kuppel"],
   star: ["stern"],
   heart: ["herz"],

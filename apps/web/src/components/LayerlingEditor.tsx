@@ -127,6 +127,10 @@ import { SHELL_SIDES, shellMaxThickness, shellOpeningsFor, shellOpenSides } from
 import { arrayFollowingPivot, circleStepDegrees, clampArrayCount, moveAlongRadius, rotateAroundVertical, rowOffset, singleAxisSpacing, type ArraySettings } from "@/lib/shapeArray";
 import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootprint, type BedOverhang } from "@/lib/printBed";
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
+import { ReadyPartsSection } from "./ReadyPartsSection";
+import { placeCustomShape } from "@/lib/customShapePackage";
+import { buildReadyPart } from "@/lib/readyPartsBuild";
+import type { ReadyPart } from "@/lib/readyParts";
 import { CUT_CONNECTOR_LIMITS, DEFAULT_CUT_CONNECTORS, normalizeCutConnectors, type CutConnectorOptions } from "@/lib/cutConnectors";
 import { NO_SPLIT_ROTATION, modelSplitPlane, snapSplitPositionToVertices, splitOrientationForNormal, splitAxisFromLabel, splitAxisLabel, splitRotationAxes, type SplitRotation } from "@/lib/modelSplit";
 import { GuideModal } from "./workplane/GuideModal";
@@ -6257,6 +6261,20 @@ export function LayerlingEditor({
     });
   }, [splitTargetPoints]);
 
+  /** Fork: ready-made parts, built and placed like a saved custom shape (they hang on the pointer when that is on). */
+  const insertReadyParts = useCallback(async (parts: ReadyPart[]) => {
+    const sourceProjectId = splitProjectIdRef.current;
+    const built = await Promise.all(parts.map((part) => buildReadyPart(part, workspaceSettingsRef.current.booleanTriangleLimit)));
+    if (splitProjectIdRef.current !== sourceProjectId) return;
+    const { shapes: inserted } = placeCustomShape({ shapes: built }, placementWorkplaneRef.current.origin, []);
+    commitShapes([...shapesRef.current, ...inserted], inserted.map((shape) => shape.id), t("readyParts.inserted", { name: parts.map((part) => part.name).join(" + ") }));
+    if (workspaceSettingsRef.current.clickToPlaceShapes && inserted.length) {
+      setCruiseAsset(null);
+      setCarryIds(inserted.map((shape) => shape.id));
+      setNotice(t("status.carryPlace"));
+    }
+  }, [commitShapes]);
+
   const applySplit = useCallback(async () => {
     const session = splitSession;
     const plane = splitPlane;
@@ -12375,6 +12393,14 @@ export function LayerlingEditor({
         }}
         objects={shapes.map((shape) => ({ id: shape.id, name: displayShapeName(shape), kind: shape.kind, hidden: Boolean(shape.hidden) }))}
         onSelectObject={(id) => selectShape(id)}
+        renderReadyParts={(close) => (
+          <ReadyPartsSection
+            onInsert={(parts) => {
+              close();
+              void insertReadyParts(parts).catch(noticeError);
+            }}
+          />
+        )}
         renderMyShapes={(close) => (
           <MyShapesSection
             shapes={customShapeEntries}
@@ -13354,6 +13380,7 @@ function SecondaryToolbar({
   overhangAngle,
   onToggleOverhangs,
   renderMyShapes,
+  renderReadyParts,
   objects,
   onSelectObject,
 }: {
@@ -13479,6 +13506,8 @@ function SecondaryToolbar({
   onToggleOverhangs: () => void;
   /** Custom shapes above the library; gets the way to close the menu. */
   renderMyShapes?: (close: () => void) => ReactNode;
+  /** Fork: ready-made parts under the library; gets the way to close the menu. */
+  renderReadyParts?: (close: () => void) => ReactNode;
   /** The bodies of the design, so the command search can find them by name. */
   objects: ReadonlyArray<{ id: string; name: string; kind: string; hidden: boolean }>;
   onSelectObject: (id: string) => void;
@@ -14051,6 +14080,7 @@ function SecondaryToolbar({
                   </button>
                 ))}
               </div>
+              {renderReadyParts ? renderReadyParts(closeShapesAfterPick) : null}
               </div>
             </ShapeMenuPanel>
           ) : null}
