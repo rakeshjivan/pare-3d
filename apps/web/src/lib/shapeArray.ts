@@ -6,7 +6,7 @@
  * Coordinates as the user sees them, like a slicer: X to the right, Y to the
  * back, Z up. In the scene that is x, -z and y.
  */
-export type ArrayMode = "row" | "circle";
+export type ArrayMode = "row" | "circle" | "grid";
 export type ArrayDirection = "x" | "y" | "z";
 
 export type ArraySettings = {
@@ -28,7 +28,61 @@ export type ArraySettings = {
   rise: number;
   /** Circle: distance from the centre gained per copy; positive widens, negative tightens (a spiral). */
   radiusChange: number;
+  /** Fork: row and grid spacing as the gap between pieces (edge to edge) instead of centre to centre. */
+  measure?: "centre" | "gap";
+  /** Fork: the gap between neighbours, in mm. */
+  gap?: number;
+  /** Fork: the row's direction when it is measured by its gap. */
+  gapDirection?: ArrayDirection;
+  /** Fork: a grid - columns along X, rows to the back (Y). */
+  columns?: number;
+  rows?: number;
 };
+
+export const GRID_MAX_SIDE = 20;
+
+/** Fork: how many pieces a pattern makes, the original included. */
+export function arrayPieceCount(settings: Pick<ArraySettings, "mode" | "count" | "columns" | "rows">) {
+  if (settings.mode !== "grid") return clampArrayCount(settings.count);
+  const columns = Math.min(GRID_MAX_SIDE, Math.max(1, Math.round(settings.columns ?? 3)));
+  const rows = Math.min(GRID_MAX_SIDE, Math.max(1, Math.round(settings.rows ?? 2)));
+  return Math.min(ARRAY_MAX_COUNT, columns * rows);
+}
+
+/**
+ * Fork: the step from one piece to the next along X, Y (back) and Z (up), centre to centre. Measured
+ * by its gap, a step is the selection's own size on that axis plus the gap.
+ */
+export function arraySteps(settings: ArraySettings, size: { x: number; y: number; z: number }) {
+  const gap = Number.isFinite(settings.gap) ? (settings.gap as number) : 5;
+  if (settings.measure === "gap") {
+    if (settings.mode === "grid") return { x: size.x + gap, y: size.y + gap, z: 0 };
+    const direction = settings.gapDirection ?? "x";
+    return { x: direction === "x" ? size.x + gap : 0, y: direction === "y" ? size.y + gap : 0, z: direction === "z" ? size.z + gap : 0 };
+  }
+  return { x: settings.spacingX, y: settings.spacingY, z: settings.mode === "grid" ? 0 : settings.spacingZ };
+}
+
+/** Fork: scene offsets of every copy (the original, at none, left out) of a row or a grid. */
+export function arrayOffsets(settings: ArraySettings, size: { x: number; y: number; z: number }) {
+  const step = arraySteps(settings, size);
+  const offsets: { dx: number; dy: number; dz: number }[] = [];
+  if (settings.mode === "grid") {
+    const columns = Math.min(GRID_MAX_SIDE, Math.max(1, Math.round(settings.columns ?? 3)));
+    const rows = Math.min(GRID_MAX_SIDE, Math.max(1, Math.round(settings.rows ?? 2)));
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        if (!row && !column) continue;
+        if (offsets.length + 1 >= ARRAY_MAX_COUNT) return offsets;
+        offsets.push({ dx: step.x * column, dy: 0, dz: -step.y * row || 0 });
+      }
+    }
+    return offsets;
+  }
+  const count = clampArrayCount(settings.count);
+  for (let index = 1; index < count; index += 1) offsets.push(rowOffset({ spacingX: step.x, spacingY: step.y, spacingZ: step.z }, index));
+  return offsets;
+}
 
 /**
  * The settings with the circle centre moved to the pivot (scene x and z), or the same object when it already sits

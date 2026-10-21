@@ -124,10 +124,12 @@ import { scaleShapesByPercent } from "@/lib/scaleByPercent";
 import { canToggleGroupColors, groupShowsPartColors } from "@/lib/groupColors";
 import { disposeBoundsTree } from "three-mesh-bvh";
 import { SHELL_SIDES, shellMaxThickness, shellOpeningsFor, shellOpenSides } from "@/lib/shellLimits";
-import { arrayFollowingPivot, circleStepDegrees, clampArrayCount, moveAlongRadius, rotateAroundVertical, rowOffset, singleAxisSpacing, type ArraySettings } from "@/lib/shapeArray";
+import { arrayFollowingPivot, circleStepDegrees, clampArrayCount, moveAlongRadius, rotateAroundVertical, rowOffset, singleAxisSpacing, type ArraySettings, arrayOffsets } from "@/lib/shapeArray";
 import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootprint, type BedOverhang } from "@/lib/printBed";
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
 import { ReadyPartsSection } from "./ReadyPartsSection";
+import { DistributePanel, type DistributeAction } from "./workplane/DistributePanel";
+import { arrangeOnPlate, spaceEvenly, spaceWithGap, type Footprint } from "@/lib/distribute";
 import { addFreehandStroke } from "@/lib/freehandStroke";
 import { Signature } from "lucide-react";
 import { placeCustomShape } from "@/lib/customShapePackage";
@@ -1471,6 +1473,20 @@ async function downloadBlobFile(filename: string, blob: Blob) {
  * along the row or turned around the circle centre. The originals stay put.
  */
 function arrayCopies(sources: WorkplaneShape[], settings: ArraySettings): WorkplaneShape[] {
+  // Fork: a row measured by its gap, and a grid, step by the selection's own size.
+  if (settings.mode === "grid" || (settings.mode === "row" && settings.measure === "gap")) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    sources.forEach((source) => meshForShape(source).vertices.forEach(([x, y, z]) => {
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+      minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+    }));
+    const size = Number.isFinite(minX) ? { x: maxX - minX, y: maxZ - minZ, z: maxY - minY } : { x: 0, y: 0, z: 0 };
+    return arrayOffsets(settings, size).flatMap(({ dx, dy, dz }) => sources.map((source) => {
+      const clone = cloneWorkplaneShapeTreeWithFreshIds(source, "copy");
+      return { ...clone, x: clone.x + dx, z: clone.z + dz, elevation: (clone.elevation ?? 0) + dy };
+    }));
+  }
   const count = clampArrayCount(settings.count);
   const step = circleStepDegrees(count, settings.angle);
   const center = { x: settings.centerX, y: settings.centerY };
@@ -3847,6 +3863,12 @@ export function LayerlingEditor({
       rotateCopies: true,
       rise: 0,
       radiusChange: 0,
+      // Fork: measured edge to edge by default, the way people think of spacing.
+      measure: "gap",
+      gap: 5,
+      gapDirection: "x",
+      columns: 3,
+      rows: 2,
     });
     setNotice(t("status.arrayStart"));
   }, [refuseLockedSelection, activeRotationPivot, arrayTool, closeSplit, selectedShapes]);
@@ -6103,6 +6125,33 @@ export function LayerlingEditor({
     [alignAxes, commitShapes, effectiveAlignAnchorId, selectedIds, selectedShapes, shapes],
   );
 
+  /** Fork: space the selection evenly, at an exact gap, or arrange it in rows on the plate. */
+  const distributeSelection = useCallback((action: DistributeAction) => {
+    const footprints: Footprint[] = selectedShapes.map((shape) => {
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      meshForShape(shape).vertices.forEach(([x, , z]) => {
+        minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+        minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+      });
+      return { id: shape.id, minX, maxX, minZ, maxZ, locked: Boolean(shape.locked) };
+    }).filter((footprint) => Number.isFinite(footprint.minX));
+    const moves = action.kind === "even"
+      ? spaceEvenly(footprints, action.axis)
+      : action.kind === "gap"
+        ? spaceWithGap(footprints, action.axis, action.gap)
+        : arrangeOnPlate(footprints, action.gap, Math.max(10, workspaceSettings.width - 10));
+    if (!moves || moves.size === 0) {
+      setNotice(t(action.kind === "even" && footprints.length < 3 ? "distribute.needThree" : "distribute.nothingToMove"));
+      return;
+    }
+    setAlignPreview(null);
+    const next = shapes.map((shape) => {
+      const move = moves.get(shape.id);
+      return move ? canonicalizeShape({ ...shape, x: shape.x + move.dx, z: shape.z + move.dz }) : shape;
+    });
+    commitShapes(next, selectedIds, t(action.kind === "even" ? "distribute.doneEven" : action.kind === "gap" ? "distribute.doneGap" : "distribute.doneArrange", { count: footprints.length, gap: action.kind === "even" ? 0 : action.gap }));
+  }, [commitShapes, selectedIds, selectedShapes, shapes, workspaceSettings.width]);
+
   const previewAlignSelection = useCallback((axis: AlignAxis, target: AlignTarget) => {
     setAlignPreview({ axis, target });
   }, []);
@@ -8188,7 +8237,8 @@ export function LayerlingEditor({
       return;
     }
     const selected = new Set(selectedIds);
-    const editableGroup = canonicalizeShape({ ...group, groupOperation: "group" });
+    // Fork: as in Tinkercad, a new group takes one colour - the sign it worked. Multicolor (Shift+M) brings the parts' own back.
+    const editableGroup = canonicalizeShape({ ...group, groupOperation: "group", multicolor: false });
     commitShapes(
       [...shapesRef.current.filter((shape) => !selected.has(shape.id)), editableGroup],
       editableGroup.id,
@@ -8437,6 +8487,8 @@ export function LayerlingEditor({
         id: original.id,
         name: original.name,
         color: ownColour ? original.color : rebuilt.color,
+        // Fork: and its colour choice - one colour, or each part its own.
+        multicolor: original.multicolor,
         transparent: original.transparent,
         hidden: original.hidden,
       }, Boolean(original.hole)));
@@ -12800,6 +12852,9 @@ export function LayerlingEditor({
             <X size={14} aria-hidden="true" />
           </button>
         </div>
+      ) : null}
+      {alignMode && selectedShapes.length >= 2 ? (
+        <DistributePanel count={selectedShapes.length} onApply={distributeSelection} />
       ) : null}
       {arrayTool && selectedShapes.length > 0 ? (
         <ArrayPanel

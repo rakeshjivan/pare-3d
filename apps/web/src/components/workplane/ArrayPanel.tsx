@@ -6,10 +6,12 @@ import { Check, X } from "lucide-react";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
-import { ARRAY_MAX_COUNT, ARRAY_MIN_COUNT, type ArrayMode, type ArraySettings } from "@/lib/shapeArray";
+import { ARRAY_MAX_COUNT, ARRAY_MIN_COUNT, GRID_MAX_SIDE, type ArrayDirection, type ArrayMode, type ArraySettings } from "@/lib/shapeArray";
 import type { WorkplaneWorkspaceSettings } from "@/types/layerling";
 
-const ARRAY_MODES: readonly ArrayMode[] = ["row", "circle"];
+const ARRAY_MODES: readonly ArrayMode[] = ["row", "grid", "circle"];
+const GAP_DIRECTIONS: readonly ArrayDirection[] = ["x", "y", "z"];
+const MAX_GAP = 100;
 const MAX_SPACING = 300;
 const MAX_SPIRAL_STEP = 100;
 /** The row steps along all three axes at once; each has its own spacing. */
@@ -61,7 +63,7 @@ export function ArrayPanel({
 
       <div className="edge-modifier-target">
         <strong>{targetName}</strong>
-        <span>{t(settings.mode === "row" ? "array.helpRow" : pivotSet ? "array.helpCirclePivot" : "array.helpCircle")}</span>
+        <span>{t(settings.mode === "grid" ? "array.helpGrid" : settings.mode === "row" ? (settings.measure === "gap" ? "array.helpRowGap" : "array.helpRow") : pivotSet ? "array.helpCirclePivot" : "array.helpCircle")}</span>
       </div>
 
       <div className="edge-modifier-field shell-openings" role="radiogroup" aria-label={t("array.mode")}>
@@ -82,17 +84,73 @@ export function ArrayPanel({
         </div>
       </div>
 
-      <EdgeModifierSlider
-        label={t("array.count")}
-        value={settings.count}
-        min={ARRAY_MIN_COUNT}
-        max={ARRAY_MAX_COUNT}
-        step={1}
-        workspace={workspace}
-        onChange={(value) => onChange({ count: Math.round(value) })}
-      />
+      {settings.mode !== "grid" ? (
+        <EdgeModifierSlider
+          label={t("array.count")}
+          value={settings.count}
+          min={ARRAY_MIN_COUNT}
+          max={ARRAY_MAX_COUNT}
+          step={1}
+          workspace={workspace}
+          onChange={(value) => onChange({ count: Math.round(value) })}
+        />
+      ) : (
+        <>
+          <EdgeModifierSlider label={t("array.columns")} value={settings.columns ?? 3} min={1} max={GRID_MAX_SIDE} step={1} workspace={workspace} onChange={(value) => onChange({ columns: Math.round(value) })} />
+          <EdgeModifierSlider label={t("array.rows")} value={settings.rows ?? 2} min={1} max={GRID_MAX_SIDE} step={1} workspace={workspace} onChange={(value) => onChange({ rows: Math.round(value) })} />
+        </>
+      )}
 
-      {settings.mode === "row" ? (
+      {settings.mode !== "circle" ? (
+        <div className="edge-modifier-field shell-openings" role="radiogroup" aria-label={t("array.measure")}>
+          <span>{t("array.measure")}</span>
+          <div className="shell-opening-options">
+            {(["gap", "centre"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={(settings.measure ?? "centre") === option}
+                className={(settings.measure ?? "centre") === option ? "active" : ""}
+                onClick={() => onChange({ measure: option })}
+              >
+                {t(option === "gap" ? "array.measure.gap" : "array.measure.centre")}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {settings.mode !== "circle" && settings.measure === "gap" ? (
+        <>
+          {settings.mode === "row" ? (
+            <div className="edge-modifier-field shell-openings" role="radiogroup" aria-label={t("array.direction")}>
+              <span>{t("array.direction")}</span>
+              <div className="shell-opening-options">
+                {GAP_DIRECTIONS.map((direction) => (
+                  <button
+                    key={direction}
+                    type="button"
+                    role="radio"
+                    aria-checked={(settings.gapDirection ?? "x") === direction}
+                    className={(settings.gapDirection ?? "x") === direction ? "active" : ""}
+                    onClick={() => onChange({ gapDirection: direction })}
+                  >
+                    {direction.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <EdgeModifierSlider label={t("array.gap")} value={settings.gap ?? 5} min={-MAX_GAP} max={MAX_GAP} step={0.5} workspace={workspace} length onChange={(value) => onChange({ gap: value })} />
+        </>
+      ) : settings.mode === "grid" ? (
+        <>
+          {ROW_AXES.slice(0, 2).map(({ key, label }) => (
+            <EdgeModifierSlider key={key} label={t(label)} value={settings[key]} min={-MAX_SPACING} max={MAX_SPACING} step={0.5} workspace={workspace} length onChange={(value) => onChange({ [key]: value })} />
+          ))}
+        </>
+      ) : settings.mode === "row" ? (
         <>
           {ROW_AXES.map(({ key, label }) => (
             <EdgeModifierSlider
