@@ -128,6 +128,8 @@ import { arrayFollowingPivot, circleStepDegrees, clampArrayCount, moveAlongRadiu
 import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootprint, type BedOverhang } from "@/lib/printBed";
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
 import { ReadyPartsSection } from "./ReadyPartsSection";
+import { addFreehandStroke } from "@/lib/freehandStroke";
+import { Signature } from "lucide-react";
 import { placeCustomShape } from "@/lib/customShapePackage";
 import { buildReadyPart } from "@/lib/readyPartsBuild";
 import type { ReadyPart } from "@/lib/readyParts";
@@ -4641,6 +4643,7 @@ export function LayerlingEditor({
       arc: t("status.sketchTool.arc"),
       bezier: t("status.sketchTool.bezier"),
       smooth: t("status.sketchTool.smooth"),
+      freehand: t("status.sketchTool.freehand"),
       rectangle: t("status.sketchTool.rectangle"),
       circle: t("status.sketchTool.circle"),
       ellipse: t("status.sketchTool.ellipse"),
@@ -4714,6 +4717,19 @@ export function LayerlingEditor({
     },
     [commitSketchProfile, sketchActivePointId, sketchConstruction, sketchProfile, sketchTool],
   );
+
+  /** Fork: Scribble - a freehand stroke becomes a smooth curve, closed into a shape unless drawn as a stroke or a construction line. */
+  const addSketchFreehand = useCallback((points: { x: number; z: number }[], tolerance: number) => {
+    const result = addFreehandStroke(sketchProfile, points, {
+      tolerance,
+      stroked: Boolean(sketchProfile.stroke),
+      construction: Boolean(sketchConstruction),
+    });
+    if (!result) return;
+    commitSketchProfile(result.profile, t(result.closed ? "status.sketchFreehandShape" : "status.sketchFreehandLine", { count: result.pointIds.length }));
+    setSketchActivePointId(null);
+    setSketchSelection(null);
+  }, [commitSketchProfile, sketchConstruction, sketchProfile]);
 
   const addSketchPlanePoint = useCallback(
     (position: { x: number; z: number }, handles?: { handleIn: { x: number; z: number }; handleOut: { x: number; z: number } }) => {
@@ -12490,6 +12506,7 @@ export function LayerlingEditor({
             onSnapChange={(snap) => updateProjectWorkspaceSettings({ workspace: workspaceSettingsRef.current, snap })}
             initialWorkspace={workspaceSettings}
             onPlanePoint={addSketchPlanePoint}
+            onFreehandStroke={addSketchFreehand}
             fromMiddle={sketchFromMiddle}
             onAddPrimitive={addSketchPrimitive}
             onAddArc={addSketchArc}
@@ -13873,6 +13890,7 @@ function SecondaryToolbar({
         plain("sketch-arc", t("sketch.arc"), drawGroup, true, () => onSketchTool("arc"), { icon: SKETCH_PALETTE_ICONS.arc, active: sketchTool === "arc" }),
         plain("sketch-bezier", t("sketch.bezier"), drawGroup, true, () => onSketchTool("bezier"), { icon: SKETCH_PALETTE_ICONS.bezier, active: sketchTool === "bezier" }),
         plain("sketch-smooth", t("sketch.smooth"), drawGroup, true, () => onSketchTool("smooth"), { icon: SKETCH_PALETTE_ICONS.smooth, active: sketchTool === "smooth" }),
+        plain("sketch-freehand", t("sketch.freehand"), drawGroup, true, () => onSketchTool("freehand"), { icon: Signature, active: sketchTool === "freehand", keywords: ["scribble", "freehand", "draw", "pen", "pencil", "kritzeln", "freihand"] }),
         plain("sketch-construction", t("sketch.construction"), drawGroup, true, () => onSketchConstruction?.(), { icon: ToolbarConstructionLineIcon, active: Boolean(sketchConstruction), keywords: ["construction", "guide", "helper", "hilfslinie", "hilfs", "konstruktion"] }),
         plain("sketch-from-middle", t("sketch.fromMiddle"), drawGroup, true, () => onSketchFromMiddle?.(), { icon: ToolbarMiddleLineIcon, active: Boolean(sketchFromMiddle), keywords: ["middle", "center", "centre", "mitte", "mittellinie", "symmetric", "symmetrisch"] }),
         ...sketchShapeMenuItems.map(({ primitive, label, icon }) => plain(
@@ -14220,6 +14238,9 @@ function SecondaryToolbar({
                     </button>
                     <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "smooth" ? "active" : ""}`} type="button" aria-label={t("sketch.smooth")} title={t("sketch.smooth")} onClick={() => onSketchTool("smooth")}>
                       <SketchReferenceIcon name="smooth" />
+                    </button>
+                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "freehand" ? "active" : ""}`} type="button" aria-label={t("sketch.freehand")} title={t("sketch.freehandHint")} onClick={() => onSketchTool("freehand")}>
+                      <Signature className="sketch-freehand-icon" aria-hidden="true" />
                     </button>
                     <button className={`toolbar-icon sketch-tool-icon sketch-construction-toggle ${sketchConstruction ? "active" : ""}`} type="button" aria-pressed={Boolean(sketchConstruction)} aria-label={t("sketch.construction")} title={t("sketch.constructionHint")} onClick={onSketchConstruction}>
                       <ToolbarConstructionLineIcon />

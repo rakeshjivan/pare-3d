@@ -653,3 +653,14 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 .ready-part.has-size > div { grid-column: 2 / span 2; }
 .ready-part.has-size .ready-part-size { grid-column: 2; grid-row: 2; justify-self: end; }
 .ready-part.has-size .ready-part-add { grid-column: 3; grid-row: 2; }
+
+/* Fork: Scribble in the Sketch tab. */
+.sketch-freehand-preview {
+  fill: none;
+  stroke: var(--primary, #1477d2);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.sketch-freehand-icon { width: 22px; height: 22px; stroke-width: 1.8; }

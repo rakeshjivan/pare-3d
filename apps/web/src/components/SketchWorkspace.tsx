@@ -40,7 +40,7 @@ import { arcPreviewPoints, arcThroughThreePoints, type SketchArcEnd } from "@/li
 import { constrainToAngle, sketchLineAngle, sketchPolarPoint, splitTypedLine } from "@/lib/sketchPolar";
 
 export type { SketchPrimitive } from "@/lib/sketchPrimitives";
-export type SketchTool = "line" | "arc" | "bezier" | "smooth" | SketchPrimitive | "select" | "refine" | "erase" | "measure";
+export type SketchTool = "line" | "arc" | "bezier" | "smooth" | "freehand" | SketchPrimitive | "select" | "refine" | "erase" | "measure";
 /** The keys 1 to 4 and the drawing tool each picks, in the order of the tools on the left (#347). */
 export const SKETCH_TOOL_KEYS: Readonly<Record<string, SketchTool>> = { "1": "line", "2": "bezier", "3": "smooth", "4": "refine" };
 export type { SketchSelection } from "@/lib/sketchSelection";
@@ -70,6 +70,8 @@ type SketchWorkspaceProps = {
   fromMiddle?: boolean;
   onPlanePoint: (point: { x: number; z: number }, handles?: { handleIn: { x: number; z: number }; handleOut: { x: number; z: number } }) => void;
   onAddPrimitive: (primitive: SketchPrimitive, center: { x: number; z: number }) => void;
+  /** Fork: a finished scribble, with how far (mm) its curve may stray from the drawn path. */
+  onFreehandStroke?: (points: { x: number; z: number }[], tolerance: number) => void;
   /** The three-point arc (#643): first the two ends, then a point the arc runs through. */
   onAddArc?: (start: SketchArcEnd, through: { x: number; z: number }, end: SketchArcEnd) => void;
   onPointPress: (id: string) => void;
@@ -138,7 +140,9 @@ type PointerAction =
   | { kind: "resize-image"; pointerId: number; imageId: string; handle: ResizeHandle; current: { x: number; z: number }; start: SketchImage }
   | { kind: "rotate-selection"; pointerId: number; pivot: { x: number; z: number }; start: { x: number; z: number }; current: { x: number; z: number }; startPoints: SketchPoint[]; snap: boolean }
   | { kind: "rotate-image"; pointerId: number; imageId: string; startAngle: number; current: { x: number; z: number }; start: SketchImage; snap: boolean }
-  | { kind: "crop-image"; pointerId: number; imageId: string; handle: ResizeHandle; current: { x: number; z: number }; start: SketchImage };
+  | { kind: "crop-image"; pointerId: number; imageId: string; handle: ResizeHandle; current: { x: number; z: number }; start: SketchImage }
+  /** Fork: Scribble - the pointer's path while the button is down, unsnapped. */
+  | { kind: "freehand"; pointerId: number; points: { x: number; z: number }[]; current: { x: number; z: number } };
 
 
 const SKETCH_MEASUREMENTS_STORAGE_KEY = "layerling.sketch.measurements";
@@ -549,6 +553,7 @@ export function SketchWorkspace({
   onPlanePoint,
   fromMiddle,
   onAddPrimitive,
+  onFreehandStroke,
   onAddArc,
   onPointPress,
   onFinishLine,
@@ -1209,7 +1214,11 @@ export function SketchWorkspace({
     const point = pointFromEvent(event);
     if (!point) return;
     event.preventDefault();
-    if (tool === "bezier") {
+    if (tool === "freehand") {
+      const start = unsnappedPointFromEvent(event) ?? point;
+      capturePointer(event.currentTarget, event.pointerId);
+      setPointerAction({ kind: "freehand", pointerId: event.pointerId, points: [start], current: start });
+    } else if (tool === "bezier") {
       capturePointer(event.currentTarget, event.pointerId);
       const startPoint = event.shiftKey && activePoint ? constrainDrawing(activePoint, point) : point;
       setPointerAction({ kind: "bezier", pointerId: event.pointerId, origin: startPoint, current: startPoint });
@@ -1244,6 +1253,14 @@ export function SketchWorkspace({
         },
       }));
       setPointerAction({ ...pointerAction, clientX: event.clientX, clientY: event.clientY });
+      return;
+    }
+    if (pointerAction?.kind === "freehand") {
+      // Every pointer event, also the ones the browser merged, so fast strokes stay smooth.
+      const native = event.nativeEvent as PointerEvent;
+      const events = typeof native.getCoalescedEvents === "function" ? native.getCoalescedEvents() : [];
+      const added = (events.length ? events : [native]).map((entry) => unsnappedPointFromEvent(entry)).filter((entry): entry is { x: number; z: number } => Boolean(entry));
+      if (added.length) setPointerAction({ ...pointerAction, points: [...pointerAction.points, ...added], current: added[added.length - 1] });
       return;
     }
     const point = pointFromEvent(event);
@@ -1282,6 +1299,14 @@ export function SketchWorkspace({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     if (action.kind === "pan") {
       setPointerAction(null);
+      return;
+    }
+    if (action.kind === "freehand") {
+      setPointerAction(null);
+      // About two pixels on screen: the curve keeps what the hand drew, not its tremble.
+      const matrix = svgRef.current?.getScreenCTM();
+      const pixelsPerMm = matrix ? Math.max(1e-4, Math.hypot(matrix.a, matrix.b)) : 4;
+      onFreehandStroke?.(action.points, 2 / pixelsPerMm);
       return;
     }
     if (action.kind === "marquee") {
@@ -1997,6 +2022,9 @@ export function SketchWorkspace({
           </g>
           {showReferenceEdges && referenceEdges ? <path className="sketch-reference-edges" d={referenceEdges} fill="none" vectorEffect="non-scaling-stroke" pointerEvents="none" /> : null}
           <rect className="sketch-plate-border" x={-workspace.width / 2} y={-workspace.depth / 2} width={workspace.width} height={workspace.depth} pointerEvents="none" />
+          {pointerAction?.kind === "freehand" && pointerAction.points.length > 1 ? (
+            <polyline className="sketch-freehand-preview" points={pointerAction.points.map((entry) => `${entry.x},${entry.z}`).join(" ")} pointerEvents="none" />
+          ) : null}
           {pointerAction?.kind === "marquee" ? (
             <rect
               className="sketch-selection-marquee"

@@ -27,6 +27,7 @@ const SAME: Row[] = [
   { tinkercad: "Duplicate and repeat", pare: "Duplicate (repeats the last move); Pattern under More for rows and circles", keys: "Ctrl+D" },
   { tinkercad: "Drag a copy", pare: "The same: hold Alt while dragging", keys: "Alt+drag" },
   { tinkercad: "Workplane", pare: "Workplane on the left bar; Shift+W puts it on the selected face", keys: "W" },
+  { tinkercad: "Scribble", pare: "Sketch tab, Extrude sketch, then the pen (Scribble): drag to draw. A loop becomes a shape; switch on Stroke for lines" },
   { tinkercad: "Ruler", pare: "Ruler on the left bar, or R with nothing selected", keys: "R" },
   { tinkercad: "Notes", pare: "Note at the top", keys: "N" },
   { tinkercad: "Cruise", pare: "The same: carry a shape onto another face", keys: "C" },
