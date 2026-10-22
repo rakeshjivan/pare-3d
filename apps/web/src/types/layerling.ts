@@ -459,9 +459,20 @@ export type SketchKeyring = { side: TextKeyringSide; diameter: number; x: number
  */
 export type SketchInset = { distance: number; radius: number };
 
+/**
+ * Fork (build 36): a rule the sketch keeps - on one line (horizontal, vertical, a fixed length in
+ * mm) or between two lines (parallel, at right angles, equal length).
+ */
+export type SketchConstraint =
+  | { id: string; kind: "horizontal" | "vertical"; segmentId: string }
+  | { id: string; kind: "length"; segmentId: string; value: number }
+  | { id: string; kind: "parallel" | "perpendicular" | "equal"; a: string; b: string };
+
 export type SketchProfile = {
   points: SketchPoint[];
   segments: SketchSegment[];
+  /** Fork (build 36): the rules this sketch keeps (lib/sketchConstraints). */
+  constraints?: SketchConstraint[];
   images?: SketchImage[];
   stroke?: SketchStroke;
   /** Built without its holes: only the outermost outlines count, as the usual Silhouette (#197). */

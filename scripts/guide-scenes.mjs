@@ -247,8 +247,13 @@ export const scenes = {
 /** Opens the sketch editor for an extruded sketch and draws an L-shaped outline. */
 async function drawOutline(ctx) {
   await ctx.goto("/?editor=1");
-  // Fork (build 32): "New sketch" starts one straight away.
-  await ctx.click(ctx.t("sketch.newSketch"));
+  // Fork (build 32): "New sketch" starts one straight away. Build 36: it sits in the Sketch tab.
+  await ctx.wait(1500);
+  await ctx.click(ctx.t("sketch.newSketch")).catch(async () => {
+    await ctx.click(ctx.t("editor.modeSketch"));
+    await ctx.wait(1500);
+    await ctx.click(ctx.t("sketch.newSketch"));
+  });
   await ctx.wait(2500);
   const points = [[430, 250], [640, 250], [640, 400], [540, 400], [540, 560], [430, 560], [430, 250]];
   for (const [x, y] of points) await ctx.mouse(x, y);
@@ -353,10 +358,18 @@ scenes["quick-guide"] = async (ctx) => {
 
 /** Switches the settings switch for edge lines on, through the open settings window. */
 async function switchEdgeLinesOn(ctx) {
+  // Build 36: the switch sits among the advanced settings, which show once that switch is on.
+  await ctx.evaluate(`(() => {
+    const advanced = [...document.querySelectorAll("[data-help]")].find((element) => /advanced/i.test(element.getAttribute("data-help")))?.querySelector("input[type=checkbox]");
+    if (advanced && !advanced.checked) advanced.click();
+    return true;
+  })()`);
+  await ctx.wait(600);
   const done = await ctx.evaluate(`(() => {
     const wanted = ${JSON.stringify(ctx.t("workspace.edgeLines"))};
-    const row = [...document.querySelectorAll(".workspace-modal-body label, .workspace-modal-body div")].find((element) =>
-      element.textContent.trim().startsWith(wanted) && element.querySelector("input[type=checkbox]"));
+    // Build 36: found by its own label wherever the settings window lays it out now.
+    const row = document.querySelector('[data-help="' + wanted + '"]')
+      ?? [...document.querySelectorAll("label")].find((element) => element.textContent.trim().startsWith(wanted) && element.querySelector("input[type=checkbox]"));
     const box = row?.querySelector("input[type=checkbox]");
     if (!box) return false;
     if (!box.checked) box.click();

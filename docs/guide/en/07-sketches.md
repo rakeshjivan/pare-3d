@@ -42,6 +42,18 @@ The keys [[1]] to [[4]] pick the drawing tools, in the order of the bar: {{ui:sk
 
 While a chain of lines is being drawn, a right click still ends it.
 
+## Rules that keep a sketch in shape
+
+A sketch can keep rules, the way Fusion and Shapr3D keep constraints: once a line is set to stay horizontal, it stays horizontal however you drag its points. Select a line (or right-click it) to set one:
+
+- **{{ui:sketch.rule.horizontalShort}}** and **{{ui:sketch.rule.verticalShort}}** keep the line level or upright.
+- **{{ui:sketch.rule.lengthShort}}** keeps the length it has now. Typing a new length on the line changes the locked length.
+- With two lines selected (Shift-click the second, or select one and right-click the other): **{{ui:sketch.rule.parallelShort}}**, **{{ui:sketch.rule.perpendicularShort}}** and **{{ui:sketch.rule.equalShort}}**.
+
+Each rule shows as a small mark beside its line - H, V, ⟷, or ∥, ⊥ and = with a number that pairs the two lines. Click a mark to remove that rule; right-click a line and choose **Remove this line's rules** to take all of its rules off at once.
+
+When you drag a point, that point goes where you put it and the rest of the sketch moves just enough to keep the rules - drag one corner of a rectangle made of horizontal and vertical lines and the far corner stays put. A rule goes with its line when the line is deleted.
+
 ## Lines by numbers
 
 Once you have set the first point with {{ui:sketch.line}} or {{ui:sketch.smooth}}, just type a number: two fields open next to the line, {{ui:sketch.typedLength}} in millimetres and {{ui:sketch.typedAngle}} in degrees. [[<]] or [[Tab]] moves to the angle, so "50<30" gives a line 50 mm long at 30°, as in AutoCAD. [[Enter]] sets the point, and you can type the next line straight away; [[Esc]] closes the fields without ending the line chain.

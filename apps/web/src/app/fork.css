@@ -1504,3 +1504,19 @@ html[data-theme="dark"] .secondary-toolbar .toolbar-section .action-buttons {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 html[data-theme="dark"] .secondary-toolbar .toolbar-section-label { color: color-mix(in srgb, var(--group-color) 80%, #ffffff); }
+
+/* Build 36: sketch rules - marks on the lines, and their glyphs in the right-click menu. */
+.sketch-rule-mark { cursor: pointer; }
+.sketch-rule-mark rect { fill: #fff; stroke: #7c4dff; stroke-width: calc(1.2px * var(--sketch-screen-unit, 1)); vector-effect: non-scaling-stroke; }
+.sketch-rule-mark text { fill: #5b2fd6; font-family: var(--font-ui); font-weight: 700; pointer-events: none; }
+.sketch-rule-mark:hover rect { fill: #fdeaea; stroke: #c4352d; }
+.sketch-rule-mark:hover text { fill: #c4352d; }
+html[data-theme="dark"] .sketch-rule-mark rect { fill: #2a2140; }
+html[data-theme="dark"] .sketch-rule-mark text { fill: #c9b6ff; }
+.sketch-rule-glyph { display: inline-flex; justify-content: center; width: 15px; color: #5b2fd6; font-weight: 800; font-size: 12px; }
+.sketch-context-menu-divider { height: 1px; margin: 4px 6px; background: color-mix(in srgb, var(--foreground, #333) 12%, transparent); }
+/* Build 36: the Shapes button and any other ribbon button drawn with the same icons. */
+.secondary-toolbar .fork-accent { fill: var(--icon-fill-strong); opacity: 1; }
+.secondary-toolbar .shape-menu-trigger { color: var(--icon-ink) !important; }
+.secondary-toolbar .shape-menu-trigger svg [fill="currentColor"][opacity] { fill: var(--icon-fill); opacity: 1; }
+.secondary-toolbar .shape-menu-trigger.active { background: color-mix(in srgb, var(--group-color) 17%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--group-color) 55%, transparent); }

@@ -16,6 +16,8 @@ import { parseMeasurementInput, resolveMeasurementInput } from "@/lib/measuremen
 import { applySegmentDimension, SEGMENT_DIMENSION_CENTER } from "@/lib/sketchDimensions";
 import { applyCornerAngle, sketchCornerAt, type CornerTurn, type SketchCorner } from "@/lib/sketchAngles";
 import { isSegmentCurved } from "@/lib/sketchSegmentCurve";
+import { addConstraint, constraintGlyph, constraintsOnSegment, liveConstraints, movedPointIds, newConstraintId, solveSketchConstraints } from "@/lib/sketchConstraints";
+import type { SketchConstraint } from "@/types/layerling";
 import { DEFAULT_SKETCH_BACKGROUND, DEFAULT_SKETCH_GRID_COLOR, DEFAULT_SKETCH_PLATE_COLOR, workplaneGridLayout } from "@/lib/workplaneGrid";
 import { closestPointOnSketchSegment, type SketchSegmentPlacement } from "@/lib/sketchPointRefinement";
 import { isChainDrawingTool, isSketchPanGesture, rightClickEndsChain, SKETCH_MANUAL_MAX_ZOOM, SKETCH_MAX_ZOOM, SKETCH_WHEEL_ZOOM_BOOST, SKETCH_MIN_ZOOM, sketchPinchZoomFactor, sketchWheelZoomFactor, zoomSketchViewAt, type SketchView } from "@/lib/sketchPointerControls";
@@ -96,6 +98,8 @@ type SketchWorkspaceProps = {
   /** The keys 1 to 4 pick Line, Bezier, Smooth Curve and Add or Remove Points, as in Tinkercad (#347). */
   onSelectTool?: (tool: SketchTool) => void;
   onInsertPoint: (segmentId: string, point: { x: number; z: number }, amount: number) => void;
+  /** Fork (build 36): sets the sketch's rules (lib/sketchConstraints); the editor solves the sketch to them. */
+  onSetConstraints?: (constraints: SketchConstraint[], message: string, points?: SketchProfile["points"]) => void;
   onSetPointMode: (id: string, mode: "corner" | "smooth" | "split") => void;
   /** Bends a straight side into a curve with handles, or makes a curved side straight again. */
   onCurveSegment?: (id: string) => void;
@@ -572,6 +576,7 @@ export function SketchWorkspace({
   onMoveHandle,
   onSelectTool,
   onInsertPoint,
+  onSetConstraints,
   onSetPointMode,
   onCurveSegment,
   onCurveSegments,
@@ -776,7 +781,9 @@ export function SketchWorkspace({
     return profile;
   }, [pointerAction, profile]);
   // A drag that would move a locked outline (#653) shows nothing moving: the editor refuses it on release.
-  const displayProfile = useMemo(() => previewProfile !== profile && changesLockedOutline(profile, previewProfile) ? profile : previewProfile, [previewProfile, profile]);
+  // Fork (build 36): while a point is dragged the sketch's rules are kept live, as they will be when it is let go.
+  const ruledPreview = useMemo(() => previewProfile !== profile && liveConstraints(profile).length ? solveSketchConstraints({ ...previewProfile, constraints: profile.constraints }, movedPointIds(profile, previewProfile)).profile : previewProfile, [previewProfile, profile]);
+  const displayProfile = useMemo(() => ruledPreview !== profile && changesLockedOutline(profile, ruledPreview) ? profile : ruledPreview, [ruledPreview, profile]);
   const displayImages = useMemo(() => {
     const images = profile.images ?? [];
     if (pointerAction?.kind === "move-image") {
@@ -848,7 +855,7 @@ export function SketchWorkspace({
   }, [onCornerDialogChange]);
   const [cornerValue, setCornerValue] = useState("2");
   // Build 35: right-click a line or a point for the usual edits.
-  type SketchMenuItem = { label: string; icon?: React.ReactNode; danger?: boolean; disabled?: boolean; run: () => void };
+  type SketchMenuItem = { label: string; icon?: React.ReactNode; danger?: boolean; disabled?: boolean; divider?: boolean; run: () => void };
   const [sketchMenu, setSketchMenu] = useState<{ x: number; y: number; items: SketchMenuItem[] } | null>(null);
   useEffect(() => {
     if (!sketchMenu) return;
@@ -893,6 +900,34 @@ export function SketchWorkspace({
     if (onCurveSegment) items.push({ label: t("sketch.curveLine"), icon: <Spline size={15} />, disabled: curved, run: () => onCurveSegment(segmentId) });
     if (onStraightenSegment) items.push({ label: t("sketch.straightenLine"), icon: <Minus size={15} />, disabled: !curved && (segment.kind ?? "line") === "line", run: () => onStraightenSegment(segmentId) });
     if (onSetSegmentConstruction) items.push({ label: t(segment.construction ? "sketch.makeSolid" : "sketch.makeConstruction"), run: () => onSetSegmentConstruction(segmentId, !segment.construction) });
+    if (onSetConstraints) {
+      const rule = (constraint: SketchConstraint, message: string) => () => onSetConstraints(addConstraint(profile, constraint), message);
+      const start = profile.points.find((entry) => entry.id === segment.startId);
+      const end = profile.points.find((entry) => entry.id === segment.endId);
+      const lineLength = start && end ? Math.hypot(end.x - start.x, end.z - start.z) : 0;
+      // A second line already selected: the rules between the two.
+      const other = selected?.kind === "segment" && selected.id !== segmentId
+        ? selected.id
+        : selected?.kind === "multiple" && selected.segmentIds.length === 2 && selected.segmentIds.includes(segmentId)
+          ? selected.segmentIds.find((id) => id !== segmentId)
+          : undefined;
+      items.push({ divider: true, label: "rules-divider", run: () => undefined });
+      items.push({ label: t("sketch.rule.horizontal"), icon: <span className="sketch-rule-glyph">H</span>, run: rule({ id: newConstraintId(), kind: "horizontal", segmentId }, t("sketch.rule.added", { rule: t("sketch.rule.horizontal") })) });
+      items.push({ label: t("sketch.rule.vertical"), icon: <span className="sketch-rule-glyph">V</span>, run: rule({ id: newConstraintId(), kind: "vertical", segmentId }, t("sketch.rule.added", { rule: t("sketch.rule.vertical") })) });
+      if (lineLength > 0) items.push({ label: t("sketch.rule.lockLength", { length: formatDimension(lineLength, workspace.accuracy) }), icon: <span className="sketch-rule-glyph">⟷</span>, run: rule({ id: newConstraintId(), kind: "length", segmentId, value: Math.round(lineLength * 1000) / 1000 }, t("sketch.rule.added", { rule: t("sketch.rule.length") })) });
+      if (other) {
+        items.push({ label: t("sketch.rule.parallel"), icon: <span className="sketch-rule-glyph">∥</span>, run: rule({ id: newConstraintId(), kind: "parallel", a: other, b: segmentId }, t("sketch.rule.added", { rule: t("sketch.rule.parallelShort") })) });
+        items.push({ label: t("sketch.rule.perpendicular"), icon: <span className="sketch-rule-glyph">⊥</span>, run: rule({ id: newConstraintId(), kind: "perpendicular", a: other, b: segmentId }, t("sketch.rule.added", { rule: t("sketch.rule.perpendicularShort") })) });
+        items.push({ label: t("sketch.rule.equal"), icon: <span className="sketch-rule-glyph">=</span>, run: rule({ id: newConstraintId(), kind: "equal", a: other, b: segmentId }, t("sketch.rule.added", { rule: t("sketch.rule.equalShort") })) });
+      } else {
+        items.push({ label: t("sketch.rule.pairHint"), disabled: true, run: () => undefined });
+      }
+      const own = constraintsOnSegment(profile, segmentId);
+      if (own.length) {
+        items.push({ label: t("sketch.rule.removeAll", { count: own.length }), icon: <X size={15} />, run: () => onSetConstraints(liveConstraints(profile).filter((constraint) => !own.includes(constraint)), t("sketch.rule.removed")) });
+      }
+      items.push({ divider: true, label: "delete-divider", run: () => undefined });
+    }
     items.push({ label: t("sketch.menu.deleteLine"), icon: <Trash2 size={15} />, danger: true, run: () => onDeleteSegment(segmentId) });
     setSketchMenu({ x: event.clientX, y: event.clientY, items });
   };
@@ -1048,10 +1083,14 @@ export function SketchWorkspace({
         : selectedPoint?.id === segment.startId ? segment.endId
         : segment.startId;
       const updatedPoints = applySegmentDimension(segment, profile.points, length, anchor);
-      if (updatedPoints !== profile.points) onTransformPoints(updatedPoints, t("sketch.dimensionUpdated"));
+      // Fork (build 36): a line whose length is locked takes the typed length as its new locked length.
+      const lock = liveConstraints(profile).find((constraint) => !("b" in constraint) && constraint.kind === "length" && constraint.segmentId === segment.id);
+      if (lock && onSetConstraints) {
+        onSetConstraints(liveConstraints(profile).map((constraint) => (constraint.id === lock.id ? { ...constraint, value: length } as SketchConstraint : constraint)), t("sketch.dimensionUpdated"), updatedPoints);
+      } else if (updatedPoints !== profile.points) onTransformPoints(updatedPoints, t("sketch.dimensionUpdated"));
     }
     setEditingDimension(null);
-  }, [editingDimension, profile.segments, profile.points, selectedPoint, onTransformPoints]);
+  }, [editingDimension, profile, selectedPoint, onTransformPoints, onSetConstraints]);
 
   // A typed width or height stretches the selection along that axis only, from its left or top edge.
   const commitBoxSizeEdit = useCallback(() => {
@@ -1910,7 +1949,7 @@ export function SketchWorkspace({
     <main className="sketch-workspace-stage" style={sketchColorStyle}>
       {sketchMenu ? (
         <div className="sketch-context-menu" role="menu" style={{ left: sketchMenu.x, top: sketchMenu.y }} onContextMenu={(event) => event.preventDefault()}>
-          {sketchMenu.items.map((item) => (
+          {sketchMenu.items.map((item) => item.divider ? <span key={item.label} className="sketch-context-menu-divider" /> : (
             <button
               key={item.label}
               type="button"
@@ -2212,6 +2251,67 @@ export function SketchWorkspace({
               />
             ))}
           </g>
+          {onSetConstraints ? (() => {
+            // Fork (build 36): a small mark on each line for each rule it keeps; a click removes the rule.
+            const rules = liveConstraints(displayProfile);
+            if (!rules.length) return null;
+            const perSegment = new Map<string, number>();
+            const pairNumber = new Map<string, number>();
+            let pairs = 0;
+            const marks: Array<{ key: string; x: number; z: number; text: string; rule: SketchConstraint }> = [];
+            const place = (segmentId: string, text: string, rule: SketchConstraint) => {
+              const segment = displayProfile.segments.find((entry) => entry.id === segmentId);
+              const start = segment ? pointById.get(segment.startId) : undefined;
+              const end = segment ? pointById.get(segment.endId) : undefined;
+              if (!segment || !start || !end) return;
+              const dx = end.x - start.x, dz = end.z - start.z;
+              const length = Math.hypot(dx, dz) || 1;
+              const slot = perSegment.get(segmentId) ?? 0;
+              perSegment.set(segmentId, slot + 1);
+              const along = 0.5 + (slot - 0) * 0.0;
+              const offset = pointRadius * 3.4;
+              marks.push({
+                key: `${rule.id}:${segmentId}`,
+                x: start.x + dx * along - (dz / length) * offset + (dx / length) * slot * pointRadius * 3.6,
+                z: start.z + dz * along + (dx / length) * offset + (dz / length) * slot * pointRadius * 3.6,
+                text,
+                rule,
+              });
+            };
+            for (const rule of rules) {
+              if ("b" in rule) {
+                pairs += 1;
+                pairNumber.set(rule.id, pairs);
+                place(rule.a, `${constraintGlyph(rule)}${pairs}`, rule);
+                place(rule.b, `${constraintGlyph(rule)}${pairs}`, rule);
+              } else {
+                place(rule.segmentId, constraintGlyph(rule), rule);
+              }
+            }
+            const size = pointRadius * 2.5;
+            const ruleName = (rule: SketchConstraint) => t(rule.kind === "horizontal" ? "sketch.rule.horizontal" : rule.kind === "vertical" ? "sketch.rule.vertical" : rule.kind === "length" ? "sketch.rule.length" : rule.kind === "parallel" ? "sketch.rule.parallelShort" : rule.kind === "perpendicular" ? "sketch.rule.perpendicularShort" : "sketch.rule.equalShort");
+            return (
+              <g className="sketch-rule-marks">
+                {marks.map((mark) => (
+                  <g
+                    key={mark.key}
+                    className="sketch-rule-mark"
+                    transform={`translate(${mark.x} ${mark.z})`}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (event.button !== 0) return;
+                      onSetConstraints(rules.filter((rule) => rule.id !== mark.rule.id), t("sketch.rule.removed"));
+                    }}
+                  >
+                    <title>{t("sketch.rule.markTitle", { rule: ruleName(mark.rule) })}</title>
+                    <rect x={-size * (0.55 + 0.28 * (mark.text.length - 1))} y={-size * 0.6} width={size * (1.1 + 0.56 * (mark.text.length - 1))} height={size * 1.2} rx={size * 0.3} />
+                    <text x={0} y={0} fontSize={size * 0.95} textAnchor="middle" dominantBaseline="central">{mark.text}</text>
+                  </g>
+                ))}
+              </g>
+            );
+          })() : null}
           {tool === "refine" && refinePreview ? (
             <circle
               className="sketch-cursor-point"
@@ -2969,6 +3069,25 @@ export function SketchWorkspace({
                 <>
                   <button type="button" title={t("sketch.curveLineHint")} disabled={!canCurveLines} onClick={() => onCurveSegments?.(selectedLines.map((segment) => segment.id))}><Spline /><span>{t("sketch.curveLine")}</span></button>
                   <button type="button" title={t("sketch.straightenLineHint")} disabled={!canStraightenLines} onClick={() => onStraightenSegments?.(selectedLines.map((segment) => segment.id))}><Minus /><span>{t("sketch.straightenLine")}</span></button>
+                  {onSetConstraints && selectedLines.length === 2 ? (
+                    <>
+                      <span className="sketch-point-divider" />
+                      {(["parallel", "perpendicular", "equal"] as const).map((kind) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          title={t(kind === "parallel" ? "sketch.rule.parallel" : kind === "perpendicular" ? "sketch.rule.perpendicular" : "sketch.rule.equal")}
+                          onClick={() => {
+                            const rule: SketchConstraint = { id: newConstraintId(), kind, a: selectedLines[0].id, b: selectedLines[1].id };
+                            onSetConstraints(addConstraint(profile, rule), t("sketch.rule.added", { rule: t(kind === "parallel" ? "sketch.rule.parallelShort" : kind === "perpendicular" ? "sketch.rule.perpendicularShort" : "sketch.rule.equalShort") }));
+                          }}
+                        >
+                          <span className="sketch-rule-glyph">{kind === "parallel" ? "∥" : kind === "perpendicular" ? "⊥" : "="}</span>
+                          <span>{t(kind === "parallel" ? "sketch.rule.parallelShort" : kind === "perpendicular" ? "sketch.rule.perpendicularShort" : "sketch.rule.equalShort")}</span>
+                        </button>
+                      ))}
+                    </>
+                  ) : null}
                 </>
               ) : null}
               {mirrorButton}
@@ -3021,6 +3140,32 @@ export function SketchWorkspace({
               <span>{t(selectedSegment.construction ? "sketch.makeSolid" : "sketch.makeConstruction")}</span>
             </button>
           ) : null}
+          {onSetConstraints ? (() => {
+            // Fork (build 36): the rules for one line, a click away.
+            const own = constraintsOnSegment(profile, selectedSegment.id);
+            const has = (kind: string) => own.some((constraint) => constraint.kind === kind);
+            const toggle = (kind: "horizontal" | "vertical" | "length", label: string) => {
+              const existing = own.find((constraint) => constraint.kind === kind);
+              if (existing) {
+                onSetConstraints(liveConstraints(profile).filter((constraint) => constraint.id !== existing.id), t("sketch.rule.removed"));
+                return;
+              }
+              const start = profile.points.find((entry) => entry.id === selectedSegment.startId);
+              const end = profile.points.find((entry) => entry.id === selectedSegment.endId);
+              const value = start && end ? Math.round(Math.hypot(end.x - start.x, end.z - start.z) * 1000) / 1000 : 0;
+              if (kind === "length" && value <= 0) return;
+              const rule: SketchConstraint = kind === "length" ? { id: newConstraintId(), kind, segmentId: selectedSegment.id, value } : { id: newConstraintId(), kind, segmentId: selectedSegment.id };
+              onSetConstraints(addConstraint(profile, rule), t("sketch.rule.added", { rule: label }));
+            };
+            return (
+              <>
+                <span className="sketch-point-divider" />
+                <button type="button" className={has("horizontal") ? "active" : ""} aria-pressed={has("horizontal")} title={t("sketch.rule.horizontal")} onClick={() => toggle("horizontal", t("sketch.rule.horizontal"))}><span className="sketch-rule-glyph">H</span><span>{t("sketch.rule.horizontalShort")}</span></button>
+                <button type="button" className={has("vertical") ? "active" : ""} aria-pressed={has("vertical")} title={t("sketch.rule.vertical")} onClick={() => toggle("vertical", t("sketch.rule.vertical"))}><span className="sketch-rule-glyph">V</span><span>{t("sketch.rule.verticalShort")}</span></button>
+                <button type="button" className={has("length") ? "active" : ""} aria-pressed={has("length")} title={t("sketch.rule.length")} onClick={() => toggle("length", t("sketch.rule.length"))}><span className="sketch-rule-glyph">⟷</span><span>{t("sketch.rule.lengthShort")}</span></button>
+              </>
+            );
+          })() : null}
           {mirrorButton}
           <GuideHelpLink section="sketchCurve" className="sketch-corner-help" iconSize={17} />
         </div>

@@ -13,6 +13,7 @@ export function cloneSketchProfile(profile: SketchProfile): SketchProfile {
     ...(profile.silhouette ? { silhouette: true } : {}),
     ...(profile.keyring ? { keyring: { ...profile.keyring } } : {}),
     ...(profile.inset ? { inset: { ...profile.inset } } : {}),
+    ...(profile.constraints?.length ? { constraints: profile.constraints.map((constraint) => ({ ...constraint })) } : {}),
   };
 }
 

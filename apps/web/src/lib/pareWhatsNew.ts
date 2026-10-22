@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 36,
+    items: [
+      "Sketch rules, as in Fusion: select a line (or right-click it) to keep it Horizontal or Vertical or to Lock its length; with two lines selected, keep them Parallel, at right angles or the Same length. Drag a point and the rest of the sketch moves just enough to keep every rule - one corner of a rectangle moves, the far corner stays put.",
+      "Each rule shows as a small mark beside its line; click a mark to remove it. Typing a new length on a locked line changes the locked length.",
+      "Round a mesh says straight away when a part is only a few millimetres across (usually imported at the wrong scale) instead of working for minutes and failing.",
+      "Every guide picture is up to date with the new toolbar, including the sketch pictures.",
+    ],
+  },
+  {
     build: 35,
     items: [
       "A new look for the toolbar: every icon drawn the same way - a thin dark line and a grey fill - each group framed in its own colour, and the tool in use tinted softly in that colour.",

@@ -238,7 +238,8 @@ export function ForkShapesIcon(props: IconProps) {
       <rect x="6" y="20" width="18" height="18" rx="3" />
       <circle cx="31" cy="14" r="9" />
       <circle cx="35" cy="35" r="9" {...ACCENT} />
-      <path d="M35 30v10M30 35h10" stroke="#fff" />
+      <circle cx="35" cy="35" r="9" />
+      <path d="M35 30.5v9M30.5 35h9" />
     </ForkIcon>
   );
 }

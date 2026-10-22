@@ -737,6 +737,7 @@ async function serializeShapeNode(
       ...(sketchProfile.silhouette ? { silhouette: true } : {}),
       ...(sketchProfile.keyring ? { keyring: sketchProfile.keyring } : {}),
       ...(sketchProfile.inset ? { inset: sketchProfile.inset } : {}),
+      ...(sketchProfile.constraints?.length ? { constraints: sketchProfile.constraints } : {}),
     };
   }
 
@@ -1185,6 +1186,23 @@ function validateSketchProfile(value: unknown, label: string) {
     if (segment.construction !== undefined && typeof segment.construction !== "boolean") throw new Error(`${label}.segments[${index}].construction must be true or false`);
   });
   if (profile.silhouette !== undefined && typeof profile.silhouette !== "boolean") throw new Error(`${label}.silhouette must be true or false`);
+  if (profile.constraints !== undefined) {
+    if (!Array.isArray(profile.constraints)) throw new Error(`${label}.constraints must be a list`);
+    profile.constraints.forEach((raw, index) => {
+      const constraint = objectRecord(raw, `${label}.constraints[${index}]`);
+      stringValue(constraint.id, `${label}.constraints[${index}].id`);
+      const kind = stringValue(constraint.kind, `${label}.constraints[${index}].kind`);
+      if (kind === "horizontal" || kind === "vertical" || kind === "length") {
+        stringValue(constraint.segmentId, `${label}.constraints[${index}].segmentId`);
+        if (kind === "length" && !(finiteNumber(constraint.value, `${label}.constraints[${index}].value`) > 0)) throw new Error(`${label}.constraints[${index}].value must be above 0`);
+      } else if (kind === "parallel" || kind === "perpendicular" || kind === "equal") {
+        stringValue(constraint.a, `${label}.constraints[${index}].a`);
+        stringValue(constraint.b, `${label}.constraints[${index}].b`);
+      } else {
+        throw new Error(`${label}.constraints[${index}].kind is not a known rule`);
+      }
+    });
+  }
   if (profile.keyring !== undefined && !isSketchKeyring(profile.keyring)) throw new Error(`${label}.keyring must be { side, diameter, x, z }`);
   if (profile.inset !== undefined) {
     const inset = objectRecord(profile.inset, `${label}.inset`);

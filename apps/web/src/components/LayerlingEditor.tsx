@@ -104,6 +104,7 @@ import { FitCheckPanel } from "./workplane/FitCheckPanel";
 import { MeshRoundPanel } from "./workplane/MeshRoundPanel";
 import { SurfaceTextPanel, type SurfaceTextSettings } from "./workplane/SurfaceTextPanel";
 import { SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK, surfaceTextPositions } from "@/lib/surfaceText";
+import { movedPointIds, solveSketchConstraints } from "@/lib/sketchConstraints";
 
 /** The id of the letters shown while Text on a surface is open, before they are added. */
 const SURFACE_TEXT_PREVIEW_ID = "surface-text-preview";
@@ -4696,7 +4697,11 @@ export function LayerlingEditor({
       const latest = trimmed.at(-1);
       // Most edits build a new profile from points and lines only; the stroke (#154) carries over
       // unless the edit sets it - or clears it with `stroke: undefined`.
-      const carried = "stroke" in next || !latest?.stroke ? next : { ...next, stroke: latest.stroke };
+      const strokeCarried = "stroke" in next || !latest?.stroke ? next : { ...next, stroke: latest.stroke };
+      // Fork (build 36): the sketch's rules carry over too, and are kept: the points this edit moved
+      // stay where they were put, the rest of the sketch follows.
+      const ruled = "constraints" in strokeCarried || !latest?.constraints?.length ? strokeCarried : { ...strokeCarried, constraints: latest.constraints };
+      const carried = ruled.constraints?.length ? solveSketchConstraints(ruled, latest ? movedPointIds(latest, ruled) : new Set()).profile : ruled;
       // Moving shapes over each other makes no shared points where their lines cross (#239); drawing does.
       const snapshot = cloneSketchProfile(latest && onlyMovesPoints(latest, carried) ? carried : addLineIntersectionPoints(carried, createLocalId));
       // A locked outline (#653) stays as it is, whatever tool tried to change it.
@@ -9205,10 +9210,21 @@ export function LayerlingEditor({
       setNotice(t("meshRound.selectOne"));
       return;
     }
+    // Fork (build 36): a part only a few millimetres across was most likely imported at the wrong
+    // scale; rounding it would grind for minutes and fail, so say so before starting.
+    const largest = Math.max(shapeWidth(shape), shapeDepth(shape), shape.height);
+    const smallest = Math.min(shapeWidth(shape), shapeDepth(shape), shape.height);
+    if (largest < 5) {
+      setNotice(t("meshRound.tiny", { size: largest.toFixed(1) }));
+      return;
+    }
     const mesh = meshForShape(shape);
     const positions = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
     const minRadius = Math.ceil(smallestRoundingRadius(positions) * 10) / 10;
-    const smallest = Math.min(shapeWidth(shape), shapeDepth(shape), shape.height);
+    if (smallest / 2 < minRadius) {
+      setNotice(t("meshRound.tooThin", { size: smallest.toFixed(1) }));
+      return;
+    }
     const maxRadius = Math.max(minRadius, Math.floor((smallest / 2) * 10) / 10);
     setMeshRoundTool({ shapeId: shape.id, radius: Math.min(maxRadius, Math.max(minRadius, 2)), mode: "outside", busy: false, error: null, minRadius, maxRadius });
   }, [meshRoundTool, refuseLockedSelection, selectedShapes]);
@@ -14095,6 +14111,7 @@ export function LayerlingEditor({
             onStraightenSegments={straightenSketchSegmentsAction}
             onStraightenSegment={straightenSketchSegmentAction}
             onSetSegmentConstruction={setSketchSegmentConstruction}
+            onSetConstraints={(constraints, message, points) => commitSketchProfile({ ...sketchProfile, constraints, ...(points ? { points } : {}) }, message)}
             onApplyFillet={applySketchFilletHandler}
             onApplyChamfer={applySketchChamferHandler}
             onClearMeasurement={clearSketchMeasurement}
