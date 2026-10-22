@@ -246,7 +246,9 @@ const indexes = new Map<string, Promise<GuidePrepared[] | null>>();
 
 /** The address of a language's guide search index. */
 export function guideIndexUrl(language: Language): string {
-  return `/${(LANGUAGE_INFO[language] ?? LANGUAGE_INFO.en).guideDir}/search-index.json`;
+  // Fork (Pare 3D build 26): the guide, and so its search, is English only.
+  void language;
+  return `/${LANGUAGE_INFO.en.guideDir}/search-index.json`;
 }
 
 /**

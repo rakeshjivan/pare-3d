@@ -19,7 +19,8 @@ import { tools } from "../../scripts/layerling-mcp-tools.mjs";
 import { GUIDE_CHAPTERS, GUIDE_SECTIONS, guideChapterForShape, guideHref, guideSectionForShape } from "@/lib/guideLinks";
 
 const root = join(__dirname, "..", "..");
-const LANGUAGES = ["de", "en", "nl", "ru", "cs"] as const;
+// Pare 3D build 26: the guide is English only.
+const LANGUAGES = ["en"] as const;
 
 async function contextFor(language: (typeof LANGUAGES)[number]) {
   return {
@@ -112,7 +113,7 @@ describe("guide markdown", () => {
   });
 
   it("reads the size of a WebP picture", () => {
-    const directory = join(root, "docs", "guide", "images", "de");
+    const directory = join(root, "docs", "guide", "images", "en");
     const file = readdirSync(directory).find((name) => name.endsWith(".webp"));
     if (!file) return;
     const size = webpSize(readFileSync(join(directory, file)));
@@ -148,13 +149,10 @@ describe("guide footer", () => {
 });
 
 describe("guide content", () => {
-  it("has the same chapters in every language", async () => {
-    const [de, en, nl, ru] = await Promise.all(LANGUAGES.map((language) => readChapters(language)));
-    expect(de.length).toBeGreaterThan(10);
-    expect(en.map((chapter: { number: string }) => chapter.number)).toEqual(de.map((chapter: { number: string }) => chapter.number));
-    expect(nl.map((chapter: { number: string }) => chapter.number)).toEqual(en.map((chapter: { number: string }) => chapter.number));
-    expect(ru.map((chapter: { number: string }) => chapter.number)).toEqual(en.map((chapter: { number: string }) => chapter.number));
-    for (const chapter of [...de, ...en, ...nl, ...ru]) {
+  it("has its chapters, each with a title and a summary", async () => {
+    const en = await readChapters("en");
+    expect(en.length).toBeGreaterThan(10);
+    for (const chapter of en) {
       expect(chapter.title, chapter.file).not.toBe(chapter.slug);
       expect(chapter.summary, chapter.file).not.toBe("");
     }
@@ -180,68 +178,17 @@ describe("guide content", () => {
     }
   });
 
-  it("stands opposite the English section it answers, in every language", async () => {
-    // The sections run in the same order in every language, and the names inside
-    // one (interface keys, pictures) stay the same in a translation: a section
-    // put in the wrong place, or two of them the other way round, shows up here.
-    const names = (text: string) =>
-      [...text.matchAll(/\{\{ui:[^}]+\}\}|\[\[[^\]]+\]\]|\(shot:[\w-]+\)/g)].map((match) => match[0].toLowerCase());
-    const sectionsOf = (body: string) =>
-      body
-        .split(/\r?\n(?=## )/)
-        .filter((part) => part.startsWith("## "))
-        .map((part) => names(part));
-    const overlap = (left: string[], right: string[]) => {
-      const a = new Set(left);
-      const b = new Set(right);
-      if (a.size === 0 || b.size === 0) return 0;
-      let common = 0;
-      for (const name of a) if (b.has(name)) common += 1;
-      return common / (a.size + b.size - common);
-    };
-    const english = await readChapters("en");
-    for (const language of LANGUAGES.filter((code) => code !== "en")) {
-      const other = await readChapters(language);
-      for (const chapter of english) {
-        const mine = other.find((entry: { number: string }) => entry.number === chapter.number);
-        expect(mine, `${language}: chapter ${chapter.number}`).toBeDefined();
-        const here = sectionsOf(chapter.body);
-        const there = sectionsOf(mine!.body);
-        expect(there.length, `${language}/${chapter.file}`).toBe(here.length);
-        for (let index = 0; index < here.length; index += 1) {
-          if (here[index].length === 0) continue;
-          const scores = here.map((names, at) => ({ at, score: overlap(there[index], names) }));
-          const best = scores.reduce((left, right) => (right.score > left.score ? right : left));
-          expect(best.at, `${language}/${chapter.file}: section ${index + 1} of ${here.length}`).toBe(index);
-        }
-      }
-    }
-  });
-
-  it("shows the same pictures in every language", async () => {
-    const shots = async (language: (typeof LANGUAGES)[number]) => {
-      const names = new Set<string>();
-      for (const chapter of await readChapters(language)) {
-        for (const match of chapter.body.matchAll(/\(shot:([\w-]+)\)/g)) names.add(match[1]);
-      }
-      return [...names].sort();
-    };
-    expect(await shots("en")).toEqual(await shots("de"));
-    expect(await shots("nl")).toEqual(await shots("en"));
-    expect(await shots("ru")).toEqual(await shots("en"));
-  });
-
   it("has a scene for every picture", async () => {
     const scenes = readFileSync(join(root, "scripts", "guide-scenes.mjs"), "utf8");
     const taken = new Set([...scenes.matchAll(/ctx\.shot\("([\w-]+)"/g)].map((match) => match[1]));
-    for (const chapter of await readChapters("de")) {
+    for (const chapter of await readChapters("en")) {
       for (const match of chapter.body.matchAll(/\(shot:([\w-]+)\)/g)) {
         expect(taken.has(match[1]), `no scene takes the picture ${match[1]}`).toBe(true);
       }
     }
   });
 
-  it("names every MCP tool in the AI chapter, in every language", async () => {
+  it("names every MCP tool in the AI chapter", async () => {
     for (const language of LANGUAGES) {
       const chapter = (await readChapters(language)).find((entry: { slug: string }) => entry.slug === GUIDE_CHAPTERS.ai[language]);
       expect(chapter, language).toBeDefined();
@@ -276,8 +223,9 @@ describe("guide content", () => {
     }
     expect(guideHref("en", undefined, "sectionView")).toBe("/guide/view-and-workplane.html#looking-inside-the-section-view");
     // A shape's question mark lands on its own heading, in the chapter it belongs to.
-    expect(guideHref("de", guideChapterForShape({ kind: "hinge" }), guideSectionForShape({ kind: "hinge" }))).toBe("/anleitung/gewinde-und-mechanik.html#scharnier");
-    expect(guideHref("de", guideChapterForShape({ kind: "knurl" }), guideSectionForShape({ kind: "knurl" }))).toBe("/anleitung/gewinde-und-mechanik.html#raendelung");
+    // Any language of the program opens the English guide.
+    expect(guideHref("de", guideChapterForShape({ kind: "hinge" }), guideSectionForShape({ kind: "hinge" }))).toBe(guideHref("en", guideChapterForShape({ kind: "hinge" }), guideSectionForShape({ kind: "hinge" })));
+    expect(guideHref("de", "solids")).toMatch(/^\/guide\//);
     expect(guideHref("en", guideChapterForShape({ kind: "box" }), guideSectionForShape({ kind: "box" }))).toBe("/guide/shapes.html#the-shape-s-settings");
     expect(guideSectionForShape({ kind: "mesh", groupedShapes: [{}], groupOperation: "bundle" })).toBe("bundling");
     // Every shape's question mark jumps to a heading, not just into a chapter.
@@ -285,7 +233,7 @@ describe("guide content", () => {
     expect(guideSectionForShape({ kind: "mesh", sketchProfile: {} })).toBe("sketchFill");
     expect(guideSectionForShape({ kind: "mesh", sketchProfile: {}, sketchOperation: "revolve" })).toBe("sketchToBody");
     expect(guideSectionForShape({ kind: "mesh", importedMesh: { sourceFormat: "stl" } })).toBe("importing");
-    expect(guideHref("de", guideChapterForShape({ kind: "mesh", sketchProfile: {} }), guideSectionForShape({ kind: "mesh", sketchProfile: {} }))).toBe("/anleitung/skizzen.html#fuellung-und-silhouette");
+    expect(guideHref("de", guideChapterForShape({ kind: "mesh", sketchProfile: {} }), guideSectionForShape({ kind: "mesh", sketchProfile: {} }))).toMatch(/^\/guide\/sketches\.html#/);
     for (const kind of ["thread", "gear", "spring", "bentTube", "gridfinity", "hinge", "knurl", "dovetail", "teardrop", "counterbore", "countersink", "doubleCountersink", "ruler"] as const) {
       const section = guideSectionForShape({ kind });
       expect(section && GUIDE_SECTIONS[section].chapter, kind).toBe(guideChapterForShape({ kind }));
@@ -293,7 +241,7 @@ describe("guide content", () => {
   });
 
   it("opens the chapter that fits a shape", () => {
-    expect(guideHref("de", "solids")).toBe("/anleitung/koerper-und-aussparungen.html");
+    expect(guideHref("de", "solids")).toBe("/guide/solids-and-holes.html");
     expect(guideHref("en")).toBe("/guide/index.html");
     expect(guideChapterForShape({ kind: "text" })).toBe("text");
     expect(guideChapterForShape({ kind: "thread" })).toBe("threads");

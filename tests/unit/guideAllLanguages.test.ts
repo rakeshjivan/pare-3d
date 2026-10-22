@@ -19,8 +19,8 @@ const LANGUAGES = readdirSync(guideRoot).filter((name) => name !== "images" && s
 type Chapter = { file: string; number: string; body: string };
 
 describe("the guide in every language", () => {
-  it("covers the eleven guide languages", () => {
-    expect(LANGUAGES.sort()).toEqual(["ar", "cs", "da", "de", "en", "fr", "hu", "nl", "pl", "ru", "sl"]);
+  it("is English only (Pare 3D build 26)", () => {
+    expect(LANGUAGES.sort()).toEqual(["en"]);
   });
 
   it("writes headings with a plain space, so they render as headings", async () => {

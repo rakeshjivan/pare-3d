@@ -105,7 +105,10 @@ export const GUIDE_SECTIONS = {
 export type GuideSection = keyof typeof GUIDE_SECTIONS;
 
 /** The address of a chapter or one of its sections, or of the guide's overview when neither is named. */
-export function guideHref(language: Language, chapter?: GuideChapter, section?: GuideSection): string {
+export function guideHref(requested: Language, chapter?: GuideChapter, section?: GuideSection): string {
+  // Fork (Pare 3D build 26): the guide is English only, whatever language the program is in.
+  void requested;
+  const language: Language = "en";
   const directory = LANGUAGE_INFO[language].guideDir;
   const target = section ? GUIDE_SECTIONS[section] : null;
   const page = target?.chapter ?? chapter;

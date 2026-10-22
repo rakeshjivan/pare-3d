@@ -31,6 +31,12 @@ export const GUIDE_LANGUAGES = Object.fromEntries(
   }),
 );
 
+/**
+ * Fork (Pare 3D build 26): the guide is written and kept in English only. The program's other
+ * languages open the English guide; its pages offer no language menu.
+ */
+export const GUIDE_BUILD_LANGUAGES = ["en"];
+
 /** Languages written right to left; their guide pages get dir="rtl". */
 const RTL_LANGUAGES = new Set(["ar", "fa", "he", "ur"]);
 
@@ -705,6 +711,7 @@ ${body}
 
 /** The language menu of a guide page: the language it is in, and a link to the same page in each of the others. */
 function languageMenu(links, language, strings) {
+  if (links.length <= 1) return "";
   const items = links
     .map((entry) => `<li><a href="${escapeHtml(entry.href)}" hreflang="${entry.htmlLang}" lang="${entry.htmlLang}"${entry.code === language ? ' aria-current="true"' : ""}>${escapeHtml(entry.name)}</a></li>`)
     .join("");
@@ -799,7 +806,7 @@ export async function buildGuide({ log = console.log } = {}) {
   const effective = Object.fromEntries(LANGUAGE_CODES.map((code) => [code, effectiveChapters(code, chaptersByLanguage)]));
   const english = GUIDE_LANGUAGES.en;
 
-  for (const [language, strings] of Object.entries(GUIDE_LANGUAGES)) {
+  for (const [language, strings] of Object.entries(GUIDE_LANGUAGES).filter(([code]) => GUIDE_BUILD_LANGUAGES.includes(code))) {
     const chapters = effective[language];
     const messages = await loadMessages(language);
     const values = await loadValues();
@@ -832,7 +839,7 @@ export async function buildGuide({ log = console.log } = {}) {
     }
 
     /** Where a chapter lives in each language (the same page in the others), or their overview when it does not exist there. */
-    const languageLinksFor = (number) => LANGUAGE_CODES.map((code) => {
+    const languageLinksFor = (number) => GUIDE_BUILD_LANGUAGES.map((code) => {
       const target = GUIDE_LANGUAGES[code];
       const slug = number === null ? null : effective[code].find((entry) => entry.number === number)?.slug;
       return { code, name: LANGUAGE_INFO[code].name, htmlLang: target.htmlLang, href: `/${target.dir}/${slug ?? "index"}.html` };
@@ -896,7 +903,7 @@ export async function buildGuide({ log = console.log } = {}) {
       if (!chapter.fallback) result.pages.push({ path, alternates });
     }
 
-    await writeFile(join(outputRoot, PRINT_ALL_PAGE), renderPrintAll({ language, chapters, printable, footer, languageLinks: LANGUAGE_CODES.map((code) => ({ code, name: LANGUAGE_INFO[code].name, htmlLang: GUIDE_LANGUAGES[code].htmlLang, href: `/${GUIDE_LANGUAGES[code].dir}/${PRINT_ALL_PAGE}` })) }));
+    await writeFile(join(outputRoot, PRINT_ALL_PAGE), renderPrintAll({ language, chapters, printable, footer, languageLinks: GUIDE_BUILD_LANGUAGES.map((code) => ({ code, name: LANGUAGE_INFO[code].name, htmlLang: GUIDE_LANGUAGES[code].htmlLang, href: `/${GUIDE_LANGUAGES[code].dir}/${PRINT_ALL_PAGE}` })) }));
 
     const cards = chapters
       .map((chapter) => `<li><a href="/${strings.dir}/${chapter.slug}.html"><b>${escapeHtml(chapter.title)}</b><span>${escapeHtml(chapter.summary)}</span></a></li>`)

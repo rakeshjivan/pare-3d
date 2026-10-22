@@ -23,7 +23,7 @@ const option = (name, fallback) => {
 };
 const BASE = option("base", "http://localhost:3010");
 const only = option("only", "")?.split(",").filter(Boolean);
-const languages = option("lang", "de,en").split(",");
+const languages = option("lang", "en").split(",");
 const WIDTH = Number(option("width", 1280));
 const HEIGHT = Number(option("height", 800));
 const EDGE = process.env.EDGE_PATH ?? "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";

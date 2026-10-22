@@ -181,24 +181,22 @@ describe("the index of a language", () => {
     document.body.innerHTML = "";
   });
 
-  it("lives in the guide folder of the language", () => {
+  it("is the English guide's, whatever the language (Pare 3D: the guide is English only)", () => {
     expect(guideIndexUrl("en")).toBe("/guide/search-index.json");
-    expect(guideIndexUrl("de")).toBe("/anleitung/search-index.json");
+    expect(guideIndexUrl("de")).toBe("/guide/search-index.json");
   });
 
   it("is fetched once, and a failure is not remembered", async () => {
+    // Every language shares the one English index: a failure first, then it loads and is kept.
+    const broken = (async () => ({ ok: false, json: async () => null })) as unknown as typeof fetch;
+    expect(await loadGuideIndex("fr", broken)).toBeNull();
     let calls = 0;
     const ok = (async () => { calls += 1; return { ok: true, json: async () => entries }; }) as unknown as typeof fetch;
     const first = await loadGuideIndex("nl", ok);
-    const second = await loadGuideIndex("nl", ok);
+    const second = await loadGuideIndex("en", ok);
     expect(first).toHaveLength(entries.length);
     expect(second).toBe(first);
     expect(calls).toBe(1);
-
-    const broken = (async () => ({ ok: false, json: async () => null })) as unknown as typeof fetch;
-    expect(await loadGuideIndex("fr", broken)).toBeNull();
-    const fixed = (async () => ({ ok: true, json: async () => entries })) as unknown as typeof fetch;
-    expect(await loadGuideIndex("fr", fixed)).toHaveLength(entries.length);
   });
 });
 
