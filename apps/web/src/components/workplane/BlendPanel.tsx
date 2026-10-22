@@ -18,6 +18,7 @@ export function BlendPanel({
   ready,
   canHollow,
   editing = false,
+  keepShortfall = null,
   settings,
   workspace,
   busy,
@@ -30,6 +31,8 @@ export function BlendPanel({
   ready: boolean;
   /** Both faces have an opening: the piece can be a sleeve. */
   canHollow: boolean;
+  /** Fork (build 31): Keep the diameter with the parts too close - the mm more it needs (0: fits; null: never). */
+  keepShortfall?: number | null;
   /** Fork (build 29): reopened on a blend made earlier - Create reads Update. */
   editing?: boolean;
   settings: BlendSettings;
@@ -110,6 +113,18 @@ export function BlendPanel({
         </div>
       </div>
 
+      <label className="blend-hollow">
+        <input type="checkbox" checked={settings.keepDiameter} onChange={(event) => onChange({ keepDiameter: event.currentTarget.checked })} />
+        <span>
+          <strong>{t("blend.keepDiameter")}</strong>
+          <small>{t("blend.keepDiameterHint")}</small>
+        </span>
+      </label>
+      {settings.keepDiameter && keepShortfall !== 0 ? (
+        <p className="blend-hint blend-warning" role="status">
+          {keepShortfall === null ? t("blend.keepDiameterNever") : t("blend.keepDiameterTight", { gap: keepShortfall })}
+        </p>
+      ) : null}
       {canHollow ? (
         <label className="edge-modifier-toggle blend-hollow">
           <input type="checkbox" checked={settings.hollow} onChange={(event) => onChange({ hollow: event.currentTarget.checked })} />

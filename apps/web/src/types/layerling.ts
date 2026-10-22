@@ -964,7 +964,7 @@ export type WorkplaneShape = {
   blendSource?: {
     parts: [string, string];
     piece: string;
-    settings: { smoothness: number; smoothnessEnd: number; linked: boolean; twist: number; hollow: boolean; join: boolean };
+    settings: { smoothness: number; smoothnessEnd: number; linked: boolean; twist: number; hollow: boolean; join: boolean; keepDiameter?: boolean };
     picks: [{ point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } }, { point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } }];
   };
   cadDisplayEdges?: CadDisplayEdge[];

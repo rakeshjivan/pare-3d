@@ -4,6 +4,12 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 31,
+    items: [
+      "Blend: Keep the diameter - every slice stands square to the path like a pipe, so an S-bend between two offset parts stays as thick as the parts instead of thinning. If the parts are too close for that, the Blend window says how many mm further apart they need to be.",
+    ],
+  },
+  {
     build: 30,
     items: [
       "Imported meshes are checked: if an STL, OBJ or 3MF is not watertight, a card says so and Make solid repairs it (a face with a hole in it closes as a ring, the hole stays open). Right-click > Check and make solid runs it any time.",

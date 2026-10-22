@@ -27,11 +27,13 @@ export type BlendSettings = {
   twist: number;
   /** Fork (build 29): true joins the two parts and the piece into one group (Fusion's Join); false leaves the piece a part of its own (New body). */
   join: boolean;
+  /** Fork (build 31): every slice stands square to the path, like a pipe sweep, so the piece keeps its size. */
+  keepDiameter: boolean;
   /** Fork (build 28): when both faces have an opening (two hollow parts), the piece is a sleeve open through. */
   hollow: boolean;
 };
 
-export const DEFAULT_BLEND: BlendSettings = { smoothness: 70, smoothnessEnd: 70, linked: true, twist: 0, hollow: true, join: true };
+export const DEFAULT_BLEND: BlendSettings = { smoothness: 70, smoothnessEnd: 70, linked: true, twist: 0, hollow: true, join: true, keepDiameter: false };
 export const BLEND_RING = 96;
 const BLEND_SECTIONS = 40;
 /** How far the piece reaches into each body, so they join without a skin. */
@@ -48,7 +50,7 @@ export function normalizeBlend(settings: Partial<BlendSettings>): BlendSettings 
   const twist = Number.isFinite(settings.twist) ? Math.round(settings.twist as number) : 0;
   const linked = settings.linked !== false;
   const end = Number.isFinite(settings.smoothnessEnd) ? Math.min(100, Math.max(0, settings.smoothnessEnd as number)) : smoothness;
-  return { smoothness, smoothnessEnd: linked ? smoothness : end, linked, twist: ((twist % BLEND_RING) + BLEND_RING) % BLEND_RING, hollow: settings.hollow !== false, join: settings.join !== false };
+  return { smoothness, smoothnessEnd: linked ? smoothness : end, linked, twist: ((twist % BLEND_RING) + BLEND_RING) % BLEND_RING, hollow: settings.hollow !== false, join: settings.join !== false, keepDiameter: settings.keepDiameter === true };
 }
 
 /** The triangles of a body in the world, nine numbers each. */
@@ -253,13 +255,19 @@ export function matchedLoops(a: THREE.Vector3[], b: THREE.Vector3[], axis: THREE
 
 /** The sections of the blend piece: outer rings, the inner rings of a sleeve, and their centres along the path. */
 /** `straight`: keep every slice parallel to the faces (no turning across the path) - the fallback when turned slices would cross. */
-function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings, straight = false) {
+function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings, straight = false, extraGap = 0) {
   const loopA = outerLoopWorld(a.face);
   const loopB = outerLoopWorld(b.face);
   if (loopA.length < 3 || loopB.length < 3) return null;
   const nA = new THREE.Vector3(a.normal.x, a.normal.y, a.normal.z).normalize();
   const nB = new THREE.Vector3(b.normal.x, b.normal.y, b.normal.z).normalize();
-  const { ringA, ringB, ca, cb } = matchedLoops(loopA, loopB, nA, settings.twist);
+  const matched = matchedLoops(loopA, loopB, nA, settings.twist);
+  const { ringA, ca } = matched;
+  // extraGap: B as if moved that much further away along its own axis (to find how far a kept
+  // diameter needs).
+  const shiftB = nB.clone().multiplyScalar(-extraGap);
+  const ringB = matched.ringB.map((point) => point.clone().add(shiftB));
+  const cb = matched.cb.clone().add(shiftB);
   const distance = ca.distanceTo(cb);
   if (distance < 0.05) return null;
   // How smoothly each end leaves its face; one value for both when linked. The middle of the piece
@@ -270,11 +278,8 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings, straig
   // The path: a curve from face to face leaving each one straight out; at 0 a straight line.
   const reachA = kA * 0.5 * distance;
   const reachB = kB * 0.5 * distance;
-  const p0 = ca;
-  const p1 = ca.clone().addScaledVector(nA, reachA);
-  const p2 = cb.clone().addScaledVector(nB, reachB);
-  const p3 = cb;
-  const curve = new THREE.CubicBezierCurve3(p0, p1, p2, p3);
+  const pathFor = (ra: number, rb: number) => new THREE.CubicBezierCurve3(ca, ca.clone().addScaledVector(nA, ra), cb.clone().addScaledVector(nB, rb), cb);
+  let curve = pathFor(reachA, reachB);
   const offsetsA = ringA.map((point) => point.clone().sub(ca));
   const offsetsB = ringB.map((point) => point.clone().sub(cb));
   // Fork (build 28): the openings of two hollow parts, swept the same way - the inner wall of a sleeve.
@@ -282,12 +287,12 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings, straig
   const openB = settings.hollow ? openingLoopWorld(b.face) : null;
   const inner = openA && openB ? matchedLoops(openA, openB, nA, settings.twist) : null;
   const innerA = inner ? inner.ringA : null;
-  const innerB = inner ? inner.ringB : null;
+  const innerB = inner ? inner.ringB.map((point) => point.clone().add(shiftB)) : null;
   const innerOffsetsA = innerA ? innerA.map((point) => point.clone().sub(ca)) : null;
   const innerOffsetsB = innerB ? innerB.map((point) => point.clone().sub(cb)) : null;
   const towardB = nB.clone().negate();
   // The slices along the path, each turned by `amount` (0..1) of the way to stand across the path.
-  const slices = (amount: number) => {
+  const slices = (amount: number, square = false) => {
     const rings: THREE.Vector3[][] = [];
     const innerRings: THREE.Vector3[][] = [];
     const centres: THREE.Vector3[] = [];
@@ -312,7 +317,8 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings, straig
       const turn = new THREE.Quaternion();
       if (amount > 0 && facing.lengthSq() > 1e-9) {
         turn.setFromUnitVectors(facing.normalize(), tangent);
-        turn.slerp(new THREE.Quaternion(), 1 - amount * Math.sin(Math.PI * t));
+        // Square: all the way, everywhere (a pipe sweep); otherwise most in the middle, none at the ends.
+        turn.slerp(new THREE.Quaternion(), square ? 0 : 1 - amount * Math.sin(Math.PI * t));
       }
       rings.push(offsetsA.map((offset, index) => offset.clone().multiplyScalar(1 - s).addScaledVector(offsetsB[index], s).applyQuaternion(turn).add(at)));
       if (innerOffsetsA && innerOffsetsB) innerRings.push(innerOffsetsA.map((offset, index) => offset.clone().multiplyScalar(1 - s).addScaledVector(innerOffsetsB[index], s).applyQuaternion(turn).add(at)));
@@ -328,6 +334,16 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings, straig
   // Slices that cross each other fold the piece inside out: every point of a slice must lie further
   // along the path than the same point of the slice before.
   const folds = ({ rings, innerRings, tangents }: ReturnType<typeof slices>) => [rings, innerRings].some((set) => set.some((ring, index) => index > 0 && ring.some((point, at) => point.clone().sub(rings[index - 1][at]).dot(tangents[index - 1].clone().add(tangents[index]).normalize()) <= 1e-6)));
+  // Keep the diameter: every slice square to the path. The path's handles are tried at several
+  // lengths for one whose bends are gentle enough; when none is, the parts are too close for it.
+  if (settings.keepDiameter && !straight) {
+    for (const share of [0.5, 0.65, 0.8, 1, 1.25, 0.35]) {
+      curve = pathFor(share * distance, share * distance);
+      const tried = slices(1, true);
+      if (!folds(tried)) return { ...tried, sleeve: tried.innerRings.length === tried.rings.length, nA, nB, ringA };
+    }
+    return null;
+  }
   // A straight taper (smoothness 0) joins matching points with straight lines: no turning. Smoother
   // ones turn as far as they can without a fold.
   let built = slices(0);
@@ -340,6 +356,30 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings, straig
     }
   }
   return { ...built, sleeve: built.innerRings.length === built.rings.length, nA, nB, ringA };
+}
+
+/**
+ * Fork (build 31): with Keep the diameter on and the parts too close for it, how much further apart
+ * (along the second part's axis) they need to be, in mm, rounded up; 0 when it already fits, null when
+ * no distance helps (the faces do not face each other, say).
+ */
+export function blendKeepDiameterShortfall(a: BlendFace, b: BlendFace, settings: BlendSettings): number | null {
+  const keep = { ...settings, keepDiameter: true };
+  if (blendSlices(a, b, keep)) return 0;
+  const size = Math.max(...outerLoopWorld(a.face).map((point) => point.distanceTo(centroidOf(outerLoopWorld(a.face))))) * 2;
+  let high = Math.max(5, size);
+  let tries = 0;
+  while (!blendSlices(a, b, keep, false, high)) {
+    high *= 2;
+    if (++tries > 4) return null;
+  }
+  let low = 0;
+  for (let step = 0; step < 12; step += 1) {
+    const middle = (low + high) / 2;
+    if (blendSlices(a, b, keep, false, middle)) high = middle;
+    else low = middle;
+  }
+  return Math.ceil(high);
 }
 
 /**

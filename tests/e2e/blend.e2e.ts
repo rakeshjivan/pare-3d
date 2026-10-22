@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 (globalThis as unknown as { window: unknown }).window = { location: { href: pathToFileURL(resolve("apps/web/public") + "/").href } };
-import { blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend } from "@/lib/blend";
+import { blendKeepDiameterShortfall, blendLoftInput, blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend } from "@/lib/blend";
 import { buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { meshForShape, getManifoldRuntime } from "@/lib/editorMeshCore";
 import type { WorkplaneShape } from "@/types/layerling";
@@ -139,5 +139,46 @@ describe("Blend options (build 29)", () => {
   it("keeps old settings working: a blend saved before has both ends alike and joins", () => {
     const old = normalizeBlend({ smoothness: 40, twist: 3 } as never);
     expect(old).toMatchObject({ smoothness: 40, smoothnessEnd: 40, linked: true, join: true, hollow: true, twist: 3 });
+  });
+});
+
+describe("Keep the diameter (build 31)", () => {
+  // Newell normal of a flat ring and its centre.
+  const ringFrame = (flat: number[]) => {
+    const n = flat.length / 3;
+    const c = [0, 0, 0];
+    const nn = [0, 0, 0];
+    for (let i = 0; i < n; i += 1) {
+      const p = flat.slice(i * 3, i * 3 + 3), q = flat.slice(((i + 1) % n) * 3, ((i + 1) % n) * 3 + 3);
+      c[0] += p[0] / n; c[1] += p[1] / n; c[2] += p[2] / n;
+      nn[0] += (p[1] - q[1]) * (p[2] + q[2]); nn[1] += (p[2] - q[2]) * (p[0] + q[0]); nn[2] += (p[0] - q[0]) * (p[1] + q[1]);
+    }
+    const len = Math.hypot(...nn);
+    return { c, n: nn.map((v) => v / len) };
+  };
+
+  it("stands every slice square to the path, so the pipe keeps its size", () => {
+    const pair = facingFaces(cylinder("low", 20, 10, 0), cylinder("high", 20, 10, 50, 18))!;
+    const input = blendLoftInput(pair.a, pair.b, normalizeBlend({ keepDiameter: true }))!;
+    expect(input).toBeTruthy();
+    const frames = input.rings.map(ringFrame);
+    for (let i = 2; i < frames.length - 2; i += 1) {
+      const along = [0, 1, 2].map((k) => frames[i + 1].c[k] - frames[i - 1].c[k]);
+      const len = Math.hypot(...along);
+      const dot = Math.abs(along.reduce((sum, v, k) => sum + (v / len) * frames[i].n[k], 0));
+      expect(dot).toBeGreaterThan(0.985);
+    }
+  });
+
+  it("says how much further apart the parts need to be when they are too close, and then it works", () => {
+    const tight = facingFaces(cylinder("low", 20, 10, 0), cylinder("high", 20, 10, 16, 20))!;
+    const settings = normalizeBlend({ keepDiameter: true });
+    expect(blendShape(tight.a, tight.b, settings, { name: "B", color: "#888" })).toBeNull();
+    const gap = blendKeepDiameterShortfall(tight.a, tight.b, settings)!;
+    expect(gap).toBeGreaterThan(0);
+    const moved = facingFaces(cylinder("low", 20, 10, 0), cylinder("high", 20, 10, 16 + gap, 20))!;
+    expect(blendShape(moved.a, moved.b, settings, { name: "B", color: "#888" })).not.toBeNull();
+    // Without the option the tight pair still blends, as before.
+    expect(blendShape(tight.a, tight.b, normalizeBlend({}), { name: "B", color: "#888" })).not.toBeNull();
   });
 });

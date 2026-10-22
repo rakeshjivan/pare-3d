@@ -109,7 +109,7 @@ import { HolePatternPanel } from "./workplane/HolePatternPanel";
 import { FaceToolPanel } from "./workplane/FaceToolPanel";
 import { DEFAULT_FACE_TOOL, FACE_TOOL_MIN_DEPTH, faceToolSettingsOn, normalizeFaceTool, type FaceToolSettings } from "@/lib/faceTool";
 import { pullToFaceTool } from "@/lib/facePull";
-import { blendCanBeHollow, blendFacePoint, blendLoftInput, blendPositions, meshPositionsVolume, blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend, type BlendFace, type BlendSettings } from "@/lib/blend";
+import { blendCanBeHollow, blendFacePoint, blendKeepDiameterShortfall, blendLoftInput, blendPositions, meshPositionsVolume, blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend, type BlendFace, type BlendSettings } from "@/lib/blend";
 import { BlendPanel } from "./workplane/BlendPanel";
 import { faceToolBody } from "@/lib/faceToolBody";
 import { DEFAULT_HOLE_PATTERN, normalizeHolePattern, type HolePatternSettings } from "@/lib/holePattern";
@@ -3652,6 +3652,15 @@ export function LayerlingEditor({
       return null;
     }
   }, [blendTool, shapes]);
+  // Fork (build 31): with Keep the diameter on and no piece, how much further apart the parts need to be.
+  const blendKeepShortfall = useMemo(() => {
+    if (!blendTool?.settings.keepDiameter || blendPreview || !blendTool.faces[0] || !blendTool.faces[1]) return 0;
+    try {
+      return blendKeepDiameterShortfall(blendTool.faces[0], blendTool.faces[1], blendTool.settings);
+    } catch {
+      return null;
+    }
+  }, [blendPreview, blendTool]);
   const holePatternPreview = useMemo(
     () => (holePatternTool?.face
       ? holePatternShapes(holePatternTool.face, holePatternTool.settings, t("holePattern.holeName"), "hole-pattern-preview")
@@ -13958,6 +13967,7 @@ export function LayerlingEditor({
           }) as [string, string]}
           ready={Boolean(blendPreview)}
           editing={Boolean(blendTool.edit)}
+          keepShortfall={blendKeepShortfall}
           canHollow={Boolean(blendTool.faces[0] && blendTool.faces[1] && blendCanBeHollow(blendTool.faces[0], blendTool.faces[1]))}
           settings={blendTool.settings}
           workspace={workspaceSettings}
