@@ -109,6 +109,8 @@ import { HolePatternPanel } from "./workplane/HolePatternPanel";
 import { FaceToolPanel } from "./workplane/FaceToolPanel";
 import { DEFAULT_FACE_TOOL, FACE_TOOL_MIN_DEPTH, faceToolSettingsOn, normalizeFaceTool, type FaceToolSettings } from "@/lib/faceTool";
 import { pullToFaceTool } from "@/lib/facePull";
+import { blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend, type BlendFace, type BlendSettings } from "@/lib/blend";
+import { BlendPanel } from "./workplane/BlendPanel";
 import { faceToolBody } from "@/lib/faceToolBody";
 import { DEFAULT_HOLE_PATTERN, normalizeHolePattern, type HolePatternSettings } from "@/lib/holePattern";
 import { holePatternShapes, readPerforableFace, type PerforableFace } from "@/lib/holePatternShapes";
@@ -195,7 +197,7 @@ import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, tra
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
-import { FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
+import { FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
 import { BookOpen, Import, Keyboard, Settings as LucideSettings, StickyNote, Upload } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
@@ -306,6 +308,7 @@ type TopPanel = "import" | "export" | null;
 /** Fork (build 21): which library shapes are on show, so a new shape whose neighbour is missing still appears. */
 /** Fork (build 24): the face tool's live preview, which can be grabbed and dragged again. */
 const FACE_TOOL_PREVIEW_ID = "face-tool-preview";
+const BLEND_PREVIEW_ID = "blend-preview";
 const libraryShapeIds: ReadonlySet<string> = new Set(libraryShapeAssets.map((shape) => shape.id));
 
 const HISTORY_VIEW_COMMANDS = new Set(["history", "export", "guide", "shortcuts"]);
@@ -3595,6 +3598,22 @@ export function LayerlingEditor({
     [arrayTool, selectedShapes],
   );
   // The holes a hole pattern would cut, shown on the face until "Create".
+  // Fork (build 25): Blend's state and its live piece (the tool itself is further down).
+  const [blendTool, setBlendTool] = useState<{
+    ids: [string, string];
+    faces: [BlendFace | null, BlendFace | null];
+    settings: BlendSettings;
+    busy: boolean;
+  } | null>(null);
+  const blendPreview = useMemo(() => {
+    if (!blendTool?.faces[0] || !blendTool.faces[1]) return null;
+    const first = shapes.find((shape) => shape.id === blendTool.ids[0]);
+    try {
+      return blendShape(blendTool.faces[0], blendTool.faces[1], blendTool.settings, { name: t("blend.pieceName"), color: first?.color ?? "#888888", id: BLEND_PREVIEW_ID });
+    } catch {
+      return null;
+    }
+  }, [blendTool, shapes]);
   const holePatternPreview = useMemo(
     () => (holePatternTool?.face
       ? holePatternShapes(holePatternTool.face, holePatternTool.settings, t("holePattern.holeName"), "hole-pattern-preview")
@@ -3609,6 +3628,8 @@ export function LayerlingEditor({
         ? [...shapes, ...holePatternPreview.holes]
         : faceToolPreview?.shape
         ? [...shapes, faceToolPreview.shape]
+        : blendPreview
+        ? [...shapes, blendPreview]
         : edgeModifier?.preview && cadModifierBaseShapeRef.current
         ? shapes.map((shape) => shape.id === cadModifierBaseShapeRef.current?.id ? edgeModifier.preview as WorkplaneShape : shape)
         : alignMode && alignPreview
@@ -3616,7 +3637,7 @@ export function LayerlingEditor({
         : mirrorMode && mirrorPreviewAxis
           ? mirroredShapesForSelection(shapes, selectedIds, selectedShapes, mirrorPreviewAxis).nextShapes
           : shapes,
-    [alignAxes, alignMode, alignPreview, arrayPreview, edgeModifier?.preview, effectiveAlignAnchorId, faceToolPreview, holePatternPreview, mirrorMode, mirrorPreviewAxis, selectedIds, selectedShapes, shapes],
+    [alignAxes, alignMode, alignPreview, arrayPreview, blendPreview, edgeModifier?.preview, effectiveAlignAnchorId, faceToolPreview, holePatternPreview, mirrorMode, mirrorPreviewAxis, selectedIds, selectedShapes, shapes],
   );
   // The preview of an intersection (#372): the operands see-through, and what they share as a body of its own on top.
   const [intersectPreviewIds, setIntersectPreviewIds] = useState<string[] | null>(null);
@@ -8173,6 +8194,96 @@ export function LayerlingEditor({
     setNotice(t("status.facePullCancelled"));
   }, []);
 
+  // Fork (build 25): Blend - a smooth piece from a flat face of one selected body to a flat face of
+  // the other (Fusion's loft between faces). The facing faces are found; a click on another flat
+  // face of either body uses that one. Enter or Create joins all three; Esc puts it away.
+  const toggleBlendTool = useCallback(() => {
+    if (blendTool) {
+      setBlendTool(null);
+      setNotice(t("blend.cancelled"));
+      return;
+    }
+    if (refuseLockedSelection()) return;
+    const solids = selectedShapes.filter((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind));
+    if (selectedShapes.length !== 2 || solids.length !== 2) {
+      setNotice(t("blend.selectTwo"));
+      return;
+    }
+    if (edgeModifier || shellTool || deleteFaceTool || splitSession || simplifyToolId || faceTool) {
+      setNotice(t("status.faceToolOtherTool"));
+      return;
+    }
+    stopCruise();
+    setHolePatternTool(null);
+    setMateTool(null);
+    setArrayTool(null);
+    const pair = facingFaces(solids[0], solids[1]);
+    setBlendTool({ ids: [solids[0].id, solids[1].id], faces: pair ? [pair.a, pair.b] : [null, null], settings: DEFAULT_BLEND, busy: false });
+    setNotice(t(pair ? "blend.ready" : "blend.noFacing"));
+  }, [blendTool, deleteFaceTool, edgeModifier, faceTool, refuseLockedSelection, selectedShapes, shellTool, simplifyToolId, splitSession, stopCruise]);
+  const pickBlendFace = useCallback((pick: LayFlatPick | null) => {
+    setBlendTool((tool) => {
+      if (!tool) return tool;
+      const side = pick ? tool.ids.indexOf(pick.shapeId) : -1;
+      const body = side >= 0 ? shapesRef.current.find((shape) => shape.id === tool.ids[side]) : null;
+      if (!pick || side < 0 || !body) {
+        setNotice(t("blend.missed"));
+        return tool;
+      }
+      const read = readPerforableFace(worldTrianglePositions(body), pick.point, pick.normal);
+      if (!read.ok) {
+        setNotice(t(read.reason === "curved" ? "blend.curved" : "blend.missed"));
+        return tool;
+      }
+      const faces: [BlendFace | null, BlendFace | null] = [...tool.faces];
+      faces[side] = { shapeId: body.id, face: read.face, normal: pick.normal };
+      setNotice(t(faces[0] && faces[1] ? "blend.ready" : "blend.pick"));
+      return { ...tool, faces };
+    });
+  }, []);
+  const applyBlend = useCallback(async () => {
+    const tool = blendTool;
+    if (!tool || tool.busy || !blendPreview) return;
+    const bodies = tool.ids.map((id) => shapesRef.current.find((shape) => shape.id === id));
+    if (!bodies[0] || !bodies[1]) return;
+    setBlendTool({ ...tool, busy: true });
+    const piece = { ...blendPreview, id: createLocalId("mesh"), name: t("blend.pieceName") };
+    const fingerprint = projectShapesFingerprint(shapesRef.current);
+    const result = await buildGroupedShapeFromSelection([bodies[0], bodies[1], piece], workspaceSettingsRef.current.booleanTriangleLimit);
+    if (projectShapesFingerprint(shapesRef.current) !== fingerprint) {
+      setBlendTool(null);
+      setNotice(t("status.groupChanged"));
+      return;
+    }
+    if (!result.group) {
+      setBlendTool((current) => (current ? { ...current, busy: false } : current));
+      setNotice(result.failureNotice);
+      return;
+    }
+    const group = canonicalizeShape({ ...result.group, groupOperation: "group" });
+    setBlendTool(null);
+    commitShapes([...shapesRef.current.filter((shape) => !tool.ids.includes(shape.id)), group], group.id, t("blend.created"));
+  }, [blendPreview, blendTool, commitShapes]);
+  // The tool belongs to the two bodies it was started for.
+  useEffect(() => {
+    if (!blendTool) return;
+    const same = selectedIds.length === 2 && blendTool.ids.every((id) => selectedIds.includes(id));
+    if (!same || faceTool || edgeModifier || shellTool || splitSession) setBlendTool(null);
+  }, [blendTool, edgeModifier, faceTool, selectedIds, shellTool, splitSession]);
+  useEffect(() => {
+    if (!blendTool || blendTool.busy) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void applyBlend();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [applyBlend, blendTool]);
+
 
   // Like the hole pattern, the tool belongs to the body it was started for and gives way to the other tools.
   useEffect(() => {
@@ -12226,6 +12337,11 @@ export function LayerlingEditor({
           setNotice(t("status.faceToolCancelled"));
           return;
         }
+        if (blendTool) {
+          setBlendTool(null);
+          setNotice(t("blend.cancelled"));
+          return;
+        }
         if (deleteFaceTool) {
           // While the faces are being deleted Esc waits, so a refusal still reaches the panel.
           if (deleteFaceTool.busy) return;
@@ -12755,6 +12871,9 @@ export function LayerlingEditor({
         canHolePattern={selectedShapes.length === 1 && Boolean(selectedShape && !selectedShape.locked && !selectedShape.hole && !isNonSolidShapeKind(selectedShape.kind))}
         onFaceTool={toggleFaceTool}
         faceToolActive={Boolean(faceTool)}
+        onBlendBodies={toggleBlendTool}
+        blendBodiesActive={Boolean(blendTool)}
+        canBlendBodies={!selectionLocked && selectedShapes.length === 2 && selectedShapes.every((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind))}
         canFaceTool={selectedShapes.length === 1 && Boolean(selectedShape && !selectedShape.locked && !selectedShape.hole && !isNonSolidShapeKind(selectedShape.kind))}
         onGroup={groupSelected}
         onBundle={bundleSelected}
@@ -13085,13 +13204,15 @@ export function LayerlingEditor({
               ? { shapeIds: [holePatternTool.sourceId] }
               : faceTool && !faceTool.busy
                 ? { shapeIds: [faceTool.sourceId] }
-                : null}
+                : blendTool && !blendTool.busy
+                  ? { shapeIds: [...blendTool.ids] }
+                  : null}
           facePull={faceTool && !faceTool.busy && !mateTool && !holePatternTool ? { shapeIds: [faceTool.sourceId, FACE_TOOL_PREVIEW_ID] } : null}
           onFacePullStart={startFacePull}
           onFacePullDrag={dragFacePull}
           onFacePullEnd={endFacePull}
           onFacePullCancel={cancelFacePull}
-          onMateFacePick={mateTool ? pickMateFace : faceTool ? pickFaceToolFace : pickHolePatternFace}
+          onMateFacePick={mateTool ? pickMateFace : faceTool ? pickFaceToolFace : blendTool ? pickBlendFace : pickHolePatternFace}
           cadFacePick={historyViewState ? null : cadFacePick}
           onCadFacePick={toggleDeleteFace}
           onNoteAdd={addNote}
@@ -13305,6 +13426,24 @@ export function LayerlingEditor({
           onCancel={() => {
             setFaceTool(null);
             setNotice(t("status.faceToolCancelled"));
+          }}
+        />
+      ) : null}
+      {blendTool ? (
+        <BlendPanel
+          names={[0, 1].map((side) => {
+            const body = shapes.find((shape) => shape.id === blendTool.ids[side]);
+            return body ? displayShapeName(body) : "";
+          }) as [string, string]}
+          ready={Boolean(blendPreview)}
+          settings={blendTool.settings}
+          workspace={workspaceSettings}
+          busy={blendTool.busy}
+          onChange={(patch) => setBlendTool((tool) => (tool ? { ...tool, settings: normalizeBlend({ ...tool.settings, ...patch }) } : tool))}
+          onApply={() => void applyBlend()}
+          onCancel={() => {
+            setBlendTool(null);
+            setNotice(t("blend.cancelled"));
           }}
         />
       ) : null}
@@ -13821,6 +13960,9 @@ function SecondaryToolbar({
   holePatternActive,
   canHolePattern,
   onFaceTool,
+  onBlendBodies,
+  blendBodiesActive,
+  canBlendBodies,
   faceToolActive,
   canFaceTool,
   onGroup,
@@ -13956,6 +14098,9 @@ function SecondaryToolbar({
   holePatternActive: boolean;
   canHolePattern: boolean;
   onFaceTool: () => void;
+  onBlendBodies: () => void;
+  blendBodiesActive: boolean;
+  canBlendBodies: boolean;
   faceToolActive: boolean;
   canFaceTool: boolean;
   onGroup: () => void;
@@ -14294,6 +14439,8 @@ function SecondaryToolbar({
     { id: "ungroup", label: t("editor.tool.ungroup"), icon: ToolbarUngroupIcon, action: onUngroup, enabled: canUngroup },
     { id: "intersect", label: t("editor.tool.intersect"), icon: ToolbarIntersectionIcon, action: onIntersect, enabled: canIntersect || intersectPreviewActive },
     { id: "intersect-preview", label: t("editor.tool.intersectPreview"), icon: Blend, action: onIntersectPreview, enabled: canIntersect || intersectPreviewActive, active: intersectPreviewActive },
+    // Fork (build 25): a smooth piece joining two bodies.
+    { id: "blendBodies", label: t("blend.title"), icon: ForkBlendIcon, action: onBlendBodies, enabled: canBlendBodies || blendBodiesActive, active: blendBodiesActive },
   ];
   const modifyTools = [
     { id: "mirror", label: t("editor.tool.mirror"), icon: ToolbarMirrorIcon, action: onMirror, enabled: canModifySelection, active: mirrorMode },

@@ -1227,3 +1227,10 @@ html[data-theme="dark"] { --toolbar-icon-disabled: #7f776d; }
   white-space: nowrap; font-variant-numeric: tabular-nums;
 }
 .face-pull-readout.pocket { background: #d9480f; }
+
+/* Fork (build 25): the Blend panel. */
+.blend-hint { margin: -2px 0 8px; padding: 0 14px; font: 500 11.5px/1.35 var(--font-ui); color: var(--muted-strong); }
+.blend-twist { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.blend-twist-buttons { display: flex; gap: 4px; }
+.blend-twist-buttons button { display: inline-grid; place-items: center; min-width: 30px; height: 28px; padding: 0 8px; color: var(--foreground); background: var(--subbar); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font: 600 12px var(--font-ui); }
+.blend-twist-buttons button.quiet { color: var(--muted-strong); background: transparent; border-color: transparent; }

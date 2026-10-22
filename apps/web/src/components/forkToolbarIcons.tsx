@@ -243,6 +243,20 @@ export function ForkShapesIcon(props: IconProps) {
   );
 }
 
+/** Fork (build 25): Blend - a wide end and a narrow end joined by a smooth flare, the flare in the accent colour. */
+export function ForkBlendIcon(props: IconProps) {
+  return (
+    <ForkIcon {...props}>
+      <path d="M14 15c8 0 10 5 16 6.5S34 22 34 22v4s-0 0-4 .5S22 33 14 33Z" {...ACCENT} />
+      <rect x="4" y="13" width="10" height="22" rx="2" {...SOFT} />
+      <rect x="4" y="13" width="10" height="22" rx="2" />
+      <rect x="34" y="19" width="10" height="10" rx="2" {...SOFT} />
+      <rect x="34" y="19" width="10" height="10" rx="2" />
+      <path d="M14 13c9 0 11 6 20 6M14 35c9 0 11-6 20-6" />
+    </ForkIcon>
+  );
+}
+
 /** Tool id (as in data-layerling-tool) to its Pare 3D icon. */
 export function ForkReadyPartsIcon(props: IconProps) {
   // Fork (build 22): finer - a box and a nut, drawn in line; the nut's hole carries the colour.
@@ -306,6 +320,7 @@ export function ForkSpaceOutIcon(props: IconProps) {
 
 export const FORK_TOOL_ICONS: Readonly<Record<string, ComponentType<IconProps>>> = {
   readyParts: ForkReadyPartsIcon,
+  blendBodies: ForkBlendIcon,
   lithophane: ForkLithophaneIcon,
   voronoi: ForkVoronoiIcon,
   spaceOut: ForkSpaceOutIcon,
@@ -331,6 +346,7 @@ export const FORK_SHORT_LABELS_EN: Readonly<Record<string, string>> = {
   lithophane: "Lithophane",
   voronoi: "Voronoi",
   trace: "Trace",
+  blendBodies: "Blend",
   spaceOut: "Space out",
   copy: "Copy",
   paste: "Paste",
@@ -418,5 +434,6 @@ export const FORK_TOOL_HINTS_EN: Readonly<Record<string, string>> = {
   lithophane: "a photo that shows when light shines through",
   voronoi: "an organic web pattern for panels and vents",
   trace: "photo of a tool or logo on paper to an outline at its real size",
+  blendBodies: "join two selected parts with a smooth piece between their facing flat faces",
   spaceOut: "space parts evenly or arrange them on the plate",
 };
