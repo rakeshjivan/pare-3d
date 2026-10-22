@@ -4,6 +4,7 @@ import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { Check, X } from "lucide-react";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
+import { MoreOptions } from "@/components/workplane/MoreOptions";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import { ARRAY_MAX_COUNT, ARRAY_MIN_COUNT, GRID_MAX_SIDE, type ArrayDirection, type ArrayMode, type ArraySettings } from "@/lib/shapeArray";
@@ -179,6 +180,8 @@ export function ArrayPanel({
             workspace={workspace}
             onChange={(value) => onChange({ angle: value })}
           />
+          {/* Fork (build 32): the count and the angle up front; spirals, the centre and turning the copies fold away. */}
+          <MoreOptions id="pattern-circle" forceOpen={settings.rise !== 0 || settings.radiusChange !== 0}>
           <EdgeModifierSlider
             label={t("array.rise")}
             value={settings.rise}
@@ -236,6 +239,7 @@ export function ArrayPanel({
               ))}
             </div>
           </div>
+          </MoreOptions>
         </>
       )}
 

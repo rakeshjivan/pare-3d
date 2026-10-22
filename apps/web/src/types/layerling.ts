@@ -546,6 +546,10 @@ export type EdgeTreatmentFeature = {
   /** The edges picked, as the tool numbered them on the body before this treatment: "Edit" picks them again (#227). */
   edgeIds?: number[];
   chamferAngle?: number;
+  /** Fork (build 32): how the chamfer's shape was set: equal sides, an angle or two distances. */
+  chamferStyle?: "equal" | "angle" | "distances";
+  /** Fork (build 32): a fillet's radius at the edge's end, when it changed along it; `amount` is its start. */
+  endAmount?: number;
   openings?: ShellOpenings;
   /** Only for "shell"; missing means "round". */
   shellEdges?: ShellEdges;

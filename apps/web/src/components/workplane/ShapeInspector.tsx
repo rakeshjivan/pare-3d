@@ -4396,51 +4396,57 @@ function RangeProperty({
     onChange(clamp(toModelValue(next), min, max));
     setDraft(formatShown(next));
   };
+  // Fork (build 32): Tinkercad's compact row - the name above, and the value box riding on the slider as its
+  // handle. Dragging it slides; a click on it without moving opens it for typing.
+  const bubbleRef = useRef<HTMLSpanElement>(null);
+  const pressRef = useRef<{ x: number; onBubble: boolean } | null>(null);
+  const valueField = (
+    <span className="range-value-control range-bubble" ref={bubbleRef}>
+      <input
+        ref={numberInputRef}
+        type="text"
+        value={editing ? draft : formatShown(controlValue)}
+        disabled={disabled}
+        inputMode={unit === "in" ? "text" : "decimal"}
+        title={shownFormula ? `= ${shownFormula}` : undefined}
+        data-formula={shownFormula ? "" : undefined}
+        onFocus={(event) => {
+          holdInteraction(true);
+          const opening = openingDraft();
+          openedWithRef.current = opening;
+          setDraft(opening);
+          setEditing(true);
+          selectWholeValue(event.currentTarget);
+        }}
+        onChange={(event) => {
+          keepSelectedRef.current = false;
+          setDraft(event.currentTarget.value);
+        }}
+        onBlur={() => {
+          keepSelectedRef.current = false;
+          commitDraft();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          } else if (event.key === "Escape") {
+            setDraft(openingDraft());
+            setEditing(false);
+          }
+        }}
+      />
+      {unit ? <span className={`range-value-unit${unit === "°" ? " degree" : ""}`}>{unit}</span> : null}
+    </span>
+  );
   const row = (
-    <label className="range-property" data-property={id} style={{ "--slider-pos": `${position}%` } as CSSProperties}>
+    <label className={`range-property compact${editing ? " editing" : ""}`} data-property={id} style={{ "--slider-pos": `${position}%`, "--slider-frac": String(position / 100) } as CSSProperties}>
       <span className="range-property-header">
         <span className="range-property-name">{label}{onReset ? <PropertyResetButton onClick={onReset} /> : null}</span>
-        <span className="range-value-control">
-          <input
-            ref={numberInputRef}
-            type="text"
-            value={editing ? draft : formatShown(controlValue)}
-            disabled={disabled}
-            inputMode={unit === "in" ? "text" : "decimal"}
-            title={shownFormula ? `= ${shownFormula}` : undefined}
-            data-formula={shownFormula ? "" : undefined}
-            onFocus={(event) => {
-              holdInteraction(true);
-              const opening = openingDraft();
-              openedWithRef.current = opening;
-              setDraft(opening);
-              setEditing(true);
-              selectWholeValue(event.currentTarget);
-            }}
-            onChange={(event) => {
-              keepSelectedRef.current = false;
-              setDraft(event.currentTarget.value);
-            }}
-            onBlur={() => {
-              keepSelectedRef.current = false;
-              commitDraft();
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              } else if (event.key === "Escape") {
-                setDraft(openingDraft());
-                setEditing(false);
-              }
-            }}
-          />
-          {unit ? <span className={`range-value-unit${unit === "°" ? " degree" : ""}`}>{unit}</span> : null}
-        </span>
       </span>
       <div className="range-control">
         <input
           type="range"
-          // Out of the Tab order: the number field above is the keyboard's way in, and Tab goes on to the next value (#300).
+          // Out of the Tab order: the value box is the keyboard's way in, and Tab goes on to the next value (#300).
           tabIndex={-1}
           min={controlMin}
           max={controlMax}
@@ -4449,22 +4455,32 @@ function RangeProperty({
           disabled={disabled}
           onFocus={() => holdInteraction(true)}
           onBlur={() => holdInteraction(false)}
-          onPointerDown={() => {
+          onPointerDown={(event) => {
             window.clearTimeout(sliderReleaseTimerRef.current);
             draggingSliderRef.current = true;
             holdInteraction(true);
+            const box = bubbleRef.current?.getBoundingClientRect();
+            pressRef.current = { x: event.clientX, onBubble: Boolean(box && event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top - 4 && event.clientY <= box.bottom + 4) };
           }}
-          onPointerUp={() => {
+          onPointerUp={(event) => {
             endSliderDrag();
             holdInteraction(false);
+            const press = pressRef.current;
+            pressRef.current = null;
+            // A click on the value box, not a drag: type the value.
+            if (press?.onBubble && Math.abs(event.clientX - press.x) < 4 && !disabled) {
+              window.setTimeout(() => numberInputRef.current?.focus(), 0);
+            }
           }}
           onPointerCancel={() => {
             endSliderDrag();
             holdInteraction(false);
+            pressRef.current = null;
           }}
           onChange={(event) => handleSliderChange(Number(event.currentTarget.value))}
           onDoubleClick={() => onDefault?.()}
         />
+        {valueField}
       </div>
     </label>
   );

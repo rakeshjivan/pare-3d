@@ -4,6 +4,7 @@ import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { Check, LoaderCircle, X } from "lucide-react";
 import { EdgeFeatureHistory, EdgeModifierSlider, type EdgeHistoryOption } from "@/components/workplane/EdgeModifierPanel";
+import { MoreOptions } from "@/components/workplane/MoreOptions";
 import { cadModifierUserErrorMessage } from "@/lib/cadModifierRuntime";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -134,6 +135,8 @@ export function ShellPanel({
         <span className="shell-openings-summary">{openSides.length === 0 ? t("shell.sidesNone") : t("shell.sidesHint")}</span>
       </div>
 
+      {/* Fork (build 32): the wall and the open sides up front; the shape of the inner edges folds away. */}
+      <MoreOptions id="hollow" forceOpen={edges !== "round"}>
       <div className="edge-modifier-field shell-openings" role="radiogroup" aria-label={t("shell.edges")}>
         <span>{t("shell.edges")}</span>
         <div className="shell-opening-options">
@@ -153,6 +156,7 @@ export function ShellPanel({
         </div>
         <span className="shell-openings-summary">{t("shell.edgesHint")}</span>
       </div>
+      </MoreOptions>
 
       {error ? <div className="edge-modifier-error" role="alert">{shellErrorMessage(error, roundedEdgesHint)}</div> : null}
       <div className="edge-modifier-footer">

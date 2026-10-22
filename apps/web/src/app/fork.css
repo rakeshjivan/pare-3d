@@ -1269,3 +1269,64 @@ html[data-theme="dark"] .range-property[data-property="rotateZ"] { --axis-colour
 .mesh-check-actions button.primary { background: var(--accent, #1662b3); border-color: var(--accent, #1662b3); color: #fff; }
 .blend-warning { color: #b45309; font-weight: 600; }
 html[data-theme="dark"] .blend-warning { color: #fbbf24; }
+
+/* Fork (build 32): the fillet and chamfer window - sizes to click, "Largest that fits", More options. */
+.edge-size-presets { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 12px; }
+.edge-size-presets button,
+.edge-more-toggle,
+.edge-modifier-secondary-action,
+.edge-modifier-error-action {
+  min-height: 28px; padding: 0 10px; border: 1px solid var(--border, #d8c8b7); border-radius: 7px;
+  background: var(--subbar, #f4f6f8); color: var(--foreground); font: 600 12px var(--font-ui); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.edge-size-presets button { min-width: 38px; justify-content: center; }
+.edge-size-presets button.active { border-color: var(--accent, #1662b3); color: var(--accent, #1662b3); background: color-mix(in srgb, var(--accent, #1662b3) 10%, transparent); }
+.edge-size-presets button:disabled,
+.edge-modifier-secondary-action:disabled { opacity: 0.5; cursor: default; }
+.edge-size-presets .edge-size-largest { margin-left: auto; }
+.edge-more-toggle { width: 100%; justify-content: flex-start; margin: 10px 0 8px; background: transparent; }
+.edge-more-options { display: grid; gap: 4px; padding: 8px 0 2px; border-top: 1px solid var(--border, #e3e7ec); }
+.edge-modifier-secondary-action { justify-self: start; margin: 2px 0 8px; }
+.edge-modifier-error-action { display: flex; margin-top: 8px; background: #fff; color: #9f2730; border-color: #efc4c8; }
+html[data-theme="dark"] .edge-modifier-error-action { background: transparent; color: #ffb4b9; }
+.edge-kind-switch { margin-bottom: 8px; }
+.edge-kind-switch .shell-opening-options,
+.edge-more-options .shell-opening-options.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.edge-kind-switch .shell-opening-options button,
+.edge-more-options .shell-opening-options.three button { padding-inline: 4px; }
+.edge-size-presets .edge-size-largest { margin-left: 0; flex: 1 0 auto; }
+
+/* Fork (build 32): Tinkercad's compact property row - the name small above, the value box riding on
+   the slider as its handle. The real thumb is as wide as the box and invisible, so dragging the box
+   drags the slider; a click without moving opens the box for typing (ShapeInspector RangeProperty). */
+.range-property.compact { --bubble-w: 80px; --bubble-h: 26px; gap: 1px; font-size: 12px; }
+.range-property.compact .range-property-header { min-height: 16px; }
+.range-property.compact .range-property-name { font-size: 12px; font-weight: 650; }
+.range-property.compact .range-control { height: 30px; padding: 0; }
+.range-property.compact .range-control input[type="range"] { height: 30px; }
+.range-property.compact .range-control input[type="range"]::-webkit-slider-runnable-track { height: 4px; }
+.range-property.compact .range-control input[type="range"]::-webkit-slider-thumb {
+  width: var(--bubble-w); height: var(--bubble-h); margin-top: calc((4px - var(--bubble-h)) / 2);
+  opacity: 0; border: 0; box-shadow: none; cursor: grab;
+}
+.range-property.compact .range-control input[type="range"]::-moz-range-track { height: 4px; }
+.range-property.compact .range-control input[type="range"]::-moz-range-thumb { width: var(--bubble-w); height: var(--bubble-h); opacity: 0; border: 0; }
+.range-property.compact .range-bubble {
+  position: absolute; top: 50%; left: calc((100% - var(--bubble-w)) * var(--slider-frac, 0));
+  transform: translateY(-50%); width: var(--bubble-w); min-width: 0; height: var(--bubble-h); min-height: 0;
+  padding: 0 8px; gap: 3px; justify-content: center; pointer-events: none;
+  background: var(--panel, #fff); border: 1.5px solid var(--accent, #1662b3); border-radius: calc(var(--bubble-h) / 2);
+  box-shadow: 0 1px 4px rgba(20, 30, 45, 0.18);
+}
+.range-property.compact.editing .range-bubble { pointer-events: auto; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #1662b3) 22%, transparent); }
+.range-property.compact .range-bubble input { width: 100%; height: calc(var(--bubble-h) - 3px); font-size: 12.5px; text-align: center; }
+.range-property.compact .range-bubble .range-value-unit { font-size: 10px; }
+.range-property.compact[data-property^="rotate"] .range-bubble { border-color: var(--axis-colour); }
+.range-property.compact .range-control input[type="range"]:disabled + .range-bubble { opacity: 0.55; }
+.property-list:has(> .range-property.compact) { gap: 8px; }
+/* Fork (build 32): the Make window's groups. */
+.ready-parts-category { margin: 14px 2px 4px; font: 700 11px/1.2 var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-strong, #5b6673); }
+.ready-parts-list > .ready-parts-category:first-of-type { margin-top: 4px; }
+.ready-part-maker-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 9px; background: var(--subbar, #f4f6f8); color: var(--accent, #1662b3); }
+.ready-part-maker-icon svg { width: 24px; height: 24px; }

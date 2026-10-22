@@ -7,6 +7,8 @@ summary: Where your designs live, how to back them up, which formats Pare 3D imp
 
 Pare 3D saves everything on your computer - inside the app, or in the browser if you use it there. There is no account and nothing is uploaded. Every change saves itself. The preview picture on the start page shows the view you last had in front of you when you went back with {{ui:editor.homeDashboard}}. If you open Pare 3D in the same browser days later, everything is there.
 
+In the Mac and Windows app, each design is kept as a file in the app's own folder (on a Mac, `~/Library/Application Support/Pare 3D/designs`; on Windows, `%LOCALAPPDATA%\Pare 3D\designs`). Only your disk limits how much fits. Older versions kept designs in the app's built-in browser storage, which has a size limit of its own: when it filled up, saving failed with "not enough space for domain". The first time you open a version that keeps designs on disk, Pare 3D moves your existing designs there by itself. In a web browser, designs stay in the browser's storage.
+
 If you go back to the start page from a design with nothing in it, Pare 3D asks whether to keep it. {{ui:confirm.yes}} or [[Enter]] keeps it, {{ui:confirm.no}} removes it, so empty designs do not pile up. For a design in a shared folder on a server, {{ui:confirm.no}} deletes the file from the server, for everyone who uses it.
 
 That has a downside: whoever clears the browser storage or switches to another computer loses the designs. **So back up important work into a file** - or let Pare 3D do it for you.
@@ -103,17 +105,17 @@ Downloaded STL, OBJ and 3MF files are often not quite solid: a face is missing, 
 - **{{ui:meshCheck.makeSolid}}** closes every opening with a flat cap - an opening with another inside it, like the rim of a missing face that had a hole in it, gets a ring-shaped cap, so the hole stays open - turns all the triangles outward and checks that the result is a closed solid. If it can only be partly repaired, the message says so.
 - **{{ui:meshCheck.leave}}** keeps the mesh as it is.
 
-You can run the check again any time: right-click the part and choose {{ui:contextMenu.makeSolid}}, or search for it with [[Ctrl]]+[[K]].
+You can run the check again any time: select the part and click **Make solid** in the {{ui:editor.group.mesh}} group of the toolbar - it appears only while an imported mesh is selected, together with **Fill hole**, **Simplify** and **Cut below** - or right-click the part and choose {{ui:contextMenu.makeSolid}}, or search for it with [[Ctrl]]+[[K]].
 
 ### Filling a hole
 
-To fill a screw hole, a bore or a nut trap in an imported part - to drill it again somewhere else, say - right-click the part, choose {{ui:contextMenu.fillHole}} and click the inside wall of the hole. Pare 3D finds the hole's surface around your click, makes a plug that fits it and joins it to the part, flush with the faces around it. Round, square and hexagonal holes work, through or blind; a counterbore or countersink is filled one step at a time, a click for each. Click the next hole, or press [[Esc]] when you are done. A click on an outside face or into an inside corner is refused - that is not a hole.
+To fill a screw hole, a bore or a nut trap in an imported part - to drill it again somewhere else, say - click **Fill hole** in the {{ui:editor.group.mesh}} group (or right-click the part and choose {{ui:contextMenu.fillHole}}) and click the inside wall of the hole. Pare 3D finds the hole's surface around your click, makes a plug that fits it and joins it to the part, flush with the faces around it. Round, square and hexagonal holes work, through or blind; a counterbore or countersink is filled one step at a time, a click for each. Click the next hole, or press [[Esc]] when you are done. A click on an outside face or into an inside corner is refused - that is not a hole.
 
 Fill a hole is for imported meshes. In a part built in Pare 3D the hole is a part of its own: open the group with [[E]] and delete it.
 
 ## Simplifying an imported mesh
 
-A scanned or sculpted mesh often has far more triangles than its shape needs, and every one of them is carried along while you move, cut and save. {{ui:simplify.title}} in the Modify group (or in the right-click menu of the body) shows the mesh as it is next to what a chosen share of its triangles would leave of it; both views turn and zoom together with the mouse buttons of the workplane. Set how much to keep as a percentage or a number of triangles, and {{ui:simplify.apply}} takes the lighter mesh. The result is a plain mesh: for the result of a cut or merge, {{ui:group.edit}} and its original parts are given up.
+A scanned or sculpted mesh often has far more triangles than its shape needs, and every one of them is carried along while you move, cut and save. {{ui:simplify.title}} in the {{ui:editor.group.mesh}} group (or in the right-click menu of the body) shows the mesh as it is next to what a chosen share of its triangles would leave of it; both views turn and zoom together with the mouse buttons of the workplane. Set how much to keep as a percentage or a number of triangles, and {{ui:simplify.apply}} takes the lighter mesh. The result is a plain mesh: for the result of a cut or merge, {{ui:group.edit}} and its original parts are given up.
 
 Cutting, merging and intersecting an imported mesh is calculated in your browser, so the workspace settings limit how many triangles such a mesh may have ({{ui:workspace.booleanTriangleLimit}}). A mesh above the limit is not processed, and the message names its triangle count; simplify the mesh first, or raise the limit if your computer can take it.
 

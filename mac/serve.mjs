@@ -8,6 +8,8 @@
 //    /__pare3d/update tells the page what happened.
 //  - /__files: where exports and backups go, chosen with the system's own folder picker (runtime 3);
 //    POST /__files/save writes an export there, or asks where with the system's save dialog.
+//  - /__designs (runtime 5): the designs themselves, one file each in the app's data folder, so they
+//    are not held in the browser engine's storage, whose quota ran out on a Mac (build 32).
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -20,7 +22,9 @@ const bundledRoot = join(fileURLToPath(new URL(".", import.meta.url)), "app");
 const port = Number(process.env.PORT || 47177);
 /** Raise when the launcher or this server change in a way new app files depend on. */
 // 4 (build 29): /__pare3d/quit, and launchers replace a server older than themselves.
-const RUNTIME_VERSION = 4;
+// 5 (build 32): /__designs keeps the designs on disk. App files still work with 4 (they fall back
+// to the browser's storage), so the update manifest's minRuntime stays 4.
+const RUNTIME_VERSION = 5;
 const RELEASES_API = process.env.PARE3D_RELEASES_API || "https://api.github.com/repos/rakeshjivan/pare-3d/releases/latest";
 // Only for the automated tests: lets a local test server stand in for GitHub.
 const TEST_ORIGIN = process.env.PARE3D_TEST_ORIGIN || "";
@@ -31,6 +35,7 @@ const DATA_DIR = platform() === "win32"
     ? join(homedir(), "Library", "Application Support", "Pare 3D")
     : join(homedir(), ".pare3d");
 const UPDATES_DIR = join(DATA_DIR, "updates");
+const DESIGNS_DIR = join(DATA_DIR, "designs");
 /** Files are looked up here in order: the newest app files first, the ones before as a fallback. */
 let roots = [bundledRoot];
 const updateState = { serving: 0, bundled: 0, ready: 0, needsReinstall: 0, checking: false, error: "" };
@@ -176,6 +181,77 @@ async function writeBackup(req, res) {
     json(res, 200, { path: file, folder: backupDir, at: now.getTime() });
   } catch (error) {
     json(res, 500, { error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+/*
+ * The designs (runtime 5). Each is the .lyl package the page made, in DESIGNS_DIR as <id>.lyl, with
+ * <id>.json holding its revision. A write goes to a temporary file first and is renamed into place,
+ * so a crash never leaves half a design; one older than what is stored is refused, as the browser
+ * store did. Only the app's own page may write or delete.
+ */
+const DESIGN_ID = /^[A-Za-z0-9_-]{1,120}$/;
+
+async function designMeta(id) {
+  try {
+    const meta = JSON.parse(await readFile(join(DESIGNS_DIR, `${id}.json`), "utf8"));
+    return { revision: Number(meta.revision) || 0, updatedAt: Number(meta.updatedAt) || 0 };
+  } catch {
+    return null;
+  }
+}
+
+async function handleDesigns(req, res, url) {
+  const id = decodeURIComponent(url.pathname.slice("/__designs".length).replace(/^\//, ""));
+  try {
+    if (!id) {
+      if (req.method !== "GET") return json(res, 405, { error: "GET only" });
+      let ids = [];
+      try {
+        ids = (await readdir(DESIGNS_DIR)).filter((name) => name.endsWith(".lyl")).map((name) => name.slice(0, -4)).filter((name) => DESIGN_ID.test(name));
+      } catch {
+        // No designs yet.
+      }
+      return json(res, 200, { runtime: RUNTIME_VERSION, folder: DESIGNS_DIR, ids });
+    }
+    if (!DESIGN_ID.test(id)) return json(res, 400, { error: "bad id" });
+    const file = join(DESIGNS_DIR, `${id}.lyl`);
+    if (req.method === "GET") {
+      const meta = await designMeta(id);
+      let bytes;
+      try {
+        bytes = await readFile(file);
+      } catch {
+        return json(res, 404, { error: "not found" });
+      }
+      res.writeHead(200, { "content-type": "application/octet-stream", "cache-control": "no-store", "x-pare3d": "1", "x-revision": String(meta?.revision ?? 0), "x-updated-at": String(meta?.updatedAt ?? 0) });
+      res.end(bytes);
+      return;
+    }
+    if (!allowedLocalWrite(req)) return json(res, 403, { error: "not allowed" });
+    if (req.method === "PUT") {
+      const revision = Number(url.searchParams.get("revision"));
+      if (!Number.isFinite(revision)) return json(res, 400, { error: "no revision" });
+      const body = await readBody(req);
+      if (body.length < 4) return json(res, 400, { error: "empty design" });
+      const meta = await designMeta(id);
+      if (meta && meta.revision > revision) return json(res, 200, { saved: false, revision: meta.revision });
+      await mkdir(DESIGNS_DIR, { recursive: true });
+      const temp = join(DESIGNS_DIR, `${id}.lyl.partial`);
+      await writeFile(temp, body);
+      await rename(temp, file);
+      const updatedAt = Date.now();
+      await writeFile(join(DESIGNS_DIR, `${id}.json`), JSON.stringify({ revision, updatedAt }));
+      return json(res, 200, { saved: true, revision, updatedAt });
+    }
+    if (req.method === "DELETE") {
+      await rm(file, { force: true });
+      await rm(join(DESIGNS_DIR, `${id}.json`), { force: true });
+      return json(res, 200, { deleted: true });
+    }
+    return json(res, 405, { error: "unknown" });
+  } catch (error) {
+    return json(res, 500, { error: error instanceof Error ? error.message : String(error) });
   }
 }
 
@@ -511,6 +587,10 @@ createServer(async (req, res) => {
   if (path === "/__backup") {
     if (req.method === "POST") await writeBackup(req, res);
     else json(res, 200, { folder: (await readFileSettings()).backups, runtime: RUNTIME_VERSION });
+    return;
+  }
+  if (path === "/__designs" || path.startsWith("/__designs/")) {
+    await handleDesigns(req, res, url);
     return;
   }
   if (path === "/__files" || path.startsWith("/__files/")) {

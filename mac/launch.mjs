@@ -34,7 +34,7 @@ async function isBusy(port) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Build 29: a server left running by an older app is replaced, not reused.
-const OWN_RUNTIME = 4;
+const OWN_RUNTIME = 5;
 async function isCurrent(port) {
   try {
     const state = await (await fetch(`http://localhost:${port}/__pare3d/update`, { signal: AbortSignal.timeout(800) })).json();

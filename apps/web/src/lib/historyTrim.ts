@@ -12,7 +12,7 @@ export function isProjectTooLargeError(error: unknown): boolean {
 export function isStorageFullError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const { name, message } = error as { name?: unknown; message?: unknown };
-  return name === "QuotaExceededError" || (typeof message === "string" && /quota/i.test(message));
+  return name === "QuotaExceededError" || (typeof message === "string" && /quota|not enough space|OpenBackingStore/i.test(message));
 }
 
 /**

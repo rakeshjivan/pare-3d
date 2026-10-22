@@ -16,6 +16,8 @@ import { fuzzyCut } from "@/lib/cadFuzzyCut";
 import { helicalGearPartSolid } from "@/lib/gearSolid";
 import { meshTreatedBody } from "@/lib/cadMeshAccuracy";
 import { blendLoftSolid } from "@/lib/cadBlendLoft";
+import { edgeIsConvex } from "@/lib/cadEdgeConvexity";
+import { filletVariableEdges } from "@/lib/cadVariableFillet";
 import { planarMeshFaces } from "@/lib/cadPlanarMesh";
 import { buildMessage } from "@/lib/buildStamp";
 import { CAD_MODIFIER_KERNEL_RESTART_MESSAGE, CAD_MODIFIER_RUNTIME_BASE, cadModifierCappedDeflection, cadModifierTessellationDeflection, cadModifierTopologyEdgeIsSelectable, cadTransformRequiresGeneralTransform, isCadModifierKernelExhausted, isCadModifierWasmMemoryFault } from "@/lib/cadModifierRuntime";
@@ -669,7 +671,10 @@ function releaseHandles(cad: OcctKernel, handles: ShapeHandle[]) {
   });
 }
 
-function collectEdges(cad: OcctKernel, shape: ShapeHandle, sharpAngle: number, suppressTreatmentDetailEdges = false, retainEdgeHandles = false) {
+/** How long the prepare may spend telling outside edges from inside ones; past it the rest stay unknown. */
+const CONVEX_BUDGET_MS = 2500;
+
+function collectEdges(cad: OcctKernel, shape: ShapeHandle, sharpAngle: number, suppressTreatmentDetailEdges = false, retainEdgeHandles = false, withConvexity = false) {
   const handles = cad.getSubShapes(shape, "edge");
   const faces = cad.getSubShapes(shape, "face");
   let keepEdgeHandles = false;
@@ -688,6 +693,7 @@ function collectEdges(cad: OcctKernel, shape: ShapeHandle, sharpAngle: number, s
     });
     const treatmentAreaLimit = suppressTreatmentDetailEdges ? treatmentDetailFaceAreaLimit([...faceAreaByHash.values()]) : 0;
     const adjacentFaces = parseEdgeFaceMap(cad.edgeToFaceMap(shape, HASH_UPPER_BOUND));
+    const convexDeadline = withConvexity ? performance.now() + CONVEX_BUDGET_MS : 0;
     const wire = cad.wireframe(shape, CAD_EDGE_WIREFRAME_DEFLECTION);
     const pointsByHash = new Map<number, number[]>();
     for (let index = 0; index + 2 < wire.edgeGroups.length; index += 3) {
@@ -702,6 +708,14 @@ function collectEdges(cad: OcctKernel, shape: ShapeHandle, sharpAngle: number, s
       const faceHashes = adjacentFaces.get(hash) ?? [];
       const points = pointsByHash.get(hash) ?? [];
       const classification = edgeAngle(cad, points, faceHashes, faceByHash);
+      // Fork (build 32): outside or inside edge, for the tool's "Outside" and "Inside" buttons; within a time budget.
+      let convex: boolean | undefined;
+      if (classification.manifold && classification.angle >= 1 && performance.now() < convexDeadline) {
+        const faceA = faceByHash.get(faceHashes[0]);
+        const faceB = faceByHash.get(faceHashes[1]);
+        const found = faceA !== undefined && faceB !== undefined ? edgeIsConvex(cad, points, faceA, faceB) : null;
+        if (found !== null) convex = found;
+      }
       const faceAreas = faceHashes.map((faceHash) => faceAreaByHash.get(faceHash) ?? 0);
       const surfaceTypes = faceHashes
         .map((faceHash) => faceByHash.get(faceHash))
@@ -719,7 +733,7 @@ function collectEdges(cad: OcctKernel, shape: ShapeHandle, sharpAngle: number, s
       } catch {
         curveType = "unknown";
       }
-      return { id, points, ...classification, curveType, surfaceTypes, faceAreas };
+      return { id, points, ...classification, ...(convex === undefined ? {} : { convex }), curveType, surfaceTypes, faceAreas };
     }).filter((edge) => edge.points.length >= 6);
     const edges: CollectedCadEdge[] = collectedEdges.map((edge) => {
       const display = treatmentAreaLimit > 0 ? isModifierDisplayCadEdge(edge, treatmentAreaLimit) : isDisplayCadEdge(edge);
@@ -796,7 +810,13 @@ class EdgeTreatmentError extends Error {
 }
 
 function treatEdges(cad: OcctKernel, solid: ShapeHandle, edges: ShapeHandle[], request: Extract<CadModifierWorkerRequest, { type: "preview" }>) {
-  if (request.kind === "fillet") return cad.fillet(solid, edges, request.amount);
+  if (request.kind === "fillet") {
+    // Fork (build 32): a radius that changes from start to end.
+    if (request.endAmount !== undefined && Math.abs(request.endAmount - request.amount) > 1e-6) {
+      return filletVariableEdges(cad, solid, edges, request.amount, request.endAmount);
+    }
+    return cad.fillet(solid, edges, request.amount);
+  }
   if (request.kind === "chamfillet") return chamfilletSolid(cad, solid, edges, request.amount, request.chamferAngle);
   return Math.abs(request.chamferAngle - 45) < 0.001
     ? cad.chamfer(solid, edges, request.amount)
@@ -862,7 +882,7 @@ async function bearbeiteAnfrage(request: CadModifierWorkerRequest, halter: { cad
   if (request.type === "prepare") {
     releaseSession(activeCad);
     baseShape = reconstructPartsWithFallback(activeCad, request.parts);
-    const collected = collectEdges(activeCad, baseShape, request.sharpAngle, Boolean(request.suppressTreatmentDetailEdges), true);
+    const collected = collectEdges(activeCad, baseShape, request.sharpAngle, Boolean(request.suppressTreatmentDetailEdges), true, !request.faces);
     edgeHandles = collected.handles;
     baseSolids = activeCad.isSolid(baseShape) ? [baseShape] : activeCad.getSubShapes(baseShape, "solid");
     if (baseSolids.length === 0) throw new Error("The selected group contains no closed solid components");

@@ -82,7 +82,7 @@ sealed class MainForm : Form
     }
 
     /// The runtime of the serve.mjs this app carries (RUNTIME_VERSION there).
-    const int OwnRuntime = 4;
+    const int OwnRuntime = 5;
 
     /// Fork (build 29): a Pare 3D server already on the port is reused only when it is at least as new as
     /// this app; one left running by an older app is replaced on the same port (designs are kept per address).

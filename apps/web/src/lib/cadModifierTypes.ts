@@ -11,6 +11,8 @@ export type CadModifierEdge = {
   angle: number;
   boundary: boolean;
   manifold: boolean;
+  /** Fork (build 32): true for an outside edge, false for an inside one; missing when it could not be told. */
+  convex?: boolean;
 };
 
 export type CadModifierQuality = "draft" | "standard" | "fine";
@@ -386,6 +388,8 @@ export type CadModifierWorkerRequest =
       amount: number;
       quality: CadModifierQuality;
       chamferAngle: number;
+      // Fork (build 32): only for "fillet": the radius at the edge's end when it changes along it.
+      endAmount?: number;
       // Only for "shell": which faces stay open; `amount` is the wall thickness.
       shellOpenings?: ShellOpenings;
       shellEdges?: ShellEdges;

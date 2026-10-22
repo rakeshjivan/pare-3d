@@ -4,6 +4,7 @@ import { Check, RotateCcw, RotateCw, X } from "lucide-react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
+import { MoreOptions } from "@/components/workplane/MoreOptions";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import type { BlendSettings } from "@/lib/blend";
@@ -99,6 +100,8 @@ export function BlendPanel({
         </>
       )}
       <p className="blend-hint">{t(settings.linked ? "blend.smoothnessHint" : "blend.endsHint")}</p>
+      {/* Fork (build 32): Smoothness and Create up front; the rest folds away. */}
+      <MoreOptions id="blend" forceOpen={!settings.linked || settings.twist !== 0 || settings.keepDiameter || !settings.join || (canHollow && !settings.hollow)}>
       <label className="blend-hollow">
         <input type="checkbox" checked={settings.linked} onChange={(event) => onChange({ linked: event.currentTarget.checked, smoothnessEnd: settings.smoothness })} />
         <span><strong>{t("blend.linkEnds")}</strong></span>
@@ -142,6 +145,7 @@ export function BlendPanel({
           <small>{t("blend.joinHint")}</small>
         </span>
       </label>
+      </MoreOptions>
 
       <div className="edge-modifier-footer">
         <button type="button" className="secondary" onClick={onCancel}>{t("common.cancel")}</button>

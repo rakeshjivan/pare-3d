@@ -111,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     /// The runtime of the serve.mjs this app carries (RUNTIME_VERSION there).
-    private let ownRuntime = 4
+    private let ownRuntime = 5
 
     /// Fork (build 29): a Pare 3D server already on the port is reused only when it is at least as new as
     /// this app - its runtime and the build it serves. One left running by an older app is replaced,
@@ -395,6 +395,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         alert.beginSheetModal(for: window) { response in
             completionHandler(response == .alertFirstButtonReturn ? field.stringValue : nil)
         }
+    }
+
+    /// Fork (build 32): WebKit asks its embedder before letting the page's storage grow past its quota
+    /// (Safari shows a prompt; an app that does not answer is refused, and saving failed with "not
+    /// enough space for domain"). The designs now live on disk through the server, but anything still
+    /// in the page's storage may grow: allow it. Private WKUIDelegate methods, called only if present.
+    @objc(_webView:requestStorageSpace:frameOrigin:quota:currentSize:spaceRequired:decisionHandler:)
+    func pareRequestStorageSpace(_ webView: WKWebView, requestStorageSpace topFrameOrigin: WKSecurityOrigin, frameOrigin: WKSecurityOrigin, quota: UInt64, currentSize: UInt64, spaceRequired: UInt64, decisionHandler: @escaping (UInt64) -> Void) {
+        decisionHandler(Self.grantedQuota(quota, currentSize, spaceRequired))
+    }
+
+    @objc(_webView:decideDatabaseQuotaForSecurityOrigin:currentQuota:currentOriginUsage:currentDatabaseUsage:expectedUsage:decisionHandler:)
+    func pareDecideDatabaseQuota(_ webView: WKWebView, decideDatabaseQuotaFor origin: WKSecurityOrigin, currentQuota: UInt64, currentOriginUsage: UInt64, currentDatabaseUsage: UInt64, expectedUsage: UInt64, decisionHandler: @escaping (UInt64) -> Void) {
+        decisionHandler(Self.grantedQuota(currentQuota, currentOriginUsage, expectedUsage))
+    }
+
+    /// Room for what is asked and as much again, at least 4 GB.
+    private static func grantedQuota(_ quota: UInt64, _ used: UInt64, _ wanted: UInt64) -> UInt64 {
+        let floor: UInt64 = 4 << 30
+        let (sum, overflow) = used.addingReportingOverflow(wanted)
+        if overflow { return UInt64.max / 2 }
+        let (doubled, overflow2) = sum.multipliedReportingOverflow(by: 2)
+        return max(quota, floor, overflow2 ? UInt64.max / 2 : doubled)
     }
 
     /// If the page's process ends (rare), it is loaded again rather than left blank.

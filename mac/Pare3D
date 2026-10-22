@@ -15,7 +15,7 @@ if [ "$(/usr/bin/uname -m)" = "arm64" ]; then BUN="$RES/bun-arm64"; else BUN="$R
 
 is_ours() { [ "$(/usr/bin/curl -s --max-time 1 "http://localhost:$1/__pare3d")" = "pare3d" ]; }
 # Build 29: a server left running by an older app is replaced, not reused (runtime and served build).
-OWN_RUNTIME=4
+OWN_RUNTIME=5
 OWN_BUILD="$(tr -dc '0-9' < "$RES/app/pare-build.txt" 2>/dev/null)"; OWN_BUILD="${OWN_BUILD:-0}"
 is_current() {
   local state runtime serving

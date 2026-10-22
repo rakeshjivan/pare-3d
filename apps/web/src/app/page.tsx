@@ -1,5 +1,6 @@
 "use client";
 
+import { designDiskAvailable, designDiskDelete, designDiskGet, designDiskId, designDiskList, designDiskPut } from "@/lib/designDiskStore";
 import { PareBuildBadge, PareVersionStatus } from "@/components/PareVersionStatus";
 import { ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
@@ -378,6 +379,12 @@ function projectResourceRecordId(projectId: string, kind: ProjectShapeResourceRe
 }
 
 async function loadProjectShapes(projectId: string) {
+  // Fork (build 32): in the app the design is on disk; a design still in the browser's storage is moved there.
+  const onDisk = await loadProjectShapeRecordFromDisk(projectId);
+  if (onDisk?.lylPackage) {
+    const restored = await importLylProject(onDisk.lylPackage);
+    return { ...onDisk, shapes: restored.shapes, history: restored.history, historyIndex: restored.historyIndex, assets: restored.assets };
+  }
   const database = await openProjectShapesDb();
   const record = await new Promise<ProjectShapeRecord | null>((resolve, reject) => {
     const transaction = database.transaction(PROJECT_SHAPES_STORE_NAME, "readonly");
@@ -393,6 +400,7 @@ async function loadProjectShapes(projectId: string) {
   const storedPackage = record.lylPackage ?? record.skfPackage;
   if (storedPackage) {
     database.close();
+    void moveProjectShapeRecordToDisk(record);
     const restored = await importLylProject(storedPackage);
     return {
       ...record,
@@ -551,6 +559,8 @@ async function projectThumbnailDataUrl(thumbnailUrl: string | null | undefined):
  * exported again just to hand the project to the server.
  */
 async function loadProjectPackage(projectId: string): Promise<Uint8Array | null> {
+  const onDisk = await loadProjectShapeRecordFromDisk(projectId);
+  if (onDisk?.lylPackage) return onDisk.lylPackage;
   const database = await openProjectShapesDb();
   const record = await new Promise<ProjectShapeRecord | null>((resolve, reject) => {
     const transaction = database.transaction(PROJECT_SHAPES_STORE_NAME, "readonly");
@@ -605,6 +615,12 @@ async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntr
     }
     if (!packed) throw error;
     lylPackage = packed;
+  }
+  // Fork (build 32): in the app, on disk; any copy left in the browser's storage is dropped to free its room.
+  if (await designDiskAvailable() && designDiskId(projectId)) {
+    await designDiskPut(projectId, entry.revision, lylPackage);
+    void deleteProjectShapesFromBrowser(projectId).catch(() => undefined);
+    return { historyTrimmed };
   }
   const database = await openProjectShapesDb();
   return new Promise<ProjectShapesSaveResult>((resolve, reject) => {
@@ -702,6 +718,72 @@ function saveProjectShapesWhenIdleInner(projectId: string, entry: ProjectShapeCa
 }
 
 async function deleteProjectShapes(projectId: string) {
+  if (await designDiskAvailable()) await designDiskDelete(projectId);
+  await deleteProjectShapesFromBrowser(projectId);
+}
+
+/**
+ * Fork (build 32): the design as the app's server keeps it on disk, or null - in a plain browser, with
+ * an older app server, or when it is not on disk (yet).
+ */
+async function loadProjectShapeRecordFromDisk(projectId: string): Promise<ProjectShapeRecord | null> {
+  if (!(await designDiskAvailable())) return null;
+  try {
+    const stored = await designDiskGet(projectId);
+    return stored ? { id: projectId, revision: stored.revision, lylPackage: stored.bytes, updatedAt: stored.updatedAt } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fork (build 32): copies a design from the browser's storage to disk, then frees its room there. */
+async function moveProjectShapeRecordToDisk(record: ProjectShapeRecord): Promise<boolean> {
+  const bytes = record.lylPackage ?? record.skfPackage;
+  if (!bytes || !(await designDiskAvailable()) || !designDiskId(record.id)) return false;
+  try {
+    await designDiskPut(record.id, record.revision, new Uint8Array(bytes));
+    await deleteProjectShapesFromBrowser(record.id).catch(() => undefined);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+let projectsMovedToDisk: Promise<number> | null = null;
+/**
+ * Fork (build 32): once per session in the app, every design still in the browser's storage moves to
+ * disk. Older records without a package (shapes kept loose) stay where they are and move when opened.
+ */
+function moveAllProjectShapesToDisk(): Promise<number> {
+  projectsMovedToDisk ??= (async () => {
+    if (!(await designDiskAvailable())) return 0;
+    let moved = 0;
+    let ids: string[] = [];
+    try {
+      ids = await storedProjectShapeIdsInBrowser();
+    } catch {
+      return 0;
+    }
+    for (const projectId of ids) {
+      try {
+        const record = await loadProjectShapeRecordFromBrowser(projectId);
+        if (!record?.lylPackage && !record?.skfPackage) continue;
+        const onDisk = await designDiskGet(projectId).catch(() => null);
+        if (onDisk && onDisk.revision >= record.revision) {
+          await deleteProjectShapesFromBrowser(projectId).catch(() => undefined);
+          continue;
+        }
+        if (await moveProjectShapeRecordToDisk(record)) moved += 1;
+      } catch {
+        // Left for the next session.
+      }
+    }
+    return moved;
+  })();
+  return projectsMovedToDisk;
+}
+
+async function deleteProjectShapesFromBrowser(projectId: string) {
   const database = await openProjectShapesDb();
   return new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(PROJECT_SHAPES_STORE_NAME, "readwrite");
@@ -717,8 +799,17 @@ async function deleteProjectShapes(projectId: string) {
   });
 }
 
-/** The ids of every design whose shapes are kept in this browser. */
+/** The ids of every design whose shapes are kept, on disk in the app and in this browser. */
 async function storedProjectShapeIds(): Promise<string[]> {
+  const onDisk = (await designDiskAvailable()) ? await designDiskList().catch(() => [] as string[]) : [];
+  const inBrowser = await storedProjectShapeIdsInBrowser().catch((error) => {
+    if (onDisk.length) return [] as string[];
+    throw error;
+  });
+  return [...new Set([...onDisk, ...inBrowser])];
+}
+
+async function storedProjectShapeIdsInBrowser(): Promise<string[]> {
   const database = await openProjectShapesDb();
   try {
     return await new Promise<string[]>((resolve, reject) => {
@@ -733,6 +824,10 @@ async function storedProjectShapeIds(): Promise<string[]> {
 }
 
 async function loadProjectShapeRecord(projectId: string): Promise<ProjectShapeRecord | null> {
+  return (await loadProjectShapeRecordFromDisk(projectId)) ?? loadProjectShapeRecordFromBrowser(projectId);
+}
+
+async function loadProjectShapeRecordFromBrowser(projectId: string): Promise<ProjectShapeRecord | null> {
   const database = await openProjectShapesDb();
   try {
     return await new Promise<ProjectShapeRecord | null>((resolve, reject) => {
@@ -1139,6 +1234,8 @@ export default function Home() {
       thumbnails.forEach((dataUrl, projectId) => {
         if (!knownDesignThumbnails.has(projectId)) knownDesignThumbnails.set(projectId, dataUrl);
       });
+      // Fork (build 32): in the app, the designs move out of the browser's storage onto disk first.
+      await moveAllProjectShapesToDisk().catch(() => 0);
       // Designs whose card the list lost come back from their stored shapes (#656).
       const recovered = await recoverOrphanedProjects(storedProjects).catch(() => []);
       setProjects((current) => {

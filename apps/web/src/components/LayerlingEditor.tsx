@@ -99,7 +99,7 @@ import {
 import { WorkplaneViewport, type LayFlatPick, type ViewportToolMemory } from "./WorkplaneViewport";
 import { layFlatRotation } from "@/lib/layFlat";
 import { SketchWorkspace, type SketchMeasurement, type SketchPrimitive, type SketchSelection, type SketchTool } from "./SketchWorkspace";
-import { EdgeModifierPanel } from "./workplane/EdgeModifierPanel";
+import { EdgeModifierPanel, type EdgeChamferStyle } from "./workplane/EdgeModifierPanel";
 import { ShellPanel } from "./workplane/ShellPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
 import { MateFacesPanel } from "./workplane/MateFacesPanel";
@@ -201,7 +201,7 @@ import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames"
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
 import { FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
-import { BookOpen, Import, Keyboard, Settings as LucideSettings, StickyNote, Upload } from "lucide-react";
+import { BookOpen, Import, Keyboard, PaintBucket, Scissors, Settings as LucideSettings, ShieldCheck, StickyNote, Upload } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -276,7 +276,7 @@ import { sketchBodyStretch, stretchedSketchProfile } from "@/lib/sketchResize";
 import { silhouetteSketchProfile } from "@/lib/sketchCadProfile";
 import { svgSketchMatchesMesh } from "@/lib/svgSketch";
 import { DEFAULT_SKETCH_STROKE, normalizeSketchStroke, strokedSketchProfile } from "@/lib/sketchStroke";
-import { bottomCadModifierEdgeIds, horizontalCadModifierEdgeIds, topCadModifierEdgeIds, verticalCadModifierEdgeIds } from "@/lib/topEdges";
+import { bottomCadModifierEdgeIds, horizontalCadModifierEdgeIds, insideCadModifierEdgeIds, outsideCadModifierEdgeIds, topCadModifierEdgeIds, verticalCadModifierEdgeIds } from "@/lib/topEdges";
 import { movedWithEditedOutline, placeSketchShape, sketchBodyAnchor, type SketchAnchor } from "@/lib/sketchPlacement";
 import { sketchOutlineBounds } from "@/lib/sketchKeyring";
 import { meshSlicePath, planeCutsMesh } from "@/lib/sketchSlice";
@@ -370,6 +370,13 @@ type OpenGroupOutcome = { ok: boolean; message: string; partIds?: string[]; grou
 type WithoutRequestId<T> = T extends unknown ? Omit<T, "requestId"> : never;
 type CadModifierWorkerPayload = WithoutRequestId<CadModifierWorkerRequest>;
 type CadPreviewPayload = Extract<CadModifierWorkerPayload, { type: "preview" }>;
+type EdgeToolPreset = { kind: CadModifierKind; amount: number; chamferAngle: number; chamferStyle?: EdgeChamferStyle; endAmount?: number; edgeIds: number[] };
+/**
+ * Fork (build 32): the size and shape last applied with each kind, so the next part starts from them
+ * rather than from a default the user has already changed once.
+ */
+const lastEdgeToolSettings = new Map<CadModifierKind, { amount: number; chamferAngle: number; chamferStyle?: EdgeChamferStyle }>();
+type EdgeQuickKey = "top" | "bottom" | "vertical" | "horizontal" | "outside" | "inside";
 type EdgeModifierSession = {
   kind: CadModifierKind;
   edges: CadModifierEdge[];
@@ -377,6 +384,12 @@ type EdgeModifierSession = {
   amount: number;
   sharpAngle: number;
   chamferAngle: number;
+  /** Fork (build 32): how the chamfer's shape is set in the window; the angle stays what the kernel is given. */
+  chamferStyle?: EdgeChamferStyle;
+  /** Fork (build 32): a fillet's radius at the edge's end, when it changes along it. */
+  endAmount?: number;
+  /** Fork (build 32): "Largest that fits" is trying sizes. */
+  searching?: boolean;
   quality: CadModifierQuality;
   tangentChain: boolean;
   // Off: every edge shows through the body. On: only the ones facing the camera.
@@ -387,7 +400,7 @@ type EdgeModifierSession = {
   error: string | null;
   // The quick buttons that were clicked for the edges picked now, so that top and bottom clicked together light as those two and not as
   // "horizontal", which holds the same edges on a box (#538). Only counts while their edges are still exactly the picked ones.
-  quickKeys?: Array<"top" | "bottom" | "vertical" | "horizontal">;
+  quickKeys?: Array<EdgeQuickKey>;
   // The selection of the last preview that worked.
   workingEdgeIds?: number[];
   // The edge(s) whose selection broke a working treatment; drawn red while that error stands.
@@ -2945,8 +2958,8 @@ export function LayerlingEditor({
   useEffect(() => onManifoldReady(() => setCustomFontRound((round) => round + 1)), []);
   const edgeModifierRef = useRef<EdgeModifierSession | null>(null);
   // "Edit" on a stored fillet or chamfer (#227): the body is taken back first, then the tool opens with these.
-  const edgeEditRequestRef = useRef<{ shapeId: string; historyLength: number; preset: { kind: CadModifierKind; amount: number; chamferAngle: number; edgeIds: number[] } } | null>(null);
-  const edgeModifierPresetRef = useRef<{ kind: CadModifierKind; amount: number; chamferAngle: number; edgeIds: number[] } | null>(null);
+  const edgeEditRequestRef = useRef<{ shapeId: string; historyLength: number; preset: EdgeToolPreset } | null>(null);
+  const edgeModifierPresetRef = useRef<EdgeToolPreset | null>(null);
   const [edgeEditRound, setEdgeEditRound] = useState(0);
   const cadModifierWorkerRef = useRef<Worker | null>(null);
   const cadModifierPendingRef = useRef(new Map<number, {
@@ -3083,7 +3096,8 @@ export function LayerlingEditor({
             edges: message.edges,
             sharpAngle: gesenkteSchwelle ?? current.sharpAngle,
             selectedEdgeIds: presetEdgeIds,
-            ...(preset && presetEdgeIds.length ? { amount: preset.amount, chamferAngle: preset.chamferAngle } : {}),
+            // The size and shape go along whenever the kind matches: after Apply too, where no edge is picked again (#538).
+            ...(preset && current.kind === preset.kind ? { amount: preset.amount, chamferAngle: preset.chamferAngle, chamferStyle: preset.chamferStyle, endAmount: preset.kind === "fillet" ? preset.endAmount : undefined } : {}),
             busy: presetEdgeIds.length > 0,
             prepared: true,
             preview: null,
@@ -3458,7 +3472,7 @@ export function LayerlingEditor({
   // Which quick buttons made the edges picked now: all of them if they are the edges the tool offers, else the buttons whose
   // edges together are exactly the picked ones - several can be on at once (#538, #517).
   const modifierQuickSelection = useMemo(() => {
-    if (!edgeModifier?.prepared || edgeModifier.selectedEdgeIds.length === 0) return [] as Array<"all" | "top" | "bottom" | "vertical" | "horizontal">;
+    if (!edgeModifier?.prepared || edgeModifier.selectedEdgeIds.length === 0) return [] as Array<"all" | EdgeQuickKey>;
     const picked = new Set(edgeModifier.selectedEdgeIds);
     if (picked.size === modifierAvailableEdgeIds.length && modifierAvailableEdgeIds.every((id) => picked.has(id))) return ["all" as const];
     const groups = [
@@ -3466,6 +3480,8 @@ export function LayerlingEditor({
       { key: "bottom" as const, ids: bottomCadModifierEdgeIds(edgeModifier.edges, modifierAvailableEdgeIds) },
       { key: "vertical" as const, ids: verticalCadModifierEdgeIds(edgeModifier.edges, modifierAvailableEdgeIds) },
       { key: "horizontal" as const, ids: horizontalCadModifierEdgeIds(edgeModifier.edges, modifierAvailableEdgeIds) },
+      { key: "outside" as const, ids: outsideCadModifierEdgeIds(edgeModifier.edges, modifierAvailableEdgeIds) },
+      { key: "inside" as const, ids: insideCadModifierEdgeIds(edgeModifier.edges, modifierAvailableEdgeIds) },
     ].filter((group) => group.ids.length > 0);
     const clicked = edgeModifier.quickKeys;
     if (clicked?.length) {
@@ -3482,7 +3498,7 @@ export function LayerlingEditor({
     return covered.size === picked.size && [...picked].every((id) => covered.has(id)) ? keys.map((group) => group.key) : [];
   }, [edgeModifier?.prepared, edgeModifier?.selectedEdgeIds, edgeModifier?.edges, edgeModifier?.quickKeys, modifierAvailableEdgeIds]);
   /** A quick button of the Fillet and Chamfer window: its edges replace the ones picked, or with Shift or Ctrl are added to them (#538). */
-  const selectQuickEdges = (key: "top" | "bottom" | "vertical" | "horizontal", pick: (edges: CadModifierEdge[], candidateIds: readonly number[]) => number[], noneKey: MessageKey, add: boolean) => setEdgeModifier((current) => {
+  const selectQuickEdges = (key: EdgeQuickKey, pick: (edges: CadModifierEdge[], candidateIds: readonly number[]) => number[], noneKey: MessageKey, add: boolean) => setEdgeModifier((current) => {
     if (!current?.prepared) return current;
     const ids = pick(current.edges, modifierAvailableEdgeIds);
     const selectedEdgeIds = add ? [...new Set([...current.selectedEdgeIds, ...ids])] : ids;
@@ -4511,7 +4527,7 @@ export function LayerlingEditor({
       return;
     }
     // The Fillet or Chamfer tool stays open, so that several features can be taken back one after the other (#514).
-    const openTool = edgeModifier ? { kind: edgeModifier.kind, amount: edgeModifier.amount, chamferAngle: edgeModifier.chamferAngle } : null;
+    const openTool = edgeModifier ? { kind: edgeModifier.kind, amount: edgeModifier.amount, chamferAngle: edgeModifier.chamferAngle, chamferStyle: edgeModifier.chamferStyle, endAmount: edgeModifier.endAmount } : null;
     invalidateCadModifierSession();
     commitShapes(
       shapesRef.current.map((shape) => shape.id === selectedShape.id ? restored.shape : shape),
@@ -4568,7 +4584,7 @@ export function LayerlingEditor({
       edgeEditRequestRef.current = {
         shapeId: restored.shape.id,
         historyLength: restored.shape.edgeTreatmentHistory?.length ?? 0,
-        preset: { kind: feature.kind, amount: feature.amount, chamferAngle: feature.chamferAngle ?? 45, edgeIds: feature.edgeIds ?? [] },
+        preset: { kind: feature.kind, amount: feature.amount, chamferAngle: feature.chamferAngle ?? 45, chamferStyle: feature.chamferStyle, endAmount: feature.endAmount, edgeIds: feature.edgeIds ?? [] },
       };
       setEdgeEditRound((round) => round + 1);
     }
@@ -6912,7 +6928,11 @@ export function LayerlingEditor({
       }), true);
       return;
     }
-    const amount = Math.max(MIN_EDGE_MODIFIER_AMOUNT, Math.min(1, shapeWidth(selectedShape) / 6, shapeDepth(selectedShape) / 6, selectedShape.height / 6));
+    const defaultAmount = Math.max(MIN_EDGE_MODIFIER_AMOUNT, Math.min(1, shapeWidth(selectedShape) / 6, shapeDepth(selectedShape) / 6, selectedShape.height / 6));
+    // The last size used with this kind, while it still suits this part (no more than a third of its thinnest side).
+    const remembered = lastEdgeToolSettings.get(kind);
+    const smallestSide = Math.min(shapeWidth(selectedShape), shapeDepth(selectedShape), selectedShape.height);
+    const amount = remembered && remembered.amount <= smallestSide / 3 ? remembered.amount : defaultAmount;
     cadModifierBaseShapeRef.current = selectedShape;
     cadModifierBaseFingerprintRef.current = projectShapesFingerprint([selectedShape]);
     cadModifierSourcePartsRef.current = sourceParts;
@@ -6926,7 +6946,8 @@ export function LayerlingEditor({
       selectedEdgeIds: [],
       amount,
       sharpAngle: 25,
-      chamferAngle: 45,
+      chamferAngle: remembered?.chamferAngle ?? 45,
+      chamferStyle: remembered?.chamferStyle,
       quality: "standard",
       tangentChain: defaultCadModifierTangentChain(appliedEdgeTreatmentCount),
       preserveEdgeSize: selectedShape.edgeResizeMode === "preserve",
@@ -7606,7 +7627,10 @@ export function LayerlingEditor({
       edgeCount: edgeModifier.selectedEdgeIds.length,
       edgeIds: [...edgeModifier.selectedEdgeIds],
       ...(edgeModifier.kind === "chamfer" || edgeModifier.kind === "chamfillet" ? { chamferAngle: edgeModifier.chamferAngle } : {}),
+      ...(edgeModifier.kind === "chamfer" && edgeModifier.chamferStyle ? { chamferStyle: edgeModifier.chamferStyle } : {}),
+      ...(edgeModifier.kind === "fillet" && edgeModifier.endAmount !== undefined ? { endAmount: edgeModifier.endAmount } : {}),
     } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number];
+    lastEdgeToolSettings.set(edgeModifier.kind, { amount: edgeModifier.amount, chamferAngle: edgeModifier.chamferAngle, chamferStyle: edgeModifier.chamferStyle });
     const createdAt = Date.now();
     const previewShape = canonicalizeShape({
       ...edgeModifier.preview,
@@ -7645,7 +7669,7 @@ export function LayerlingEditor({
     edgeEditRequestRef.current = {
       shapeId: base.id,
       historyLength: modifiedShape.edgeTreatmentHistory?.length ?? 0,
-      preset: { kind: edgeModifier.kind, amount: edgeModifier.amount, chamferAngle: edgeModifier.chamferAngle, edgeIds: [] },
+      preset: { kind: edgeModifier.kind, amount: edgeModifier.amount, chamferAngle: edgeModifier.chamferAngle, chamferStyle: edgeModifier.chamferStyle, endAmount: edgeModifier.endAmount, edgeIds: [] },
     };
     setEdgeEditRound((round) => round + 1);
   }, [commitShapes, edgeModifier, invalidateCadModifierSession, shapes]);
@@ -7723,12 +7747,72 @@ export function LayerlingEditor({
         amount: edgeModifier.amount,
         quality: edgeModifier.quality,
         chamferAngle: edgeModifier.chamferAngle,
+        ...(edgeModifier.kind === "fillet" && edgeModifier.endAmount !== undefined ? { endAmount: edgeModifier.endAmount } : {}),
         minDeflection: cadModifierBaseShapeRef.current?.cadMeshDeflection,
         ...(addedEdgeIds.length ? { addedEdgeIds } : {}),
       });
     }, 120);
     return () => window.clearTimeout(timer);
-  }, [discardPendingCadPreviews, edgeModifier?.amount, edgeModifier?.chamferAngle, edgeModifier?.kind, edgeModifier?.prepared, edgeModifier?.quality, edgeModifier?.selectedEdgeIds]);
+  }, [discardPendingCadPreviews, edgeModifier?.amount, edgeModifier?.chamferAngle, edgeModifier?.endAmount, edgeModifier?.kind, edgeModifier?.prepared, edgeModifier?.quality, edgeModifier?.selectedEdgeIds]);
+
+  /**
+   * Fork (build 32): "Largest that fits". Tries sizes on the picked edges with quick draft previews,
+   * halving the gap each time, and takes a little under the largest the kernel accepts. A radius that
+   * changes along the edge keeps its proportion.
+   */
+  const findLargestEdgeAmount = useCallback(async () => {
+    const session = edgeModifierRef.current;
+    const base = cadModifierBaseShapeRef.current;
+    if (!session?.prepared || !base || session.selectedEdgeIds.length === 0 || session.searching) return;
+    discardPendingCadPreviews();
+    setEdgeModifier((current) => current ? { ...current, searching: true, busy: true, error: null, preview: null } : current);
+    const ratio = session.kind === "fillet" && session.endAmount !== undefined && session.amount > 0 ? session.endAmount / session.amount : 1;
+    const stillOpen = () => cadModifierBaseShapeRef.current === base && Boolean(edgeModifierRef.current?.searching);
+    const works = async (amount: number) => {
+      try {
+        await postCadModifierRequestAsync({
+          type: "preview",
+          kind: session.kind,
+          edgeIds: [...session.selectedEdgeIds],
+          amount,
+          quality: "draft",
+          chamferAngle: session.chamferAngle,
+          ...(ratio !== 1 ? { endAmount: amount * ratio } : {}),
+        }, [], 30000);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const ceiling = edgeModifierMaxAmount / Math.max(1, ratio);
+    let low = 0;
+    let high = ceiling;
+    if (await works(Math.min(session.amount, ceiling))) low = Math.min(session.amount, ceiling);
+    else high = session.amount;
+    for (let step = 0; step < 10 && stillOpen() && high - low > Math.max(0.01, high * 0.01); step += 1) {
+      const middle = (low + high) / 2;
+      if (await works(middle)) low = middle;
+      else high = middle;
+    }
+    if (!stillOpen()) return;
+    if (low <= 0) {
+      setEdgeModifier((current) => current ? { ...current, searching: false, busy: false, error: t("edge.noSizeFits") } : current);
+      return;
+    }
+    const found = Math.max(MIN_EDGE_MODIFIER_AMOUNT, Math.floor(low * (low >= ceiling * 0.99 ? 1 : 0.98) * 100) / 100);
+    setEdgeModifier((current) => current ? {
+      ...current,
+      searching: false,
+      amount: found,
+      ...(ratio !== 1 ? { endAmount: Math.min(edgeModifierMaxAmount, Math.round(found * ratio * 100) / 100) } : {}),
+      // A fresh array, so the preview runs again even when the size comes out the same.
+      selectedEdgeIds: [...current.selectedEdgeIds],
+      preview: null,
+      busy: true,
+      error: null,
+    } : current);
+    setNotice(t("status.largestEdgeSize", { size: `${formatLengthMm(found, workspaceSettingsRef.current.accuracy)} ${lengthDisplayUnit(workspaceSettingsRef.current).label}` }));
+  }, [discardPendingCadPreviews, edgeModifierMaxAmount, postCadModifierRequestAsync, setNotice]);
 
   const snapSelected = useCallback(() => {
     if (!hasSelection) {
@@ -13415,6 +13499,10 @@ export function LayerlingEditor({
               close();
               void insertReadyParts(parts, options).catch(noticeError);
             }}
+            onMake={(maker) => {
+              close();
+              setMakerPanel(maker);
+            }}
           />
         )}
         renderMoreShapes={(close, after, present) => (
@@ -14077,6 +14165,10 @@ export function LayerlingEditor({
           amount={edgeModifier.amount}
           maxAmount={edgeModifierMaxAmount}
           chamferAngle={edgeModifier.chamferAngle}
+          chamferStyle={edgeModifier.chamferStyle}
+          endAmount={edgeModifier.kind === "fillet" ? edgeModifier.endAmount : undefined}
+          searching={edgeModifier.searching}
+          canTellInside={edgeModifier.edges.some((edge) => edge.convex === false) && edgeModifier.edges.some((edge) => edge.convex === true)}
           quality={edgeModifier.quality}
           sharpAngle={edgeModifier.sharpAngle}
           workspace={workspaceSettings}
@@ -14108,9 +14200,31 @@ export function LayerlingEditor({
           })}
           onKindChange={(kind) => setEdgeModifier((current) => {
             if (!current?.prepared || current.kind === kind) return current;
-            const chamferAngle = kind === "chamfillet" ? Math.max(15, Math.min(75, current.chamferAngle)) : current.chamferAngle;
+            // A plain chamfer of "equal sides" is 45°; the chamfillet keeps its own range.
+            const chamferAngle = kind === "chamfillet"
+              ? Math.max(15, Math.min(75, current.chamferAngle))
+              : kind === "chamfer" && (current.chamferStyle ?? "equal") === "equal" ? 45 : current.chamferAngle;
             return { ...current, kind, chamferAngle, preview: null, busy: current.selectedEdgeIds.length > 0, error: null };
           })}
+          onChamferStyleChange={(chamferStyle) => setEdgeModifier((current) => {
+            if (!current?.prepared) return current;
+            const chamferAngle = chamferStyle === "equal" ? 45 : current.chamferAngle;
+            return { ...current, chamferStyle, chamferAngle, ...(chamferAngle !== current.chamferAngle ? { preview: null, busy: current.selectedEdgeIds.length > 0, error: null } : {}) };
+          })}
+          onSwapChamferSides={() => setEdgeModifier((current) => {
+            if (!current?.prepared) return current;
+            // The other face gets the first distance: distance d at angle a becomes d·tan(a) at 90° - a.
+            const amount = Math.max(MIN_EDGE_MODIFIER_AMOUNT, Math.min(edgeModifierMaxAmount, current.amount * Math.tan((current.chamferAngle * Math.PI) / 180)));
+            return { ...current, amount, chamferAngle: 90 - current.chamferAngle, preview: null, busy: current.selectedEdgeIds.length > 0, error: null };
+          })}
+          onEndAmountChange={(value) => setEdgeModifier((current) => {
+            if (!current?.prepared) return current;
+            const endAmount = value === undefined ? undefined : Math.max(MIN_EDGE_MODIFIER_AMOUNT, Math.min(edgeModifierMaxAmount, value));
+            return endAmount === current.endAmount ? current : { ...current, endAmount, preview: null, busy: current.selectedEdgeIds.length > 0, error: null };
+          })}
+          onSelectOutside={(add) => selectQuickEdges("outside", outsideCadModifierEdgeIds, "edge.noOutsideEdges", add)}
+          onSelectInside={(add) => selectQuickEdges("inside", insideCadModifierEdgeIds, "edge.noInsideEdges", add)}
+          onFindLargest={() => void findLargestEdgeAmount()}
           onQualityChange={(quality) => setEdgeModifier((current) => !current?.prepared || quality === current.quality ? current : { ...current, quality, preview: null, busy: current.selectedEdgeIds.length > 0, error: null })}
           onSharpAngleChange={(sharpAngle) => setEdgeModifier((current) => {
             if (!current?.prepared) return current;
@@ -14986,7 +15100,13 @@ function SecondaryToolbar({
     { id: "fillet", label: t("editor.tool.fillet"), icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify, active: edgeModifierKind === "fillet" },
     { id: "hollow", label: t("editor.tool.hollow"), icon: ToolbarHollowIcon, action: onHollow, enabled: canEdgeModify, active: hollowActive },
     { id: "deleteFace", label: t("editor.tool.deleteFace"), icon: ToolbarDeleteFaceIcon, action: onDeleteFace, enabled: canEdgeModify, active: deleteFaceActive },
+  ];
+  // Fork (build 32): the tools for an imported mesh, in a section of their own that shows only while one is selected.
+  const meshTools = [
+    { id: "meshCheck", label: t("meshCheck.command"), icon: ShieldCheck, action: () => window.dispatchEvent(new Event(MESH_CHECK_EVENT)), enabled: canSimplify },
+    { id: "fillHole", label: t("fillHole.command"), icon: PaintBucket, action: () => window.dispatchEvent(new Event(FILL_HOLE_EVENT)), enabled: canSimplify },
     { id: "simplify", label: t("editor.tool.simplify"), icon: ToolbarSimplifyIcon, action: onSimplify, enabled: canSimplify, active: simplifyActive },
+    { id: "cutBelowBed", label: t("cutBelowBed.command"), icon: Scissors, action: () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT)), enabled: canSimplify },
   ];
   const arrangeTools = [
     { id: "align", label: t("editor.tool.align"), icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign, active: alignMode },
@@ -15000,10 +15120,8 @@ function SecondaryToolbar({
   ];
   // Fork: the makers - each opens its own panel.
   const makeTools = [
-    { id: "readyParts", label: t("readyParts.title"), icon: ForkReadyPartsIcon, action: togglePartsWindow, enabled: !historyViewActive, active: shapesOpen && shapesTab === "parts" },
-    { id: "lithophane", label: t("lithophane.title"), icon: ForkLithophaneIcon, action: onLithophane, enabled: Boolean(onLithophane), active: Boolean(lithophaneOpen) },
-    { id: "trace", label: t("trace.title"), icon: ForkTraceIcon, action: onTrace, enabled: Boolean(onTrace), active: Boolean(traceOpen) },
-    { id: "voronoi", label: t("voronoi.title"), icon: ForkVoronoiIcon, action: onVoronoi, enabled: Boolean(onVoronoi), active: Boolean(voronoiOpen) },
+    { id: "readyParts", label: t("readyParts.title"), icon: ForkReadyPartsIcon, action: togglePartsWindow, enabled: !historyViewActive, active: (shapesOpen && shapesTab === "parts") || Boolean(lithophaneOpen || traceOpen || voronoiOpen) },
+    // Fork (build 32): Lithophane, Photo to outline and Voronoi moved into this window, under "Make from a picture".
   ];
   const sketchClipboardTools = [
     { id: "sketch-copy", label: t("editor.tool.copy"), icon: ToolbarCopyIcon, action: onSketchCopy, enabled: sketchHasSelection },
@@ -15011,7 +15129,7 @@ function SecondaryToolbar({
     { id: "sketch-duplicate", label: t("editor.tool.duplicate"), icon: ToolbarDuplicateIcon, action: onSketchDuplicate, enabled: sketchHasSelection },
     { id: "sketch-delete", label: t("editor.tool.delete"), icon: ToolbarTrashIcon, action: onSketchDelete, enabled: sketchHasSelection },
   ];
-  const renderToolButton = (tool: (typeof leftTools)[number] | (typeof visibilityTools)[number] | (typeof combineTools)[number] | (typeof modifyTools)[number] | (typeof arrangeTools)[number] | (typeof makeTools)[number]) => {
+  const renderToolButton = (tool: (typeof leftTools)[number] | (typeof visibilityTools)[number] | (typeof combineTools)[number] | (typeof modifyTools)[number] | (typeof arrangeTools)[number] | (typeof makeTools)[number] | (typeof meshTools)[number]) => {
     const { id, action, label } = tool;
     // Fork: Pare 3D's own icon where there is one, and a short name under it.
     const Icon = FORK_TOOL_ICONS[id] ?? tool.icon;
@@ -15433,6 +15551,12 @@ function SecondaryToolbar({
           <div className="toolbar-section-label">{t("editor.group.modify")}</div>
           <div className="toolbar-section-tools">{modifyTools.map(renderToolButton)}</div>
         </div>
+        {canSimplify ? (
+          <div className="toolbar-section toolbar-mesh-section" data-group="mesh">
+            <div className="toolbar-section-label">{t("editor.group.mesh")}</div>
+            <div className="toolbar-section-tools">{meshTools.map(renderToolButton)}</div>
+          </div>
+        ) : null}
         <div className="toolbar-section" data-group="arrange">
           <div className="toolbar-section-label">{t("editor.group.arrange")}</div>
           <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>

@@ -106,3 +106,15 @@ export function topCadModifierEdgeIds(edges: readonly CadModifierEdge[], candida
     })
     .map((edge) => edge.id);
 }
+
+/** Fork (build 32): the edges that stick out - a box's corners, a rim's outer lip. */
+export function outsideCadModifierEdgeIds(edges: readonly CadModifierEdge[], candidateIds: readonly number[]): number[] {
+  const candidates = new Set(candidateIds);
+  return edges.filter((edge) => candidates.has(edge.id) && edge.convex === true).map((edge) => edge.id);
+}
+
+/** Fork (build 32): the edges tucked in - where a wall meets the floor of a pocket or the plate it stands on. */
+export function insideCadModifierEdgeIds(edges: readonly CadModifierEdge[], candidateIds: readonly number[]): number[] {
+  const candidates = new Set(candidateIds);
+  return edges.filter((edge) => candidates.has(edge.id) && edge.convex === false).map((edge) => edge.id);
+}
