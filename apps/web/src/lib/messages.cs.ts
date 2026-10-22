@@ -3322,4 +3322,6 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "blend.created": "Blended: the two parts and the piece between them are one group",
   "blend.cancelled": "Blend cancelled",
   "edge.faceNoEdges": "No edge of that face can be rounded at this threshold. Click an edge instead.",
+  "shell.sideNotOpenable": "Only a face pointing straight up, down, front, back, left or right can be left open.",
+  "shell.pickHint": "Click a face of the part to open or close it. Drag a face inward to set the wall thickness. Enter hollows.",
 };

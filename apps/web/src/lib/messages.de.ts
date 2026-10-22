@@ -3323,4 +3323,6 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "blend.created": "Verbunden: die beiden Teile und das Stück dazwischen sind eine Gruppe",
   "blend.cancelled": "Übergang abgebrochen",
   "edge.faceNoEdges": "Keine Kante dieser Fläche lässt sich bei dieser Schwelle verrunden. Stattdessen eine Kante anklicken.",
+  "shell.sideNotOpenable": "Nur eine Fläche, die gerade nach oben, unten, vorn, hinten, links oder rechts zeigt, kann offen bleiben.",
+  "shell.pickHint": "Eine Fläche des Teils anklicken öffnet oder schließt sie. Eine Fläche nach innen ziehen setzt die Wandstärke. Enter höhlt aus.",
 };

@@ -7278,6 +7278,61 @@ export function LayerlingEditor({
       });
   }, [commitShapes, selectedShape, selectedShapes.length, shellShape, shellTool]);
 
+  // Fork (build 25): Hollow on the part itself, as in Fusion's Shell: a click on a face opens or
+  // closes that side; dragging a face inward sets the wall thickness; Enter hollows.
+  const shellPullFaceRef = useRef<LayFlatPick | null>(null);
+  const shellSideOfNormal = (normal: { x: number; y: number; z: number }): ShellSide | null => {
+    const length = Math.hypot(normal.x, normal.y, normal.z) || 1;
+    const [x, y, z] = [normal.x / length, normal.y / length, normal.z / length];
+    if (y > 0.9) return "top";
+    if (y < -0.9) return "bottom";
+    if (z > 0.9) return "front";
+    if (z < -0.9) return "back";
+    if (x > 0.9) return "right";
+    if (x < -0.9) return "left";
+    return null;
+  };
+  const toggleShellSideAt = useCallback((pick: LayFlatPick) => {
+    const target = selectedShape;
+    const side = shellSideOfNormal(pick.normal);
+    if (!target || !side) {
+      setNotice(t("shell.sideNotOpenable"));
+      return;
+    }
+    setShellTool((current) => {
+      if (!current) return current;
+      const open = new Set(shellOpenSides(current.openings));
+      if (open.has(side)) open.delete(side);
+      else open.add(side);
+      const openings = shellOpeningsFor([...open]);
+      const max = shellMaxThickness({ width: shapeWidth(target), depth: shapeDepth(target), height: target.height }, openings);
+      return { ...current, openings, thickness: Math.min(current.thickness, max), error: null };
+    });
+  }, [selectedShape]);
+  const shellThicknessFromPull = useCallback((distance: number) => {
+    const target = selectedShape;
+    if (!target) return;
+    setShellTool((current) => {
+      if (!current) return current;
+      const max = shellMaxThickness({ width: shapeWidth(target), depth: shapeDepth(target), height: target.height }, current.openings);
+      const thickness = Math.max(0.2, Math.min(max, Number((-distance).toFixed(2))));
+      return thickness === current.thickness ? current : { ...current, thickness, error: null };
+    });
+  }, [selectedShape]);
+  useEffect(() => {
+    if (!shellTool || shellTool.busy) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.tagName === "BUTTON" || target.isContentEditable)) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        applyShellTool();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [applyShellTool, shellTool]);
+
   // The panel belongs to one selected body; a new selection closes it.
   useEffect(() => {
     setShellTool((current) => current && !current.busy ? null : current);
@@ -13230,12 +13285,31 @@ export function LayerlingEditor({
                 ? { shapeIds: [faceTool.sourceId] }
                 : blendTool && !blendTool.busy
                   ? { shapeIds: [...blendTool.ids] }
-                  : null}
-          facePull={faceTool && !faceTool.busy && !mateTool && !holePatternTool ? { shapeIds: [faceTool.sourceId, FACE_TOOL_PREVIEW_ID] } : null}
-          onFacePullStart={startFacePull}
-          onFacePullDrag={dragFacePull}
-          onFacePullEnd={endFacePull}
-          onFacePullCancel={cancelFacePull}
+                  : shellTool && !shellTool.busy && selectedShape
+                    ? { shapeIds: [selectedShape.id] }
+                    : null}
+          facePull={faceTool && !faceTool.busy && !mateTool && !holePatternTool
+            ? { shapeIds: [faceTool.sourceId, FACE_TOOL_PREVIEW_ID] }
+            : shellTool && !shellTool.busy && selectedShape
+              ? { shapeIds: [selectedShape.id], inward: true, label: t("shell.wall") }
+              : null}
+          onFacePullStart={shellTool ? (pick) => {
+            shellPullFaceRef.current = pick;
+            return -shellTool.thickness;
+          } : startFacePull}
+          onFacePullDrag={shellTool ? shellThicknessFromPull : dragFacePull}
+          onFacePullEnd={shellTool ? (distance) => {
+            const pick = shellPullFaceRef.current;
+            shellPullFaceRef.current = null;
+            if (distance === null) {
+              if (pick) toggleShellSideAt(pick);
+              return;
+            }
+            shellThicknessFromPull(distance);
+          } : endFacePull}
+          onFacePullCancel={shellTool ? () => {
+            shellPullFaceRef.current = null;
+          } : cancelFacePull}
           onMateFacePick={mateTool ? pickMateFace : faceTool ? pickFaceToolFace : blendTool ? pickBlendFace : pickHolePatternFace}
           cadFacePick={historyViewState ? null : cadFacePick}
           onCadFacePick={toggleDeleteFace}

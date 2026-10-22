@@ -88,6 +88,7 @@ export function ShellPanel({
       <div className="edge-modifier-target">
         <strong>{targetName}</strong>
         <span>{t("shell.help")}</span>
+        <span>{t("shell.pickHint")}</span>
       </div>
 
       <EdgeFeatureHistory

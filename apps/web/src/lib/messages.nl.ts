@@ -3323,4 +3323,6 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "blend.created": "Verbonden: de twee onderdelen en het stuk ertussen zijn één groep",
   "blend.cancelled": "Overgang geannuleerd",
   "edge.faceNoEdges": "Geen rand van dat vlak kan bij deze drempel worden afgerond. Klik in plaats daarvan op een rand.",
+  "shell.sideNotOpenable": "Alleen een vlak dat recht omhoog, omlaag, naar voren, achteren, links of rechts wijst kan open blijven.",
+  "shell.pickHint": "Klik een vlak van het onderdeel om het te openen of te sluiten. Sleep een vlak naar binnen voor de wanddikte. Enter holt uit.",
 };

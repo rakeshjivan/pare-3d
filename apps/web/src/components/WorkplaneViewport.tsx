@@ -455,7 +455,8 @@ type WorkplaneViewportProps = {
    * out (positive) or pushes it in (negative) along its normal, snapped to the grid (Shift: finely).
    * Typing a number sets the depth; Enter takes it, Esc gives up. A press without a drag is a pick.
    */
-  facePull?: { shapeIds: string[] } | null;
+  /** `inward`: the value is how far into the body (a wall thickness), shown as `label` and a positive number. */
+  facePull?: { shapeIds: string[]; inward?: boolean; label?: string } | null;
   /** False refuses the press; a number is the depth the face already stands at (grabbing the preview again). */
   onFacePullStart?: (pick: LayFlatPick) => boolean | number;
   /** The whole depth: out positive, in negative (typed or dragged). */
@@ -7430,8 +7431,10 @@ export function WorkplaneViewport({
       const value = typedValue ?? distance;
       const text = typed
         ? `${typed}${typedValue === null ? "" : " mm"} ↵`
-        : `${value > 0 ? "+" : value < 0 ? "−" : ""}${formatMeasure(Math.abs(value), workspaceRef.current.accuracy)}`;
-      setFacePullReadout({ x: lastX - rect.left + 20, y: lastY - rect.top - 30, text, pocket: value < 0 });
+        : target.inward
+          ? `${target.label ?? ""} ${formatMeasure(Math.max(0, -value), workspaceRef.current.accuracy)}`.trim()
+          : `${value > 0 ? "+" : value < 0 ? "−" : ""}${formatMeasure(Math.abs(value), workspaceRef.current.accuracy)}`;
+      setFacePullReadout({ x: lastX - rect.left + 20, y: lastY - rect.top - 30, text, pocket: !target.inward && value < 0 });
     };
     const update = (clientX: number, clientY: number) => {
       lastX = clientX;
@@ -7466,8 +7469,8 @@ export function WorkplaneViewport({
       if (upEvent.pointerId !== pointerId) return;
       stop();
       const typedValue = typedPull(typed);
-      if (typedValue !== null) callbacks.onFacePullEnd?.(typedValue, true);
-      else callbacks.onFacePullEnd?.(moved && distance !== 0 ? distance : null, true);
+      if (typedValue !== null) callbacks.onFacePullEnd?.(target.inward ? -Math.abs(typedValue) : typedValue, true);
+      else callbacks.onFacePullEnd?.(moved && distance !== base ? distance : null, true);
     };
     const cancel = (cancelEvent: PointerEvent) => {
       if (cancelEvent.pointerId !== pointerId) return;
@@ -7488,7 +7491,7 @@ export function WorkplaneViewport({
         keyEvent.preventDefault();
         keyEvent.stopPropagation();
         stop();
-        callbacks.onFacePullEnd?.(typedValue, true);
+        callbacks.onFacePullEnd?.(target.inward ? -Math.abs(typedValue) : typedValue, true);
         return;
       }
       if (keyEvent.key === "Shift") {
@@ -7499,10 +7502,11 @@ export function WorkplaneViewport({
       if (/^[0-9.]$/.test(keyEvent.key) || (keyEvent.key === "-" && !typed)) {
         keyEvent.preventDefault();
         keyEvent.stopPropagation();
-        // A number typed without a sign keeps the way the drag was going: in stays in.
-        typed = !typed && keyEvent.key !== "-" && distance < 0 ? `-${keyEvent.key}` : typed + keyEvent.key;
+        // A number typed without a sign keeps the way the drag was going: in stays in. A wall
+        // thickness is always a plain number.
+        typed = !target.inward && !typed && keyEvent.key !== "-" && distance < 0 ? `-${keyEvent.key}` : typed + keyEvent.key;
         const typedValue = typedPull(typed);
-        if (typedValue !== null) callbacks.onFacePullDrag?.(typedValue, true);
+        if (typedValue !== null) callbacks.onFacePullDrag?.(target.inward ? -Math.abs(typedValue) : typedValue, true);
         show();
         return;
       }
@@ -7511,7 +7515,7 @@ export function WorkplaneViewport({
         keyEvent.stopPropagation();
         typed = typed.slice(0, -1);
         const typedValue = typedPull(typed);
-        if (typedValue !== null) callbacks.onFacePullDrag?.(typedValue, true);
+        if (typedValue !== null) callbacks.onFacePullDrag?.(target.inward ? -Math.abs(typedValue) : typedValue, true);
         else callbacks.onFacePullDrag?.(distance, true);
         show();
       }

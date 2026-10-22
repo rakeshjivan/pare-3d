@@ -3299,4 +3299,6 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "blend.created": "Raccordé : les deux pièces et la pièce entre elles forment un groupe",
   "blend.cancelled": "Raccord annulé",
   "edge.faceNoEdges": "Aucune arête de cette face ne peut être arrondie à ce seuil. Cliquez plutôt une arête.",
+  "shell.sideNotOpenable": "Seule une face orientée droit vers le haut, le bas, l'avant, l'arrière, la gauche ou la droite peut rester ouverte.",
+  "shell.pickHint": "Cliquez une face de la pièce pour l'ouvrir ou la fermer. Tirez une face vers l'intérieur pour régler l'épaisseur. Entrée évide.",
 };
