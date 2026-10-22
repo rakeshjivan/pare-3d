@@ -450,8 +450,11 @@ type WorkplaneViewportProps = {
   layFlatPickMode?: boolean;
   onLayFlatPick?: (pick: LayFlatPick | null) => void;
   /** "Align faces" waiting for a click on a face of one of these bodies. */
-  mateFacePick?: { shapeIds: string[] } | null;
-  onMateFacePick?: (pick: LayFlatPick | null) => void;
+  /** `marker: "point"` shows a small ring where the click lands instead of shading the face (text on a surface). */
+  mateFacePick?: { shapeIds: string[]; marker?: "face" | "point"; dragId?: string } | null;
+  onMateFacePick?: (pick: (LayFlatPick & { dragging?: boolean }) | null) => void;
+  /** Fork (build 35): a double-click on text laid on a surface opens it for editing. */
+  onEditSurfaceText?: () => void;
   /**
    * Fork (build 23): push/pull by dragging. Pressing on a face of this body grabs it; dragging pulls it
    * out (positive) or pushes it in (negative) along its normal, snapped to the grid (Shift: finely).
@@ -3463,6 +3466,7 @@ export function WorkplaneViewport({
   onLayFlatPick,
   mateFacePick = null,
   onMateFacePick,
+  onEditSurfaceText,
   facePull = null,
   arrayHandle = null,
   onArrayHandleDrag,
@@ -4908,6 +4912,8 @@ export function WorkplaneViewport({
   // as Edit Sketch or Edit group. Both can be switched off in the settings.
   const onEditSketchRef = useRef(onEditSketch);
   onEditSketchRef.current = onEditSketch;
+  const onEditSurfaceTextRef = useRef(onEditSurfaceText);
+  onEditSurfaceTextRef.current = onEditSurfaceText;
   const onOpenGroupRef = useRef(onOpenGroup);
   onOpenGroupRef.current = onOpenGroup;
   const onSelectShapeRef = useRef(onSelectShape);
@@ -4925,7 +4931,9 @@ export function WorkplaneViewport({
       const selected = selectedIdsRef.current;
       if (selected.length !== 1 || selected[0] !== shape.id) return;
       const settings = workspaceRef.current;
-      if (shape.sketchProfile && settings.doubleClickOpensSketch !== false) onEditSketchRef.current?.();
+      if (mateFacePickRef.current) return;
+      if (shape.surfaceText) onEditSurfaceTextRef.current?.();
+      else if (shape.sketchProfile && settings.doubleClickOpensSketch !== false) onEditSketchRef.current?.();
       else if (shape.groupedShapes?.length && settings.doubleClickOpensGroup !== false) {
         onOpenGroupRef.current?.(shape.id);
         // Fork: once the group is open, the part that was double-clicked is the one selected, so it
@@ -7814,7 +7822,44 @@ export function WorkplaneViewport({
 
       if (mateFacePickRef.current) {
         event.preventDefault();
-        onMateFacePick?.(pickLayFlatFace(state, event.clientX, event.clientY));
+        const pick = pickLayFlatFace(state, event.clientX, event.clientY);
+        onMateFacePick?.(pick);
+        // Fork (build 35): text being placed can be dragged across the part, as in Bambu Studio.
+        if (pick && mateFacePickRef.current.marker === "point" && mateFacePickRef.current.dragId === pick.shapeId) {
+          const { pointerId } = event;
+          const skip = new Set([pick.shapeId]);
+          let last = 0;
+          let pending: { x: number; y: number } | null = null;
+          let timer = 0;
+          const send = () => {
+            timer = 0;
+            if (!pending) return;
+            last = performance.now();
+            const next = pickLayFlatFace(state, pending.x, pending.y, skip);
+            pending = null;
+            if (next) onMateFacePick?.({ ...next, dragging: true });
+          };
+          const onMove = (move: PointerEvent) => {
+            if (move.pointerId !== pointerId) return;
+            pending = { x: move.clientX, y: move.clientY };
+            const wait = 120 - (performance.now() - last);
+            if (wait <= 0) send();
+            else if (!timer) timer = window.setTimeout(send, wait);
+          };
+          const onEnd = (end: PointerEvent) => {
+            if (end.pointerId !== pointerId) return;
+            window.removeEventListener("pointermove", onMove, true);
+            window.removeEventListener("pointerup", onEnd, true);
+            window.removeEventListener("pointercancel", onEnd, true);
+            if (timer) window.clearTimeout(timer);
+            send();
+            state.controls.enabled = true;
+          };
+          state.controls.enabled = false;
+          window.addEventListener("pointermove", onMove, true);
+          window.addEventListener("pointerup", onEnd, true);
+          window.addEventListener("pointercancel", onEnd, true);
+        }
         return;
       }
 
@@ -8295,7 +8340,7 @@ export function WorkplaneViewport({
         return;
       }
       if (mateFacePickRef.current) {
-        syncLayFlatHover(threeRef.current, mateFacePickRef.current.shapeIds, resolvedThemeRef.current, event.clientX, event.clientY);
+        syncLayFlatHover(threeRef.current, mateFacePickRef.current.shapeIds, resolvedThemeRef.current, event.clientX, event.clientY, mateFacePickRef.current.marker === "point");
         return;
       }
       if (cadFacePickRef.current && threeRef.current) {
@@ -13084,6 +13129,7 @@ function syncLayFlatHover(
   theme: ResolvedAppTheme,
   clientX: number | null,
   clientY: number | null,
+  pointMarker = false,
 ) {
   if (!state) return;
   let layer = state.layFlatHoverLayer;
@@ -13112,6 +13158,34 @@ function syncLayFlatHover(
   const mesh = hit?.object as THREE.Mesh<THREE.BufferGeometry> | undefined;
   if (!hit || !mesh || hit.faceIndex === undefined || hit.faceIndex === null || !selectedIds.includes(mesh.userData.shapeId as string)) {
     clear();
+    return;
+  }
+
+  if (pointMarker) {
+    // Fork (build 35): a ring where the text will sit. On a curved part one "face" is a thin sliver,
+    // which looked like a stray line.
+    const normal = hit.face?.normal ? hit.face.normal.clone().transformDirection(mesh.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
+    const pointKey = `point:${hit.point.x.toFixed(2)}:${hit.point.y.toFixed(2)}:${hit.point.z.toFixed(2)}:${theme}`;
+    if (layer.userData.key === pointKey) return;
+    const color = theme === "dark" ? "#69d9ff" : "#079bc6";
+    const marker = new THREE.Group();
+    const material = () => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(2.2, 3, 40), material());
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.7, 20), material());
+    [ring, dot].forEach((part) => {
+      part.layers.set(RENDER_LAYER_PREVIEWS);
+      part.renderOrder = 960;
+      part.raycast = () => undefined;
+      marker.add(part);
+    });
+    marker.position.copy(hit.point).addScaledVector(normal, 0.05);
+    marker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    marker.layers.set(RENDER_LAYER_PREVIEWS);
+    disposeChildren(layer);
+    layer.add(marker);
+    layer.userData.key = pointKey;
+    layer.visible = true;
+    state.needsRender = true;
     return;
   }
 

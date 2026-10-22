@@ -130,7 +130,7 @@ type SketchReferenceFootprint = {
 };
 type PointerAction =
   | { kind: "bezier"; pointerId: number; origin: { x: number; z: number }; current: { x: number; z: number } }
-  | { kind: "move-point"; pointerId: number; pointId: string; origin: { x: number; z: number }; current: { x: number; z: number } }
+  | { kind: "move-point"; pointerId: number; pointId: string; origin: { x: number; z: number }; current: { x: number; z: number }; pressFallback?: boolean }
   | { kind: "move-selection"; pointerId: number; origin: { x: number; z: number }; current: { x: number; z: number }; startPoints: SketchPoint[] }
   | { kind: "resize-selection"; pointerId: number; handle: ResizeHandle; current: { x: number; z: number }; startPoints: SketchPoint[]; bounds: SelectionBounds; proportional?: boolean; grab?: { x: number; z: number } }
   | { kind: "move-handle"; pointerId: number; pointId: string; handle: "in" | "out"; current: { x: number; z: number } }
@@ -847,6 +847,78 @@ export function SketchWorkspace({
     onCornerDialogChange?.(dialog);
   }, [onCornerDialogChange]);
   const [cornerValue, setCornerValue] = useState("2");
+  // Build 35: right-click a line or a point for the usual edits.
+  type SketchMenuItem = { label: string; icon?: React.ReactNode; danger?: boolean; disabled?: boolean; run: () => void };
+  const [sketchMenu, setSketchMenu] = useState<{ x: number; y: number; items: SketchMenuItem[] } | null>(null);
+  useEffect(() => {
+    if (!sketchMenu) return;
+    const close = (event: Event) => {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
+      if (event.target instanceof Element && event.target.closest(".sketch-context-menu")) return;
+      setSketchMenu(null);
+    };
+    window.addEventListener("pointerdown", close, true);
+    window.addEventListener("keydown", close, true);
+    window.addEventListener("wheel", close, true);
+    return () => {
+      window.removeEventListener("pointerdown", close, true);
+      window.removeEventListener("keydown", close, true);
+      window.removeEventListener("wheel", close, true);
+    };
+  }, [sketchMenu]);
+  const insertPointOn = (segmentId: string, at: { x: number; z: number }) => {
+    const segment = profile.segments.find((entry) => entry.id === segmentId);
+    const start = segment ? profile.points.find((entry) => entry.id === segment.startId) : undefined;
+    const end = segment ? profile.points.find((entry) => entry.id === segment.endId) : undefined;
+    if (!segment || !start || !end) return;
+    const placement = closestPointOnSketchSegment(segment, start, end, at);
+    onInsertPoint(segment.id, placement.point, placement.amount);
+  };
+  const menuOpenable = (event: ReactMouseEvent) => {
+    // While a chain of lines is being drawn, a right click ends it (#520).
+    if (activePointId && isChainDrawingTool(tool)) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  };
+  const openSegmentMenu = (event: ReactMouseEvent<SVGElement>, segmentId: string) => {
+    if (!menuOpenable(event)) return;
+    const at = pointFromEvent(event as unknown as ReactPointerEvent<SVGElement>);
+    const segment = profile.segments.find((entry) => entry.id === segmentId);
+    if (!segment) return;
+    const curved = isSegmentCurved(displayProfile, segment);
+    const items: SketchMenuItem[] = [
+      { label: t("sketch.menu.addPoint"), icon: <Plus size={15} />, disabled: !at, run: () => at && insertPointOn(segmentId, at) },
+    ];
+    if (onCurveSegment) items.push({ label: t("sketch.curveLine"), icon: <Spline size={15} />, disabled: curved, run: () => onCurveSegment(segmentId) });
+    if (onStraightenSegment) items.push({ label: t("sketch.straightenLine"), icon: <Minus size={15} />, disabled: !curved && (segment.kind ?? "line") === "line", run: () => onStraightenSegment(segmentId) });
+    if (onSetSegmentConstruction) items.push({ label: t(segment.construction ? "sketch.makeSolid" : "sketch.makeConstruction"), run: () => onSetSegmentConstruction(segmentId, !segment.construction) });
+    items.push({ label: t("sketch.menu.deleteLine"), icon: <Trash2 size={15} />, danger: true, run: () => onDeleteSegment(segmentId) });
+    setSketchMenu({ x: event.clientX, y: event.clientY, items });
+  };
+  const openPointMenu = (event: ReactMouseEvent<SVGElement>, pointId: string) => {
+    if (!menuOpenable(event)) return;
+    const corner = (dialog: "fillet" | "chamfer") => () => {
+      onSelectTool?.("select");
+      onSelectMany([pointId], [], []);
+      // After the selection has settled - picking a point closes an open corner box.
+      window.setTimeout(() => {
+        setCornerDialog(dialog);
+        setCornerValue("2");
+      }, 60);
+    };
+    const items: SketchMenuItem[] = [
+      { label: t("sketch.makeCorner"), icon: <CornerDownRight size={15} />, run: () => onSetPointMode(pointId, "corner") },
+      { label: t("sketch.makeSmooth"), icon: <Waves size={15} />, run: () => onSetPointMode(pointId, "smooth") },
+      { label: t("sketch.splitHandles"), icon: <Split size={15} />, run: () => onSetPointMode(pointId, "split") },
+    ];
+    if (canApplySketchCornerTreatment(displayProfile, pointId)) {
+      items.push({ label: t("sketch.filletCorner"), icon: <Spline size={15} />, run: corner("fillet") });
+      items.push({ label: t("sketch.chamferCorner"), icon: <Slash size={15} />, run: corner("chamfer") });
+    }
+    items.push({ label: t("sketch.menu.removePoint"), icon: <Trash2 size={15} />, danger: true, run: () => onDeletePoint(pointId) });
+    setSketchMenu({ x: event.clientX, y: event.clientY, items });
+  };
   // Mirror (#512): the bar with the choice of axis, and the step where a line is picked as the axis.
   const [mirrorOpen, setMirrorOpen] = useState(false);
   const [mirrorPicking, setMirrorPicking] = useState(false);
@@ -1369,7 +1441,9 @@ export function SketchWorkspace({
     } else if (action.kind === "resize-selection") {
       onTransformPoints(resizeSketchPoints(action.startPoints, action.bounds, action.handle, resizeTarget(action), action.proportional || keepProportionsRef.current), t("sketch.shapeResized"));
     } else if (action.kind === "move-point") {
-      onMovePoint(action.pointId, action.current);
+      // Build 35: a point pressed with a drawing tool and let go where it was is a click on it, as before.
+      if (action.pressFallback && action.current.x === action.origin.x && action.current.z === action.origin.z) onPointPress(action.pointId);
+      else onMovePoint(action.pointId, action.current);
     } else if (action.kind === "move-handle") {
       onMoveHandle(action.pointId, action.handle, action.current);
     } else if (action.kind === "move-image") {
@@ -1834,6 +1908,26 @@ export function SketchWorkspace({
 
   return (
     <main className="sketch-workspace-stage" style={sketchColorStyle}>
+      {sketchMenu ? (
+        <div className="sketch-context-menu" role="menu" style={{ left: sketchMenu.x, top: sketchMenu.y }} onContextMenu={(event) => event.preventDefault()}>
+          {sketchMenu.items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              className={item.danger ? "danger" : ""}
+              disabled={item.disabled}
+              onClick={() => {
+                setSketchMenu(null);
+                item.run();
+              }}
+            >
+              {item.icon ?? <span className="sketch-context-menu-gap" />}
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="sketch-mode-badge">{operation === "revolve" ? t("sketch.modeBadgeRevolve") : operation === "sweep" ? t("sketch.modeBadgeSweep") : t("sketch.modeBadge")}</div>
       {operation === "revolve" ? <SketchRevolvePreview positions={revolvePreviewPositions} /> : null}
       <div className="camera-controls sketch-camera-controls" aria-label={t("sketch.viewControls")} data-help-section="cameraBar">
@@ -1896,6 +1990,24 @@ export function SketchWorkspace({
             setRefinePreview(null);
           }}
           onWheel={handleWheel}
+          onDoubleClick={(event) => {
+            // Build 35: a double click anywhere on a line puts a new point there (whatever lies over the line).
+            if (activePointId && isChainDrawingTool(tool)) return;
+            if (event.target instanceof Element && event.target.closest('[data-sketch-entity="point"]')) return;
+            const at = pointFromEvent(event as unknown as ReactPointerEvent<SVGElement>);
+            if (!at) return;
+            const reach = pointRadius * 2.5;
+            let best: { id: string; distance: number } | null = null;
+            for (const segment of profile.segments) {
+              const start = profile.points.find((entry) => entry.id === segment.startId);
+              const end = profile.points.find((entry) => entry.id === segment.endId);
+              if (!start || !end) continue;
+              const placement = closestPointOnSketchSegment(segment, start, end, at);
+              const distance = Math.hypot(placement.point.x - at.x, placement.point.z - at.z);
+              if (distance <= reach && (!best || distance < best.distance)) best = { id: segment.id, distance };
+            }
+            if (best) insertPointOn(best.id, at);
+          }}
           onContextMenu={(event) => {
             event.preventDefault();
             if (onFinishLine && activePointId && isChainDrawingTool(tool) && rightClickEndsChain(rightPressRef.current, { x: event.clientX, y: event.clientY })) onFinishLine();
@@ -2064,6 +2176,7 @@ export function SketchWorkspace({
                 onPointerLeave={() => {
                   if (tool === "refine") setRefinePreview((current) => current?.segmentId === segment.id ? null : current);
                 }}
+                onContextMenu={(event) => openSegmentMenu(event, segment.id)}
                 onPointerDown={(event) => {
                   const point = pointFromEvent(event);
                   event.preventDefault();
@@ -2456,10 +2569,15 @@ export function SketchWorkspace({
                   } else if (event.button === 0 && tool === "bezier" && activePointId !== point.id) {
                     // A Bezier side may start or end on a point that is already there, and pulling handles out of it works as on empty plane (#635).
                     beginEntityDrag(event, { kind: "bezier", pointerId: event.pointerId, origin: { x: point.x, z: point.z }, current: { x: point.x, z: point.z } });
+                  } else if (event.button === 0 && !activePointId) {
+                    // Build 35: points can be dragged with any drawing tool, not only with Select - a click
+                    // without moving still does what the tool does with a point.
+                    beginEntityDrag(event, { kind: "move-point", pointerId: event.pointerId, pointId: point.id, origin: { x: point.x, z: point.z }, current: { x: point.x, z: point.z }, pressFallback: true });
                   } else if (event.button === 0) {
                     onPointPress(point.id);
                   }
                 }}
+                onContextMenu={(event) => openPointMenu(event, point.id)}
               />
             ))}
           </g>

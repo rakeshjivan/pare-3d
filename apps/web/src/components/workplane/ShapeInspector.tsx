@@ -228,10 +228,7 @@ import {
 import { MAX_HINGE_CLEARANCE, MAX_HINGE_KNUCKLES, MIN_HINGE_CLEARANCE, MIN_HINGE_KNUCKLES, hingePlan, minimumHingeDepth, normalizeHingeClearance, normalizeHingeKnuckles, normalizeHingeLeafThickness, normalizeHingePinDiameter } from "@/lib/hingeGeometry";
 import { useLanguage } from "@/lib/useLanguage";
 import { useMovablePanel, type MovablePanelOptions } from "@/lib/useMovablePanel";
-import { PrintFitCard } from "@/components/workplane/PrintFitCard";
-import { PrintHelpers } from "@/components/workplane/PrintHelpers";
 import { SelectionSizeCard } from "@/components/workplane/SelectionSizeCard";
-import { MouseEarsCard } from "@/components/workplane/MouseEarsCard";
 import { isNonSolidShapeKind, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeSupportsTaper, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
 import { MAX_SKETCH_REVOLVE_TURNS, normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
 import { roundSideCount } from "@/lib/roundSideCount";
@@ -2799,17 +2796,6 @@ export function ShapeInspector({
         </button>
       ) : null}
 
-      {onWrapAroundCylinder ? (
-        <CylinderWrapCard
-          key={shape.id}
-          shape={shape}
-          workspace={workspace}
-          disabled={locked}
-          onWrap={onWrapAroundCylinder}
-          onInteractionActiveChange={onInteractionActiveChange}
-        />
-      ) : null}
-
       {onTextTags && shape.kind === "text" ? (
         <NameListCard key={`names-${shape.id}`} shapeId={shape.id} disabled={locked} onTextTags={onTextTags} onInteractionActiveChange={onInteractionActiveChange} />
       ) : null}
@@ -3032,6 +3018,17 @@ export function ShapeInspector({
           ) : null}
         </div>
       ) : null}
+      {/* Build 35: wrapping comes after the sizes, position, rotation, taper and twist. */}
+      {onWrapAroundCylinder ? (
+        <CylinderWrapCard
+          key={shape.id}
+          shape={shape}
+          workspace={workspace}
+          disabled={locked}
+          onWrap={onWrapAroundCylinder}
+          onInteractionActiveChange={onInteractionActiveChange}
+        />
+      ) : null}
       {isThread ? (
         <div className={`property-card ${threadOpen ? "" : "collapsed"}`}>
           <button
@@ -3092,12 +3089,7 @@ export function ShapeInspector({
       {/* Fork: "Make layers" (a multicolour tag from text or an outline) is an extra, so it waits below the sizes. */}
       {shape.kind === "text" && onLayerText ? <MakeLayersButton disabled={locked} onLayerText={onLayerText} /> : null}
       {iconTag && !iconTag.isTag ? <MakeIconLayersButton disabled={locked} onLayer={iconTag.onLayer} /> : null}
-      {/* Fork: Print fit for holes, mouse ears for solids - folded away under the sizes (build 15). */}
-      {shape.hole && shape.groupOperation !== "bundle" ? (
-        <PrintHelpers><PrintFitCard shape={shape} locked={locked} onUpdate={(patch) => onUpdate(patch)} /></PrintHelpers>
-      ) : !shape.hole && !isNonSolidShapeKind(shape.kind) ? (
-        <PrintHelpers><MouseEarsCard shape={shape} locked={locked} /></PrintHelpers>
-      ) : null}
+      {/* Build 35: no Print helpers card - brim ears and hole compensation belong to the slicer. */}
       {!movable.moved ? (
         <div className="inspector-snap-dock">
           <SnapGridControl units={workspace.units} onUnitsChange={onUnitsChange} customGrids={workspace.customSnapGrids} snap={snap} snapOpen={snapOpen} onSnapChange={onSnapChange} onSnapOpenChange={onSnapOpenChange} objectSnap={workspace.objectSnap} onObjectSnapChange={onObjectSnapChange} />

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 (globalThis as unknown as { window: unknown }).window = { location: { href: pathToFileURL(resolve("apps/web/public") + "/").href } };
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
-import { surfaceTextPositions, SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK } from "@/lib/surfaceText";
+import { curveLetterPoint, surfaceTextPositions, SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK } from "@/lib/surfaceText";
 import { weldTriangles } from "@/lib/meshRepair";
 
 const soup = (m: { getMesh(): { numProp: number; vertProperties: Float32Array; triVerts: Uint32Array } }) => {
@@ -53,5 +53,64 @@ describe("text on any surface (build 34)", () => {
     const long = soup(m.Manifold.cube([80, 1, 6], true).translate([0, 0.5, 0]));
     const off = await surfaceTextPositions(long, soup(ball), { origin: { x: 0, y: 0, z: 20 }, normal: { x: 0, y: 0, z: 1 } }, { depth: 1, mode: "raised", letterHeight: 6 });
     expect(off.offSurface).toBeGreaterThan(0.2);
+  });
+
+  it("keeps letters that run past an edge at the edge's height - they never drop onto a lower step (build 35)", async () => {
+    const m = await getManifoldRuntime();
+    // A 20 mm wide block on a wide base 10 mm lower; text 40 mm wide clicked on the block's top.
+    const block = m.Manifold.union(m.Manifold.cube([20, 20, 20]).translate([-10, 0, -10]), m.Manifold.cube([80, 10, 40]).translate([-40, 0, -20]));
+    const letters = soup(m.Manifold.cube([40, 1, 6], true).translate([0, 0.5, 0]));
+    const result = await surfaceTextPositions(letters, soup(block), { origin: { x: 0, y: 20, z: 0 }, normal: { x: 0, y: 1, z: 0 } }, { depth: 1, mode: "raised", letterHeight: 6 });
+    expect(result.offSurface).toBeGreaterThan(0.3);
+    let minY = Infinity;
+    for (let i = 1; i < result.positions.length; i += 3) minY = Math.min(minY, result.positions[i]);
+    expect(minY).toBeGreaterThan(20 - SURFACE_TEXT_SINK - 0.05);
+    const text = await solid(result.positions);
+    expect(text.decompose()).toHaveLength(1);
+  });
+
+  it("wraps a long line of text right round a cylinder, every point the right distance from its axis (build 35)", async () => {
+    const m = await getManifoldRuntime();
+    const can = m.Manifold.cylinder(40, 20, 20, 128).rotate([-90, 0, 0]); // upright along y, radius 20
+    // 100 mm of "text" round a 126 mm circumference: most of the way round.
+    const letters = soup(m.Manifold.cube([100, 1, 6], true).translate([0, 0.5, 0]));
+    const result = await surfaceTextPositions(letters, soup(can), { origin: { x: 0, y: 20, z: 20 }, normal: { x: 0, y: 0, z: 1 } }, { depth: 1, mode: "raised", letterHeight: 6, shape: "wrap" });
+    expect(result.offSurface).toBe(0);
+    let minR = Infinity, maxR = -Infinity, back = 0;
+    for (let i = 0; i < result.positions.length; i += 3) {
+      const r = Math.hypot(result.positions[i], result.positions[i + 2]);
+      minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+      if (result.positions[i + 2] < -10) back += 1;
+    }
+    expect(minR).toBeGreaterThan(20 - SURFACE_TEXT_SINK - 0.1);
+    expect(maxR).toBeLessThan(21 + 0.1);
+    expect(back).toBeGreaterThan(0); // it reached round the back
+    const text = await solid(result.positions);
+    expect(text.status()).toBe("NoError");
+    expect(m.Manifold.union(can, text).decompose()).toHaveLength(1);
+  });
+
+  it("bends the line into an arc, and lays it flat on request (build 35)", () => {
+    // A rainbow: the ends lower than the middle, the length kept along the arc.
+    const [u0, v0] = curveLetterPoint(0, 0, 50, 40);
+    const [u1, v1] = curveLetterPoint(20, 0, 50, 40);
+    expect(u0).toBeCloseTo(0);
+    expect(v0).toBeCloseTo(0);
+    expect(v1).toBeLessThan(-3);
+    expect(u1).toBeLessThan(20);
+    const [, smile] = curveLetterPoint(20, 0, -50, 40);
+    expect(smile).toBeGreaterThan(3);
+    expect(curveLetterPoint(7, 2, 0, 40)).toEqual([7, 2]);
+  });
+
+  it("stands flat text on the plane touching the part (build 35)", async () => {
+    const m = await getManifoldRuntime();
+    const ball = m.Manifold.sphere(30, 96);
+    const letters = soup(m.Manifold.cube([20, 1, 6], true).translate([0, 0.5, 0]));
+    const result = await surfaceTextPositions(letters, soup(ball), { origin: { x: 0, y: 0, z: 30 }, normal: { x: 0, y: 0, z: 1 } }, { depth: 1, mode: "raised", letterHeight: 6, shape: "flat" });
+    let minZ = Infinity, maxZ = -Infinity;
+    for (let i = 2; i < result.positions.length; i += 3) { minZ = Math.min(minZ, result.positions[i]); maxZ = Math.max(maxZ, result.positions[i]); }
+    expect(minZ).toBeCloseTo(30 - SURFACE_TEXT_SINK, 3);
+    expect(maxZ).toBeCloseTo(31, 3);
   });
 });

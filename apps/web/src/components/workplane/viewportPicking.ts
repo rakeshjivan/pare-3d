@@ -149,9 +149,9 @@ export function pickRotationPivot(state: ThreeState, clientX: number, clientY: n
   return planarFaceCentroid(positions, hit.faceIndex) ?? { x: hit.point.x, y: hit.point.y, z: hit.point.z };
 }
 
-export function pickLayFlatFace(state: ThreeState, clientX: number, clientY: number): LayFlatPick | null {
+export function pickLayFlatFace(state: ThreeState, clientX: number, clientY: number, skip?: ReadonlySet<string>): LayFlatPick | null {
   aimPickRay(state, clientX, clientY, RENDER_LAYER_SHAPES);
-  const hit = firstShapeHit(state, { needsFace: true });
+  const hit = firstShapeHit(state, { needsFace: true, skip });
   if (!hit || !hit.face) return null;
   const mesh = hit.object as THREE.Mesh<THREE.BufferGeometry>;
   mesh.updateWorldMatrix(true, false);

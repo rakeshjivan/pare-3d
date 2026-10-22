@@ -137,12 +137,15 @@ const LYL_MAX_FONTS = 64;
 function embeddedFonts(states: WorkplaneShape[][]): LylFontV1[] {
   const characters = new Map<string, Set<string>>();
   const visit = (shape: WorkplaneShape) => {
-    if (isCustomFontId(shape.font) && shape.kind === "text") {
-      const used = characters.get(shape.font) ?? new Set<string>();
-      const glyphs = customFontEntry(shape.font)?.data.glyphs as Record<string, unknown> | undefined;
-      textCharacters((shape.text ?? "TEXT").trim() || " ", glyphs).forEach((character) => used.add(character));
-      characters.set(shape.font, used);
-    }
+    const add = (font: string, text: string) => {
+      const used = characters.get(font) ?? new Set<string>();
+      const glyphs = customFontEntry(font)?.data.glyphs as Record<string, unknown> | undefined;
+      textCharacters(text.trim() || " ", glyphs).forEach((character) => used.add(character));
+      characters.set(font, used);
+    };
+    if (isCustomFontId(shape.font) && shape.kind === "text") add(shape.font, shape.text ?? "TEXT");
+    // Fork (build 35): text laid on a surface keeps its font for the next edit.
+    if (shape.surfaceText && isCustomFontId(shape.surfaceText.font)) add(shape.surfaceText.font, shape.surfaceText.text);
     shape.groupedShapes?.forEach(visit);
   };
   states.forEach((shapes) => shapes.forEach(visit));

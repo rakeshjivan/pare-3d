@@ -332,4 +332,26 @@ describe("hollowing a solid with the real OCCT kernel", () => {
     kernel.release(result);
     kernel.release(tube);
   });
+
+  // Build 35: a box rounded or chamfered on every edge, then hollowed with a wall as thick as the
+  // rounding or thicker - the kernel's own offset gives up there; the outside must keep its edges.
+  for (const [kind, size, wall] of [["fillet", 2, 2], ["fillet", 1, 2], ["chamfer", 1.5, 2], ["fillet", 2, 3]] as const) {
+    it(`hollows a box with ${size} mm ${kind}s on every edge to a ${wall} mm wall, open at the top`, () => {
+      const plain = box();
+      const edges = kernel.getSubShapes(plain, "edge");
+      const treated = kind === "fillet" ? kernel.fillet(plain, edges, size) : kernel.chamfer(plain, edges, size);
+      const before = kernel.getVolume(treated);
+      const result = shellSolid(kernel, treated, wall, ["top"]);
+      expect(kernel.isValid(result)).toBe(true);
+      const volume = kernel.getVolume(result);
+      expect(volume).toBeGreaterThan(0);
+      expect(volume).toBeLessThan(before * 0.6);
+      const bounds = kernel.getBoundingBox(result, false);
+      expect(bounds.xmax - bounds.xmin).toBeCloseTo(40, 3);
+      expect(bounds.ymax - bounds.ymin).toBeCloseTo(20, 3);
+      // About what a sharp box with these walls holds (40 x 20 x 30, open top, walls and floor of `wall`).
+      const cavity = (40 - 2 * wall) * (30 - 2 * wall) * (20 - wall);
+      expect(before - volume).toBeGreaterThan(cavity * 0.95);
+    });
+  }
 });

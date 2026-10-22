@@ -380,7 +380,6 @@ export const FORK_SHORT_LABELS_EN: Readonly<Record<string, string>> = {
   fitCheck: "Fit check",
   roundMesh: "Round",
   roundAll: "Round all",
-  flexiModel: "Flexi",
   surfaceText: "Text",
   align: "Align",
   snap: "Snap",
@@ -390,8 +389,12 @@ export const FORK_SHORT_LABELS_EN: Readonly<Record<string, string>> = {
   center: "Center",
 };
 
-/** Fork (build 33): the Modify tools kept under its "More" button, so the toolbar fits on one row at 1280 px. */
-export const FORK_OVERFLOW_TOOLS: ReadonlySet<string> = new Set(["pivot", "holePattern", "faceTool", "deleteFace", "roundAll", "flexiModel"]);
+/**
+ * Fork (build 33): Modify tools kept under a "More" button. Since build 35 there is room for all of
+ * them on the row (the Mesh group is one button), so none are hidden; the button shows only if a
+ * tool is listed here again.
+ */
+export const FORK_OVERFLOW_TOOLS: ReadonlySet<string> = new Set<string>();
 
 /** The advanced tools shown in the toolbar's "More" menu rather than on the row itself. */
 export const FORK_MORE_TOOLS: ReadonlySet<string> = new Set([
@@ -404,7 +407,6 @@ export const FORK_MORE_TOOLS: ReadonlySet<string> = new Set([
   "hollow",
   "deleteFace",
   "roundAll",
-  "flexiModel",
   "snap",
   "layFlat",
   "mateFaces",
@@ -448,7 +450,6 @@ export const FORK_TOOL_HINTS_EN: Readonly<Record<string, string>> = {
   fitCheck: "find parts that overlap or sit too close to print apart or move",
   roundMesh: "round every edge by one radius, also on imported meshes",
   roundAll: "round every edge by one radius, also where the fillet tool cannot",
-  flexiModel: "cut the selected model into segments joined by print-in-place joints - a flexi toy",
   surfaceText: "click any part to put text on it - it hugs flat and curved surfaces, raised or cut in",
   align: "line parts up with each other",
   mateFaces: "put one part's face flat against another's",

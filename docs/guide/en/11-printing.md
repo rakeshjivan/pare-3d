@@ -60,21 +60,21 @@ Parts that move against each other - a lid, a hinge, a print-in-place joint, a g
 
 Click a line in the list to select its two parts. The check runs again by itself whenever a part moves, so you can nudge parts apart with the window open and watch the list empty. {{ui:edge.done}} closes it.
 
-## Holes that fit: Print fit
+## Holes that fit
 
-A printed hole comes out a little smaller than drawn, so a 5 mm peg will not go into a 5 mm hole. Select a hole and open {{ui:printHelpers.title}} in its properties: the {{ui:printFit.title}} card makes the hole bigger by the right amount, shared evenly on every side, while the size you typed stays as it is.
+A printed hole comes out a little smaller than drawn, so a 5 mm peg will not go into a 5 mm hole. Give the hole the clearance in its size - for a 5 mm peg that should slide, make the hole 5.2 to 5.4 mm - or let the slicer do it for every hole at once (in Bambu Studio: X-Y hole compensation, under Quality).
 
-- **{{ui:printFit.exact}}:** the size as drawn.
-- **{{ui:printFit.press}}:** the part goes in firmly and stays put.
-- **{{ui:printFit.snug}}:** slides in and out, for lids and pegs.
-- **{{ui:printFit.loose}}:** turns or moves freely, for hinges and axles.
-- **{{ui:printFit.mine}}:** the clearance your own printer needs, from the fit test.
+As a rule of thumb:
 
-Print fit works on a single straight-sided hole. For a group or a tapered hole, add about 0.2 mm to its size by hand.
+- about 0.1 mm larger: the part goes in firmly and stays put;
+- about 0.2 mm: slides in and out, for lids and pegs;
+- about 0.4 mm: turns or moves freely, for hinges and axles.
 
 ### Finding your printer's own fit
 
-Every printer is a little different. {{ui:fitTest.title}} in **Ready-made parts** finds yours: {{ui:fitTest.make}} puts a strip of holes, each a little bigger than the last, and a peg on the plate. Print both and try the peg in each hole. Pick the tightest one it slides into without forcing under {{ui:fitTest.which}}, and Pare 3D remembers it: from then on {{ui:printFit.mine}} gives every hole exactly that clearance.
+Every printer is a little different. {{ui:fitTest.title}} in **Ready-made parts** finds yours: {{ui:fitTest.make}} puts a strip of holes, each a little bigger than the last, and a peg on the plate. Print both and try the peg in each hole: the tightest one it slides into without forcing tells you the clearance your printer needs.
+
+Brims and mouse ears against warping are set in the slicer too, so Pare 3D leaves them to it.
 
 ## Ready to print?
 
@@ -99,7 +99,7 @@ Switch on {{ui:printCheck.menuItem}} in the same menu and {{ui:printCheck.title}
 ## Wall thickness, clearance and chamfers
 
 - Walls should be at least two extrusion lines wide, so 0.8 mm with a 0.4 mm nozzle. Sturdy parts need 1.2 to 2 mm.
-- Where two parts fit into each other you need clearance: usually 0.2 to 0.4 mm, depending on the printer. {{ui:printFit.title}} and the fit test above do this for holes.
+- Where two parts fit into each other you need clearance: usually 0.2 to 0.4 mm, depending on the printer. The fit test above tells you what your printer needs.
 - Many people lightly chamfer the lower edge that sits on the plate. That keeps the first layer from spreading ("elephant foot").
 
 ## When you are ready

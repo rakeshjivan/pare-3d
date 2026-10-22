@@ -4,6 +4,19 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 35,
+    items: [
+      "A new look for the toolbar: every icon drawn the same way - a thin dark line and a grey fill - each group framed in its own colour, and the tool in use tinted softly in that colour.",
+      "Text on a surface works like Bambu Studio's: double-click placed text to change anything - raised or cut in, font, size, depth - drag the letters to slide them across the part, and choose Follow surface, Flat or Wrap around (right round a mug or bottle). A Curve slider bends the line into an arc, and you can add a font file of your own.",
+      "Text that runs past an edge no longer falls apart or cuts through the model, and the window says plainly that the text is a preview until you press Add.",
+      "Hollow now works after rounding or chamfering the edges, even with walls thicker than the rounding.",
+      "Fillet: a size too big for the picked edges drops to the largest that fits by itself, and says so.",
+      "Sketches: drag any point with whichever tool is picked (no need to press Select first), double-click a line to add a point, and right-click a line or a point for add, remove, curve, straighten, corner, smooth, fillet and chamfer.",
+      "A smaller, tidier properties panel: Properties, Position, Rotation, Taper, Twist & Lean, then Wrap around a cylinder. Print helpers is gone - brims and hole compensation are set in the slicer.",
+      "Every Modify tool has its own button again (Push/pull face is back in view), Round a mesh keeps the window working while it runs, and Make it flexi and the duplicate Text on a face are gone.",
+    ],
+  },
+  {
     build: 34,
     items: [
       "Text on any surface, like Bambu Studio: click the T in Modify (or right-click a part > Add text here), type, click anywhere on a part - the letters hug flat, curved, domed and imported surfaces, raised or cut in. Click elsewhere to move it; font, size, depth and turn change it at once.",

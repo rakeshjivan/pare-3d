@@ -33,6 +33,15 @@ A body comes only from a **closed** outline.
 
 The keys [[1]] to [[4]] pick the drawing tools, in the order of the bar: {{ui:sketch.line}}, {{ui:sketch.bezier}}, {{ui:sketch.smooth}} and {{ui:sketch.refine}}. They work as long as no line is being drawn; while one is, the digits are its length (see below).
 
+## Changing a drawing
+
+- **Drag any point** to move it - with whichever drawing tool is picked, not only with Select. A click without moving still does what the tool does there.
+- **Double-click a line** anywhere to put a new point on it.
+- **Right-click a line** for {{ui:sketch.menu.addPoint}}, {{ui:sketch.curveLine}}, {{ui:sketch.straightenLine}}, {{ui:sketch.makeConstruction}} and {{ui:sketch.menu.deleteLine}}.
+- **Right-click a point** for {{ui:sketch.makeCorner}}, {{ui:sketch.makeSmooth}}, {{ui:sketch.splitHandles}}, {{ui:sketch.filletCorner}}, {{ui:sketch.chamferCorner}} and {{ui:sketch.menu.removePoint}}.
+
+While a chain of lines is being drawn, a right click still ends it.
+
 ## Lines by numbers
 
 Once you have set the first point with {{ui:sketch.line}} or {{ui:sketch.smooth}}, just type a number: two fields open next to the line, {{ui:sketch.typedLength}} in millimetres and {{ui:sketch.typedAngle}} in degrees. [[<]] or [[Tab]] moves to the angle, so "50<30" gives a line 50 mm long at 30°, as in AutoCAD. [[Enter]] sets the point, and you can type the next line straight away; [[Esc]] closes the fields without ending the line chain.

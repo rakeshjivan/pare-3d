@@ -24,20 +24,27 @@ The edges of text can be chamfered or filleted too, straight or curved, see [Bre
 
 To put lettering on a part - a name on a mug, a label on a curved lid, a number on a scanned model - use **{{ui:editor.tool.surfaceText}}** in the {{ui:editor.group.modify}} group (the **T**), or right-click a part and choose {{ui:surfaceText.menu}}. It works like the text tool in Bambu Studio:
 
-1. Type the text, and choose the {{ui:surfaceText.font}}, {{ui:readyParts.raised}} or {{ui:readyParts.engraved}}, the {{ui:readyParts.letterHeight}} and the {{ui:readyParts.textDepth}}.
-2. Click on any part where the text should go. The letters hug the surface there - flat, sloped, curved, a dome, an imported STL - standing out of it or reaching into it by the depth.
-3. Click elsewhere to move it; change any setting and the text is laid again at once. {{ui:surfaceText.rotation}} turns it on the surface.
-4. {{ui:surfaceText.apply}} (or [[Enter]]) adds it.
+1. Type the text, and choose the {{ui:surfaceText.font}}, {{ui:readyParts.raised}} or {{ui:readyParts.engraved}}, the {{ui:readyParts.letterHeight}} and the {{ui:readyParts.textDepth}}. For a font of your own, pick {{ui:surfaceText.addFont}} at the bottom of the font list; fonts you added before are listed under {{ui:surfaceText.yourFonts}}.
+2. Click on any part where the text should go - a ring shows where it will land. The letters hug the surface there - flat, sloped, curved, a dome, an imported STL - standing out of it or reaching into it by the depth.
+3. Drag the letters to slide them across the part, or click elsewhere to move them; change any setting and the text is laid again at once. {{ui:surfaceText.rotation}} turns it on the surface, {{ui:surfaceText.curve}} bends the line into an arc (above 0 the middle is highest, below 0 the ends are).
+4. Until you press {{ui:surfaceText.apply}} (or [[Enter]]) it is only a preview; that adds it.
 
-The text stays editable: select it and click the **T** again (or right-click it and choose {{ui:surfaceText.editMenu}}) to change the words, font, size, depth or where it sits, then {{ui:surfaceText.update}}.
+How the text meets the part:
+
+- **{{ui:surfaceText.shape.surface}}** - the letters follow the surface where you clicked. Letters that run past an edge carry on at the edge's height instead of dropping onto another part of the model.
+- **{{ui:surfaceText.shape.flat}}** - the letters stand flat on the plane touching the part where you clicked.
+- **{{ui:surfaceText.shape.wrap}}** - the line of text runs right round the part, past the sides and round the back: a name round a mug, a bottle or a ring. It needs a closed part.
+
+The text stays editable: **double-click it** (or right-click it and choose {{ui:surfaceText.editMenu}}) and the window opens again with everything as you left it - switch between raised and cut in, change the words, font, size, depth, shape, curve or where it sits, then {{ui:surfaceText.update}}. If you moved or resized it with the ordinary tools meanwhile, the edit starts from where and how big it is now.
 
 When it is final, select the text and the part and group them ([[Ctrl]]+[[G]]): raised text joins the part, cut-in text is cut out of it.
 
 Good to know:
 
-- On the side of an upright cylinder or tube (with {{ui:surfaceText.rotation}} at 0°) the text is wrapped exactly round it, however far it runs. Elsewhere it is projected onto the surface along the direction of the face you clicked, so text running far round a tight curve gets stretched - make it smaller, or split it in two.
+- On the side of an upright cylinder or tube (with {{ui:surfaceText.shape.surface}}, no curve and {{ui:surfaceText.rotation}} at 0°) the text is wrapped exactly round it, however far it runs.
 - Text across a sharp edge or a deep crease bends with it, as in any slicer's text tool.
-- If part of the text runs off the part, the window says how much; move it or make it smaller.
+- If part of the text runs past the edge of the surface, the window says how much; move it or make it smaller.
+- A font of your own travels with the design when you save it, so the text can still be edited on another computer.
 
 ## Your own fonts
 

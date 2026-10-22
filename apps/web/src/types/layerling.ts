@@ -935,9 +935,19 @@ export type WorkplaneShape = {
     depth: number;
     mode: "raised" | "engraved";
     rotation: number;
+    /** Fork (build 35): follow the surface (the default), flat, or wrapped right round the part. */
+    shape?: "surface" | "flat" | "wrap";
+    /** Fork (build 35): the line bent into an arc, -100 to 100 (0 straight). */
+    curve?: number;
     targetId: string;
     origin: { x: number; y: number; z: number };
     normal: { x: number; y: number; z: number };
+    /**
+     * Fork (build 35): the text's middle and size when it was laid, so moving or resizing it with
+     * the ordinary tools is carried into the next edit.
+     */
+    laidCenter?: { x: number; y: number; z: number };
+    laidSize?: number;
   };
   importedMesh?: {
     positions: number[];

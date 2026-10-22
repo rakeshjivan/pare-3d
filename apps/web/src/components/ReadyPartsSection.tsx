@@ -1,6 +1,6 @@
 "use client";
 
-import { BoxPartIcon, FlexiPartIcon, HingePartIcon, InsertPartIcon, JarPartIcon, NutPartIcon, ParaboloidPartIcon, SnapPartIcon, TextPartIcon } from "@/components/readyPartIcons";
+import { BoxPartIcon, FlexiPartIcon, HingePartIcon, InsertPartIcon, JarPartIcon, NutPartIcon, ParaboloidPartIcon, SnapPartIcon } from "@/components/readyPartIcons";
 import { DEFAULT_JAR, jarParts, normalizeJar, type JarOptions } from "@/lib/readyJar";
 import { DEFAULT_FLEXI_CHAIN, flexiChainParts, normalizeFlexiChain, type FlexiChainOptions } from "@/lib/flexiJoint";
 import { useState } from "react";
@@ -13,18 +13,15 @@ import {
   INSERT_HOLES,
   METRIC_SIZES,
   NUTS,
-  DEFAULT_FACE_TEXT,
   DEFAULT_LIVING_HINGE,
   DEFAULT_SNAP_FIT,
   boxWithLidParts,
   dividerDrop,
-  faceTextPart,
   livingHingePart,
   normalizeLivingHinge,
   normalizeSnapFit,
   snapFitParts,
   snapFitSafeBend,
-  type FaceTextOptions,
   type LivingHingeOptions,
   type SnapFitOptions,
   insertHolePart,
@@ -37,19 +34,18 @@ import {
 } from "@/lib/readyParts";
 
 /** Fork: the Shapes panel's "Ready-made parts" - built from ordinary shapes, placed with a click. */
-export function ReadyPartsSection({ onInsert, onMake, onTextTool }: { onInsert: (parts: ReadyPart[], options?: { sink?: number; carry?: boolean }) => void; onMake?: (maker: "lithophane" | "trace" | "voronoi") => void; onTextTool?: (text: { text: string; letterHeight: number; depth: number; mode: "engraved" | "raised" }) => void }) {
+export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: ReadyPart[], options?: { sink?: number; carry?: boolean }) => void; onMake?: (maker: "lithophane" | "trace" | "voronoi") => void }) {
   useLanguage();
   const [insertSize, setInsertSize] = useState<MetricSize>("M3");
   const [nutSize, setNutSize] = useState<MetricSize>("M3");
   const [boxOpen, setBoxOpen] = useState(false);
   const [box, setBox] = useState<BoxWithLidOptions>(DEFAULT_BOX_WITH_LID);
-  const [openForm, setOpenForm] = useState<"snap" | "hinge" | "text" | "jar" | "flexi" | null>(null);
+  const [openForm, setOpenForm] = useState<"snap" | "hinge" | "jar" | "flexi" | null>(null);
   const [jar, setJar] = useState<JarOptions>(DEFAULT_JAR);
   const [flexi, setFlexi] = useState<FlexiChainOptions>(DEFAULT_FLEXI_CHAIN);
   const [snap, setSnap] = useState<SnapFitOptions>(DEFAULT_SNAP_FIT);
   const [hinge, setHinge] = useState<LivingHingeOptions>(DEFAULT_LIVING_HINGE);
-  const [faceText, setFaceText] = useState<FaceTextOptions>(DEFAULT_FACE_TEXT);
-  const toggleForm = (form: "snap" | "hinge" | "text" | "jar" | "flexi") => setOpenForm(openForm === form ? null : form);
+  const toggleForm = (form: "snap" | "hinge" | "jar" | "flexi") => setOpenForm(openForm === form ? null : form);
   const safeBend = snapFitSafeBend(snap);
   const insert = INSERT_HOLES[insertSize];
   const nut = NUTS[nutSize];
@@ -281,53 +277,6 @@ export function ReadyPartsSection({ onInsert, onMake, onTextTool }: { onInsert: 
           ) : null}
           <h4 className="ready-parts-category">{t("readyParts.cat.helpers")}</h4>
           <FitTestCard onInsert={onInsert} />
-          <div className="ready-part ready-part-box">
-            <TextPartIcon />
-            <div>
-              <strong>{t("readyParts.faceText")}</strong>
-              <span>{t("readyParts.faceTextHint")}</span>
-            </div>
-            <button type="button" className="ready-part-add" aria-expanded={openForm === "text"} onClick={() => toggleForm("text")}>
-              {openForm === "text" ? t("readyParts.hide") : t("readyParts.setUp")}
-            </button>
-          </div>
-          {openForm === "text" ? (
-            <div className="ready-part-form">
-              <label className="ready-part-field">
-                <span>{t("readyParts.textLabel")}</span>
-                <span className="ready-part-input">
-                  <input type="text" aria-label={t("readyParts.textLabel")} value={faceText.text} maxLength={24} onKeyDown={(event) => event.stopPropagation()} onChange={(event) => setFaceText({ ...faceText, text: event.currentTarget.value })} style={{ textAlign: "left" }} />
-                </span>
-              </label>
-              <div className="ready-part-fields">
-                <MmField label={t("readyParts.letterHeight")} value={faceText.letterHeight} onChange={(letterHeight) => setFaceText({ ...faceText, letterHeight: Math.max(2, Math.min(200, letterHeight)) })} />
-                <MmField label={t("readyParts.textDepth")} value={faceText.depth} onChange={(depth) => setFaceText({ ...faceText, depth: Math.max(0.2, Math.min(20, depth)) })} />
-              </div>
-              <div className="ready-part-fit" role="group" aria-label={t("readyParts.textMode")}>
-                {(["engraved", "raised"] as const).map((mode) => (
-                  <button type="button" key={mode} className={faceText.mode === mode ? "active" : ""} aria-pressed={faceText.mode === mode} onClick={() => setFaceText({ ...faceText, mode })}>
-                    {t(mode === "engraved" ? "readyParts.engraved" : "readyParts.raised")}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                className="ready-part-make"
-                onClick={() => {
-                  // Fork (build 34): the text tool that hugs any surface takes it from here.
-                  if (onTextTool) {
-                    onTextTool({ text: faceText.text || "TEXT", letterHeight: faceText.letterHeight, depth: faceText.depth, mode: faceText.mode });
-                    return;
-                  }
-                  const part = faceTextPart(faceText, faceText.text || "TEXT");
-                  onInsert([part], { sink: part.sink, carry: true });
-                }}
-              >
-                {t("readyParts.placeText")}
-              </button>
-            </div>
-          ) : null}
-
           <div className="ready-part">
             <ParaboloidPartIcon />
             <div>

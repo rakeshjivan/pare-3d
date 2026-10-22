@@ -127,6 +127,85 @@ export const CANNOT_HOLLOW_MESSAGE = "This body cannot be hollowed with any wall
 const PROBE_WALL = 0.05;
 const MIN_PROBE_WALL = 0.01;
 
+/** One hollowing of `solid` with walls of `wall`, trying each join and tolerance; null when none works. */
+function hollowAttempt(cad: OcctKernel, solid: ShapeHandle, open: ShapeHandle[], wall: number, joinTypes: Array<JoinType.Arc | JoinType.Intersection>): { result: ShapeHandle | null; error: unknown } {
+  // Past the thickness a body can take, OCCT may hand back the untouched
+  // solid as a "valid" result - a hollow body has to lose volume.
+  const solidVolume = cad.getVolume(solid);
+  let lastError: unknown = null;
+  for (const joinType of joinTypes) {
+    for (const tolerance of [1e-6, 1e-3]) {
+      // With faces to open, the thick solid first; where it fails (a face with a pocket in it), the
+      // body grown over the open faces. A closed body is hollowed with the offset of itself.
+      const builds: Array<() => ShapeHandle> = open.length > 0
+        ? [() => cad.shell(solid, open, wall, tolerance, joinType), () => shellByExtension(cad, solid, open, wall, tolerance, joinType)]
+        : [() => {
+          const cavity = cavityFromOffset(cad, cad.offset(solid, -wall, tolerance, joinType));
+          try {
+            return cad.cut(solid, cavity);
+          } finally {
+            cad.release(cavity);
+          }
+        }];
+      for (const build of builds) {
+        try {
+          const result = build();
+          const volume = shapeIsValid(cad, result) ? cad.getVolume(result) : 0;
+          if (volume > 0 && volume < solidVolume * (1 - 1e-6)) return { result, error: null };
+          cad.release(result);
+          lastError = new Error("invalid shell");
+        } catch (error) {
+          // A missing kernel function is not a verdict on the wall thickness.
+          if (error instanceof Error && /is not a function/.test(error.message)) throw error;
+          lastError = error;
+        }
+      }
+    }
+  }
+  return { result: null, error: lastError };
+}
+
+/**
+ * Fork (build 35): hollows a body whose rounded or chamfered edges are no wider than the wall. Those
+ * faces (narrow strips, at most about twice the wall across) are taken off a copy, the copy is
+ * hollowed, and the cavity it leaves is cut from the body as it is. Null when that does not work.
+ */
+function hollowWithoutNarrowEdges(cad: OcctKernel, solid: ShapeHandle, wall: number, openings: ShellOpenings, joinTypes: Array<JoinType.Arc | JoinType.Intersection>): ShapeHandle | null {
+  const handles: ShapeHandle[] = [];
+  const faces = cad.getSubShapes(solid, "face");
+  try {
+    const narrow = faces.filter((face) => {
+      const box = cad.getBoundingBox(face, false);
+      const length = Math.hypot(box.xmax - box.xmin, box.ymax - box.ymin, box.zmax - box.zmin);
+      if (length <= 1e-9) return false;
+      // A strip's width is about its area over its length (a quarter round of radius r is 1.57 r wide).
+      return cad.getSurfaceArea(face) / length <= wall * 2;
+    });
+    if (narrow.length === 0) return null;
+    const sharp = cad.defeature(solid, narrow, 1e-4);
+    handles.push(sharp);
+    if (!cad.isSolid(sharp) || !shapeIsValid(cad, sharp) || cad.getVolume(sharp) < cad.getVolume(solid) * (1 - 1e-6)) return null;
+    const sharpFaces = cad.getSubShapes(sharp, "face");
+    handles.push(...sharpFaces);
+    const open = shellOpeningFaces(cad, sharp, sharpFaces, openings);
+    const hollowed = hollowAttempt(cad, sharp, open, wall, joinTypes).result;
+    if (!hollowed) return null;
+    handles.push(hollowed);
+    const cavity = cad.cut(sharp, hollowed);
+    handles.push(cavity);
+    const result = cad.cut(solid, cavity);
+    const volume = shapeIsValid(cad, result) ? cad.getVolume(result) : 0;
+    if (volume > 0 && volume < cad.getVolume(solid) * (1 - 1e-6)) return result;
+    cad.release(result);
+    return null;
+  } catch {
+    return null;
+  } finally {
+    releaseAll(cad, faces);
+    releaseAll(cad, handles);
+  }
+}
+
 /**
  * Hollows one solid to walls of `thickness`, measured inward.
  *
@@ -150,41 +229,11 @@ function shellBody(cad: OcctKernel, solid: ShapeHandle, thickness: number, openi
     if (missing && (Array.isArray(openings) || open.length === 0)) {
       throw new Error(`This body has no flat ${missing} face to leave open`);
     }
-    // Past the thickness a body can take, OCCT may hand back the untouched
-    // solid as a "valid" result - a hollow body has to lose volume.
-    const solidVolume = cad.getVolume(solid);
     let lastError: unknown = null;
     const attempt = (wall: number): ShapeHandle | null => {
-      for (const joinType of joinTypes) {
-        for (const tolerance of [1e-6, 1e-3]) {
-          // With faces to open, the thick solid first; where it fails (a face with a pocket in it), the
-          // body grown over the open faces. A closed body is hollowed with the offset of itself.
-          const builds: Array<() => ShapeHandle> = open.length > 0
-            ? [() => cad.shell(solid, open, wall, tolerance, joinType), () => shellByExtension(cad, solid, open, wall, tolerance, joinType)]
-            : [() => {
-              const cavity = cavityFromOffset(cad, cad.offset(solid, -wall, tolerance, joinType));
-              try {
-                return cad.cut(solid, cavity);
-              } finally {
-                cad.release(cavity);
-              }
-            }];
-          for (const build of builds) {
-            try {
-              const result = build();
-              const volume = shapeIsValid(cad, result) ? cad.getVolume(result) : 0;
-              if (volume > 0 && volume < solidVolume * (1 - 1e-6)) return result;
-              cad.release(result);
-              lastError = new Error("invalid shell");
-            } catch (error) {
-              // A missing kernel function is not a verdict on the wall thickness.
-              if (error instanceof Error && /is not a function/.test(error.message)) throw error;
-              lastError = error;
-            }
-          }
-        }
-      }
-      return null;
+      const tried = hollowAttempt(cad, solid, open, wall, joinTypes);
+      lastError = tried.error ?? lastError;
+      return tried.result;
     };
     const hollowed = attempt(thickness);
     if (hollowed) return hollowed;
@@ -198,9 +247,18 @@ function shellBody(cad: OcctKernel, solid: ShapeHandle, thickness: number, openi
       const thin = attempt(probe);
       if (thin) {
         cad.release(thin);
+        // Fork (build 35): rounded or chamfered edges no wider than the wall are what usually stop it
+        // (their inward offset shrinks to nothing). Hollow the body without them and cut that cavity
+        // from the body as it is: the outside keeps its edges, the inside gets sharp corners, as
+        // Fusion does.
+        const sharp = hollowWithoutNarrowEdges(cad, solid, thickness, openings, joinTypes);
+        if (sharp) return sharp;
         throw new Error(TOO_THICK_MESSAGE);
       }
     }
+    // Chamfers meeting at the corners can stop it at every wall: the same way round.
+    const sharp = hollowWithoutNarrowEdges(cad, solid, thickness, openings, joinTypes);
+    if (sharp) return sharp;
     throw new Error(CANNOT_HOLLOW_MESSAGE);
   } finally {
     releaseAll(cad, faces);

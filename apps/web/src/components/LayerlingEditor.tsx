@@ -102,12 +102,14 @@ import { SketchWorkspace, type SketchMeasurement, type SketchPrimitive, type Ske
 import { EdgeModifierPanel, type EdgeChamferStyle } from "./workplane/EdgeModifierPanel";
 import { FitCheckPanel } from "./workplane/FitCheckPanel";
 import { MeshRoundPanel } from "./workplane/MeshRoundPanel";
-import { FlexiModelPanel } from "./workplane/FlexiModelPanel";
 import { SurfaceTextPanel, type SurfaceTextSettings } from "./workplane/SurfaceTextPanel";
 import { SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK, surfaceTextPositions } from "@/lib/surfaceText";
-import { DEFAULT_FLEXI_MODEL, flexiModelSegments, type FlexiModelOptions } from "@/lib/flexiModel";
+
+/** The id of the letters shown while Text on a surface is open, before they are added. */
+const SURFACE_TEXT_PREVIEW_ID = "surface-text-preview";
 import { checkFit, hullPositions, type FitReport } from "@/lib/partTools";
-import { roundMeshPositions, smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
+import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
+import { roundMeshInBackground } from "@/lib/meshJobs";
 import { ShellPanel } from "./workplane/ShellPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
 import { MateFacesPanel } from "./workplane/MateFacesPanel";
@@ -209,7 +211,7 @@ import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames"
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
 import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
-import { BookOpen, Import, Keyboard, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, StickyNote, Type, Upload, Waves } from "lucide-react";
+import { BookOpen, Import, Keyboard, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, StickyNote, Type, Upload } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -3007,6 +3009,9 @@ export function LayerlingEditor({
   // A text with a fill mode draws plain until the 2D kernel is there, then again properly (#215).
   useEffect(() => onManifoldReady(() => setCustomFontRound((round) => round + 1)), []);
   const edgeModifierRef = useRef<EdgeModifierSession | null>(null);
+  /** Fork (build 35): a size too big for the picked edges drops to the largest that fits by itself. */
+  const autoLargestRef = useRef<(() => void) | null>(null);
+  const autoLargestRunsRef = useRef<{ key: string; runs: number }>({ key: "", runs: 0 });
   // "Edit" on a stored fillet or chamfer (#227): the body is taken back first, then the tool opens with these.
   const edgeEditRequestRef = useRef<{ shapeId: string; historyLength: number; preset: EdgeToolPreset } | null>(null);
   const edgeModifierPresetRef = useRef<EdgeToolPreset | null>(null);
@@ -3217,7 +3222,17 @@ export function LayerlingEditor({
         } : current);
         // Ein zu grosser Radius scheitert - der inzwischen gewaehlte kleinere darf es trotzdem versuchen.
         if (cadPreviewQueueRef.current.settle(message.requestId).status !== "sent") {
-          setNotice(t("status.edgeNeedsAdjustment"), true);
+          const session = edgeModifierRef.current;
+          const key = session ? `${session.kind}:${[...session.selectedEdgeIds].sort((a, b) => a - b).join(",")}` : "";
+          const record = autoLargestRunsRef.current;
+          const runs = record.key === key ? record.runs : 0;
+          if (session && session.selectedEdgeIds.length > 0 && !session.searching && runs < 2) {
+            // Too big for these edges: find the largest size that fits and use it, rather than stop.
+            autoLargestRunsRef.current = { key, runs: runs + 1 };
+            window.setTimeout(() => autoLargestRef.current?.(), 0);
+          } else {
+            setNotice(t("status.edgeNeedsAdjustment"), true);
+          }
         }
       }
     }
@@ -7911,7 +7926,7 @@ export function LayerlingEditor({
    * halving the gap each time, and takes a little under the largest the kernel accepts. A radius that
    * changes along the edge keeps its proportion.
    */
-  const findLargestEdgeAmount = useCallback(async () => {
+  const findLargestEdgeAmount = useCallback(async (automatic = false) => {
     const session = edgeModifierRef.current;
     const base = cadModifierBaseShapeRef.current;
     if (!session?.prepared || !base || session.selectedEdgeIds.length === 0 || session.searching) return;
@@ -7962,8 +7977,10 @@ export function LayerlingEditor({
       busy: true,
       error: null,
     } : current);
-    setNotice(t("status.largestEdgeSize", { size: `${formatLengthMm(found, workspaceSettingsRef.current.accuracy)} ${lengthDisplayUnit(workspaceSettingsRef.current).label}` }));
+    const sizeLabel = `${formatLengthMm(found, workspaceSettingsRef.current.accuracy)} ${lengthDisplayUnit(workspaceSettingsRef.current).label}`;
+    setNotice(t(automatic ? "status.largestEdgeSizeUsed" : "status.largestEdgeSize", { size: sizeLabel }));
   }, [discardPendingCadPreviews, edgeModifierMaxAmount, postCadModifierRequestAsync, setNotice]);
+  autoLargestRef.current = () => void findLargestEdgeAmount(true);
 
   const snapSelected = useCallback(() => {
     if (!hasSelection) {
@@ -9208,7 +9225,7 @@ export function LayerlingEditor({
       try {
         const mesh = meshForShape(shape);
         const positions = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
-        const result = await roundMeshPositions(positions, tool.radius, tool.mode);
+        const result = await roundMeshInBackground(positions, tool.radius, tool.mode);
         const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
         if (!current || projectShapesFingerprint([current]) !== projectShapesFingerprint([shape])) {
           setMeshRoundTool(null);
@@ -9228,60 +9245,10 @@ export function LayerlingEditor({
     if (meshRoundTool && !(selectedIds.length === 1 && selectedIds[0] === meshRoundTool.shapeId) && !meshRoundTool.busy) setMeshRoundTool(null);
   }, [meshRoundTool, selectedIds]);
 
-  // Fork (build 33): Make it flexi.
-  const [flexiTool, setFlexiTool] = useState<{ shapeId: string; options: FlexiModelOptions; busy: boolean; error: string | null; length: number } | null>(null);
-  const toggleFlexiTool = useCallback(() => {
-    if (flexiTool) {
-      setFlexiTool(null);
-      return;
-    }
-    if (refuseLockedSelection()) return;
-    const shape = selectedShapes.length === 1 ? selectedShapes[0] : null;
-    if (!shape || shape.hole || isNonSolidShapeKind(shape.kind)) {
-      setNotice(t("flexiModel.selectOne"));
-      return;
-    }
-    const length = Math.max(shapeWidth(shape), shapeDepth(shape));
-    // About one segment per 20 mm, as flexi toys come.
-    setFlexiTool({ shapeId: shape.id, options: { ...DEFAULT_FLEXI_MODEL, segments: Math.max(2, Math.min(30, Math.round(length / 20))) }, busy: false, error: null, length });
-  }, [flexiTool, refuseLockedSelection, selectedShapes]);
-  const applyFlexi = useCallback(() => {
-    const tool = flexiTool;
-    const shape = tool ? shapesRef.current.find((candidate) => candidate.id === tool.shapeId) : null;
-    if (!tool || !shape) {
-      setFlexiTool(null);
-      return;
-    }
-    setFlexiTool({ ...tool, busy: true, error: null });
-    window.setTimeout(async () => {
-      try {
-        const mesh = meshForShape(shape);
-        const positions = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
-        const result = await flexiModelSegments(positions, tool.options);
-        const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
-        if (!current || projectShapesFingerprint([current]) !== projectShapesFingerprint([shape])) {
-          setFlexiTool(null);
-          setNotice(t("meshRound.changed"));
-          return;
-        }
-        const segments = result.segments.map((segment, index) => canonicalizeShape({
-          ...shapeWithWorldPositions(meshShapeFromPositions(`${displayShapeName(shape)} ${index + 1}`, shape.color, segment), segment),
-          name: `${displayShapeName(shape)} ${index + 1}`,
-        }));
-        commitShapes([...shapesRef.current.filter((candidate) => candidate.id !== shape.id), ...segments], segments.map((segment) => segment.id), t(result.skipped ? "flexiModel.doneSkipped" : "flexiModel.done", { count: segments.length, joints: result.joints, skipped: result.skipped }));
-        setFlexiTool(null);
-      } catch (error) {
-        setFlexiTool((latest) => latest ? { ...latest, busy: false, error: error instanceof Error ? localizedError(error.message) : String(error) } : latest);
-      }
-    }, 30);
-  }, [commitShapes, flexiTool]);
-  useEffect(() => {
-    if (flexiTool && !(selectedIds.length === 1 && selectedIds[0] === flexiTool.shapeId) && !flexiTool.busy) setFlexiTool(null);
-  }, [flexiTool, selectedIds]);
 
 
   const surfaceTextRunRef = useRef(0);
-  const lastSurfaceTextSettingsRef = useRef<SurfaceTextSettings>({ text: "TEXT", font: "Multilanguage", letterHeight: 8, depth: 1, mode: "raised", rotation: 0 });
+  const lastSurfaceTextSettingsRef = useRef<SurfaceTextSettings>({ text: "TEXT", font: "Multilanguage", letterHeight: 8, depth: 1, mode: "raised", rotation: 0, shape: "surface", curve: 0 });
   const toggleSurfaceText = useCallback(() => {
     if (surfaceTextTool) {
       setSurfaceTextTool(null);
@@ -9289,9 +9256,19 @@ export function LayerlingEditor({
     }
     const editing = selectedShapes.length === 1 && selectedShapes[0].surfaceText ? selectedShapes[0] : null;
     const record = editing?.surfaceText;
+    // Moved or resized with the ordinary tools since it was laid: the edit starts from where and how big it is now.
+    let origin = record?.origin;
+    let letterHeight = record?.letterHeight ?? 0;
+    if (editing && record?.laidCenter && origin) {
+      const box = meshAabb(editing);
+      const center = { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2, z: (box.minZ + box.maxZ) / 2 };
+      origin = { x: origin.x + center.x - record.laidCenter.x, y: origin.y + center.y - record.laidCenter.y, z: origin.z + center.z - record.laidCenter.z };
+      const size = Math.max(box.maxX - box.minX, box.maxY - box.minY, box.maxZ - box.minZ);
+      if (record.laidSize && Math.abs(size / record.laidSize - 1) > 0.01) letterHeight = Math.round(letterHeight * (size / record.laidSize) * 10) / 10;
+    }
     setSurfaceTextTool({
-      settings: record ? { text: record.text, font: record.font, letterHeight: record.letterHeight, depth: record.depth, mode: record.mode, rotation: record.rotation } : lastSurfaceTextSettingsRef.current,
-      placement: record ? { targetId: record.targetId, origin: record.origin, normal: record.normal } : null,
+      settings: record ? { text: record.text, font: record.font, letterHeight, depth: record.depth, mode: record.mode, rotation: record.rotation, shape: record.shape ?? "surface", curve: record.curve ?? 0 } : lastSurfaceTextSettingsRef.current,
+      placement: record && origin ? { targetId: record.targetId, origin, normal: record.normal } : null,
       editingId: editing?.id ?? null,
       busy: false,
       error: null,
@@ -9300,12 +9277,17 @@ export function LayerlingEditor({
     });
     setNotice(t(record ? "surfaceText.editing" : "surfaceText.clickToPlace"), true);
   }, [selectedShapes, surfaceTextTool]);
-  const pickSurfaceText = useCallback((pick: LayFlatPick | null) => {
+  const pickSurfaceText = useCallback((pick: (LayFlatPick & { dragging?: boolean }) | null) => {
     if (!pick) {
       setNotice(t("surfaceText.missed"));
       return;
     }
-    setSurfaceTextTool((current) => current ? { ...current, placement: { targetId: pick.shapeId, origin: pick.point, normal: pick.normal }, error: null } : current);
+    // A click on the preview letters moves the text along the part it is on.
+    setSurfaceTextTool((current) => {
+      if (!current) return current;
+      const targetId = pick.shapeId === SURFACE_TEXT_PREVIEW_ID ? current.placement?.targetId : pick.shapeId;
+      return targetId ? { ...current, placement: { targetId, origin: pick.point, normal: pick.normal }, error: null } : current;
+    });
   }, []);
   // The text is laid again a moment after every change of its settings or its place.
   useEffect(() => {
@@ -9331,7 +9313,7 @@ export function LayerlingEditor({
         } as WorkplaneShape);
         let result: { positions: number[]; offSurface: number };
         const normalLength = Math.hypot(placement.normal.x, placement.normal.y, placement.normal.z) || 1;
-        if (settings.rotation === 0 && uprightCylinderDiameter(target) && Math.abs(placement.normal.y) < 0.35 * normalLength) {
+        if (settings.shape === "surface" && settings.curve === 0 && settings.rotation === 0 && uprightCylinderDiameter(target) && Math.abs(placement.normal.y) < 0.35 * normalLength) {
           // The side of an upright cylinder or tube: wrapped exactly round it, however far the text runs.
           const wrapped = textWrappedOnCylinder({ ...flat, height: settings.depth }, target, placement.origin, settings.mode === "engraved" ? settings.depth : 0);
           if (typeof wrapped === "string") throw new Error(t(wrapped === "tooWide" ? "faceText.tooWide" : "faceText.wrapFailed"));
@@ -9340,13 +9322,13 @@ export function LayerlingEditor({
         } else {
           const mesh = meshForShape(flat);
           const letters = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
-          result = await surfaceTextPositions(letters, worldTriangles(target), { origin: placement.origin, normal: placement.normal, rotation: settings.rotation }, { depth: settings.depth, mode: settings.mode, letterHeight: settings.letterHeight });
+          result = await surfaceTextPositions(letters, worldTriangles(target), { origin: placement.origin, normal: placement.normal, rotation: settings.rotation }, { depth: settings.depth, mode: settings.mode, letterHeight: settings.letterHeight, shape: settings.shape, curve: settings.curve });
         }
         if (surfaceTextRunRef.current !== run) return;
         const name = settings.text.trim();
         const preview = {
           ...shapeWithWorldPositions(meshShapeFromPositions(name, settings.mode === "engraved" ? "#999999" : target.color, result.positions), result.positions),
-          id: "surface-text-preview",
+          id: SURFACE_TEXT_PREVIEW_ID,
           name,
           hole: settings.mode === "engraved" || undefined,
           locked: true,
@@ -9362,7 +9344,14 @@ export function LayerlingEditor({
   const applySurfaceText = useCallback(() => {
     const tool = surfaceTextTool;
     if (!tool?.preview || !tool.placement || tool.busy) return;
-    const record = { ...tool.settings, text: tool.settings.text.trim(), ...tool.placement };
+    const previewBox = meshAabb(tool.preview);
+    const record = {
+      ...tool.settings,
+      text: tool.settings.text.trim(),
+      ...tool.placement,
+      laidCenter: { x: (previewBox.minX + previewBox.maxX) / 2, y: (previewBox.minY + previewBox.maxY) / 2, z: (previewBox.minZ + previewBox.maxZ) / 2 },
+      laidSize: Math.max(previewBox.maxX - previewBox.minX, previewBox.maxY - previewBox.minY, previewBox.maxZ - previewBox.minZ),
+    };
     lastSurfaceTextSettingsRef.current = tool.settings;
     const base = shapesRef.current.find((shape) => shape.id === tool.editingId);
     const made = canonicalizeShape({
@@ -13741,7 +13730,6 @@ export function LayerlingEditor({
         { key: "deleteFace", label: t("editor.tool.deleteFace"), onSelect: startDeleteFaceTool },
         { key: "roundMesh", label: t("meshRound.menu"), onSelect: toggleMeshRound },
         { key: "surfaceText", label: t(selectedShapes.length === 1 && selectedShapes[0].surfaceText ? "surfaceText.editMenu" : "surfaceText.menu"), onSelect: toggleSurfaceText },
-        { key: "flexiModel", label: t("flexiModel.menu"), onSelect: toggleFlexiTool },
       );
       if (!single.hole && !isNonSolidShapeKind(single.kind)) {
         items.push({ key: "holePattern", label: t("holePattern.title"), onSelect: toggleHolePattern });
@@ -13887,8 +13875,6 @@ export function LayerlingEditor({
           canRound: !selectionLocked && selectedShapes.length === 1 && !selectedShapes[0].hole && !isNonSolidShapeKind(selectedShapes[0].kind),
           roundActive: Boolean(meshRoundTool),
           onRound: toggleMeshRound,
-          flexiActive: Boolean(flexiTool),
-          onFlexi: toggleFlexiTool,
           textActive: Boolean(surfaceTextTool),
           onText: toggleSurfaceText,
         }}
@@ -13955,12 +13941,6 @@ export function LayerlingEditor({
             onMake={(maker) => {
               close();
               setMakerPanel(maker);
-            }}
-            onTextTool={(text) => {
-              close();
-              lastSurfaceTextSettingsRef.current = { ...lastSurfaceTextSettingsRef.current, ...text };
-              setSurfaceTextTool({ settings: lastSurfaceTextSettingsRef.current, placement: null, editingId: null, busy: false, error: null, offSurface: 0, preview: null });
-              setNotice(t("surfaceText.clickToPlace"), true);
             }}
           />
         )}
@@ -14227,8 +14207,9 @@ export function LayerlingEditor({
           onPivotPick={pickRotationPivot}
           layFlatPickMode={layFlatPickMode}
           onLayFlatPick={layFlatOnFace}
+          onEditSurfaceText={toggleSurfaceText}
           mateFacePick={surfaceTextTool
-            ? { shapeIds: shapes.filter((shape) => !shape.hidden && shape.id !== surfaceTextTool.editingId && !isNonSolidShapeKind(shape.kind)).map((shape) => shape.id) }
+            ? { shapeIds: [...shapes.filter((shape) => !shape.hidden && shape.id !== surfaceTextTool.editingId && !isNonSolidShapeKind(shape.kind)).map((shape) => shape.id), SURFACE_TEXT_PREVIEW_ID], marker: "point" as const, dragId: SURFACE_TEXT_PREVIEW_ID }
             : mateTool && mateTool.step !== "ready"
             ? { shapeIds: mateTool.step === "source" ? [mateTool.sourceId] : shapes.filter((shape) => shape.id !== mateTool.sourceId && !shape.hidden).map((shape) => shape.id) }
             : holePatternTool?.step === "pick"
@@ -14646,19 +14627,6 @@ export function LayerlingEditor({
           onChange={(patch) => setSurfaceTextTool((current) => current ? { ...current, settings: { ...current.settings, ...patch } } : current)}
           onApply={applySurfaceText}
           onCancel={() => setSurfaceTextTool(null)}
-        />
-      ) : null}
-      {flexiTool ? (
-        <FlexiModelPanel
-          targetName={displayShapeName(shapes.find((shape) => shape.id === flexiTool.shapeId) ?? ({ name: "" } as WorkplaneShape))}
-          options={flexiTool.options}
-          segmentLength={flexiTool.length / flexiTool.options.segments}
-          busy={flexiTool.busy}
-          error={flexiTool.error}
-          workspace={workspaceSettings}
-          onChange={(patch) => setFlexiTool((current) => current && !current.busy ? { ...current, options: { ...current.options, ...patch }, error: null } : current)}
-          onApply={applyFlexi}
-          onCancel={() => setFlexiTool(null)}
         />
       ) : null}
       {meshRoundTool ? (
@@ -15266,7 +15234,7 @@ function SecondaryToolbar({
   onFaceTool: () => void;
   onBlendBodies: () => void;
   /** Fork (build 33): Hull, Fit check and Round a mesh. */
-  build33: { canHull: boolean; onHull: () => void; fitActive: boolean; onFitCheck: () => void; canRound: boolean; roundActive: boolean; onRound: () => void; flexiActive: boolean; onFlexi: () => void; textActive: boolean; onText: () => void };
+  build33: { canHull: boolean; onHull: () => void; fitActive: boolean; onFitCheck: () => void; canRound: boolean; roundActive: boolean; onRound: () => void; textActive: boolean; onText: () => void };
   blendBodiesActive: boolean;
   canBlendBodies: boolean;
   faceToolActive: boolean;
@@ -15645,7 +15613,6 @@ function SecondaryToolbar({
     { id: "deleteFace", label: t("editor.tool.deleteFace"), icon: ToolbarDeleteFaceIcon, action: onDeleteFace, enabled: canEdgeModify, active: deleteFaceActive },
     { id: "surfaceText", label: t("editor.tool.surfaceText"), icon: Type, action: build33.onText, enabled: true, active: build33.textActive },
     { id: "roundAll", label: t("meshRound.title"), icon: Squircle, action: build33.onRound, enabled: build33.canRound || build33.roundActive, active: build33.roundActive },
-    { id: "flexiModel", label: t("flexiModel.title"), icon: Waves, action: build33.onFlexi, enabled: build33.canRound || build33.flexiActive, active: build33.flexiActive },
   ];
   // Fork (build 32): the tools for an imported mesh, in a section of their own that shows only while one is selected.
   const meshTools = [
@@ -16100,7 +16067,7 @@ function SecondaryToolbar({
           <div className="toolbar-section-tools">
             {modifyTools.filter((tool) => !FORK_OVERFLOW_TOOLS.has(tool.id)).map(renderToolButton)}
             {/* Fork (build 33): the less used tools under "More", so the row fits on a laptop screen. */}
-            <button
+            {modifyTools.some((tool) => FORK_OVERFLOW_TOOLS.has(tool.id)) ? <button
               className={`toolbar-icon toolbar-more-trigger ${modifyMoreOpen || modifyTools.some((tool) => FORK_OVERFLOW_TOOLS.has(tool.id) && "active" in tool && tool.active) ? "active" : ""}`}
               type="button"
               data-layerling-tool="modifyMore"
@@ -16112,9 +16079,9 @@ function SecondaryToolbar({
             >
               <MoreHorizontal />
               <span className="tool-label" aria-hidden="true">{t("editor.more")}</span>
-            </button>
+            </button> : null}
           </div>
-          {modifyMoreOpen ? (
+          {modifyMoreOpen && modifyTools.some((tool) => FORK_OVERFLOW_TOOLS.has(tool.id)) ? (
             <div className="visibility-dropdown mesh-dropdown" role="menu" aria-label={t("editor.moreTools")}>
               {modifyTools.filter((tool) => FORK_OVERFLOW_TOOLS.has(tool.id)).map((tool) => {
                 const Icon = FORK_TOOL_ICONS[tool.id] ?? tool.icon;

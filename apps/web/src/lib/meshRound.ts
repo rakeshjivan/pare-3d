@@ -218,7 +218,12 @@ export async function roundMeshPositions(positions: ArrayLike<number>, radius: n
   if (!grid) throw new Error(`The radius is too small for a part this size - try at least ${smallestRoundingRadius(positions).toFixed(1)} mm`);
   const runtime = await getManifoldRuntime();
   const welded = weldTriangles(positions);
-  const original = new runtime.Manifold(new runtime.Mesh({ numProp: 3, vertProperties: new Float32Array(welded.points.flat()), triVerts: new Uint32Array(welded.triangles.flat()) }));
+  let original: InstanceType<typeof runtime.Manifold>;
+  try {
+    original = new runtime.Manifold(new runtime.Mesh({ numProp: 3, vertProperties: new Float32Array(welded.points.flat()), triVerts: new Uint32Array(welded.triangles.flat()) }));
+  } catch {
+    throw new Error("This part is not a closed solid - use Make solid first");
+  }
   const made: Array<{ delete(): void }> = [original];
   try {
     if (original.status() !== "NoError" || original.volume() <= 0) throw new Error("This part is not a closed solid - use Make solid first");
