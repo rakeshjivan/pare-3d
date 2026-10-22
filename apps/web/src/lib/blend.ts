@@ -36,6 +36,12 @@ export const BLEND_RING = 96;
 const BLEND_SECTIONS = 40;
 /** How far the piece reaches into each body, so they join without a skin. */
 export const BLEND_OVERLAP = 0.2;
+/** Fork (build 29): how much the piece narrows inside each body (a share of the way to its centre). */
+const BLEND_TUCK = 0;
+/** A point moved `share` of the way toward `centre` (away from it when negative). */
+function towards(point: THREE.Vector3, centre: THREE.Vector3, share: number) {
+  return point.clone().lerp(centre, share);
+}
 
 export function normalizeBlend(settings: Partial<BlendSettings>): BlendSettings {
   const smoothness = Number.isFinite(settings.smoothness) ? Math.min(100, Math.max(0, settings.smoothness as number)) : DEFAULT_BLEND.smoothness;
@@ -246,7 +252,8 @@ export function matchedLoops(a: THREE.Vector3[], b: THREE.Vector3[], axis: THREE
 }
 
 /** The sections of the blend piece: outer rings, the inner rings of a sleeve, and their centres along the path. */
-function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings) {
+/** `straight`: keep every slice parallel to the faces (no turning across the path) - the fallback when turned slices would cross. */
+function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings, straight = false) {
   const loopA = outerLoopWorld(a.face);
   const loopB = outerLoopWorld(b.face);
   if (loopA.length < 3 || loopB.length < 3) return null;
@@ -286,8 +293,10 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings) {
     const centres: THREE.Vector3[] = [];
     const tangents: THREE.Vector3[] = [];
     // A little into body A, then the sweep, then a little into body B.
-    rings.push(ringA.map((point) => point.clone().addScaledVector(nA, -BLEND_OVERLAP)));
-    if (innerA) innerRings.push(innerA.map((point) => point.clone().addScaledVector(nA, -BLEND_OVERLAP)));
+    // Inside the body the piece narrows a little (and a sleeve's bore widens), so its sides do not lie
+    // on the body's own sides there - coinciding faces are what the CAD kernel cannot fuse.
+    rings.push(ringA.map((point) => towards(point, ca, BLEND_TUCK).addScaledVector(nA, -BLEND_OVERLAP)));
+    if (innerA) innerRings.push(innerA.map((point) => towards(point, ca, -BLEND_TUCK).addScaledVector(nA, -BLEND_OVERLAP)));
     centres.push(ca.clone().addScaledVector(nA, -BLEND_OVERLAP));
     tangents.push(nA.clone());
     for (let section = 0; section <= BLEND_SECTIONS; section += 1) {
@@ -310,8 +319,8 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings) {
       centres.push(at);
       tangents.push(tangent);
     }
-    rings.push(ringB.map((point) => point.clone().addScaledVector(nB, -BLEND_OVERLAP)));
-    if (innerB) innerRings.push(innerB.map((point) => point.clone().addScaledVector(nB, -BLEND_OVERLAP)));
+    rings.push(ringB.map((point) => towards(point, cb, BLEND_TUCK).addScaledVector(nB, -BLEND_OVERLAP)));
+    if (innerB) innerRings.push(innerB.map((point) => towards(point, cb, -BLEND_TUCK).addScaledVector(nB, -BLEND_OVERLAP)));
     centres.push(cb.clone().addScaledVector(nB, -BLEND_OVERLAP));
     tangents.push(towardB.clone());
     return { rings, innerRings, centres, tangents };
@@ -322,7 +331,7 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings) {
   // A straight taper (smoothness 0) joins matching points with straight lines: no turning. Smoother
   // ones turn as far as they can without a fold.
   let built = slices(0);
-  for (const amount of [1, 0.75, 0.5, 0.25].map((value) => value * k)) {
+  for (const amount of (straight ? [] : [1, 0.75, 0.5, 0.25]).map((value) => value * k)) {
     if (amount <= 0) break;
     const tried = slices(amount);
     if (!folds(tried)) {
@@ -335,14 +344,16 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings) {
 
 /**
  * Fork (build 29): what the CAD worker needs to build the piece as an exact loft (cadBlendLoft.ts):
- * every other section of the sweep (the ends and the straight first and last steps kept), and for a
+ * every section of the sweep, and for a
  * sleeve the inner sections reaching a further half millimetre out at both ends.
  */
-export function blendLoftInput(a: BlendFace, b: BlendFace, settings: BlendSettings): { rings: number[][]; innerRings?: number[][] } | null {
-  const built = blendSlices(a, b, settings);
+export function blendLoftInput(a: BlendFace, b: BlendFace, settings: BlendSettings, straight = false): { rings: number[][]; innerRings?: number[][] } | null {
+  const built = blendSlices(a, b, settings, straight);
   if (!built) return null;
   const last = built.rings.length - 1;
-  const keep = built.rings.map((_, index) => index).filter((index) => index <= 1 || index >= last - 1 || index % 2 === 0);
+  // Every section: fewer lets the smooth loft bulge away from the preview where the piece turns.
+  const keep = built.rings.map((_, index) => index);
+  void last;
   const flat = (ring: THREE.Vector3[]) => ring.flatMap((point) => [point.x, point.y, point.z]);
   const rings = keep.map((index) => flat(built.rings[index]));
   if (!built.sleeve) return { rings };
@@ -354,8 +365,8 @@ export function blendLoftInput(a: BlendFace, b: BlendFace, settings: BlendSettin
 }
 
 /** The triangles of the blend piece, in the world, outward-facing. Null when the faces cannot be joined. */
-export function blendPositions(a: BlendFace, b: BlendFace, settings: BlendSettings): number[] | null {
-  const built = blendSlices(a, b, settings);
+export function blendPositions(a: BlendFace, b: BlendFace, settings: BlendSettings, straight = false): number[] | null {
+  const built = blendSlices(a, b, settings, straight);
   if (!built) return null;
   const { rings, innerRings, centres, sleeve, nA, nB, ringA } = built;
 
@@ -430,6 +441,18 @@ export function blendPositions(a: BlendFace, b: BlendFace, settings: BlendSettin
     }
   }
   return positions;
+}
+
+/** The volume enclosed by triangles given nine numbers each (outward-facing). */
+export function meshPositionsVolume(positions: ArrayLike<number>): number {
+  let volume = 0;
+  for (let i = 0; i + 8 < positions.length; i += 9) {
+    const ax = positions[i], ay = positions[i + 1], az = positions[i + 2];
+    const bx = positions[i + 3], by = positions[i + 4], bz = positions[i + 5];
+    const cx = positions[i + 6], cy = positions[i + 7], cz = positions[i + 8];
+    volume += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+  }
+  return volume;
 }
 
 /** The blend piece as a body standing where it was built. */

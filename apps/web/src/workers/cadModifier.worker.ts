@@ -888,7 +888,7 @@ async function bearbeiteAnfrage(request: CadModifierWorkerRequest, halter: { cad
   }
   if (request.type === "blendLoft") {
     // Stands apart from the edge tool's session: nothing prepared is touched.
-    const solid = blendLoftSolid(activeCad, { rings: request.rings, innerRings: request.innerRings });
+    const solid = blendLoftSolid(activeCad, { rings: request.rings, innerRings: request.innerRings, expectedVolume: request.expectedVolume });
     try {
       const deflection = cadModifierTessellationDeflection("standard", 1);
       const mesh = copyCadMesh(activeCad.tessellate(solid, tessellationOptions(deflection)));

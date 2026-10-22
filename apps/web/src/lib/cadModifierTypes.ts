@@ -400,7 +400,7 @@ export type CadModifierWorkerRequest =
       addedEdgeIds?: number[];
     }
   // Fork (build 29): build a Blend piece as an exact loft (cadBlendLoft.ts); answered like a preview.
-  | { type: "blendLoft"; requestId: number; rings: number[][]; innerRings?: number[][] }
+  | { type: "blendLoft"; requestId: number; rings: number[][]; innerRings?: number[][]; expectedVolume?: number }
   | { type: "dispose"; requestId: number };
 
 export type CadModifierWorkerResponse =

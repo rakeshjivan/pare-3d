@@ -3320,6 +3320,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "blend.twistReset": "Reset",
   "blend.apply": "Create",
   "blend.hollow": "Dutý skrz",
+  "blend.straightened": "Přechod vytvořen. Díly jsou hodně posunuté do strany, proto řezy zůstaly rovnoběžné s plochami: přechod je přesné těleso, které lze zaoblit.",
+  "blend.notExact": "Přechod vytvořen, ale zatáčí příliš ostře, aby byl přesným tělesem: nelze ho zaoblit ani zkosit. Posuňte díly dál od sebe nebo vyberte plochy, které jsou proti sobě.",
   "blend.linkEnds": "Stejné na obou koncích",
   "blend.smoothnessAt": "Plynulost u {name}",
   "blend.endsHint": "Každý konec zvlášť: vysoká hodnota vychází kolmo z plochy, nízká ji opouští šikmo - jako váha tečnosti ve Fusionu.",

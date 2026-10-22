@@ -3299,6 +3299,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "blend.twistReset": "Reset",
   "blend.apply": "Create",
   "blend.hollow": "Votlo skozi",
+  "blend.straightened": "Prehod ustvarjen. Dela sta močno zamaknjena vstran, zato prerezi ostanejo vzporedni s ploskvama: prehod je natančno telo, ki ga lahko zaoblite.",
+  "blend.notExact": "Prehod ustvarjen, vendar zavije preostro, da bi bil natančno telo: ni ga mogoče zaobliti ali posneti. Razmaknite dela ali izberite ploskvi, ki sta obrnjeni druga proti drugi.",
   "blend.linkEnds": "Enako na obeh koncih",
   "blend.smoothnessAt": "Gladkost pri {name}",
   "blend.endsHint": "Vsak konec posebej: visoka vrednost izstopi pravokotno iz ploskve, nizka poševno - kot utež tangentnosti v Fusionu.",

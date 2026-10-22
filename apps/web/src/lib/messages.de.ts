@@ -3321,6 +3321,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "blend.twistReset": "Zurücksetzen",
   "blend.apply": "Erstellen",
   "blend.hollow": "Hollow through",
+  "blend.straightened": "Blended. The parts are far apart sideways, so the slices stay parallel to the faces: the piece is an exact solid you can fillet.",
+  "blend.notExact": "Blended, but this blend turns too tightly to be an exact solid, so it can't be filleted or chamfered. Move the parts further apart, or pick faces that face each other.",
   "blend.linkEnds": "Same at both ends",
   "blend.smoothnessAt": "Smoothness at {name}",
   "blend.endsHint": "Each end on its own: high flares out square to its face, low leaves it at an angle - like Fusion's tangency weight.",

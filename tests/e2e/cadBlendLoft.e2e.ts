@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 (globalThis as unknown as { window: unknown }).window = { location: { href: pathToFileURL(resolve("apps/web/public") + "/").href } };
 import { OcctKernel } from "occt-wasm";
 import { blendLoftInput, blendPositions, DEFAULT_BLEND, facingFaces, normalizeBlend } from "@/lib/blend";
-import { blendLoftSolid } from "@/lib/cadBlendLoft";
+import { blendLoftSolid, surfaceVolume } from "@/lib/cadBlendLoft";
 import type { WorkplaneShape } from "@/types/layerling";
 
 function cylinder(id: string, diameter: number, height: number, elevation: number, x = 0): WorkplaneShape {
@@ -39,20 +39,30 @@ describe("the Blend piece as an exact CAD loft (build 29)", () => {
       const solid = blendLoftSolid(cad, blendLoftInput(pair.a, pair.b, settings)!);
       expect(cad.isValid(solid)).toBe(true);
       const mesh = meshVolume(blendPositions(pair.a, pair.b, settings)!);
-      expect(cad.getVolume(solid) / mesh).toBeGreaterThan(0.97);
-      expect(cad.getVolume(solid) / mesh).toBeLessThan(1.03);
+      expect(surfaceVolume(cad, solid) / mesh).toBeGreaterThan(0.97);
+      expect(surfaceVolume(cad, solid) / mesh).toBeLessThan(1.03);
     }
   });
 
-  it("can be filleted and chamfered at its rims - the reason it is exact", () => {
+  it("can be filleted at its rim - the reason it is exact", () => {
     const pair = facingFaces(cylinder("big", 30, 10, 0), cylinder("small", 12, 10, 30))!;
     const solid = blendLoftSolid(cad, blendLoftInput(pair.a, pair.b, DEFAULT_BLEND)!);
-    const edges = cad.getSubShapes(solid, "edge");
-    expect(edges.length).toBeLessThan(12);
-    const rims = edges.filter((edge) => { const b = cad.getBoundingBox(edge, false); return Math.abs(b.ymax - b.ymin) < 1e-3; });
-    expect(rims.length).toBeGreaterThanOrEqual(2);
-    const rounded = cad.fillet(solid, [rims[0]], 1);
+    const top = cad.getBoundingBox(solid, false).ymax;
+    const rim = cad.getSubShapes(solid, "edge").filter((edge) => { const b = cad.getBoundingBox(edge, false); return Math.abs(b.ymax - b.ymin) < 1e-3 && Math.abs(b.ymax - top) < 1e-3; });
+    expect(rim.length).toBeGreaterThan(10);
+    const rounded = cad.fillet(solid, rim, 0.5);
     expect(cad.isValid(rounded)).toBe(true);
+  });
+
+  it("fuses with the two parts it joins into one solid (the edge tool needs that)", () => {
+    const boxA = cad.translate(cad.makeBox(20, 20, 20), -10, 0, -10);
+    const boxB = cad.translate(cad.makeBox(20, 20, 20), 28.5, 0, -10);
+    const pair = facingFaces(box("a", 20, 20, 0, 0), box("b", 20, 20, 0, 38.5))!;
+    const piece = blendLoftSolid(cad, blendLoftInput(pair.a, pair.b, DEFAULT_BLEND)!);
+    const fused = cad.fuse(cad.fuse(piece, boxA), boxB);
+    expect(cad.getSubShapes(fused, "solid").length).toBe(1);
+    expect(cad.isValid(fused)).toBe(true);
+    expect(cad.getVolume(fused)).toBeCloseTo(16000 + 400 * 18.5, -1);
   });
 
   it("lofts a square into a round, and a sleeve between two tubes", () => {
@@ -64,6 +74,51 @@ describe("the Blend piece as an exact CAD loft (build 29)", () => {
     const sleeve = blendLoftSolid(cad, input);
     expect(cad.isValid(sleeve)).toBe(true);
     const solidPiece = blendLoftSolid(cad, blendLoftInput(tubes.a, tubes.b, normalizeBlend({ hollow: false }))!);
-    expect(cad.getVolume(sleeve)).toBeLessThan(cad.getVolume(solidPiece) * 0.8);
+    expect(surfaceVolume(cad, sleeve)).toBeLessThan(surfaceVolume(cad, solidPiece) * 0.8);
+  });
+
+  it("stays valid and true to the preview when the parts are offset sideways (build 29 browser case)", () => {
+    const offsetBox = (id: string, x: number, z: number) => ({ ...box(id, 20, 20, 0, x), z }) as WorkplaneShape;
+    for (const [gap, dz] of [[10, 5], [26, 12], [40, 0]]) {
+      const pair = facingFaces(offsetBox("a", 0, 0), offsetBox("b", 20 + gap, dz))!;
+      for (const smoothness of [0, 70, 100]) {
+        const settings = normalizeBlend({ smoothness });
+        const solid = blendLoftSolid(cad, blendLoftInput(pair.a, pair.b, settings)!);
+        expect(cad.isValid(solid)).toBe(true);
+        const ratio = surfaceVolume(cad, solid) / meshVolume(blendPositions(pair.a, pair.b, settings)!);
+        expect(ratio).toBeGreaterThan(0.97);
+        expect(ratio).toBeLessThan(1.03);
+      }
+    }
+  });
+
+  it("refuses an exact piece that would not match the preview, so the mesh piece is used", () => {
+    const offsetBox = (id: string, x: number, z: number) => ({ ...box(id, 20, 20, 0, x), z }) as WorkplaneShape;
+    const pair = facingFaces(offsetBox("a", 0, 0), offsetBox("b", 26, 18))!;
+    for (const smoothness of [0, 100]) {
+      const settings = normalizeBlend({ smoothness });
+      const expectedVolume = meshVolume(blendPositions(pair.a, pair.b, settings)!);
+      try {
+        const solid = blendLoftSolid(cad, { ...blendLoftInput(pair.a, pair.b, settings)!, expectedVolume });
+        const ratio = surfaceVolume(cad, solid) / expectedVolume;
+        expect(Math.abs(ratio - 1)).toBeLessThanOrEqual(0.03);
+      } catch (error) {
+        expect(String(error)).toMatch(/differs from the preview|not a valid solid|one solid/);
+      }
+    }
+  });
+
+  it("makes an exact piece with straight slices between facing faces offset far sideways", () => {
+    const offsetBox = (id: string, x: number, z: number) => ({ ...box(id, 20, 20, 0, x), z }) as WorkplaneShape;
+    for (const [gap, dz] of [[12, 15], [20, 18]]) {
+      const pair = facingFaces(offsetBox("a", 0, 0), offsetBox("b", 20 + gap, dz))!;
+      expect(pair.a.normal.x * pair.b.normal.x + pair.a.normal.z * pair.b.normal.z).toBeLessThan(-0.9);
+      for (const smoothness of [0, 70, 100]) {
+        const settings = normalizeBlend({ smoothness });
+        const expectedVolume = meshVolume(blendPositions(pair.a, pair.b, settings, true)!);
+        const solid = blendLoftSolid(cad, { ...blendLoftInput(pair.a, pair.b, settings, true)!, expectedVolume });
+        expect(cad.isValid(solid)).toBe(true);
+      }
+    }
   });
 });

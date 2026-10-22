@@ -109,7 +109,7 @@ import { HolePatternPanel } from "./workplane/HolePatternPanel";
 import { FaceToolPanel } from "./workplane/FaceToolPanel";
 import { DEFAULT_FACE_TOOL, FACE_TOOL_MIN_DEPTH, faceToolSettingsOn, normalizeFaceTool, type FaceToolSettings } from "@/lib/faceTool";
 import { pullToFaceTool } from "@/lib/facePull";
-import { blendCanBeHollow, blendFacePoint, blendLoftInput, blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend, type BlendFace, type BlendSettings } from "@/lib/blend";
+import { blendCanBeHollow, blendFacePoint, blendLoftInput, blendPositions, meshPositionsVolume, blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend, type BlendFace, type BlendSettings } from "@/lib/blend";
 import { BlendPanel } from "./workplane/BlendPanel";
 import { faceToolBody } from "@/lib/faceToolBody";
 import { DEFAULT_HOLE_PATTERN, normalizeHolePattern, type HolePatternSettings } from "@/lib/holePattern";
@@ -8404,9 +8404,11 @@ export function LayerlingEditor({
       const source = selectedShapes[0];
       const joined = source.id !== madeBefore.piece;
       const children = joined ? restoreGroupedChildren(source) : [];
-      const find = (id: string) => (joined ? children.find((child) => child.id === id) : shapesRef.current.find((shape) => shape.id === id));
+      // Opened, a group's parts get new ids; they keep their order, so a part is found by its place.
+      const place = (id: string) => (source.groupedShapes ?? []).findIndex((child) => child.id === id);
+      const find = (id: string) => (joined ? children[place(id)] : shapesRef.current.find((shape) => shape.id === id));
       const parts = [find(madeBefore.parts[0]), find(madeBefore.parts[1])];
-      const piece = joined ? children.find((child) => child.id === madeBefore.piece) : source;
+      const piece = joined ? children[place(madeBefore.piece)] : source;
       // A blend filleted or hollowed afterwards, or whose parts changed inside the group, is no longer that blend.
       if (!parts[0] || !parts[1] || !piece || (joined && (children.length !== 3 || (source.edgeTreatments?.length ?? 0) > 0))) {
         setNotice(t("blend.editGone"));
@@ -8482,20 +8484,31 @@ export function LayerlingEditor({
     let piece: WorkplaneShape = { ...blendPreview, id: createLocalId("mesh"), name: t("blend.pieceName") };
     // Fork (build 29): the piece as an exact CAD loft, so fillets, chamfers, hollowing and STEP work
     // on it like any solid. Should the kernel refuse, the mesh piece of the preview is used as before.
-    if (tool.faces[0] && tool.faces[1]) {
+    let straightened = false;
+    // As previewed first; where its turned slices would cross (parts far apart sideways), with the
+    // slices kept parallel to the faces. Only if both fail does the mesh piece stay.
+    const [faceA0, faceB0] = tool.faces;
+    // Straight slices only make sense between faces that face each other (offset sideways); an elbow needs its turn.
+    const opposite = faceA0 && faceB0 ? faceA0.normal.x * faceB0.normal.x + faceA0.normal.y * faceB0.normal.y + faceA0.normal.z * faceB0.normal.z < -0.9 : false;
+    for (const straight of opposite ? [false, true] : [false]) {
+      const [faceA, faceB] = tool.faces;
+      if (!faceA || !faceB) break;
       try {
-        const input = blendLoftInput(tool.faces[0], tool.faces[1], tool.settings);
-        if (input) {
-          const response = await postCadModifierRequestAsync({ type: "blendLoft", rings: input.rings, ...(input.innerRings ? { innerRings: input.innerRings } : {}) }, [], 45000);
-          if (response.type === "preview") {
-            const exact = shapeFromCadMesh(piece, response.positions, response.normals, response.indices, response.brep, response.deflection);
-            if (exact) piece = canonicalizeShape({ ...exact, cadDisplayEdges: cadDisplayEdgesForShape(exact, response.displayEdges), cadDisplayEdgesVersion: 2 as const });
-          }
-        }
-      } catch {
-        // The mesh piece stays.
+        const input = blendLoftInput(faceA, faceB, tool.settings, straight);
+        if (!input) continue;
+        const expectedVolume = meshPositionsVolume(blendPositions(faceA, faceB, tool.settings, straight) ?? []);
+        const response = await postCadModifierRequestAsync({ type: "blendLoft", rings: input.rings, ...(input.innerRings ? { innerRings: input.innerRings } : {}), expectedVolume }, [], 45000);
+        if (response.type !== "preview") continue;
+        const exact = shapeFromCadMesh(piece, response.positions, response.normals, response.indices, response.brep, response.deflection);
+        if (!exact) continue;
+        piece = canonicalizeShape({ ...exact, cadDisplayEdges: cadDisplayEdgesForShape(exact, response.displayEdges), cadDisplayEdgesVersion: 2 as const });
+        straightened = straight;
+        break;
+      } catch (error) {
+        console.warn(`[blend] exact loft${straight ? " (straight slices)" : ""} failed`, error);
       }
     }
+    console.info("[blend] piece", piece.cadBrep ? (straightened ? "exact, straightened" : "exact") : "mesh");
     const blendSource: NonNullable<WorkplaneShape["blendSource"]> = {
       parts: [bodies[0].id, bodies[1].id],
       piece: piece.id,
@@ -8508,7 +8521,11 @@ export function LayerlingEditor({
     const editedId = tool.edit?.source.id;
     // Everything but what this blend replaces: the two parts, or the blend being changed.
     const others = () => shapesRef.current.filter((shape) => (editedId ? shape.id !== editedId : !tool.ids.includes(shape.id)));
-    const notice = t(tool.edit ? "blend.updated" : tool.settings.join ? "blend.created" : "blend.createdSeparate");
+    const notice = straightened
+      ? t("blend.straightened")
+      : !piece.cadBrep
+        ? t("blend.notExact")
+        : t(tool.edit ? "blend.updated" : tool.settings.join ? "blend.created" : "blend.createdSeparate");
     if (!tool.settings.join) {
       // New body: the two parts stay as they are; the piece carries the blend.
       const separate = canonicalizeShape({ ...piece, blendSource });
@@ -8533,7 +8550,12 @@ export function LayerlingEditor({
       setNotice(result.failureNotice);
       return;
     }
-    const group = canonicalizeShape({ ...result.group, groupOperation: "group", blendSource });
+    // The group gives its parts ids of their own (in the order given): the blend remembers those.
+    const childIds = (result.group.groupedShapes ?? []).map((child) => child.id);
+    const joinedSource: typeof blendSource = childIds.length === 3
+      ? { ...blendSource, parts: [childIds[0], childIds[1]], piece: childIds[2] }
+      : blendSource;
+    const group = canonicalizeShape({ ...result.group, groupOperation: "group", blendSource: joinedSource });
     setBlendTool(null);
     // A separate piece being joined now: its two parts leave the scene into the group.
     const joinedParts = tool.edit && tool.edit.source.id === tool.edit.source.blendSource?.piece ? [...tool.ids] : ([] as string[]);

@@ -3296,6 +3296,8 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "blend.twistReset": "Réinitialiser",
   "blend.apply": "Créer",
   "blend.hollow": "Creux traversant",
+  "blend.straightened": "Raccordé. Les pièces sont très décalées, donc les sections restent parallèles aux faces : le raccord est un solide exact que l'on peut arrondir.",
+  "blend.notExact": "Raccordé, mais ce raccord tourne trop serré pour être un solide exact : il ne peut pas être arrondi ni chanfreiné. Éloignez les pièces ou choisissez des faces qui se font face.",
   "blend.linkEnds": "Identique aux deux extrémités",
   "blend.smoothnessAt": "Douceur côté {name}",
   "blend.endsHint": "Chaque extrémité séparément : élevée, elle part d'équerre à sa face ; faible, elle la quitte en biais - comme le poids de tangence de Fusion.",

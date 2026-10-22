@@ -3320,6 +3320,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "blend.twistReset": "Herstellen",
   "blend.apply": "Maken",
   "blend.hollow": "Hol doorlopend",
+  "blend.straightened": "Overgang gemaakt. De delen liggen ver uit elkaar opzij, dus de doorsneden blijven evenwijdig aan de vlakken: de overgang is een exact lichaam dat je kunt afronden.",
+  "blend.notExact": "Overgang gemaakt, maar hij draait te krap om een exact lichaam te zijn: hij kan niet worden afgerond of afgeschuind. Zet de delen verder uit elkaar of kies vlakken die naar elkaar wijzen.",
   "blend.linkEnds": "Gelijk aan beide uiteinden",
   "blend.smoothnessAt": "Vloeiendheid bij {name}",
   "blend.endsHint": "Elk uiteinde apart: hoog loopt haaks uit zijn vlak, laag verlaat het schuin - zoals het raaklijngewicht in Fusion.",
