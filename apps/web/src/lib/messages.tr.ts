@@ -568,6 +568,7 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "shell.errorProjectChanged": "İçi boşaltılırken nesne veya proje değişti; lütfen tekrar dene.",
   "shell.errorFailed": "Gövdenin içi boşaltılamadı. Lütfen farklı bir duvar kalınlığı veya açıklık seç.",
   "status.shelled": "{size} mm duvarlarla içi boşaltıldı",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "MCP nesnenin içini {size} mm duvarlarla boşalttı",
   "status.shellRebuilt": "Duvarlar yeniden hesaplandı, yine {size} mm kalınlıkta",
   "status.shellRebuildFailed": "İçi boşaltma bu boyutta yeniden hesaplanamadı. Duvarlar gövdeyle birlikte ölçeklendi.",

@@ -586,6 +586,7 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "shell.errorProjectChanged": "Obiekt lub projekt zmienił się w trakcie wydrążania. Spróbuj ponownie.",
   "shell.errorFailed": "Nie udało się wydrążyć bryły. Wybierz inną grubość ścianki lub inne otwarcie.",
   "status.shelled": "Wydrążono ze ściankami {size} mm",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "MCP wydrążył obiekt ze ściankami {size} mm",
   "status.shellRebuilt": "Ścianki przeliczone, znów mają {size} mm",
   "status.shellRebuildFailed": "Nie udało się przeliczyć wydrążenia w tym rozmiarze. Ścianki zostały przeskalowane razem z bryłą.",

@@ -579,6 +579,7 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "shell.errorProjectChanged": "Objektet eller projektet ændrede sig mens det blev udhulet; prøv igen.",
   "shell.errorFailed": "Formen kunne ikke udhules. Vælg en anden vægtykkelse eller åbning.",
   "status.shelled": "Udhuet med {size} mm vægge",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "MCP udhulede objektet med {size} mm vægge",
   "status.shellRebuilt": "Vægge genberegnet, {size} mm tykke igen",
   "status.shellRebuildFailed": "Udhulingen kunne ikke genberegnes ved denne størrelse. Væggene blev skaleret sammen med formen.",

@@ -3327,4 +3327,5 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "shell.pickHint": "Klik een vlak van het onderdeel om het te openen of te sluiten. Sleep een vlak naar binnen voor de wanddikte. Enter holt uit.",
   "array.dragHintRow": "Of sleep een kopie om ze verder uit elkaar of dichterbij te zetten; + en − tijdens het slepen veranderen het aantal. Enter maakt het.",
   "array.dragHintCircle": "Of sleep een kopie rond om in te stellen hoe ver de cirkel gaat; + en − tijdens het slepen veranderen het aantal. Enter maakt het.",
+  "status.shelledSealed": "Uitgehold met wanden van {size} mm, rondom gesloten - de holte zit binnenin, dus het lijkt massief. Open een zijde om hem te zien.",
 };

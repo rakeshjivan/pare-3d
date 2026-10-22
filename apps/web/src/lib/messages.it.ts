@@ -558,6 +558,7 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "shell.errorProjectChanged": "L'oggetto o il progetto è cambiato durante lo svuotamento. Riprova.",
   "shell.errorFailed": "Non è stato possibile svuotare il corpo. Prova a scegliere uno spessore delle pareti o un'apertura diversa.",
   "status.shelled": "Corpo svuotato con pareti di {size} mm",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "MCP ha svuotato l'oggetto con pareti di {size} mm",
   "status.shellRebuilt": "Pareti ricalcolate, nuovamente spesse {size} mm",
   "status.shellRebuildFailed": "Non è stato possibile ricalcolare lo svuotamento con questo spessore. Le pareti sono state ridimensionate insieme al corpo.",

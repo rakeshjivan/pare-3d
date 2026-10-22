@@ -673,6 +673,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "shell.errorProjectChanged": "Během vytváření dutiny se objekt nebo projekt změnil. Zkuste to znovu.",
   "shell.errorFailed": "Dutinu se nepodařilo vytvořit. Zvolte jinou tloušťku stěn nebo otevřenou stranu.",
   "status.shelled": "Vytvořena dutina se stěnami {size} mm",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "MCP vytvořilo dutinu v objektu se stěnami {size} mm",
   "status.shellRebuilt": "Stěny byly přepočítány na tloušťku {size} mm",
   "status.shellRebuildFailed": "Dutinu při těchto rozměrech nelze přepočítat. Tloušťka stěn se změnila společně s rozměry tělesa.",

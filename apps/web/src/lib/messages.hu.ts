@@ -558,6 +558,7 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "shell.errorProjectChanged": "Az objektum vagy a projekt megváltozott a kiüregelés közben; próbáld újra.",
   "shell.errorFailed": "A testet nem sikerült kiüregelni. Válassz más falvastagságot vagy nyílást.",
   "status.shelled": "Kiüregelve, falvastagság: {size} mm",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "Az MCP kiüregelte az objektumot, falvastagság: {size} mm",
   "status.shellRebuilt": "Falak újraszámolva, ismét {size} mm vastagok",
   "status.shellRebuildFailed": "A kiüregelést ennél a méretnél nem sikerült újraszámolni. A falak a testtel együtt méreteződtek.",

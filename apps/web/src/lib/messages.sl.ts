@@ -490,6 +490,7 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "shell.errorProjectChanged": "Objekt ali projekt se je med dolbljenjem spremenil; poskusi znova.",
   "shell.errorFailed": "Telesa ni bilo mogoče izdolbiti. Izberi drugo debelino stene ali odprtino.",
   "status.shelled": "Izdolbeno s stenami {size} mm",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "MCP je izdolbel objekt s stenami {size} mm",
   "status.shellRebuilt": "Stene ponovno izračunane, spet debele {size} mm",
   "status.shellRebuildFailed": "Dolbljenja pri tej velikosti ni bilo mogoče ponovno izračunati. Stene so bile skalirane skupaj s telesom.",

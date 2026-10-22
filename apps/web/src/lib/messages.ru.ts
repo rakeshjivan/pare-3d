@@ -593,6 +593,7 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "shell.errorProjectChanged": "Объект или проект изменился во время создания оболочки; попробуйте ещё раз.",
   "shell.errorFailed": "Не удалось создать оболочку. Выберите другую толщину стенок или другую открытую сторону.",
   "status.shelled": "Создана оболочка со стенками {size} мм",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "MCP создал оболочку со стенками {size} мм",
   "status.shellRebuilt": "Стенки пересчитаны, снова {size} мм",
   "status.shellRebuildFailed": "Не удалось пересчитать оболочку при таком размере. Стенки масштабированы вместе с телом.",

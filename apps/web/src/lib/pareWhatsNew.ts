@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 27,
+    items: [
+      "Hollow fixed: clicking a face of the part now opens that side. Before, clicking the top (already open by default) closed it, so the box came out sealed and looked unchanged.",
+      "Hollowing a part that is already hollow - or one hollowed and then resized - now replaces its hollowing instead of failing with \"This body cannot be hollowed\".",
+      "A sealed hollow (no side open) says so after hollowing, since it looks solid from outside.",
+    ],
+  },
+  {
     build: 26,
     items: [
       "Pare 3D is now English only: the language menu is gone, and the app and its guide speak one language.",

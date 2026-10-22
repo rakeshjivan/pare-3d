@@ -2927,7 +2927,7 @@ export function LayerlingEditor({
     setSketchCornerDialog(null);
   }, [sketchSelection, sketchTool, sketchActive]);
   const [edgeModifier, setEdgeModifier] = useState<EdgeModifierSession | null>(null);
-  const [shellTool, setShellTool] = useState<{ thickness: number; openings: ShellOpenings; edges: ShellEdges; busy: boolean; error: string | null } | null>(null);
+  const [shellTool, setShellTool] = useState<{ thickness: number; openings: ShellOpenings; edges: ShellEdges; busy: boolean; error: string | null; replaces?: string; picked?: boolean } | null>(null);
   const [simplifyToolId, setSimplifyToolId] = useState<string | null>(null);
   /** The window for fonts of one's own (#customFonts), opened from a text's font select. */
   const [fontManagerOpen, setFontManagerOpen] = useState(false);
@@ -7338,6 +7338,14 @@ export function LayerlingEditor({
     }
     if (edgeModifier) invalidateCadModifierSession();
     closeSplit();
+    // Fork (build 27): a body that is already hollow is not hollowed a second time - that fails in the
+    // kernel. The tool opens on its hollowing instead, and Hollow replaces it.
+    const history = selectedShape.edgeTreatmentHistory ?? [];
+    const last = history[history.length - 1];
+    if (last?.feature.kind === "shell") {
+      setShellTool({ thickness: last.feature.amount, openings: last.feature.openings ?? "top", edges: last.feature.shellEdges ?? "round", busy: false, error: null, replaces: last.id });
+      return;
+    }
     const smallest = Math.min(shapeWidth(selectedShape), shapeDepth(selectedShape), selectedShape.height);
     setShellTool({ thickness: Math.max(0.2, Math.min(2, Number((smallest / 5).toFixed(1)))), openings: "top", edges: "round", busy: false, error: null });
   }, [refuseLockedSelection, closeSplit, edgeModifier, invalidateCadModifierSession, selectedShape, selectedShapes.length, shellTool]);
@@ -7349,14 +7357,18 @@ export function LayerlingEditor({
       setShellTool(null);
       return;
     }
-    const { thickness, openings, edges } = shellTool;
+    const { thickness, openings, edges, replaces } = shellTool;
     setShellTool((current) => current ? { ...current, busy: true, error: null } : current);
-    void shellShape(target, thickness, openings, edges)
+    const base = replaces
+      ? restoreEdgeTreatmentInShape(target, [], replaces, workspaceSettingsRef.current.booleanTriangleLimit).then((restored) => restored?.shape ?? target)
+      : Promise.resolve(target);
+    void base
+      .then((source) => shellShape(source, thickness, openings, edges, target))
       .then((modifiedShape) => {
         commitShapes(
           shapesRef.current.map((candidate) => candidate.id === target.id ? modifiedShape : candidate),
           modifiedShape.id,
-          t("status.shelled", { size: Number(thickness.toFixed(2)) }),
+          t(shellOpenSides(openings).length ? "status.shelled" : "status.shelledSealed", { size: Number(thickness.toFixed(2)) }),
         );
         setShellTool(null);
       })
@@ -7389,12 +7401,14 @@ export function LayerlingEditor({
     }
     setShellTool((current) => {
       if (!current) return current;
-      const open = new Set(shellOpenSides(current.openings));
-      if (open.has(side)) open.delete(side);
+      // Fork (build 27): the first click on the part picks that side as the opening (Top is only the
+      // starting choice); later clicks add or remove sides. Clicking the open top no longer seals the box.
+      const open = new Set(current.picked ? shellOpenSides(current.openings) : []);
+      if (current.picked && open.has(side)) open.delete(side);
       else open.add(side);
       const openings = shellOpeningsFor([...open]);
       const max = shellMaxThickness({ width: shapeWidth(target), depth: shapeDepth(target), height: target.height }, openings);
-      return { ...current, openings, thickness: Math.min(current.thickness, max), error: null };
+      return { ...current, openings, picked: true, thickness: Math.min(current.thickness, max), error: null };
     });
   }, [selectedShape]);
   const shellThicknessFromPull = useCallback((distance: number) => {
@@ -13681,7 +13695,7 @@ export function LayerlingEditor({
             if (!current) return current;
             // A wall that fitted a frame may be too thick once a floor has to stay.
             const max = shellMaxThickness({ width: shapeWidth(selectedShape), depth: shapeDepth(selectedShape), height: selectedShape.height }, value);
-            return { ...current, openings: value, thickness: Math.min(current.thickness, max), error: null };
+            return { ...current, openings: value, picked: true, thickness: Math.min(current.thickness, max), error: null };
           })}
           edges={shellTool.edges}
           onEdgesChange={(value) => setShellTool((current) => current ? { ...current, edges: value, error: null } : current)}

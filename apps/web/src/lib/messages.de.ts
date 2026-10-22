@@ -612,6 +612,7 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "shell.errorProjectChanged": "Das Objekt oder Projekt wurde während des Aushöhlens geändert. Bitte erneut versuchen.",
   "shell.errorFailed": "Der Körper konnte nicht ausgehöhlt werden. Bitte eine andere Wandstärke oder Öffnung wählen.",
   "status.shelled": "Mit {size} mm Wandstärke ausgehöhlt",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "MCP hat das Objekt mit {size} mm Wandstärke ausgehöhlt",
   "status.shellRebuilt": "Wände neu berechnet, wieder {size} mm dick",
   "status.shellRebuildFailed": "In dieser Größe ließ sich die Aushöhlung nicht neu berechnen. Die Wände sind mitskaliert.",

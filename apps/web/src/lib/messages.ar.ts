@@ -603,6 +603,7 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "shell.errorProjectChanged": "تغير الجسم أو المشروع أثناء تفريغه؛ يرجى المحاولة مرة أخرى.",
   "shell.errorFailed": "تعذر تفريغ الجسم. يرجى اختيار سمك جدار مختلف أو فتحة مختلفة.",
   "status.shelled": "تم التفريغ بجدران {size} مم",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "قام MCP بتفريغ الجسم بجدران {size} مم",
   "status.shellRebuilt": "أُعيد حساب الجدران، بسمك {size} مم مرة أخرى",
   "status.shellRebuildFailed": "تعذر إعادة حساب التفريغ بهذا الحجم. تغيّر حجم الجدران مع الجسم.",

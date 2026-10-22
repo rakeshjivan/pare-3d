@@ -3303,4 +3303,5 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "shell.pickHint": "Cliquez une face de la pièce pour l'ouvrir ou la fermer. Tirez une face vers l'intérieur pour régler l'épaisseur. Entrée évide.",
   "array.dragHintRow": "Ou tirez une copie pour écarter ou rapprocher les copies ; + et − pendant le glissement changent le nombre. Entrée crée.",
   "array.dragHintCircle": "Ou tirez une copie autour pour régler l'étendue du cercle ; + et − pendant le glissement changent le nombre. Entrée crée.",
+  "status.shelledSealed": "Évidé avec des parois de {size} mm, fermé de tous côtés - la cavité est à l'intérieur, la pièce paraît donc pleine. Ouvrez un côté pour la voir.",
 };

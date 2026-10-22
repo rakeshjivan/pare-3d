@@ -585,6 +585,7 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "shell.errorProjectChanged": "中空にしている間に、オブジェクトまたはプロジェクトが変わりました。もう一度お試しください。",
   "shell.errorFailed": "ボディを中空にできませんでした。別の壁の厚さか開ける側を選んでください。",
   "status.shelled": "{size} mmの壁で中空にしました",
+  "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
   "status.shelledMcp": "MCPがオブジェクトを{size} mmの壁で中空にしました",
   "status.shellRebuilt": "壁を計算し直し、厚さを再び{size} mmにしました",
   "status.shellRebuildFailed": "このサイズでは中空の壁を計算し直せませんでした。壁はボディと一緒に拡大縮小されました。",
