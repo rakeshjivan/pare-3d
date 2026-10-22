@@ -109,3 +109,14 @@ The faces around the deleted ones grow until the gap is closed. A box with round
 Pick all the faces of what should go, and only those. If the faces around them cannot close the gap, Pare 3D says so and nothing changes: a main side of a box, for example, has no neighbour that could take its place. Deleting only the floor of a pocket turns it into a hole straight through, because the walls of the pocket run on to the other side.
 
 {{ui:editor.tool.deleteFace}} needs exact faces: it works on parts imported as STEP and on Pare 3D's shapes. Whatever Pare 3D keeps as a mesh has none: an imported STL, OBJ or 3MF, a split, wrapped or simplified body, or a very detailed shape such as a long text. Import a part as STEP if you can. On a detailed imported part, a few faces can be too much for the CAD kernel: after 45 seconds the deletion is stopped and nothing changes. A body resized after an edge treatment while keeping its edge size has no exact faces at its new size until the resize is taken back.
+
+## Draft angle
+
+**{{ui:draft.title}}** in the {{ui:editor.group.modify}} group leans side walls in as they go up, the way a moulded or cast part needs to come out of its mould - and a press-fit or stacking part slides on and off more easily.
+
+1. Select one part and click **{{ui:draft.title}}** (or right-click it and choose {{ui:draft.menu}}).
+2. Click the side walls to lean - click one again to unpick it. The top and bottom cannot be drafted.
+3. Set the {{ui:draft.angle}}: 1 to 3 degrees for a mould or a press, more for a tapered look. A negative angle leans the walls out instead.
+4. **{{ui:draft.apply}}**.
+
+The walls keep their place at the bottom of the part and lean in from there, so the footprint stays as it was and the top gets smaller. The draft is kept in the part's list of changes, where it can be taken back like a fillet or a hollow.

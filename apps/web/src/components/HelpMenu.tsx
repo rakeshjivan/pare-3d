@@ -8,8 +8,8 @@ import { guideHref } from "@/lib/guideLinks";
 import { OPEN_TINKERCAD_GUIDE_EVENT } from "@/components/TinkercadGuide";
 import { readToolNames, setToolNames } from "@/lib/toolNames";
 import { OPEN_WHATS_NEW_EVENT } from "@/components/WhatsNew";
+import { openFeedback } from "@/lib/feedback";
 
-const FEEDBACK_URL = "https://github.com/rakeshjivan/pare-3d/issues/new";
 
 /**
  * Fork: one Help button for everything that explains the app, instead of five icons side by side
@@ -100,10 +100,10 @@ export function HelpMenu({
             <Sparkles size={17} aria-hidden="true" />
             <span><strong>{t("helpMenu.whatsNew")}</strong><small>{t("helpMenu.whatsNewHint")}</small></span>
           </button>
-          <a role="menuitem" href={FEEDBACK_URL} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
+          <button type="button" role="menuitem" onClick={pick(() => openFeedback())}>
             <MessageSquareHeart size={17} aria-hidden="true" />
-            <span><strong>{t("helpMenu.feedback")}</strong><small>{t("helpMenu.feedbackHint")}</small></span>
-          </a>
+            <span><strong>{t("feedback.title")}</strong><small>{t("helpMenu.feedbackHint")}</small></span>
+          </button>
           <a role="menuitem" href={guideHref(language)} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
             <LibraryBig size={17} aria-hidden="true" />
             <span><strong>{t("dashboard.userGuide")}</strong><small>{t("helpMenu.userGuideHint")}</small></span>

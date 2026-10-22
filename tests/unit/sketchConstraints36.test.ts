@@ -94,4 +94,35 @@ describe("sketch constraints (build 36)", () => {
     expect(b.z).toBeCloseTo(0, 5);
     expect(b.handleIn!.z).toBeCloseTo(-3, 5);
   });
+
+  it("holds an angle between two lines (build 37)", () => {
+    const base = quad();
+    const { profile, satisfied } = solveSketchConstraints({ ...base, constraints: [{ id: "1", kind: "angle", a: "ab", b: "bc", value: 60 }] });
+    expect(satisfied).toBe(true);
+    const u = { x: at(profile, "b").x - at(profile, "a").x, z: at(profile, "b").z - at(profile, "a").z };
+    const w = { x: at(profile, "c").x - at(profile, "b").x, z: at(profile, "c").z - at(profile, "b").z };
+    const angle = (Math.acos((u.x * w.x + u.z * w.z) / (Math.hypot(u.x, u.z) * Math.hypot(w.x, w.z))) * 180) / Math.PI;
+    expect(angle).toBeCloseTo(60, 2);
+  });
+
+  it("keeps a point on a line, and two points mirrored about a line (build 37)", () => {
+    const base: SketchProfile = {
+      points: [
+        { id: "s", x: 0, z: -20 }, { id: "t", x: 0, z: 20 },
+        { id: "p", x: -10, z: 4 }, { id: "q", x: 13, z: 1 },
+        { id: "r", x: 3, z: 9 },
+      ],
+      segments: [{ id: "axis", startId: "s", endId: "t" }, { id: "pq", startId: "p", endId: "q" }, { id: "qr", startId: "q", endId: "r" }],
+    };
+    const { profile, satisfied } = solveSketchConstraints({ ...base, constraints: [
+      { id: "1", kind: "symmetric", p: "p", q: "q", segmentId: "axis" },
+      { id: "2", kind: "pointOnLine", pointId: "r", segmentId: "axis" },
+    ] }, new Set(["s", "t"]));
+    expect(satisfied).toBe(true);
+    expect(at(profile, "p").x).toBeCloseTo(-at(profile, "q").x, 4);
+    expect(at(profile, "p").z).toBeCloseTo(at(profile, "q").z, 4);
+    expect(at(profile, "r").x).toBeCloseTo(0, 4);
+    // The axis was held where it was.
+    expect(at(profile, "s")).toMatchObject({ x: 0, z: -20 });
+  });
 });

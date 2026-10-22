@@ -24,14 +24,37 @@ type Vec = { x: number; z: number };
 /** The rules whose lines are all still there (a line deleted takes its rules with it). */
 export function liveConstraints(profile: SketchProfile): SketchConstraint[] {
   const segments = new Set(profile.segments.map((segment) => segment.id));
-  return (profile.constraints ?? []).filter((constraint) => "b" in constraint
-    ? segments.has(constraint.a) && segments.has(constraint.b) && constraint.a !== constraint.b
-    : segments.has(constraint.segmentId));
+  const points = new Set(profile.points.map((point) => point.id));
+  return (profile.constraints ?? []).filter((constraint) => {
+    if ("b" in constraint) return segments.has(constraint.a) && segments.has(constraint.b) && constraint.a !== constraint.b;
+    if (constraint.kind === "pointOnLine") return points.has(constraint.pointId) && segments.has(constraint.segmentId);
+    if (constraint.kind === "symmetric") return points.has(constraint.p) && points.has(constraint.q) && constraint.p !== constraint.q && segments.has(constraint.segmentId);
+    return segments.has(constraint.segmentId);
+  });
+}
+
+/** The lines a rule is shown on. */
+export function constraintSegments(constraint: SketchConstraint): string[] {
+  return "b" in constraint ? [constraint.a, constraint.b] : [constraint.segmentId];
 }
 
 /** The rules on one line. */
 export function constraintsOnSegment(profile: SketchProfile, segmentId: string) {
-  return liveConstraints(profile).filter((constraint) => ("b" in constraint ? constraint.a === segmentId || constraint.b === segmentId : constraint.segmentId === segmentId));
+  return liveConstraints(profile).filter((constraint) => constraintSegments(constraint).includes(segmentId));
+}
+
+/** The angle in degrees (0 to 180) between two lines as drawn, start to end. */
+export function lineAngleDegrees(profile: SketchProfile, a: string, b: string) {
+  const end = (id: string) => profile.segments.find((segment) => segment.id === id);
+  const sa = end(a), sb = end(b);
+  const pt = (id: string) => profile.points.find((point) => point.id === id);
+  if (!sa || !sb) return 0;
+  const a0 = pt(sa.startId), a1 = pt(sa.endId), b0 = pt(sb.startId), b1 = pt(sb.endId);
+  if (!a0 || !a1 || !b0 || !b1) return 0;
+  const da = { x: a1.x - a0.x, z: a1.z - a0.z };
+  const db = { x: b1.x - b0.x, z: b1.z - b0.z };
+  const cos = (da.x * db.x + da.z * db.z) / ((Math.hypot(da.x, da.z) * Math.hypot(db.x, db.z)) || 1);
+  return (Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI;
 }
 
 /**
@@ -42,6 +65,9 @@ export function addConstraint(profile: SketchProfile, constraint: SketchConstrai
   const existing = liveConstraints(profile);
   const lines = "b" in constraint ? [constraint.a, constraint.b] : [constraint.segmentId];
   const kept = existing.filter((other) => {
+    if (constraint.kind === "pointOnLine") return !(other.kind === "pointOnLine" && other.pointId === constraint.pointId && other.segmentId === constraint.segmentId);
+    if (constraint.kind === "symmetric") return !(other.kind === "symmetric" && [other.p, other.q].sort().join() === [constraint.p, constraint.q].sort().join());
+    if (other.kind === "pointOnLine" || other.kind === "symmetric") return true;
     if ("b" in constraint) {
       // One relation per pair of lines.
       return !("b" in other && lines.includes(other.a) && lines.includes(other.b));
@@ -68,7 +94,17 @@ function residual(constraint: SketchConstraint, at: (id: string) => Vec, ends: (
     if (constraint.kind === "equal") return Math.abs(la - lb);
     const cross = (da.x * db.z - da.z * db.x) / (la * lb);
     const dot = (da.x * db.x + da.z * db.z) / (la * lb);
+    if (constraint.kind === "angle") return Math.abs(Math.acos(Math.max(-1, Math.min(1, dot))) - (constraint.value * Math.PI) / 180) * Math.min(la, lb);
     return (constraint.kind === "parallel" ? Math.abs(cross) : Math.abs(dot)) * Math.min(la, lb);
+  }
+  if (constraint.kind === "pointOnLine" || constraint.kind === "symmetric") {
+    const e = ends(constraint.segmentId);
+    if (!e) return 0;
+    const s0 = at(e[0]), s1 = at(e[1]);
+    if (constraint.kind === "pointOnLine") return distanceToLine(at(constraint.pointId), s0, s1);
+    const m = mirrorPoint(at(constraint.q), s0, s1);
+    const p = at(constraint.p);
+    return Math.hypot(m.x - p.x, m.z - p.z);
   }
   const e = ends(constraint.segmentId);
   if (!e) return 0;
@@ -80,6 +116,31 @@ function residual(constraint: SketchConstraint, at: (id: string) => Vec, ends: (
 }
 
 const sub = (a: Vec, b: Vec): Vec => ({ x: a.x - b.x, z: a.z - b.z });
+
+/** The point on the line through s0 and s1 nearest r. */
+function footOnLine(r: Vec, s0: Vec, s1: Vec): Vec {
+  const d = sub(s1, s0);
+  const l2 = d.x * d.x + d.z * d.z || 1e-12;
+  const t = ((r.x - s0.x) * d.x + (r.z - s0.z) * d.z) / l2;
+  return { x: s0.x + d.x * t, z: s0.z + d.z * t };
+}
+function distanceToLine(r: Vec, s0: Vec, s1: Vec) {
+  const f = footOnLine(r, s0, s1);
+  return Math.hypot(r.x - f.x, r.z - f.z);
+}
+/** r mirrored about the line through s0 and s1. */
+function mirrorPoint(r: Vec, s0: Vec, s1: Vec): Vec {
+  const f = footOnLine(r, s0, s1);
+  return { x: 2 * f.x - r.x, z: 2 * f.z - r.z };
+}
+/** A direction mirrored about the line's direction (the reflection without its shift). */
+function mirrorDirection(v: Vec, s0: Vec, s1: Vec): Vec {
+  const d = sub(s1, s0);
+  const l = Math.hypot(d.x, d.z) || 1;
+  const u = { x: d.x / l, z: d.z / l };
+  const along = v.x * u.x + v.z * u.z;
+  return { x: 2 * along * u.x - v.x, z: 2 * along * u.z - v.z };
+}
 
 export type SolveResult = { profile: SketchProfile; satisfied: boolean; worst: number };
 
@@ -163,8 +224,51 @@ export function solveSketchConstraints(profile: SketchProfile, pinned: ReadonlyS
           if (length < TOLERANCE) continue;
           const sign = constraint.kind === "horizontal" ? Math.sign(d.x) || 1 : Math.sign(d.z) || 1;
           setLine(constraint.segmentId, constraint.kind === "horizontal" ? { x: sign, z: 0 } : { x: 0, z: sign }, null);
+        } else if (constraint.kind === "pointOnLine") {
+          const e = ends(constraint.segmentId);
+          if (!e || e.includes(constraint.pointId)) continue;
+          const r = at(constraint.pointId);
+          const f = footOnLine(r, at(e[0]), at(e[1]));
+          const wr = weight(constraint.pointId);
+          const wl = (weight(e[0]) + weight(e[1])) / 2;
+          if (wr + wl === 0) continue;
+          const dx = f.x - r.x, dz = f.z - r.z;
+          move(constraint.pointId, (dx * wr) / (wr + wl), (dz * wr) / (wr + wl));
+          move(e[0], (-dx * wl) / (wr + wl), (-dz * wl) / (wr + wl));
+          move(e[1], (-dx * wl) / (wr + wl), (-dz * wl) / (wr + wl));
+        } else if (constraint.kind === "symmetric") {
+          const e = ends(constraint.segmentId);
+          if (!e) continue;
+          const s0 = at(e[0]), s1 = at(e[1]);
+          const p = at(constraint.p);
+          const m = mirrorPoint(at(constraint.q), s0, s1);
+          const wp = weight(constraint.p), wq = weight(constraint.q);
+          if (wp + wq === 0) continue;
+          const ex = m.x - p.x, ez = m.z - p.z;
+          move(constraint.p, (ex * wp) / (wp + wq), (ez * wp) / (wp + wq));
+          // q moves so that its mirror image moves the rest of the way back.
+          const back = mirrorDirection({ x: (-ex * wq) / (wp + wq), z: (-ez * wq) / (wp + wq) }, s0, s1);
+          move(constraint.q, back.x, back.z);
         } else if (!("b" in constraint)) {
           if (constraint.kind === "length") setLine(constraint.segmentId, null, Math.max(TOLERANCE, constraint.value));
+        } else if (constraint.kind === "angle") {
+          const da = lineVector(constraint.a);
+          const db = lineVector(constraint.b);
+          const la = Math.hypot(da.x, da.z);
+          const lb = Math.hypot(db.x, db.z);
+          if (la < TOLERANCE || lb < TOLERANCE) continue;
+          const ma = lineMobility(constraint.a);
+          const mb = lineMobility(constraint.b);
+          if (ma + mb === 0) continue;
+          const angleA = Math.atan2(da.z, da.x);
+          let diff = Math.atan2(db.z, db.x) - angleA;
+          while (diff > Math.PI) diff -= 2 * Math.PI;
+          while (diff < -Math.PI) diff += 2 * Math.PI;
+          const want = ((diff >= 0 ? 1 : -1) * constraint.value * Math.PI) / 180;
+          const error = diff - want;
+          const rotate = (v: Vec, angle: number) => ({ x: v.x * Math.cos(angle) - v.z * Math.sin(angle), z: v.x * Math.sin(angle) + v.z * Math.cos(angle) });
+          if (ma) setLine(constraint.a, rotate({ x: da.x / la, z: da.z / la }, (error * mb) / (ma + mb)), null);
+          if (mb) setLine(constraint.b, rotate({ x: db.x / lb, z: db.z / lb }, (-error * ma) / (ma + mb)), null);
         } else {
           const da = lineVector(constraint.a);
           const db = lineVector(constraint.b);
@@ -245,6 +349,9 @@ export function movedPointIds(before: SketchProfile, after: SketchProfile): Set<
 /** The short mark shown on a line for a rule. */
 export function constraintGlyph(constraint: SketchConstraint): string {
   switch (constraint.kind) {
+    case "angle": return "∠";
+    case "pointOnLine": return "•";
+    case "symmetric": return "⇔";
     case "horizontal": return "H";
     case "vertical": return "V";
     case "length": return "⟷";

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
 import { PARE_BUILD } from "@/lib/pareUpdate";
 import { WHATS_NEW, whatsNewSince } from "@/lib/pareWhatsNew";
+import { openFeedback } from "@/lib/feedback";
 
 const STORAGE_KEY = "pare3d.lastSeenBuild";
 export const OPEN_WHATS_NEW_EVENT = "pare3d:whats-new";
@@ -52,6 +53,8 @@ export function WhatsNew() {
           </div>
         ))}
         <footer>
+          {/* Fork (build 37): testers are a click away from saying what broke or what they would like. */}
+          <button type="button" onClick={() => { setEntries([]); openFeedback({ kind: "suggestion" }); }}>{t("feedback.footer")}</button>
           <button type="button" className="primary" onClick={() => setEntries([])}>{t("pareWhatsNew.gotIt")}</button>
         </footer>
       </section>

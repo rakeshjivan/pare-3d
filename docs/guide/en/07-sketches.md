@@ -48,9 +48,11 @@ A sketch can keep rules, the way Fusion and Shapr3D keep constraints: once a lin
 
 - **{{ui:sketch.rule.horizontalShort}}** and **{{ui:sketch.rule.verticalShort}}** keep the line level or upright.
 - **{{ui:sketch.rule.lengthShort}}** keeps the length it has now. Typing a new length on the line changes the locked length.
-- With two lines selected (Shift-click the second, or select one and right-click the other): **{{ui:sketch.rule.parallelShort}}**, **{{ui:sketch.rule.perpendicularShort}}** and **{{ui:sketch.rule.equalShort}}**.
+- With two lines selected (Shift-click the second, or select one and right-click the other): **{{ui:sketch.rule.parallelShort}}**, **{{ui:sketch.rule.perpendicularShort}}**, **{{ui:sketch.rule.equalShort}}**, or hold the angle they make now (**{{ui:sketch.rule.angleShort}}**).
+- A point on a line: select the line, then right-click the point and choose **{{ui:sketch.rule.pointOnLine}}**. The point can slide along the line (and past its ends), but not off it.
+- Two points mirrored about a line - the two sides of a symmetric part: select one point and the line (Shift-click), then right-click the other point and choose **{{ui:sketch.rule.symmetric}}**. A construction line makes a good axis.
 
-Each rule shows as a small mark beside its line - H, V, ⟷, or ∥, ⊥ and = with a number that pairs the two lines. Click a mark to remove that rule; right-click a line and choose **Remove this line's rules** to take all of its rules off at once.
+Each rule shows as a small mark beside its line - H, V, ⟷, • for a point on the line, ⇔ on a mirror line, or ∥, ⊥, = and ∠ with a number that pairs the two lines. Click a mark to remove that rule; right-click a line and choose **Remove this line's rules** to take all of its rules off at once.
 
 When you drag a point, that point goes where you put it and the rest of the sketch moves just enough to keep the rules - drag one corner of a rectangle made of horizontal and vertical lines and the far corner stays put. A rule goes with its line when the line is deleted.
 

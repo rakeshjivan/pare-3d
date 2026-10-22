@@ -1,5 +1,6 @@
 "use client";
 
+import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { designDiskAvailable, designDiskDelete, designDiskGet, designDiskId, designDiskList, designDiskPut } from "@/lib/designDiskStore";
 import { PareBuildBadge, PareVersionStatus } from "@/components/PareVersionStatus";
 import { ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
@@ -3697,6 +3698,7 @@ function Dashboard({
               <PareUpdateBanner />
               <FirstRunCard />
               <WhatsNew />
+      <FeedbackDialog />
               {/* Fork: on a first visit the "New to 3D design?" question already offers the Tinkercad guide. */}
               {firstRunAnswered ? (
               <button type="button" className="tc-guide-card" onClick={() => window.dispatchEvent(new Event(OPEN_TINKERCAD_GUIDE_EVENT))}>

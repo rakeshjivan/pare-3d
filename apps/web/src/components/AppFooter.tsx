@@ -1,5 +1,7 @@
 "use client";
 
+import { openFeedback } from "@/lib/feedback";
+
 import { Heart, Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { LANGUAGE_INFO, t, type Language } from "@/lib/i18n";
@@ -126,6 +128,10 @@ export function AppFooter({
         <a href={t("welcome.guideUrl")} target="_blank" rel="noreferrer">
           {t("dashboard.userGuide")}
         </a>
+        {/* Fork (build 37): the feedback form, always a click away. */}
+        <button type="button" className="footer-feedback-link" onClick={() => openFeedback()}>
+          {t("feedback.footer")}
+        </button>
       </div>
       <div className="dashboard-legal-group">
         <a href={SOURCE_CODE_URL} target="_blank" rel="noreferrer" title="Based on layerling (AGPL-3.0)">

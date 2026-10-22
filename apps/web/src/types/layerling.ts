@@ -300,7 +300,12 @@ export type ShapeCustomization = {
 
 export type ShapeCustomizationMap = Partial<Record<ShapeKind, ShapeCustomization>>;
 
+/** Fork (build 37): a named value of a design that number fields can use (lib/designParameters). */
+export type DesignParameter = { name: string; value: number; note?: string };
+
 export type WorkplaneWorkspaceSettings = {
+  /** Fork (build 37): this design's named values; never part of "Make default". */
+  parameters?: DesignParameter[];
   width: number;
   depth: number;
   sizePreset: string;
@@ -466,7 +471,13 @@ export type SketchInset = { distance: number; radius: number };
 export type SketchConstraint =
   | { id: string; kind: "horizontal" | "vertical"; segmentId: string }
   | { id: string; kind: "length"; segmentId: string; value: number }
-  | { id: string; kind: "parallel" | "perpendicular" | "equal"; a: string; b: string };
+  | { id: string; kind: "parallel" | "perpendicular" | "equal"; a: string; b: string }
+  /** Fork (build 37): the angle between two lines held, in degrees. */
+  | { id: string; kind: "angle"; a: string; b: string; value: number }
+  /** Fork (build 37): a point kept on a line (or its extension). */
+  | { id: string; kind: "pointOnLine"; pointId: string; segmentId: string }
+  /** Fork (build 37): two points kept mirror images about a line. */
+  | { id: string; kind: "symmetric"; p: string; q: string; segmentId: string };
 
 export type SketchProfile = {
   points: SketchPoint[];
@@ -551,7 +562,8 @@ export type ShellEdges = "round" | "sharp";
 
 export type EdgeTreatmentFeature = {
   /** "shell" hollows the body: `amount` is then the wall thickness. "deleteFace" deletes faces and closes the gap (#451). */
-  kind: "fillet" | "chamfer" | "chamfillet" | "shell" | "deleteFace";
+  kind: "fillet" | "chamfer" | "chamfillet" | "shell" | "deleteFace" | "draft";
+  /** For "draft" (build 37): the angle in degrees the picked faces lean in. */
   amount: number;
   edgeCount: number;
   /** The edges picked, as the tool numbered them on the body before this treatment: "Edit" picks them again (#227). */

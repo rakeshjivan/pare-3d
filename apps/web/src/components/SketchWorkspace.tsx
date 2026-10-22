@@ -16,7 +16,7 @@ import { parseMeasurementInput, resolveMeasurementInput } from "@/lib/measuremen
 import { applySegmentDimension, SEGMENT_DIMENSION_CENTER } from "@/lib/sketchDimensions";
 import { applyCornerAngle, sketchCornerAt, type CornerTurn, type SketchCorner } from "@/lib/sketchAngles";
 import { isSegmentCurved } from "@/lib/sketchSegmentCurve";
-import { addConstraint, constraintGlyph, constraintsOnSegment, liveConstraints, movedPointIds, newConstraintId, solveSketchConstraints } from "@/lib/sketchConstraints";
+import { addConstraint, constraintGlyph, constraintsOnSegment, lineAngleDegrees, liveConstraints, movedPointIds, newConstraintId, solveSketchConstraints } from "@/lib/sketchConstraints";
 import type { SketchConstraint } from "@/types/layerling";
 import { DEFAULT_SKETCH_BACKGROUND, DEFAULT_SKETCH_GRID_COLOR, DEFAULT_SKETCH_PLATE_COLOR, workplaneGridLayout } from "@/lib/workplaneGrid";
 import { closestPointOnSketchSegment, type SketchSegmentPlacement } from "@/lib/sketchPointRefinement";
@@ -919,6 +919,8 @@ export function SketchWorkspace({
         items.push({ label: t("sketch.rule.parallel"), icon: <span className="sketch-rule-glyph">∥</span>, run: rule({ id: newConstraintId(), kind: "parallel", a: other, b: segmentId }, t("sketch.rule.added", { rule: t("sketch.rule.parallelShort") })) });
         items.push({ label: t("sketch.rule.perpendicular"), icon: <span className="sketch-rule-glyph">⊥</span>, run: rule({ id: newConstraintId(), kind: "perpendicular", a: other, b: segmentId }, t("sketch.rule.added", { rule: t("sketch.rule.perpendicularShort") })) });
         items.push({ label: t("sketch.rule.equal"), icon: <span className="sketch-rule-glyph">=</span>, run: rule({ id: newConstraintId(), kind: "equal", a: other, b: segmentId }, t("sketch.rule.added", { rule: t("sketch.rule.equalShort") })) });
+        const heldAngle = Math.round(lineAngleDegrees(profile, other, segmentId) * 10) / 10;
+        items.push({ label: t("sketch.rule.angle", { angle: heldAngle }), icon: <span className="sketch-rule-glyph">∠</span>, run: rule({ id: newConstraintId(), kind: "angle", a: other, b: segmentId, value: heldAngle }, t("sketch.rule.added", { rule: t("sketch.rule.angleShort") })) });
       } else {
         items.push({ label: t("sketch.rule.pairHint"), disabled: true, run: () => undefined });
       }
@@ -950,6 +952,19 @@ export function SketchWorkspace({
     if (canApplySketchCornerTreatment(displayProfile, pointId)) {
       items.push({ label: t("sketch.filletCorner"), icon: <Spline size={15} />, run: corner("fillet") });
       items.push({ label: t("sketch.chamferCorner"), icon: <Slash size={15} />, run: corner("chamfer") });
+    }
+    if (onSetConstraints) {
+      // Fork (build 37): keep this point on a selected line, or mirror it about one.
+      const line = selected?.kind === "segment" ? profile.segments.find((segment) => segment.id === selected.id) : undefined;
+      if (line && line.startId !== pointId && line.endId !== pointId) {
+        items.push({ label: t("sketch.rule.pointOnLine"), icon: <span className="sketch-rule-glyph">•</span>, run: () => onSetConstraints(addConstraint(profile, { id: newConstraintId(), kind: "pointOnLine", pointId, segmentId: line.id }), t("sketch.rule.added", { rule: t("sketch.rule.pointOnLineShort") })) });
+      }
+      if (selected?.kind === "multiple" && selected.pointIds.length === 1 && selected.segmentIds.length === 1 && selected.pointIds[0] !== pointId) {
+        const partner = selected.pointIds[0];
+        const axis = selected.segmentIds[0];
+        items.push({ label: t("sketch.rule.symmetric"), icon: <span className="sketch-rule-glyph">⇔</span>, run: () => onSetConstraints(addConstraint(profile, { id: newConstraintId(), kind: "symmetric", p: pointId, q: partner, segmentId: axis }), t("sketch.rule.added", { rule: t("sketch.rule.symmetricShort") })) });
+      }
+      if (!line && !(selected?.kind === "multiple")) items.push({ label: t("sketch.rule.pointHint"), disabled: true, run: () => undefined });
     }
     items.push({ label: t("sketch.menu.removePoint"), icon: <Trash2 size={15} />, danger: true, run: () => onDeletePoint(pointId) });
     setSketchMenu({ x: event.clientX, y: event.clientY, items });
@@ -2289,7 +2304,7 @@ export function SketchWorkspace({
               }
             }
             const size = pointRadius * 2.5;
-            const ruleName = (rule: SketchConstraint) => t(rule.kind === "horizontal" ? "sketch.rule.horizontal" : rule.kind === "vertical" ? "sketch.rule.vertical" : rule.kind === "length" ? "sketch.rule.length" : rule.kind === "parallel" ? "sketch.rule.parallelShort" : rule.kind === "perpendicular" ? "sketch.rule.perpendicularShort" : "sketch.rule.equalShort");
+            const ruleName = (rule: SketchConstraint) => t(rule.kind === "horizontal" ? "sketch.rule.horizontal" : rule.kind === "vertical" ? "sketch.rule.vertical" : rule.kind === "length" ? "sketch.rule.length" : rule.kind === "parallel" ? "sketch.rule.parallelShort" : rule.kind === "perpendicular" ? "sketch.rule.perpendicularShort" : rule.kind === "angle" ? "sketch.rule.angleShort" : rule.kind === "pointOnLine" ? "sketch.rule.pointOnLineShort" : rule.kind === "symmetric" ? "sketch.rule.symmetricShort" : "sketch.rule.equalShort");
             return (
               <g className="sketch-rule-marks">
                 {marks.map((mark) => (

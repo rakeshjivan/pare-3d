@@ -244,6 +244,18 @@ export function ForkShapesIcon(props: IconProps) {
   );
 }
 
+/** Fork (build 37): Draft angle - a block whose sides lean in towards the top, one side in the accent colour. */
+export function ForkDraftIcon(props: IconProps) {
+  return (
+    <ForkIcon {...props}>
+      <path d="M10 40 15 10h18l5 30Z" {...SOFT} />
+      <path d="M33 10 38 40H28l-3-30Z" {...ACCENT} />
+      <path d="M10 40 15 10h18l5 30Z" />
+      <path d="M33 10v30" strokeDasharray="2.5 3" />
+    </ForkIcon>
+  );
+}
+
 /** Fork (build 25): Blend - a wide end and a narrow end joined by a smooth flare, the flare in the accent colour. */
 export function ForkBlendIcon(props: IconProps) {
   return (

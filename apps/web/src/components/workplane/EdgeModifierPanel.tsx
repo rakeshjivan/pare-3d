@@ -47,6 +47,7 @@ export type EdgeHistoryOption = {
 function edgeHistoryLabel(option: EdgeHistoryOption) {
   const size = String(Number(option.amount.toFixed(2)));
   if (option.kind === "shell") return t("edge.revertShell", { size });
+  if (option.kind === "draft") return t("edge.revertDraft", { size: String(Number(option.amount.toFixed(1))), count: option.faceCount ?? 0 });
   if (option.kind === "deleteFace") {
     return option.faceCount === 1 ? t("edge.revertDeleteFaceOne") : t("edge.revertDeleteFaceMany", { count: option.faceCount ?? 0 });
   }
@@ -531,7 +532,10 @@ export function EdgeModifierPanel({
         ) : null}
       </div>
 
-      {error ? (
+      {error && availableCount === 0 && appliedFeatureCount > 0 ? (
+        // Fork (build 37): every edge already treated is a finished state, not a failure.
+        <p className="edge-modifier-selection-help" role="status">{t("edge.allEdgesTreated")}</p>
+      ) : error ? (
         <div ref={errorRef} className="edge-modifier-error" role="alert">
           {cadModifierUserErrorMessage(error)}
           {onFindLargest && selectedCount > 0 && !searching ? (

@@ -1,3 +1,4 @@
+import { normalizeDesignParameters } from "@/lib/designParameters";
 import { DEFAULT_OVERHANG_ANGLE, normalizeOverhangAngle } from "@/lib/overhangLimits";
 import type { CustomSnapGrid, CustomSnapGridSize, GridSize, HistoryRetentionLimit, MeasurementAccuracy, ShapeCustomization, ShapeCustomizationMap, ShapeKind, WorkplaneWorkspaceSettings } from "@/types/layerling";
 import { normalizeScaleForUnits } from "@/lib/measurementUnits";
@@ -714,6 +715,8 @@ export function normalizeWorkspaceSettings(value: unknown, fallback: WorkplaneWo
     booleanTriangleLimit: booleanTriangleLimitOrDefault(candidate.booleanTriangleLimit, fallback.booleanTriangleLimit),
     customSnapGrids: normalizeCustomSnapGrids(candidate.customSnapGrids, fallback.customSnapGrids),
     shapeCustomizations: normalizeShapeCustomizations(candidate.shapeCustomizations, fallback.shapeCustomizations),
+    // A design's own values: never taken from the fallback (the default a new design starts from).
+    ...(normalizeDesignParameters(candidate.parameters) ? { parameters: normalizeDesignParameters(candidate.parameters) } : {}),
   };
 }
 
@@ -829,7 +832,7 @@ export function saveWorkspaceDefault(
   }
   try {
     storage.setItem(WORKSPACE_DEFAULT_STORAGE_KEY, JSON.stringify({
-      workspace: normalizeWorkspaceSettings(workspace),
+      workspace: (({ parameters: _parameters, ...rest }) => rest)(normalizeWorkspaceSettings(workspace)),
       snap: normalizeSnapGrid(snap, DEFAULT_SNAP_GRID),
     }));
     return true;

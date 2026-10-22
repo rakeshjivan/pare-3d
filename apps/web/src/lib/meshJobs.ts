@@ -3,16 +3,21 @@
  * cannot start - an old browser, the tests - the same work runs here as before.
  */
 import type { MeshRoundMode, MeshRoundResult } from "@/lib/meshRound";
+import type { FitReport } from "@/lib/partTools";
+import type { WorkplaneShape } from "@/types/layerling";
 
-export type MeshJobRequest = { id: number; base: string; kind: "round"; positions: Float32Array; radius: number; mode: MeshRoundMode };
+export type MeshJobRequest =
+  | { id: number; base: string; kind: "round"; positions: Float32Array; radius: number; mode: MeshRoundMode }
+  | { id: number; base: string; kind: "fit"; shapes: WorkplaneShape[]; clearance: number };
 export type MeshJobResponse =
-  | { id: number; ok: true; result: { positions: Float32Array; voxel: number; coarse: boolean } }
+  | { id: number; ok: true; kind?: "round"; result: { positions: Float32Array; voxel: number; coarse: boolean } }
+  | { id: number; ok: true; kind: "fit"; report: FitReport }
   | { id: number; ok: false; error: string };
 
 let worker: Worker | null = null;
 let failed = false;
 let nextId = 1;
-const pending = new Map<number, { resolve: (value: MeshRoundResult) => void; reject: (error: Error) => void }>();
+const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
 
 function meshWorker(): Worker | null {
   if (failed || typeof window === "undefined" || typeof Worker === "undefined") return null;
@@ -24,8 +29,9 @@ function meshWorker(): Worker | null {
       const waiting = pending.get(reply.id);
       if (!waiting) return;
       pending.delete(reply.id);
-      if (reply.ok) waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
-      else waiting.reject(new Error(reply.error));
+      if (!reply.ok) waiting.reject(new Error(reply.error));
+      else if (reply.kind === "fit") waiting.resolve(reply.report);
+      else waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
     };
     worker.onerror = () => {
       // A worker that cannot load: everything waiting runs here instead, and later jobs too.
@@ -57,12 +63,31 @@ export async function roundMeshInBackground(positions: ArrayLike<number>, radius
   const data = Float32Array.from(positions as ArrayLike<number>);
   try {
     return await new Promise<MeshRoundResult>((resolve, reject) => {
-      pending.set(id, { resolve, reject });
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
       const request: MeshJobRequest = { id, base: new URL(".", window.location.href).href, kind: "round", positions: data, radius, mode };
       target.postMessage(request, [data.buffer]);
     });
   } catch (error) {
     if (error instanceof Error && error.message === "worker-unavailable") return roundHere(positions, radius, mode);
     throw error;
+  }
+}
+
+/** Fit check (build 37) in the worker when one runs, so a big assembly keeps the window working. */
+export async function checkFitInBackground(shapes: readonly WorkplaneShape[], clearance: number): Promise<FitReport> {
+  const here = async () => (await import("@/lib/partTools")).checkFit(shapes, clearance);
+  const target = meshWorker();
+  if (!target) return here();
+  const id = nextId;
+  nextId += 1;
+  try {
+    return await new Promise<FitReport>((resolve, reject) => {
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      const request: MeshJobRequest = { id, base: new URL(".", window.location.href).href, kind: "fit", shapes: shapes as WorkplaneShape[], clearance };
+      target.postMessage(request);
+    });
+  } catch {
+    // Whatever went wrong in the worker, the check is run here instead.
+    return here();
   }
 }

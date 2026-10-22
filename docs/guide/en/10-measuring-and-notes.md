@@ -77,3 +77,15 @@ A reference point is a bare mark in space, like a pencil mark or a layout point 
 - When you drag a shape, its edges and its centre snap to a point, like they snap to other shapes ({{ui:workspace.objectSnap}}). The framing square snaps to points too.
 - Points are saved in the design, appear in no export, and are shown or hidden together with the notes by {{ui:visibility.notes}}.
 - An AI can mark, list and remove them with `layerling_add_reference_points`, `layerling_list_reference_points` and `layerling_remove_reference_points`.
+
+## Parameters: named sizes
+
+A design can have **{{ui:parameters.title}}**: named sizes such as `wall = 2` or `width = 60` that any number field can use, the way OpenSCAD's customiser or Fusion's parameters work. Open them with the **{{ui:parameters.title}}** button in the title row (next to Export).
+
+1. Click **{{ui:parameters.add}}**, give it a name (letters, digits and `_`, starting with a letter) and a value in the design's unit. A note says what it is for.
+2. Type the name into any number field - alone (`width`) or in a sum (`width - 2 * wall`, `height / 2 + 0.4`). The field remembers it.
+3. Change the value in the Parameters window and every field that uses it follows at once, on every part. Renaming a parameter renames it in every field that uses it.
+
+Each parameter shows how many fields use it. Removing one leaves those fields at the values they have. Undo takes back the parts' changes; the parameter's value itself stays as you set it.
+
+Good uses: a box and its lid that share `width` and `depth`, wall thickness on every part of an enclosure, a clearance used by all the holes for one bolt.

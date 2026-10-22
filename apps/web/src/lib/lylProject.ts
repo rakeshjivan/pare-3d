@@ -55,7 +55,7 @@ const SHAPE_KINDS = new Set([
 ]);
 
 const FEATURE_TYPES = new Set([
-  "group", "boolean-subtraction", "boolean-intersection", "mirror", "sketch-extrusion", "sketch-revolve", "sketch-sweep", "fillet", "chamfer", "chamfillet", "shell", "delete-face",
+  "group", "boolean-subtraction", "boolean-intersection", "mirror", "sketch-extrusion", "sketch-revolve", "sketch-sweep", "fillet", "chamfer", "chamfillet", "shell", "delete-face", "draft",
 ]);
 
 type LylAssetKind = "source" | "derived-mesh" | "brep" | "image" | "display-edges";
@@ -912,7 +912,7 @@ function activeProjectIndexes(state: LylStateV1) {
     }
     const treatments = Array.isArray(node.definition.edgeTreatments) ? node.definition.edgeTreatments as Array<Record<string, unknown>> : [];
     treatments.forEach((treatment, index) => {
-      const type = treatment.kind === "fillet" || treatment.kind === "chamfillet" || treatment.kind === "shell" ? treatment.kind : treatment.kind === "deleteFace" ? "delete-face" : "chamfer";
+      const type = treatment.kind === "fillet" || treatment.kind === "chamfillet" || treatment.kind === "shell" || treatment.kind === "draft" ? treatment.kind : treatment.kind === "deleteFace" ? "delete-face" : "chamfer";
       const featureId = `feature/${safeNodeToken(node.nodeId)}/${type}/${index}`;
       features.push({
         id: featureId,
@@ -1195,9 +1195,17 @@ function validateSketchProfile(value: unknown, label: string) {
       if (kind === "horizontal" || kind === "vertical" || kind === "length") {
         stringValue(constraint.segmentId, `${label}.constraints[${index}].segmentId`);
         if (kind === "length" && !(finiteNumber(constraint.value, `${label}.constraints[${index}].value`) > 0)) throw new Error(`${label}.constraints[${index}].value must be above 0`);
-      } else if (kind === "parallel" || kind === "perpendicular" || kind === "equal") {
+      } else if (kind === "parallel" || kind === "perpendicular" || kind === "equal" || kind === "angle") {
         stringValue(constraint.a, `${label}.constraints[${index}].a`);
         stringValue(constraint.b, `${label}.constraints[${index}].b`);
+        if (kind === "angle") finiteNumber(constraint.value, `${label}.constraints[${index}].value`);
+      } else if (kind === "pointOnLine") {
+        stringValue(constraint.pointId, `${label}.constraints[${index}].pointId`);
+        stringValue(constraint.segmentId, `${label}.constraints[${index}].segmentId`);
+      } else if (kind === "symmetric") {
+        stringValue(constraint.p, `${label}.constraints[${index}].p`);
+        stringValue(constraint.q, `${label}.constraints[${index}].q`);
+        stringValue(constraint.segmentId, `${label}.constraints[${index}].segmentId`);
       } else {
         throw new Error(`${label}.constraints[${index}].kind is not a known rule`);
       }

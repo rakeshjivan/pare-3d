@@ -18,6 +18,7 @@ import { meshTreatedBody } from "@/lib/cadMeshAccuracy";
 import { blendLoftSolid } from "@/lib/cadBlendLoft";
 import { edgeIsConvex } from "@/lib/cadEdgeConvexity";
 import { filletVariableEdges } from "@/lib/cadVariableFillet";
+import { draftFacesSolid, DRAFT_FACES_REFUSED } from "@/lib/cadDraft";
 import { planarMeshFaces } from "@/lib/cadPlanarMesh";
 import { buildMessage } from "@/lib/buildStamp";
 import { CAD_MODIFIER_KERNEL_RESTART_MESSAGE, CAD_MODIFIER_RUNTIME_BASE, cadModifierCappedDeflection, cadModifierTessellationDeflection, cadModifierTopologyEdgeIsSelectable, cadTransformRequiresGeneralTransform, isCadModifierKernelExhausted, isCadModifierWasmMemoryFault } from "@/lib/cadModifierRuntime";
@@ -924,11 +925,12 @@ async function bearbeiteAnfrage(request: CadModifierWorkerRequest, halter: { cad
   }
   if (baseShape === null) throw new Error("Prepare an object before previewing the modifier");
   const selected = request.edgeIds.map((id) => ({ id, edge: edgeHandles[id], owner: edgeOwners[id] })).filter((entry): entry is { id: number; edge: ShapeHandle; owner: number } => entry.edge !== undefined);
-  const selectedFaces = request.kind === "deleteFace"
+  const faceTool = request.kind === "deleteFace" || request.kind === "draft";
+  const selectedFaces = faceTool
     ? (request.faceIds ?? []).map((id) => ({ id, face: faceHandles[id], owner: faceOwners[id] })).filter((entry): entry is { id: number; face: ShapeHandle; owner: number } => entry.face !== undefined)
     : [];
-  if (request.kind === "deleteFace" && selectedFaces.length === 0) throw new Error("Select at least one face");
-  if (selected.length === 0 && request.kind !== "shell" && request.kind !== "deleteFace") throw new Error("Select at least one highlighted edge");
+  if (faceTool && selectedFaces.length === 0) throw new Error("Select at least one face");
+  if (selected.length === 0 && request.kind !== "shell" && !faceTool) throw new Error("Select at least one highlighted edge");
   const componentResults: ShapeHandle[] = [];
   let result: ShapeHandle | null = null;
   try {
@@ -942,6 +944,10 @@ async function bearbeiteAnfrage(request: CadModifierWorkerRequest, halter: { cad
       } else if (request.kind === "deleteFace") {
         const componentFaces = selectedFaces.filter((entry) => entry.owner === owner).map((entry) => entry.face);
         component = componentFaces.length ? deleteFacesSolid(activeCad, solid, componentFaces) : activeCad.copy(solid);
+      } else if (request.kind === "draft") {
+        // Fork (build 37): the faces lean in by `amount` degrees.
+        const componentFaces = selectedFaces.filter((entry) => entry.owner === owner).map((entry) => entry.face);
+        component = componentFaces.length ? draftFacesSolid(activeCad, solid, componentFaces, request.amount) : activeCad.copy(solid);
       } else if (componentEdges.length === 0) {
         component = activeCad.copy(solid);
       } else {
@@ -962,7 +968,7 @@ async function bearbeiteAnfrage(request: CadModifierWorkerRequest, halter: { cad
       componentResults.push(component);
     }
     result = componentResults.length === 1 ? componentResults[0] : activeCad.makeCompound(componentResults);
-    if (!cadShapeIsValid(activeCad, result)) throw new Error(request.kind === "deleteFace" ? DELETE_FACES_UNCHANGED_MESSAGE : "The chosen size creates invalid or overlapping edge geometry");
+    if (!cadShapeIsValid(activeCad, result)) throw new Error(request.kind === "draft" ? DRAFT_FACES_REFUSED : request.kind === "deleteFace" ? DELETE_FACES_UNCHANGED_MESSAGE : "The chosen size creates invalid or overlapping edge geometry");
     const baseLoose = cadModifierTessellationDeflection(request.quality, request.amount, request.minDeflection);
     const baseCapped = cadModifierCappedDeflection(request.quality, baseLoose);
     const loose = request.kind === "chamfillet"
@@ -1055,6 +1061,8 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
   const message = kernelRefused
     ? request.kind === "deleteFace"
       ? DELETE_FACES_UNCHANGED_MESSAGE
+      : request.kind === "draft"
+        ? DRAFT_FACES_REFUSED
       : request.kind === "shell"
         ? "The walls cannot be this thick for this body. Choose a thinner wall."
         : `The selected edges cannot be ${request.kind === "fillet" ? "filleted" : "chamfered"} together at this size. Reduce the size or select fewer connected edges.`

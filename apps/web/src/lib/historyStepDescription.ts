@@ -24,6 +24,7 @@ const FEATURE_KINDS: Record<EdgeTreatmentFeature["kind"], ChangeKind> = {
   chamfillet: "edges",
   shell: "hollowed",
   deleteFace: "facesDeleted",
+  draft: "edges",
 };
 
 const POSITION_FIELDS = new Set(["x", "z", "elevation"]);

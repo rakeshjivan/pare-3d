@@ -1,3 +1,4 @@
+import { parameterValue } from "@/lib/designParameters";
 import { t, type MessageKey } from "@/lib/i18n";
 import type { MeasurementAccuracy, WorkplaneWorkspaceSettings } from "@/types/layerling";
 
@@ -116,7 +117,8 @@ export function formatFractionalInches(inches: number) {
  * anything that is not a plain sum of numbers.
  */
 export function evaluateArithmetic(text: string) {
-  const source = text.replace(/[\s\u00a0]/g, "").replace(/,/g, ".").replace(/[\u00d7xX]/g, "*").replace(/\u00f7/g, "/").replace(/[\u2212\u2013]/g, "-");
+  // "x" multiplies only between numbers ("2x3"), so a parameter's name may contain one (build 37).
+  const source = text.replace(/[\s\u00a0]/g, "").replace(/,/g, ".").replace(/\u00d7/g, "*").replace(/([\d.)])[xX](?=[\d.(])/g, "$1*").replace(/\u00f7/g, "/").replace(/[\u2212\u2013]/g, "-");
   let index = 0;
   const peek = () => source[index];
   const number = (): number => {
@@ -140,6 +142,12 @@ export function evaluateArithmetic(text: string) {
       if (peek() !== ")") return Number.NaN;
       index += 1;
       return value;
+    }
+    // A design parameter by its name (build 37).
+    const name = /^[A-Za-z_][A-Za-z0-9_]*/.exec(source.slice(index));
+    if (name) {
+      index += name[0].length;
+      return parameterValue(name[0]) ?? Number.NaN;
     }
     return number();
   };
@@ -170,7 +178,7 @@ export function evaluateArithmetic(text: string) {
 
 /** Whether a field's text is a calculation rather than one number (a leading minus does not count). */
 function looksLikeArithmetic(compact: string) {
-  return /[*\u00d7\u00f7()+xX]/.test(compact) || /.[-\u2212\u2013/]/.test(compact);
+  return /[*\u00d7\u00f7()+xX]/.test(compact) || /.[-\u2212\u2013/]/.test(compact) || /^[-+(]*[A-Za-z_]/.test(compact);
 }
 
 /** Whether typed text is a calculation worth remembering (#180): arithmetic that works out, not a plain number, fraction or percentage. */

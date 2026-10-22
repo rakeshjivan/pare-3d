@@ -2312,6 +2312,26 @@ function getShapeProperties(shape: WorkplaneShape, onUpdate: ShapeInspectorUpdat
 }
 
 /**
+ * Fork (build 37): the change a field's formula makes to a body, worked out exactly as typing it
+ * into the Properties panel would - so a design parameter changed in one place reaches every field
+ * that uses it. Null when the formula gives no number or the field is not one of the body's.
+ */
+export function fieldPatchFromFormula(shape: WorkplaneShape, fieldId: string, formula: string, workspace: WorkplaneWorkspaceSettings): Partial<WorkplaneShape> | null {
+  const typed = parseMeasurementInput(formula);
+  if (!Number.isFinite(typed)) return null;
+  const value = propertyUsesLengthUnit(fieldId) ? displayToMillimeters(typed, workspace) : typed;
+  if (fieldId === "positionX") return { x: value };
+  if (fieldId === "positionY") return { z: insideZ(value) };
+  if (fieldId === "positionZ") return { elevation: value };
+  let patch: Partial<WorkplaneShape> | null = null;
+  const property = getShapeProperties(shape, (next) => { patch = next; }, workspace).find((entry) => entry.id === fieldId && entry.type !== "text" && entry.type !== "select" && entry.type !== "toggle");
+  if (!property || !("onChange" in property)) return null;
+  const range = property as { min?: number; max?: number; onChange: (value: number) => void };
+  range.onChange(Math.max(range.min ?? -Infinity, value));
+  return patch;
+}
+
+/**
  * The snap step in mm (0 when the grid is off). A length slider dragged with the mouse snaps to it, so a
  * height comes out in whole millimetres instead of 0.81 steps of one pixel; typing and the arrow keys stay exact.
  */
