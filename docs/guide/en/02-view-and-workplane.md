@@ -19,9 +19,9 @@ How fast the wheel zooms is set with {{ui:workspace.zoomSpeed}} in the settings,
 
 On a tablet or phone, two fingers zoom (spread and pinch) and move the view (slide together). One finger on empty space turns the view, and a tap there clears the selection; on a shape or a handle it works on the design, just like the left mouse button. To turn the view with a finger that starts on a shape too, switch on {{ui:camera.touchRotate}} in the camera bar. That switch shows on devices with a touch screen.
 
-A graphics tablet with a pen behaves like a mouse: the tip is the left button, the barrel button on the pen the right one, for turning the view and for the menu. The tablet's hotkeys can be set in its driver to layerling's [keyboard shortcuts](chapter:shortcuts).
+A graphics tablet with a pen behaves like a mouse: the tip is the left button, the barrel button on the pen the right one, for turning the view and for the menu. The tablet's hotkeys can be set in its driver to Pare 3D's [keyboard shortcuts](chapter:shortcuts).
 
-**On a tablet, work with a stylus if you can.** Its tip is far finer than a fingertip and does not cover what you aim at, so small points, thin lines and handles in a sketch, measuring points and edges are hit exactly, and longer work is less tiring. layerling already lets a finger reach a little further to points, lines, handles and edges than a mouse pointer does, but a stylus remains the more precise way. This holds for a pen that the tablet knows as a pen (an S Pen, an Apple Pencil and the like). A plain stylus with a rubber tip counts as a finger for the screen and is not finer than one.
+**On a tablet, work with a stylus if you can.** Its tip is far finer than a fingertip and does not cover what you aim at, so small points, thin lines and handles in a sketch, measuring points and edges are hit exactly, and longer work is less tiring. Pare 3D already lets a finger reach a little further to points, lines, handles and edges than a mouse pointer does, but a stylus remains the more precise way. This holds for a pen that the tablet knows as a pen (an S Pen, an Apple Pencil and the like). A plain stylus with a rubber tip counts as a finger for the screen and is not finer than one.
 
 There is no right mouse button on a tablet: hold a finger still on a shape or on empty space for half a second, and the menu opens that a right click opens, with **Select all** on empty space. **Select multiple** in the same menu stands in for Shift on a tablet: each tap on a body then adds it to the selection or takes it out again, until you tap empty space or press [[Esc]]; a finger on empty space still turns the view. The handles around a selected shape can be caught by a finger from a little beside them.
 
@@ -87,7 +87,7 @@ The grid shows the size of the plate. At the bottom right is the **snap step**: 
 
 ### The settings window
 
-The cogwheel in the ribbon ({{ui:editor.workspaceSettings}}) opens the settings. On the left are five areas: {{ui:workspace.appearance}}, {{ui:workspace.measurement}}, {{ui:workspace.workplane}}, {{ui:workspace.shapeDefaults}} and {{ui:workspace.history}}. A change counts at once. {{ui:workspace.makeDefault}} at the bottom saves the current settings as the default, so that a new design starts with them, and {{ui:workspace.close}} at the top right closes the window. This part goes through the settings one by one.
+The cogwheel in the ribbon ({{ui:editor.workspaceSettings}}) opens the settings. On the left are the areas: {{ui:workspace.appearance}}, {{ui:workspace.measurement}}, {{ui:workspace.workplane}}, {{ui:workspace.shapeDefaults}}, {{ui:workspace.history}} and {{ui:files.section}} (where exports and backups go, see [Files and saving](chapter:files-and-saving)). Looking for one setting? Type part of its name into the search box at the top - {{ui:settings.searchPlaceholder}} - and only the matching settings stay. A change counts at once. {{ui:workspace.makeDefault}} at the bottom saves the current settings as the default, so that a new design starts with them, and {{ui:workspace.close}} at the top right closes the window. This part goes through the settings one by one.
 
 ### Appearance: theme, toolbar and view cube
 
@@ -99,15 +99,15 @@ The cogwheel in the ribbon ({{ui:editor.workspaceSettings}}) opens the settings.
 
 ### Appearance: fast mode
 
-{{ui:workspace.fastMode}} is for slower computers. It turns off shadows, edge lines on all bodies and the camera's inertia, and draws the view at screen resolution only. Your own settings are kept for later, and the switches it overrides say {{ui:workspace.offInFastMode}} while it is on. More about what helps on a slow computer is under "When layerling feels slow" below.
+{{ui:workspace.fastMode}} is for slower computers. It turns off shadows, edge lines on all bodies and the camera's inertia, and draws the view at screen resolution only. Your own settings are kept for later, and the switches it overrides say {{ui:workspace.offInFastMode}} while it is on. If the view stutters when you first open a design, Pare 3D notices and offers {{ui:fastModeHint.turnOn}}; {{ui:fastModeHint.noThanks}} keeps everything as it is. More about what helps on a slow computer is under "When Pare 3D feels slow" below.
 
 ### Appearance: colours of the work area and the sketch
 
-The colours of the work area are set under {{ui:workspace.appearance}}: {{ui:workspace.backgroundColor}} and {{ui:workspace.surfaceColor}} for the light theme (the dark themes keep their own), next to the grid colour under {{ui:workspace.workplane}}. Each colour is a button that shows the colour. A click opens a small window with the colour field, a row of ready colours, a field for the hex value and an arrow that puts the colour back to what layerling started with. [[Enter]] takes a typed hex value, and so does a click outside the window.
+The colours of the work area are set under {{ui:workspace.appearance}}: {{ui:workspace.backgroundColor}} and {{ui:workspace.surfaceColor}} for the light theme (the dark themes keep their own), next to the grid colour under {{ui:workspace.workplane}}. Each colour is a button that shows the colour. A click opens a small window with the colour field, a row of ready colours, a field for the hex value and an arrow that puts the colour back to what Pare 3D started with. [[Enter]] takes a typed hex value, and so does a click outside the window.
 
 The sketch view has its own colours: {{ui:workspace.sketchBackground}} for the window round the sheet, {{ui:workspace.sketchPlateColor}} for the sheet under the grid, and {{ui:workspace.sketchGridColor}}, all for the light theme. {{ui:workspace.sketchMatch}} takes over the work area's three colours in one click.
 
-{{ui:workspace.classicLook}} sets the work area up as Tinkercad shows it: white ground, a pale blue millimetre grid with a darker line every centimetre, black edge lines, light from above with soft shadows. Every value can still be changed on its own afterwards. All of them start as layerling always looked, and what suits you depends on your monitor.
+{{ui:workspace.classicLook}} sets the work area up as Tinkercad shows it: white ground, a pale blue millimetre grid with a darker line every centimetre, black edge lines, light from above with soft shadows. Every value can still be changed on its own afterwards. All of them start as Pare 3D always looked, and what suits you depends on your monitor.
 
 ![The settings under Appearance: background and workplane colours for the light theme, and the switch for edge lines on all bodies.](shot:settings-appearance)
 
@@ -153,7 +153,7 @@ The sketch view has its own colours: {{ui:workspace.sketchBackground}} for the w
 
 Under {{ui:workspace.measurement}} you set the {{ui:workspace.units}}, the unit that measures are shown in ({{ui:workspace.scale}}: millimetres, centimetres or metres in metric, inches or feet in imperial), how many decimal places a number shows ({{ui:workspace.accuracy}}), the {{ui:workspace.snapGrid}} that moving and resizing snap to and your own snap steps under {{ui:workspace.customSnapGrids}}.
 
-Under {{ui:workspace.measurement}} in the settings you set the {{ui:workspace.units}}. With {{ui:units.imperial}}, layerling shows every measure in inches, on the shape, in the properties panel, on the tape measure and the ruler. The snap grid then offers steps from 1/64 to 1 inch, and the grid on the plate is drawn in inches (1/8 to 1 inch, 1/4 inch by default) with a stronger line on every whole inch. Under {{ui:workspace.inchFormat}} you choose whether inches appear as fractions like in Tinkercad (1 5/8, rounded to 1/64 inch) or as decimals (1.625) with as many decimal places as set under {{ui:workspace.accuracy}}. You can type either, "1 5/8" included. A quick way between millimetres and inches is the small switch **mm | in** beside the {{ui:inspector.snapGrid}} at the bottom of the properties window: it changes the unit, the plate's grid and the snap step as the settings do, for this design.
+Under {{ui:workspace.measurement}} in the settings you set the {{ui:workspace.units}}. With {{ui:units.imperial}}, Pare 3D shows every measure in inches, on the shape, in the properties panel, on the tape measure and the ruler. The snap grid then offers steps from 1/64 to 1 inch, and the grid on the plate is drawn in inches (1/8 to 1 inch, 1/4 inch by default) with a stronger line on every whole inch. Under {{ui:workspace.inchFormat}} you choose whether inches appear as fractions like in Tinkercad (1 5/8, rounded to 1/64 inch) or as decimals (1.625) with as many decimal places as set under {{ui:workspace.accuracy}}. You can type either, "1 5/8" included. A quick way between millimetres and inches is the small switch **mm | in** beside the {{ui:inspector.snapGrid}} at the bottom of the properties window: it changes the unit, the plate's grid and the snap step as the settings do, for this design.
 
 Under {{ui:workspace.customSnapGrids}} in the same place you add snap steps of your own: a name and a size in millimetres, for example "Pin pitch 2.54 mm" for the spacing of DIP chips, pin headers and perfboard holes, or "MX Key Unit" with 19.05 mm for the spacing of keyboard keys. The snap step menu then offers that measure whole, halved and quartered (1 ×, ½ × and ¼ ×), so shapes can be moved by one pitch, half a pitch or a quarter pitch. If you want just the measure itself, untick {{ui:workspace.customSnapGridParts}} beside it; the menu then has only that one step. Custom steps are kept with the design and go along with {{ui:workspace.makeDefault}}.
 
@@ -179,13 +179,13 @@ Under {{ui:workspace.shapeDefaults}} you choose a shape with {{ui:workspace.shap
 
 Under {{ui:workspace.history}} the slider {{ui:workspace.savedHistory}} sets how many completed actions stay available for Undo after you save or reopen a design. The default is 100 actions in a design. A lower limit permanently discards the older undo steps of the design.
 
-## When layerling feels slow
+## When Pare 3D feels slow
 
-layerling calculates and draws everything in your browser. On an older computer, with a weak graphics card or on several large screens the view can therefore feel sluggish. This helps:
+Pare 3D calculates and draws everything in your browser. On an older computer, with a weak graphics card or on several large screens the view can therefore feel sluggish. This helps:
 
 - **{{ui:workspace.fastMode}}** under {{ui:workspace.appearance}} turns off at once everything that costs the view a lot: shadows, edge lines on all bodies and the camera's inertia. It also draws the view at the screen's own resolution only, which on high-resolution screens is up to four times fewer pixels. Your own settings are kept and apply again as soon as you turn it off.
 - **The camera keeps turning:** When you let go of the mouse after turning, the view turns on for a moment and slows down gently. That is on purpose, not stutter. If you are used to Tinkercad or Fusion 360, turn off {{ui:workspace.cameraInertia}} under {{ui:workspace.appearance}}, and the view stops at once.
 - **Single switches:** Without fast mode you can also turn off just {{ui:workspace.showShadows}} or {{ui:workspace.edgeLines}}.
 - **Use the graphics card:** In Chrome open `chrome://gpu` (in Edge `edge://gpu`). Next to "WebGL" it should say "Hardware accelerated". If it says "Software only", hardware acceleration is off in the browser's settings. On Windows you can also pick "High performance" for the browser under Settings → System → Display → Graphics, so it uses the real graphics card and not the weaker one in the processor.
 - **Simplify large imported meshes:** A model of many hundred thousand triangles slows any view down. How to thin it out is in the chapter on files, under "Simplifying an imported mesh".
-- **Close other tabs:** Every open layerling tab and every other 3D page shares the same graphics card.
+- **Close other tabs:** Every open Pare 3D tab and every other 3D page shares the same graphics card.

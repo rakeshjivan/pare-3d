@@ -99,7 +99,7 @@ The edge tool and the STEP export take a spring as its exact body: a round wire 
 
 ## Bent tubes
 
-A {{ui:shape.bentTube}} consists of up to twelve sections: a straight piece followed by a bend. For each you set the {{ui:prop.bentTubeSegmentLength}}, the {{ui:prop.bentTubeBendAngle}}, the {{ui:prop.bentTubeBendRadius}} and the {{ui:prop.bentTubeRoll}}. The section you are editing is lit up in orange on the tube, so you can follow the order. A roll angle of 0° bends within the plane of the workplane, at 90° the tube bends upward. The profile can be round, square, hexagonal or octagonal, the inside likewise, or fully solid. If the tube runs into itself, layerling warns you.
+A {{ui:shape.bentTube}} consists of up to twelve sections: a straight piece followed by a bend. For each you set the {{ui:prop.bentTubeSegmentLength}}, the {{ui:prop.bentTubeBendAngle}}, the {{ui:prop.bentTubeBendRadius}} and the {{ui:prop.bentTubeRoll}}. The section you are editing is lit up in orange on the tube, so you can follow the order. A roll angle of 0° bends within the plane of the workplane, at 90° the tube bends upward. The profile can be round, square, hexagonal or octagonal, the inside likewise, or fully solid. If the tube runs into itself, Pare 3D warns you.
 
 ## Loft
 
@@ -115,7 +115,7 @@ The loft is an exact body, twisted and tilted too: its edges can be chamfered an
 
 ## Gridfinity
 
-The {{ui:shape.gridfinity}} shape makes parts for the open storage system by Zack Freedman: bins on a 42 mm grid that stand in a baseplate and stack on one another. The measures follow the published Gridfinity specification, so a bin from layerling fits a baseplate made with another generator, and the other way round. Under {{ui:prop.gridfinityType}} you choose:
+The {{ui:shape.gridfinity}} shape makes parts for the open storage system by Zack Freedman: bins on a 42 mm grid that stand in a baseplate and stack on one another. The measures follow the published Gridfinity specification, so a bin from Pare 3D fits a baseplate made with another generator, and the other way round. Under {{ui:prop.gridfinityType}} you choose:
 
 - **{{ui:gridfinity.bin}}:** a bin with a foot under every grid unit. {{ui:prop.gridfinityUnitsX}} and {{ui:prop.gridfinityUnitsZ}} count grid units of 42 mm (a bin is 0.5 mm smaller, 41.5 mm for one unit); {{ui:prop.gridfinityUnitsY}} counts height units of 7 mm, up to 20. The {{ui:prop.gridfinityLip}} on top of the wall holds the feet of the next bin and makes the bin 4.4 mm taller: a bin of 3 units with the lip is 25.4 mm tall. With {{ui:prop.gridfinityMagnets}} every foot gets a hole for a 6 × 2 mm magnet in each corner.
 - **{{ui:gridfinity.baseplate}}:** the plate the bins stand in, 5 mm tall, with a socket for every grid unit. It is an open frame with no floor and no magnet holes.
@@ -146,7 +146,7 @@ The {{ui:shape.hinge}} prints in one piece and moves afterwards (print-in-place)
 
 The {{ui:shape.knurl}} is a round grip with grooves all around, for knobs, thumb wheels and tool handles. Under {{ui:prop.knurlPattern}} you pick {{ui:knurl.straight}}, grooves along the axis as on a control knob, {{ui:knurl.diamond}}: two slanted rows of grooves cross into small diamonds, or {{ui:knurl.round}}: grooves and ridges along the axis as a soft wave of arcs, a pleasant grip without sharp ridges. Round grooves stay shallower than half a pitch, or the ridges would bulge at their foot; a depth too great gives way. You set the {{ui:prop.diameter}} and the {{ui:prop.height}}, the number of {{ui:prop.knurlCount}} and the {{ui:prop.knurlDepth}}; for crossed knurling also the {{ui:prop.knurlAngle}} to the axis. The {{ui:prop.knurlChamfer}} breaks both ends at 45 degrees, as on a turned knob; 0 leaves them sharp.
 
-Straight and round knurling are exact bodies, so their edges can be broken and rounded. Crossed knurling stays a mesh, because as an exact body it would take almost a minute to compute with 30 grooves. For a knob on a shaft, group the knurl with a hole, such as a {{ui:shape.thread}} set as a tapped hole. Grooves shallower than 0.4 mm hardly any printer prints cleanly, and layerling does not set them closer than 0.8 mm around the grip: a thin grip gets fewer of them.
+Straight and round knurling are exact bodies, so their edges can be broken and rounded. Crossed knurling stays a mesh, because as an exact body it would take almost a minute to compute with 30 grooves. For a knob on a shaft, group the knurl with a hole, such as a {{ui:shape.thread}} set as a tapped hole. Grooves shallower than 0.4 mm hardly any printer prints cleanly, and Pare 3D does not set them closer than 0.8 mm around the grip: a thin grip gets fewer of them.
 
 ## Dovetail
 

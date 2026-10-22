@@ -3,7 +3,7 @@ title: Solids and holes
 summary: How simple shapes become bores, slots and pockets, and how to change a group again later.
 ---
 
-This is the most important idea in layerling, and it is quickly learned: **Every shape is either a solid or a hole.** A solid stays. A hole is a tool that takes material away.
+This is the most important idea in Pare 3D, and it is quickly learned: **Every shape is either a solid or a hole.** A solid stays. A hole is a tool that takes material away.
 
 ## Solid or hole
 
@@ -50,6 +50,19 @@ Sometimes parts should only stay together without becoming one - a white logo on
 ## Intersection
 
 {{ui:editor.tool.intersect}} keeps only what two or more bodies have in common. Lay two overlapping shapes on top of each other, select both and click it. That turns a cylinder and a box into a piece with one round and one straight side. A group counts the way it looks, holes included. If a hole is selected too, what remains is what all the solids share with all the holes. If the shapes share nothing, nothing is changed and a message says so. Next to it, {{ui:editor.tool.intersectPreview}} shows the common part before you apply it: the selected shapes turn see-through and what they share is drawn in green. Select and move each shape on its own and the green part follows; {{ui:editor.tool.intersect}} applies it, [[Esc]] closes the preview.
+
+## Blend
+
+{{ui:blend.title}} joins two parts with a smooth piece between them - like a loft in Fusion. Two cylinders of different sizes become one with a flowing neck; a round pipe runs into a square duct; a handle grows out of a base.
+
+1. Place the two parts where they should be, with a gap between them. Both must be solid parts.
+2. Select both and click {{ui:blend.title}} in the {{ui:editor.group.combine}} group of the toolbar.
+3. Pare 3D finds the flat faces that face each other - the top of the lower cylinder and the bottom of the upper one, say - and shows the piece between them as a preview. To use another flat face, click it; a curved face cannot be used.
+4. Set the {{ui:blend.smoothness}}: 0 is a straight taper from one face to the other; 100 leaves both faces square and flares smoothly in between, like a hose adapter. The parts need not sit in line: the piece curves from one face to the other.
+5. If the piece looks twisted - a square running into a hexagon, say - {{ui:blend.twist}} turns one outline a step against the other until the corners line up.
+6. [[Enter]] or {{ui:blend.apply}} makes it. [[Esc]] closes the tool without it.
+
+The two parts and the piece between them become one group, so they print as one body; {{ui:editor.tool.ungroup}} takes them apart again and the piece is an ordinary part you can delete. The faces can be any flat outline - circles, squares, a sketch, a polygon. For a smooth result, round shapes should have plenty of sides (see [How round is round?](chapter:shapes)).
 
 ## Editing a group
 

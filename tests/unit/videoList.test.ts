@@ -29,7 +29,7 @@ describe("the video list in the guide", () => {
   });
 
   it("is checked in the languages that have the chapter", () => {
-    expect(languages.filter((language) => chapterVideoLinks(language) !== null).length).toBeGreaterThanOrEqual(10);
+    expect(languages.filter((language) => chapterVideoLinks(language) !== null).length).toBeGreaterThanOrEqual(1);
   });
 });
 

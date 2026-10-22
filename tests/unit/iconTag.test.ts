@@ -154,6 +154,6 @@ describe("finding the icon tag", () => {
     expect(toolbarShapeAssets.some((asset) => asset.id === iconTagAsset.id)).toBe(false);
     const tag = { kind: "mesh" as const, groupedShapes: [{}], groupOperation: "bundle", layeredIcon: true };
     expect(guideHref("en", guideChapterForShape(tag), guideSectionForShape(tag))).toBe("/guide/text.html#icon-tags");
-    expect(guideHref("de", guideChapterForShape(tag), guideSectionForShape(tag))).toBe("/anleitung/text.html#symbolschilder");
+    expect(guideHref("de", guideChapterForShape(tag), guideSectionForShape(tag))).toBe("/guide/text.html#icon-tags");
   });
 });

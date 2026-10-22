@@ -1,23 +1,24 @@
 ---
 title: Placing and adjusting shapes
-summary: The shape library, dimensions by number and by handle, colour, rotating, tapering and twisting.
+summary: The Shapes panel, Ready-made parts, making from a photo, dimensions by number and by handle, colour, rotating, tapering and twisting.
 ---
 
-Every part in layerling starts with a shape. From them you build everything else: shapes complement each other, cut each other out or are joined into a new shape.
+Every part in Pare 3D starts with a shape. From them you build everything else: shapes complement each other, cut each other out or are joined into a new shape.
 
 ## Adding a shape
 
-Click {{ui:editor.addShape}} in the ribbon. The shape library opens.
+The Shapes panel is on the right whenever a design opens, as in Tinkercad. {{ui:editor.addShape}} in the toolbar opens and closes it.
 
 ![The shape library. Every little picture is rendered from the shape's real geometry.](shot:shape-menu)
 
-The library closes after each shape you pick. Its title bar moves it, so you can put it where it does not cover the spot you are aiming at, over the Properties panel for example; a double-click on the title bar puts it back under its button, and where you left it is kept in the browser. The pin in the title bar keeps the library open while you put several shapes one after the other. Its edges and corners pull its size, as wide and as high as your screen allows; the size is kept in the browser too, and a double-click on an edge sets it back. Pulled narrow, the library leaves out the names and shows only the pictures; the name appears when you point at a shape.
+Pinned (the pin at its top right, on at first), the panel stays open while you place one shape after another; unpinned, it closes after each shape you pick and opens under its button. Its title bar moves it, so you can put it where it does not cover the spot you are aiming at, over the Properties panel for example; a double-click on the title bar puts it back under its button, and where you left it is kept in the browser. The pin in the title bar keeps the library open while you put several shapes one after the other. Its edges and corners pull its size, as wide and as high as your screen allows; the size is kept in the browser too, and a double-click on an edge sets it back. Pulled narrow, the library leaves out the names and shows only the pictures; the name appears when you point at a shape.
 
 Pick a shape. It now hangs on the mouse pointer and lands where you click. Move it over a body and it lies down on the face under the pointer, sloped ones too, like Cruise in Tinkercad; over the empty plate it lands on the workplane. [[Esc]] cancels placing. A tool that waits for a click, such as the tape measure, the framing square, a note, {{ui:camera.placeWorkplane}}, {{ui:editor.tool.layFlat}} or the edge tools, is switched off when you pick a shape, so the click places the shape. The other way round, switching one of those tools on puts the shape down again. If you would rather have the shape appear in the middle of the plate, you can switch off placing by click in the settings (area {{ui:workspace.appearance}}, switch {{ui:workspace.cruise}}).
 
 What the library offers:
 
 - **Basic shapes:** {{ui:shape.box}}, {{ui:shape.roundedBox}}, {{ui:shape.cylinder}}, {{ui:shape.slot}}, {{ui:shape.ellipse}}, {{ui:shape.polygon}} (three to twenty-four sides), {{ui:shape.sphere}}, {{ui:shape.cone}}, {{ui:shape.pyramid}} (with three to twenty-four sides, so three-sided too), {{ui:shape.wedge}}, {{ui:shape.roundRoof}}, {{ui:shape.halfSphere}} and {{ui:shape.torus}}.
+- **Pare 3D's extra shapes,** each next to the shape it is a variant of: {{ui:moreShapes.roundedCylinder}} and {{ui:moreShapes.chamferedCylinder}} after the cylinder (knobs, caps, feet), {{ui:moreShapes.geodesicBall}} after the sphere, {{ui:moreShapes.gusset}} after the wedge (a brace to stiffen a corner), {{ui:moreShapes.pieSlice}} and {{ui:moreShapes.ringSegment}} after the tube (dials, fans, curved brackets), {{ui:moreShapes.spiralRamp}} after the spring (cable guides, marble runs) and {{ui:moreShapes.arrow}} after the heart. They are bodies of their own: resizing stretches them, as with an imported part.
 - **Tubes:** {{ui:shape.tube}} and {{ui:shape.bentTube}}, made of up to twelve straight pieces with bends in between, and the {{ui:shape.loft}} from one outline to another, say from square to round.
 - **Decorative shapes:** {{ui:shape.star}}, {{ui:shape.heart}} and {{ui:shape.crescent}}.
 - **Lettering:** {{ui:shape.text}}, also along a circular arc. More in [Text](chapter:text).
@@ -30,7 +31,7 @@ The {{ui:shape.slot}} can be narrower at one end than at the other, say for a gu
 
 ## The shape's settings
 
-As soon as a shape is selected, its settings appear on the right. At the top is the name; the pencil beside it ({{ui:outliner.rename}}) lets you type a new one. [[Enter]] keeps it, [[Esc]] cancels, and an empty name brings back the shape's default name. Further right, the padlock locks the shape against accidental moving and the eye hides it. The arrow on the far left folds the settings down to their title bar. The cards below fold open and shut with a click on their title ({{ui:inspector.properties}}, {{ui:inspector.position}}, {{ui:inspector.rotation}}, {{ui:inspector.taper}}, {{ui:inspector.twist}} and the cards of the special shapes); layerling remembers which ones you left open, for the next shape and the next visit.
+As soon as a shape is selected, its settings appear on the right. At the top is the name; the pencil beside it ({{ui:outliner.rename}}) lets you type a new one. [[Enter]] keeps it, [[Esc]] cancels, and an empty name brings back the shape's default name. Further right, the padlock locks the shape against accidental moving and the eye hides it. The arrow on the far left folds the settings down to their title bar. The cards below fold open and shut with a click on their title ({{ui:inspector.properties}}, {{ui:inspector.position}}, {{ui:inspector.rotation}}, {{ui:inspector.taper}}, {{ui:inspector.twist}} and the cards of the special shapes). They all start folded, so a shape's settings never greet you as a wall of fields: open the one you need. A card you open stays open for the next shape while you work; the next time you open Pare 3D they start folded again.
 
 The settings sit docked at the right edge. If they cover something you want to see, drag them by their title bar and they float wherever you drop them; they stay there for the next shape too. Drop them back at the top right, or double-click the title bar, and they dock again. While they float or are folded down, the snap step moves from the bottom of the settings to the bottom right of the workplane.
 
@@ -68,7 +69,7 @@ The colours of the work area in the settings have a simpler picker of their own,
 
 ## How round is round? The side count
 
-Round shapes such as cylinder, cone, tube, ellipse or the bores have the switch {{ui:prop.sidesFollowSize}} and the slider {{ui:prop.sides}} in their properties. The {{ui:shape.torus}} has two sliders: {{ui:prop.torusSides}} around the ring and {{ui:prop.torusSteps}} around the tube. They follow the size there too until you hold them, so a large torus shows no facets. The reason: for the view and for STL, 3MF and OBJ, layerling draws a circle as a polygon of many small sides. The more sides, the smoother it is, and the more triangles it takes.
+Round shapes such as cylinder, cone, tube, ellipse or the bores have the switch {{ui:prop.sidesFollowSize}} and the slider {{ui:prop.sides}} in their properties. The {{ui:shape.torus}} has two sliders: {{ui:prop.torusSides}} around the ring and {{ui:prop.torusSteps}} around the tube. They follow the size there too until you hold them, so a large torus shows no facets. The reason: for the view and for STL, 3MF and OBJ, Pare 3D draws a circle as a polygon of many small sides. The more sides, the smoother it is, and the more triangles it takes.
 
 **Where the side count matters**
 
@@ -84,13 +85,13 @@ Round shapes such as cylinder, cone, tube, ellipse or the bores have the switch 
 
 **Where it matters again**
 
-- **For chamfers and fillets on a shape with few sides.** If you set the side count below the default, the edge tool takes the shape as it is drawn: a cylinder with 6 sides stays a hexagonal bar, and the fillet runs round its six edges. That is how you can build, for instance, a nut pocket with rounded corners. For a round shape, leave {{ui:prop.sidesFollowSize}} on.
+- **For chamfers and fillets on a shape with few sides.** If you set the side count below the default, the edge tool takes the shape as it is drawn: a cylinder with 6 sides stays a hexagonal bar, and the fillet runs round its six edges. That is how you can build, for instance, a nut pocket with rounded corners. For a truly round fillet, keep the count at or above the default.
 
 **How to use it**
 
-- **Leave {{ui:prop.sidesFollowSize}} on.** Then layerling picks the side count from the diameter so that the polygon strays at most {{value:ROUND_DEVIATION_TOLERANCE}} mm from the true circle, far below what a printer resolves. Small shapes get at least {{value:MIN_AUTOMATIC_SIDES}} sides, large ones more.
-- **Fewer sides** you take when you want a polygon on purpose (but there is the {{ui:shape.polygon}} for that) or when the editor gets slow with very many round shapes.
-- **More sides** you hardly ever need. Only on very large round parts, when you see edges in the STL.
+- **A new round shape starts with its side count set** - {{ui:prop.sidesFollowSize}} is off - at the count its size calls for, so that the polygon strays at most {{value:ROUND_DEVIATION_TOLERANCE}} mm from the true circle; small shapes get at least {{value:MIN_AUTOMATIC_SIDES}} sides. The {{ui:prop.sides}} slider works straight away: drag it up for a smoother curve, down for a deliberate polygon.
+- **The count stays when you resize.** A small cylinder you later make much bigger keeps its sides and may show facets; raise {{ui:prop.sides}}, or switch {{ui:prop.sidesFollowSize}} on and the count follows the size from then on.
+- **More sides** you need only on large round parts, when you see edges in the STL.
 - **For parts you only treat with edges or hand on as STEP,** the side count does not matter.
 
 ## Working with the handles
@@ -113,7 +114,7 @@ The snap step is at the bottom right of the editor and can be changed at any tim
 
 ## Copying and duplicating
 
-{{ui:editor.tool.copy}}, {{ui:editor.tool.paste}} and {{ui:editor.tool.duplicate}} are in the ribbon ({{ui:editor.group.clipboard}}). [[Ctrl]]+[[D]] duplicates a selection. layerling remembers how you last moved or rotated the copy and applies the same again on the next duplicate. That produces a row of holes or steps in a few key presses. For regular arrangements there is also the pattern, described in [Selecting and arranging](chapter:select-and-arrange).
+{{ui:editor.tool.copy}}, {{ui:editor.tool.paste}} and {{ui:editor.tool.duplicate}} are in the ribbon ({{ui:editor.group.clipboard}}). [[Ctrl]]+[[D]] duplicates a selection. Pare 3D remembers how you last moved or rotated the copy and applies the same again on the next duplicate. That produces a row of holes or steps in a few key presses. For regular arrangements there is also the pattern, described in [Selecting and arranging](chapter:select-and-arrange).
 
 > **Tip:** If a shape refuses to take the size you want, it is often the limits for new shapes. Under {{ui:workspace.shapeDefaults}} in the settings you decide how each shape starts and how large it may get.
 
@@ -153,5 +154,27 @@ For an engraving, switch on {{ui:inspector.wrapInward}}: the thickness then goes
 
 A shape that is wrapped already is a mesh of the wrapped thing and cannot be wrapped again: undo the wrapping, or wrap the flat original once more with another diameter.
 
-The result is a mesh like an imported model. Undo lays the shape flat again; for another diameter, undo first and wrap again. It cannot go further than once around the cylinder; then layerling names the smallest diameter that fits.
+The result is a mesh like an imported model. Undo lays the shape flat again; for another diameter, undo first and wrap again. It cannot go further than once around the cylinder; then Pare 3D names the smallest diameter that fits.
 
+
+## Ready-made parts
+
+**Ready-made parts** in the Make group of the toolbar opens a window of its own beside the Shapes panel - the same button closes it again. It holds parts designed for 3D printing that you would otherwise build by hand. Some go in with {{ui:readyParts.add}}; the bigger ones have {{ui:readyParts.setUp}}, which opens their settings in the window first. Then click on the plate (or on a face) to put the part there.
+
+- **{{ui:readyParts.paraboloid}}:** a smooth dome with a flat base - a lamp shade, a dish, a nose cone.
+- **{{ui:readyParts.insert}}:** a hole sized for a brass heat-set insert, M2 to M5. Set it on a part and group them; then press the insert in with a soldering iron.
+- **{{ui:readyParts.nutTrap}}:** a hex pocket for a nut with the hole for its bolt, M2 to M5.
+- **{{ui:readyParts.box}}:** a box with compartments ({{ui:readyParts.columns}} and {{ui:readyParts.rows}}), rounded corners and, if you like, a lid that fits ({{ui:readyParts.lidFit}} sets how much room it gets). You give the inside size. {{ui:readyParts.stackable}} gives it a foot that fits into the box below.
+- **{{ui:readyParts.faceText}}:** lettering, raised or cut in. Type it, choose the letter height, click {{ui:readyParts.placeText}} and then the face to put it on - any face, sloped ones too. Then select the text and the part and group them.
+- **{{ui:readyParts.snapFit}}:** a hook and the slot it clicks into, to join two parts. It works out how far the arm can bend in PLA and says if the catch is too deep for it.
+- **{{ui:readyParts.livingHinge}}:** two leaves joined by a thin web that bends. Print it flat; PETG or PP bends thousands of times, PLA only a few.
+- **{{ui:fitTest.title}}:** see [Print fit and the fit test](chapter:printing).
+- **{{ui:enclosure.title}}:** a box for a circuit board. Give the board's size and thickness, the tallest part on it and the room under it; the enclosure gets standoffs at the board's holes (for heat-set inserts or self-tapping screws), cut-outs for the ports you list (USB-C, micro USB, USB-A, a DC jack, HDMI - on any side, at the height you set) and a lid with vents if you like.
+
+## Making from a photo or a pattern
+
+The Make group also has three tools that build a body from something else:
+
+- **{{ui:lithophane.title}}:** a photo that shows when light shines through it. Choose a photo; the preview shows it lit from behind. Make it flat, curved or as a lamp shade, set its width, the thinnest and thickest parts, brightness, contrast and detail, and add a stand if you like. Print it standing up, in white PLA, at 100 % infill and a fine layer height.
+- **{{ui:voronoi.title}}:** an organic web of openings. {{ui:voronoi.panel}} makes a plate with the openings and a solid border; {{ui:voronoi.pattern}} makes just the openings, as a hole to set down on a part and group with it. Set the number of cells, the web width, the rounding and how even it is; {{ui:voronoi.shuffle}} deals a new pattern. A web thinner than 0.8 mm may not print.
+- **{{ui:trace.title}}:** turns a photo of a tool, template or logo into an outline at its real size. Lay the thing on plain white paper and photograph it straight from above, in good light without hard shadows. Pare 3D finds the dark shape and follows its edge; check that the pink line in the preview hugs it (tick the box if the thing is light on a dark background). Give the length of its longest side. {{ui:trace.cutout}} makes a hole the shape of the thing, with a little {{ui:trace.clearance}} - set it into a tray or a Gridfinity bin and group them, and the tool has a place of its own. {{ui:trace.solid}} makes a body of the outline: a badge, a stamp or the start of a cookie cutter.

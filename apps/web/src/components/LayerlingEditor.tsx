@@ -218,7 +218,6 @@ import { applySketchCorners } from "@/lib/sketchFilletChamfer";
 import { revolveAxisShift } from "@/lib/revolveAxis";
 import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketchRevolveSettings, type SketchRevolveMesh } from "@/lib/sketchRevolve";
 import { AppFooter } from "@/components/AppFooter";
-import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { SimpleModeSwitch } from "@/components/SimpleModeSwitch";
 import { TinkercadGuideButton } from "@/components/TinkercadGuide";
@@ -15468,7 +15467,6 @@ function SecondaryToolbar({
           <SimpleModeSwitch />
           <InstantTips />
           <ThemeSwitch />
-          <LanguageSwitch />
         </div>
       </div>
     </div>

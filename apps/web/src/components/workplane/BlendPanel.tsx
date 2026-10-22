@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, RotateCcw, RotateCw, X } from "lucide-react";
+import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { t } from "@/lib/i18n";
@@ -43,6 +44,7 @@ export function BlendPanel({
           <span>{t("blend.subtitle")}</span>
         </div>
         <div className="panel-header-actions">
+          <GuideHelpLink section="blend" />
           <button type="button" aria-label={t("blend.cancel")} onClick={onCancel}><X size={20} /></button>
         </div>
       </div>

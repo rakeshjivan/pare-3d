@@ -32,8 +32,11 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function session(language, port) {
   const profile = mkdtempSync(join(tmpdir(), "edge-guide-"));
   const edge = spawn(EDGE, [
-    "--headless=new", "--disable-gpu", "--disable-extensions", "--no-first-run", `--lang=${language === "de" ? "de-DE" : "en-US"}`,
-    `--window-size=${WIDTH},${HEIGHT}`, `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "about:blank",
+    "--headless=new", ...(process.platform === "linux" ? [] : ["--disable-gpu"]), "--disable-extensions", "--no-first-run", `--lang=${language === "de" ? "de-DE" : "en-US"}`,
+    `--window-size=${WIDTH},${HEIGHT}`, `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`,
+    // Fork: on Linux (CI, containers) Chromium runs as root without a GPU.
+    ...(process.platform === "linux" ? ["--no-sandbox", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] : []),
+    "about:blank",
   ], { stdio: "ignore" });
   for (let i = 0; i < 60; i += 1) {
     try { if ((await fetch(`http://127.0.0.1:${port}/json/version`)).ok) break; } catch { /* still starting */ }

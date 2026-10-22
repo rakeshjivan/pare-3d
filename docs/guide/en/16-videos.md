@@ -5,7 +5,7 @@ summary: Videos that other people have made about layerling.
 
 ## Made by others
 
-These videos are not from this project. The links open YouTube in a new tab; nothing is loaded from there until you click.
+These videos are about layerling, the free program Pare 3D is based on, so most of what they show works the same in Pare 3D. They are not from this project. The links open YouTube in a new tab; nothing is loaded from there until you click.
 
 - [I'm 100% In on Layerling - The Next Big Free CAD](https://youtu.be/IO7S-7bxS5o) – Printology (English). A first test by a Tinkercad user: what layerling does better than Tinkercad, what still needs work, and whether to switch now.
 - [10 Things Layerling Can Do That Tinkercad Can't!](https://youtu.be/cx0OVHgUsJM) – Print N Repeat (English). A second video by this channel: ten things layerling can do that Tinkercad cannot.

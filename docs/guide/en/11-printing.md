@@ -1,6 +1,6 @@
 ---
 title: Preparing for 3D printing
-summary: Choosing your own printer, being warned when something does not fit, and laying the part the right way.
+summary: Choosing your printer, checking the design before you print, splitting parts that are too big, holes that fit, and sending the design to Bambu Studio.
 ---
 
 ## Choosing your printer
@@ -13,7 +13,7 @@ Three things happen:
 
 - The workplane takes the size of the print bed.
 - In the corner of the workplane appear the printer's name and its build volume. If the writing gets in the way, switch it off with {{ui:workspace.showPlateLabels}} under {{ui:workspace.workplane}}; that also goes for the design's name at the front left.
-- layerling **warns** when something does not fit.
+- Pare 3D **warns** when something does not fit.
 
 The printer profiles come from OrcaSlicer, so they are the same ones your slicer knows. If you would rather work without a printer, choose {{ui:workspace.printerNone}}. You can also set the size of the workplane by hand.
 
@@ -23,7 +23,7 @@ A body that sticks out over the edge of the print plate is marked. A message tel
 
 ![The box is wider than the print bed of the Bambu Lab A1 mini. The message at the bottom says by how much.](shot:printer-overhang)
 
-The warning does not stop you from working on. It is a hint so you do not find out only in the slicer that the part is too big. A part that is too big can often be split: cut it in two with {{ui:editor.tool.split}} and print both halves separately.
+The warning does not stop you from working on. It is a hint so you do not find out only in the slicer that the part is too big. A part that is too big can be split: {{ui:splitToFit.button}} (in the {{ui:printCheck.title}} check, below, or from [[Ctrl]]+[[K]]) cuts it into as few pieces as fit the plate and adds dowel pins and matching holes so the pieces line up when you glue them. To choose the cut yourself, use {{ui:editor.tool.split}}.
 
 If you park parts beside the plate on purpose, click the small cross in the message. The warning is then gone for exactly these bodies. Once one of them fits again and you move it out later, or another body sticks out, the message comes back. Hidden bodies never count, so hiding the parked parts works as well.
 
@@ -44,12 +44,47 @@ A few rules of thumb for direction:
 
 In the menu next to the eye ({{ui:editor.group.visibility}}), **Show overhangs** switches the overhangs on. Every face that points down more steeply than 45° is then hatched red and white - that is where the printer would need supports. What rests on the plate stays clear. So you see while designing whether a sphere, an arch or a horizontal hole prints without supports; the [teardrop hole](chapter:threads-and-mechanics) is made for exactly that. Turn the part or lay it on another face with {{ui:editor.tool.layFlat}}, and the hatching follows at once.
 
-How steep your printer manages is set in the settings under {{ui:workspace.appearance}}: from 30° (careful) to 70° (for printers with good part cooling). A face resting on another body is still marked - layerling only looks at the face itself.
+How steep your printer manages is set in the settings under {{ui:workspace.appearance}}: from 30° (careful) to 70° (for printers with good part cooling). A face resting on another body is still marked - Pare 3D only looks at the face itself.
+
+## Holes that fit: Print fit
+
+A printed hole comes out a little smaller than drawn, so a 5 mm peg will not go into a 5 mm hole. Select a hole and open {{ui:printHelpers.title}} in its properties: the {{ui:printFit.title}} card makes the hole bigger by the right amount, shared evenly on every side, while the size you typed stays as it is.
+
+- **{{ui:printFit.exact}}:** the size as drawn.
+- **{{ui:printFit.press}}:** the part goes in firmly and stays put.
+- **{{ui:printFit.snug}}:** slides in and out, for lids and pegs.
+- **{{ui:printFit.loose}}:** turns or moves freely, for hinges and axles.
+- **{{ui:printFit.mine}}:** the clearance your own printer needs, from the fit test.
+
+Print fit works on a single straight-sided hole. For a group or a tapered hole, add about 0.2 mm to its size by hand.
+
+### Finding your printer's own fit
+
+Every printer is a little different. {{ui:fitTest.title}} in **Ready-made parts** finds yours: {{ui:fitTest.make}} puts a strip of holes, each a little bigger than the last, and a peg on the plate. Print both and try the peg in each hole. Pick the tightest one it slides into without forcing under {{ui:fitTest.which}}, and Pare 3D remembers it: from then on {{ui:printFit.mine}} gives every hole exactly that clearance.
+
+## Ready to print?
+
+Before you send a design to the printer, {{ui:printCheck.title}} looks it over for the things that spoil a print, and says which part each one is on:
+
+- a part that goes past the edge of the plate - with {{ui:splitToFit.button}} right there;
+- a part floating in the air with nothing under it;
+- a hole on its own, which cuts nothing until it is grouped with a part;
+- a wall too thin to print;
+- overhangs that will need supports ({{ui:printCheck.showOverhangs}} hatches them);
+- hidden parts, which are not exported.
+
+{{ui:printCheck.select}} selects the part in question so you can fix it. Open the check from the menu next to **Send to Bambu Studio**, or search for it with [[Ctrl]]+[[K]].
+
+## Sending to Bambu Studio
+
+**Send to Bambu Studio** in the title row exports the design and opens it in Bambu Studio in one step. The small menu beside it chooses the file type: **STL** (one merged body) or **3MF** (each part with its colour, for multicolour prints). The app keeps a copy in Documents › Pare 3D Exports. In a web browser the file is downloaded instead, and you open it in Bambu Studio yourself.
+
+Switch on {{ui:printCheck.menuItem}} in the same menu and {{ui:printCheck.title}} runs each time you send. If it finds something, you can fix it first or choose {{ui:printCheck.sendAnyway}}.
 
 ## Wall thickness, clearance and chamfers
 
 - Walls should be at least two extrusion lines wide, so 0.8 mm with a 0.4 mm nozzle. Sturdy parts need 1.2 to 2 mm.
-- Where two parts fit into each other you need clearance: usually 0.2 to 0.4 mm, depending on the printer. Make a small test pair before you print the big part.
+- Where two parts fit into each other you need clearance: usually 0.2 to 0.4 mm, depending on the printer. {{ui:printFit.title}} and the fit test above do this for holes.
 - Many people lightly chamfer the lower edge that sits on the plate. That keeps the first layer from spreading ("elephant foot").
 
 ## When you are ready

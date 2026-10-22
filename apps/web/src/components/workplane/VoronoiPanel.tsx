@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Shuffle, X } from "lucide-react";
+import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { useMemo, useState } from "react";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { t } from "@/lib/i18n";
@@ -24,6 +25,7 @@ export function VoronoiPanel({ busy, onCreate, onClose }: { busy: boolean; onCre
             <span>{t("voronoi.subtitle")}</span>
           </div>
           <div className="panel-header-actions">
+            <GuideHelpLink section="makeFromPhoto" />
             <button type="button" aria-label={t("common.cancel")} onClick={onClose}><X size={20} /></button>
           </div>
         </div>

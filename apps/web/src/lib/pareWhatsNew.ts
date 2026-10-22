@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 26,
+    items: [
+      "Pare 3D is now English only: the language menu is gone, and the app and its guide speak one language.",
+      "The user guide (in Help) is rewritten for every tool: push/pull by dragging, Blend, Pattern by dragging, fillet and hollow on faces, Space out, Ready-made parts, Lithophane, Voronoi, Photo to outline, Ready to print?, Print fit and the fit test, Send to Bambu Studio, and where files and backups go.",
+      "The ? in the Blend, Lithophane, Voronoi and Photo to outline windows opens the part of the guide about them.",
+    ],
+  },
+  {
     build: 25,
     items: [
       "Blend (Combine group): select two parts and get a smooth piece joining their facing flat faces - two cylinders of different sizes flare into each other, square to both ends. Set the smoothness, then Enter.",

@@ -13,7 +13,7 @@ In the editor, {{ui:editor.keyboardShortcuts}} in the {{ui:editor.group.help}} a
 
 Can't find a tool? Press [[Ctrl]]+[[K]] or click the magnifying glass in the {{ui:editor.group.help}} area, then type what you are looking for: a tool ("fillet", "mirror"), a shape ("cylinder") or a command ("export", "undo"). Move with the arrow keys and press [[Enter]], or click the entry.
 
-- The search understands the English and the German word alike and ignores capital letters and umlauts: "aushoehlen" finds {{ui:editor.tool.hollow}}.
+- The search ignores capital letters: "hollow" finds {{ui:editor.tool.hollow}}.
 - Every entry shows the keys that do the same and the area of the toolbar it lives in, so you learn where it is.
 - Entries that are greyed out cannot run right now, mostly because nothing is selected. They stay in the list so the search still tells you where the tool is.
 
@@ -33,6 +33,6 @@ Cannot find where to read about a button or a field? Let the program take you th
 - If the guide says nothing about the element, the window says so and offers {{ui:interactiveHelp.search}}.
 - [[Esc]], or the question mark again, leaves the mode. On a touch screen there is no hover: a tap on an element opens the window straight away.
 
-The window moves by its title bar like the other windows. The program finds the section by the name of the element - the label on a button, the name of a field - because this guide writes every button as it is called in the program. It looks it up in the same search as the box at the top of each guide page, in the language you are using, and runs entirely in your browser.
+The window moves by its title bar like the other windows. The program finds the section by the name of the element - the label on a button, the name of a field - because this guide writes every button as it is called in the program. It looks it up in the same search as the box at the top of each guide page, and runs entirely in your browser.
 
 {{shortcuts}}

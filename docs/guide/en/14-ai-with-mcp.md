@@ -3,21 +3,21 @@ title: Building with an AI (MCP)
 summary: How an AI assistant such as Gemini, Claude or Codex creates and changes shapes, groups them and takes pictures of the view in your open editor.
 ---
 
-layerling comes with an MCP server. MCP is a standard through which an AI assistant can use tools in other programs. With it an AI client such as Gemini, Claude or Codex sees an open editor tab and works in it: it creates shapes, changes dimensions, groups, cuts, rounds edges, reads out the scene and takes pictures of the view. You describe the part, the AI builds it, you watch and can step in at any moment.
+Pare 3D's source, like layerling's it is based on, comes with an MCP server. MCP is a standard through which an AI assistant can use tools in other programs. With it an AI client such as Gemini, Claude or Codex sees an open editor tab and works in it: it creates shapes, changes dimensions, groups, cuts, rounds edges, reads out the scene and takes pictures of the view. You describe the part, the AI builds it, you watch and can step in at any moment.
 
 The bridge between AI client and editor runs **locally on your computer**. Keep in mind, though: what the AI reads, meaning the scene and the pictures of the view, goes to the provider of your AI client, like any other input there.
 
-> **Important:** The MCP bridge exists in the development server that you start yourself on your computer. On layerling.com and in installations with static hosting it is switched off. A copy you host yourself, such as the Docker image on a NAS, can switch it on with an access token; see "A copy on a NAS or server" below.
+> **Important:** The MCP bridge exists only in the development server that you start yourself from the source code. The Pare 3D app for Mac and Windows does not include it, and neither do layerling.com or other copies with static hosting. A copy you host yourself, such as the Docker image on a NAS, can switch it on with an access token; see "A copy on a NAS or server" below.
 
 ## Setting up
 
-1. Get layerling from [GitHub](https://github.com/henmedia/layerling) and start it in the project folder with `npm run dev`. Node.js must be installed. On Windows the quick-start line in the README takes care of that.
-2. Open an editor tab, for example `http://127.0.0.1:3000/?editor=1`. You can leave that to the AI: when no editor is open, the first tool that needs one starts your browser with an editor and waits until it has connected. That works for a layerling on your own computer; a copy on a NAS or server needs you to open the editor. Set `LAYERLING_MCP_OPEN_EDITOR=0` for the MCP server to switch it off.
+1. Get the source from [GitHub](https://github.com/rakeshjivan/pare-3d) (or layerling's, [henmedia/layerling](https://github.com/henmedia/layerling)) and start it in the project folder with `npm run dev`. Node.js must be installed. On Windows the quick-start line in the README takes care of that.
+2. Open an editor tab, for example `http://127.0.0.1:3000/?editor=1`. You can leave that to the AI: when no editor is open, the first tool that needs one starts your browser with an editor and waits until it has connected. That works for a Pare 3D on your own computer; a copy on a NAS or server needs you to open the editor. Set `LAYERLING_MCP_OPEN_EDITOR=0` for the MCP server to switch it off.
 3. Connect your AI client to the MCP server. The client starts it itself with `node scripts/layerling-mcp-server.mjs`.
 
 ### Claude Code
 
-Nothing to install: the project brings a `.mcp.json` that registers the server, and the skill under `.claude/skills/layerling-mcp-skill`. Open the layerling folder in Claude Code and ask, for example: "Use the layerling MCP tools to list my open editors and inspect the scene."
+Nothing to install: the project brings a `.mcp.json` that registers the server, and the skill under `.claude/skills/layerling-mcp-skill`. Open the Pare 3D folder in Claude Code and ask, for example: "Use the Pare 3D MCP tools to list my open editors and inspect the scene."
 
 ### Claude Desktop
 
@@ -41,7 +41,7 @@ Only a client with the token can list or drive the editors. The editor pages nee
 
 ## What the AI can do
 
-The AI works with the same functions as you, through the same path as your operation in the editor. New layerling functions get their MCP action right away. The tools:
+The AI works with the same functions as you, through the same path as your operation in the editor. New Pare 3D functions get their MCP action right away. The tools:
 
 | Tool | What it does |
 | --- | --- |

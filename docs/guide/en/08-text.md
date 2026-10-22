@@ -26,7 +26,7 @@ Besides the eight built-in fonts you can use any font of your own: a font file f
 
 - **{{ui:font.addFile}}** takes a TrueType file (`.ttf`), an OpenType file (`.otf`) or a WOFF file (`.woff`). You can also simply drag the file into the window.
 - **On Windows** the installed fonts live in the Fonts folder (`C:\Windows\Fonts`). The browser's file dialog hides it. Open it in Explorer instead and drag the font into the {{ui:font.title}} window. Fonts installed for you alone live in `%LOCALAPPDATA%\Microsoft\Windows\Fonts`, which the file dialog shows too. On a Mac fonts live in `/Library/Fonts` and `~/Library/Fonts`.
-- **{{ui:font.fromSystem}}** lists the fonts installed on your computer. The first time, the browser asks whether layerling may read them. The search field finds a font quickly, a click takes it.
+- **{{ui:font.fromSystem}}** lists the fonts installed on your computer. The first time, the browser asks whether Pare 3D may read them. The search field finds a font quickly, a click takes it.
 
 If a text is selected, it gets the new font at once. Otherwise the font shows up under {{ui:prop.font}} in the {{ui:font.customGroup}} group, and {{ui:font.use}} in the window puts it on the selected texts. Fonts of your own work like the built-in ones: text on a circular arc, chamfers and fillets on the edges and the STEP export all work the same. Letters a font lacks are taken from Sans.
 
@@ -38,16 +38,16 @@ Arabic, Persian, Urdu and Hebrew are written right to left: the first letter sta
 
 | Browser | Choose a font file | Font from the computer |
 | --- | --- | --- |
-| Chrome and Edge on a computer, the installed layerling app too | yes | yes, after the browser asks |
+| Chrome and Edge on a computer, the installed Pare 3D app too | yes | yes, after the browser asks |
 | Firefox | yes | no |
 | Safari on a Mac | yes | no |
 | Tablet and phone | yes, from the device's files | no |
 
-Web pages may not simply read the installed fonts. Only Chrome and Edge have a permission for it, and only on secure pages, over `https` as on layerling.com. When layerling runs over `http`, say on your own server or as a Docker install in your home network, {{ui:font.fromSystem}} is missing; drag the font over from Explorer then. In the other browsers you choose the font file from the fonts folder, with the same result. If you declined the question in Chrome or Edge, allow it again in the site settings, behind the padlock to the left of the address.
+Web pages may not simply read the installed fonts. Only Chrome and Edge have a permission for it, and only on secure pages, over `https` as on layerling.com. When Pare 3D runs over `http`, say on your own server or as a Docker install in your home network, {{ui:font.fromSystem}} is missing; drag the font over from Explorer then. In the other browsers you choose the font file from the fonts folder, with the same result. If you declined the question in Chrome or Edge, allow it again in the site settings, behind the padlock to the left of the address.
 
-layerling cannot read WOFF2 files (there is almost always a TTF or OTF version), font collections (`.ttc`, several fonts in one file) or colour emoji fonts. From very large fonts, such as Chinese ones, layerling takes the first 8000 characters. A variable font is read in its default setting, usually the regular weight.
+Pare 3D cannot read WOFF2 files (there is almost always a TTF or OTF version), font collections (`.ttc`, several fonts in one file) or colour emoji fonts. From very large fonts, such as Chinese ones, Pare 3D takes the first 8000 characters. A variable font is read in its default setting, usually the regular weight.
 
-Some fonts, script and variable fonts above all, draw a letter from strokes that overlap. layerling merges them into one clean outline when it reads the font, so the body stays printable. Such letters are then made of very short straight pieces instead of curves; it does not show.
+Some fonts, script and variable fonts above all, draw a letter from strokes that overlap. Pare 3D merges them into one clean outline when it reads the font, so the body stays printable. Such letters are then made of very short straight pieces instead of curves; it does not show.
 
 ### Where the fonts are kept
 
@@ -60,9 +60,9 @@ A design does **not store the font file**, only the outlines of the letters its 
 So:
 
 - **The design opens correctly anywhere**, also on a computer without the font. The texts look the same and can be moved, turned, scaled and filleted.
-- **New letters need the font.** If someone without the font types a letter the design did not bring along, layerling draws it from Sans. Under {{ui:prop.font}} the font is then marked {{ui:font.fromDesign}}. Adding the font file brings back every letter.
+- **New letters need the font.** If someone without the font types a letter the design did not bring along, Pare 3D draws it from Sans. Under {{ui:prop.font}} the font is then marked {{ui:font.fromDesign}}. Adding the font file brings back every letter.
 - **Exports hold geometry only.** STL, 3MF, OBJ, STEP and SVG contain bodies and outlines, no font.
-- **Older layerling versions** do not know fonts of one's own yet and draw such texts in Multilanguage.
+- **Older Pare 3D versions** do not know fonts of one's own yet and draw such texts in Multilanguage.
 
 **Licences:** Fonts are protected by copyright, and their licence says what you may do with them. The embedded letter outlines are what PDF files take along from a font, and most licences allow that. Some commercial fonts, though, forbid passing on even single letters. Before you pass on or publish a design with a font of your own, check the font's licence. Free fonts such as those from Google Fonts (mostly under the SIL Open Font License) can be passed on without worry. For a printed part or an exported STL it does not matter: they hold no font any more, only geometry.
 
@@ -88,7 +88,7 @@ With a line outside, a centred line or "Wider" the box of the text grows, while 
 
 ## Layers and name tags
 
-A name tag for a multicolour print is a text in layers: the letters on top, under them the same text a little wider in a second colour, at the bottom a plate without holes in a third. layerling makes it in one click:
+A name tag for a multicolour print is a text in layers: the letters on top, under them the same text a little wider in a second colour, at the bottom a plate without holes in a third. Pare 3D makes it in one click:
 
 - **A new name tag:** choose {{ui:shape.nameTag}} in the shape library and place it. It says "Name" in white letters on a red rim and a dark plate.
 - **From a text:** select the text and click {{ui:nameTag.makeLayers}} at the top of its settings.

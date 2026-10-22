@@ -1,29 +1,32 @@
 ---
 title: Getting started
-summary: From a blank sheet to your first part for the 3D printer, in five minutes, with no account and nothing to install.
+summary: From a blank sheet to your first part for the 3D printer, in five minutes, with no account.
 ---
 
-layerling is a design program for 3D printing that runs right in your browser. You build a part from simple shapes, cut holes into it, round the edges and send it to your slicer. There is nothing to install and nothing to sign up for. What you build stays on your computer.
+Pare 3D is a free design program for 3D printing, for Mac and Windows. You build a part from simple shapes, cut holes into it, round the edges and send it to your slicer. If you have used Tinkercad you will feel at home; if you have used Fusion you will find its push/pull, fillet, shell, pattern and loft moves. There is nothing to sign up for, and what you build stays on your computer. How to install it is in [Installing, updates and where things are saved](chapter:offline-and-install).
 
-![The start page of layerling: "Create new 3D design" at the top, your designs and the quick guide below.](shot:start-page)
+![The start page of Pare 3D: "Create new 3D design" at the top, your designs and the quick guide below.](shot:start-page)
 
 ## Creating a design
 
-Open [layerling.com](https://layerling.com/). On the start page click {{ui:dashboard.createDesign}}. The editor opens with an empty workplane, the grid on which everything takes shape.
+Open Pare 3D. The start page has three big buttons: {{ui:dashboard.createDesign}}, **Continue last design** and {{ui:dashboard.importGeometry}}. Click {{ui:dashboard.createDesign}}: the editor opens with an empty workplane - the grid on which everything takes shape - and the Shapes panel open on the right.
 
-If you already have a file to continue with, use {{ui:dashboard.importGeometry}}. That works for layerling designs (`.lyl`) as well as STL, OBJ, 3MF, STEP or SVG files.
+The first time, the start page asks **New to 3D design?**. {{ui:firstRun.beginner}} starts in Simple mode: fewer tools, each with its name under it. {{ui:firstRun.tinkercad}} opens a page that shows where everything you know from Tinkercad is. {{ui:firstRun.experienced}} shows every tool. You can switch at any time with **Simple mode** at the top right.
 
-All your designs later appear on the start page with a preview picture. They are kept in your browser's storage and saved automatically after every change, so there is no save button. **layerling takes no responsibility for designs kept in the browser.** A browser can fail, or a browser update can cause problems, so back up your designs from time to time with {{ui:dashboard.backupAll}} on the start page, or save them as files. A backup comes back with {{ui:dashboard.restoreBackup}}. How to pack designs into a file and pass them on is covered in [Files and saving](chapter:files-and-saving).
+If you already have a file to continue with, use {{ui:dashboard.importGeometry}}. That works for Pare 3D designs (`.lyl`) as well as STL, OBJ, 3MF, STEP or SVG files.
+
+All your designs appear on the start page with a preview picture. They are saved automatically after every change, so there is no save button; **Saved** next to the design's name shows it happened. Pare 3D also backs them all up by itself every few minutes while they change: the line above **Designs** says where and when (Documents › Pare 3D Backups at first). {{ui:backupStrip.backUpNow}} makes a backup on the spot, {{ui:backupStrip.restore}} brings one back. More in [Files and saving](chapter:files-and-saving).
 
 ## The editor at a glance
 
 ![The editor with two shapes on the workplane. The ribbon on top, the camera controls on the left, the settings of the selected shape on the right.](shot:editor-overview)
 
-- **On top** is the ribbon. It is sorted by task: {{ui:editor.group.clipboard}}, {{ui:editor.group.history}}, {{ui:editor.group.shapes}}, {{ui:editor.group.visibility}}, {{ui:editor.group.combine}}, {{ui:editor.group.modify}}, {{ui:editor.group.arrange}}, {{ui:editor.group.manage}} and {{ui:editor.group.help}}. Hover over an icon to see its name. Wherever you see a small question mark, for example in a shape's settings, in the shape library or in the tool panels, it leads straight to the matching chapter of this guide.
+- **On top** is the toolbar. It is sorted by task: Home, {{ui:editor.group.clipboard}}, {{ui:editor.group.history}}, {{ui:editor.group.shapes}}, {{ui:editor.group.visibility}}, {{ui:editor.group.combine}}, {{ui:editor.group.modify}}, {{ui:editor.group.arrange}} and Make. Hover over an icon and a short tip says what it does; **Help › Show tool names** puts a name under every icon. Wherever you see a small question mark, in a shape's settings or in a tool's window, it leads straight to the part of this guide that explains it.
+- **The Shapes panel** on the right holds the basic shapes; it is open whenever a design opens. **Ready-made parts** (in the Make group) opens its own window in the same place - see [Shapes](chapter:shapes). The pin at the top of a panel keeps it open while you place one shape after another.
 - **In the middle** lies the workplane. This is where you place shapes, pull them into form and see the result.
-- **On the right** appear the settings of the selected shape: colour, dimensions, position and whatever else makes up the shape. Typing numbers is more exact than dragging.
+- **The settings of the selected shape** appear beside the panel: Solid or Hole, then folded sections - {{ui:inspector.properties}}, {{ui:inspector.position}}, {{ui:inspector.rotation}} and more. They start folded so the screen stays calm; click a heading to open it. One you open stays open while you work. Typing numbers is more exact than dragging.
 - **On the left** are the camera controls with the view cube above them. They move you around the scene, more in [View and workplane](chapter:view-and-workplane).
-- **At the very top** you switch between {{ui:editor.modeGeometry}} and {{ui:editor.modeSketch}}, rename the design and choose language and colour scheme.
+- **At the very top** you switch between {{ui:editor.modeGeometry}} and {{ui:editor.modeSketch}}, rename the design, send it to Bambu Studio, open Help, switch Simple mode and choose the colour scheme.
 
 ## The buttons around the work area
 
@@ -47,7 +50,7 @@ Hover over a button to see its name. If you are not sure what a button does, cli
 
 ### Theme
 
-{{ui:common.theme}} at the very top chooses how layerling looks: as your system, light, dark or graphite.
+{{ui:common.theme}} at the very top chooses how Pare 3D looks: as your system, light, dark or graphite.
 
 ### Rename design
 
@@ -83,7 +86,7 @@ The switch **mm | in** beside {{ui:inspector.snapGrid}} changes the unit, the pl
 
 ### The footer
 
-At the foot of the window: {{ui:dashboard.sponsor}} leads to the page where you can support the project; {{ui:dashboard.userGuide}} opens this guide; {{ui:dashboard.forum}} leads to the place for questions, ideas and bug reports (the discussions on GitHub, in German the forum of drucktipps3d); {{ui:editor.bugReport}} makes a ZIP for a bug report; {{ui:dashboard.projectOnGitHub}} leads to the project on GitHub, and the version number opens the release notes. The links to the imprint and the privacy policy belong to whoever runs the copy of layerling you use.
+At the foot of the window: {{ui:dashboard.userGuide}} opens this guide, and **Based on layerling · Source** leads to the free software Pare 3D is built on and to Pare 3D's own source code.
 
 ## Your first part
 
@@ -103,12 +106,10 @@ This is how bores, slots and pockets are made. The chapter [Solids and holes](ch
 
 ## New since your last visit
 
-When you open layerling again after an update, a card on the start page lists what has been added since you were last here: every version since then, the newest first. After a long absence you scroll down inside the card. Below them, {{ui:whatsNew.earlier}} adds the versions from before your last visit too. Close it with {{ui:whatsNew.dismiss}} and it stays away until the next update. {{ui:whatsNew.footerLink}} in the footer of the start page shows the latest additions again at any time. The browser remembers the last version you saw, and nothing about you leaves it.
-
-On a copy of layerling on your own computer or server, the notice "Update available" has a button, {{ui:update.previewShow}}, that lists what the update brings before you install it. The list is fetched from GitHub only when you press the button.
+After Pare 3D has updated itself, a **What's new** card on the start page lists what the new build brought; {{ui:pareWhatsNew.gotIt}} puts it away. **Help › What's new** shows the latest builds again at any time. How updates work is in [Installing, updates and where things are saved](chapter:offline-and-install).
 
 ## From design to print
 
-When your part is done, click {{ui:editor.export}}, choose STL or 3MF and download the file. Open it in your slicer, for example Bambu Studio, PrusaSlicer, OrcaSlicer or Cura. If you choose your printer in the settings, you can see while building whether the part fits on the print bed. More in [Printing](chapter:printing).
+When your part is done, click **Bambu Studio** at the top: Pare 3D first checks the design ({{ui:printCheck.title}}) and then opens it in Bambu Studio. For another slicer - PrusaSlicer, OrcaSlicer, Cura - click {{ui:editor.export}}, choose STL or 3MF and open the file there. If you choose your printer in the settings, you see while building whether the part fits on the print bed. More in [Printing](chapter:printing).
 
-> **Tip:** If you come from Tinkercad you will find your way quickly: plate, shapes, solid and hole, group, align and mirror work almost the same. What is new is mostly chamfer and fillet, hollowing, threads and sketches.
+> **Tip:** If you come from Tinkercad you will find your way quickly: plate, shapes, solid and hole, group, align and mirror work almost the same, and most keyboard shortcuts too. **Help › Coming from Tinkercad?** shows where everything is. What is new is mostly chamfer and fillet, hollowing, push/pull, blending, threads and sketches.

@@ -5,7 +5,7 @@ summary: Working with fingers or a stylus: selecting several bodies, turning and
 
 ## Fingers and a stylus
 
-layerling runs in the browser of a tablet, and as an app from its home screen. A finger does what the left mouse button does. Three things a tablet does not have, a right mouse button, a Shift key and a wheel, have a way of their own:
+Pare 3D runs in the browser of a tablet, and as an app from its home screen. A finger does what the left mouse button does. Three things a tablet does not have, a right mouse button, a Shift key and a wheel, have a way of their own:
 
 | You want to | On a tablet |
 | --- | --- |
@@ -34,7 +34,7 @@ The view cube in the top left turns the view when you drag it, and a tap on one 
 
 ## Handles, small points and a stylus
 
-A fingertip covers what it aims at. layerling lets a finger reach a little further to handles, points, lines and edges than a mouse pointer does, but a stylus is finer. This holds for a pen the tablet knows as a pen, such as an Apple Pencil or an S Pen. A plain stylus with a rubber tip counts as a finger for the screen and is not finer than one, so work with it as with a finger. An Apple Pencil that hovers above the screen on an iPad also shows the name of a control after a moment, in a small bubble, as the mouse pointer does with a tooltip.
+A fingertip covers what it aims at. Pare 3D lets a finger reach a little further to handles, points, lines and edges than a mouse pointer does, but a stylus is finer. This holds for a pen the tablet knows as a pen, such as an Apple Pencil or an S Pen. A plain stylus with a rubber tip counts as a finger for the screen and is not finer than one, so work with it as with a finger. An Apple Pencil that hovers above the screen on an iPad also shows the name of a control after a moment, in a small bubble, as the mouse pointer does with a tooltip.
 
 If bodies slip when children or hurried hands touch them, switch on {{ui:workspace.selectBeforeMoving}} in the settings: a body then has to be selected first, and only the next drag moves it.
 

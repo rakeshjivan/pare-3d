@@ -32,11 +32,13 @@ The card {{ui:inspector.position}} in the properties panel shows where the selec
 
 ## Parking parts beside the plate
 
-You can drag a shape past the edge of the plate and leave it there, about one plate width beyond each side, to keep it for later. The arrow keys move it as far as you like. A parked part still belongs to the design and goes into the export with everything else. To leave it out, hide it or export only the selection. If you have picked a printer, layerling warns at export when something sits outside its plate.
+You can drag a shape past the edge of the plate and leave it there, about one plate width beyond each side, to keep it for later. The arrow keys move it as far as you like. A parked part still belongs to the design and goes into the export with everything else. To leave it out, hide it or export only the selection. If you have picked a printer, Pare 3D warns at export when something sits outside its plate.
 
 ## Snapping while moving
 
 When you drag a shape across the workplane, it snaps to other shapes: its left, right, front or back edge or its centre lands exactly on an edge or centre of another shape. A pink guide line shows what it is holding on to. That way two parts sit flush side by side or centred one behind the other without typing numbers. It works with the grid switched off, too.
+
+While you drag, a dashed pink line also runs to the nearest part beside the one you are moving, with the gap between them in millimetres. Let go when it shows the gap you want.
 
 Hold [[Shift]] while dragging to keep the move on one axis: the shape follows whichever direction, X or Y, you have dragged further in, and leaves the other alone. Best press [[Shift]] once you are already dragging; on a shape that is not selected yet, a click with [[Shift]] only adds it to the selection.
 
@@ -80,20 +82,32 @@ Just as simple are {{ui:editor.tool.dropToWorkplane}} ([[D]]), which drops the s
 
 [[C]] picks the selection up, like Cruise in Tinkercad: it follows the mouse pointer and lies down on the face of another body you are over, sloped ones too. A click sets it down there, [[Esc]] leaves it where it was. Its underside then rests on the face, lined up with the face's edges as a new shape would be; it keeps its own turn about its up axis. Several parts travel together and keep their spacing. Over the empty plate, [[C]] stands a tilted part upright on the workplane again. Without a keyboard, the menu of a long press has {{ui:contextMenu.carry}} for the same.
 
-## Patterns: row and circle
+## Patterns: row, grid and circle
 
-For hole grids, bolt circles and rings of teeth there is the {{ui:editor.tool.array}}. Select the shapes to be multiplied and click it in the ribbon.
+For hole grids, bolt circles, rings of teeth or a row of pegs there is the {{ui:editor.tool.array}}. Select the shapes to be multiplied and click it in the {{ui:editor.group.modify}} group of the toolbar.
 
 ![The pattern in "Circle" mode: the copies first appear as a preview.](shot:pattern-tool)
 
-- **{{ui:array.mode.row}}:** The selection is repeated at equal distances. The row steps along all three axes at once, with {{ui:array.spacingX}}, {{ui:array.spacingY}} and {{ui:array.spacingZ}}: one of them gives a straight row, two or three a diagonal row or a staircase. A negative spacing lays the row the other way.
-- **{{ui:array.mode.circle}}:** The selection is spread around a centre. How many copies there are you set under {{ui:array.count}}, and the {{ui:array.angle}} is 360° for a full circle. Choose whether the copies turn along. {{ui:array.rise}} lifts every copy a little more than the one before (a screw or an ascending spiral), and {{ui:array.radiusChange}} moves it further from the centre or closer to it (a flat spiral); together they give a conical spiral. A spiral winds once around at most: an angle above 360° counts as a full circle, and there are at most 100 copies.
+Choose the {{ui:array.mode}}:
+
+- **{{ui:array.mode.row}}:** the selection repeats in a line. Under {{ui:array.measure}} choose {{ui:array.measure.gap}} - the same gap between the pieces, edge to edge, whatever their size - or {{ui:array.measure.centre}}, where the row can step along X, Y and Z at once: one of them gives a straight row, two or three a diagonal row or a staircase. A negative spacing lays the row the other way.
+- **{{ui:array.mode.grid}}:** copies in {{ui:array.columns}} and {{ui:array.rows}}, with the gap (or centre spacing) between them - a tray of pegs, a block of holes.
+- **{{ui:array.mode.circle}}:** the selection is spread around a centre. {{ui:array.count}} sets how many there are, and the {{ui:array.angle}} is 360° for a full circle. Choose whether the copies turn with the circle or keep their orientation. {{ui:array.rise}} lifts every copy a little more than the one before (a screw or an ascending spiral), and {{ui:array.radiusChange}} moves it further from the centre or closer to it (a flat spiral); together they give a conical spiral. A spiral winds once around at most, and there are at most 100 copies.
+
+### Dragging the copies
+
+You do not have to type the numbers. The copies show at once as a preview, and you can grab one with the mouse:
+
+- In a row or a grid, drag a copy further away or closer: the spacing follows, and the readout beside the pointer shows it. Copies further along keep in step.
+- In a circle, drag a copy round: the total angle follows, so a half circle or a fan of teeth is one drag.
+- While dragging, [[+]] and [[-]] add a copy or take one away.
+- [[Enter]] or {{ui:array.apply}} makes the copies; [[Esc]] closes the tool without them.
 
 Tip: first set the pivot on a face with {{ui:editor.tool.rotationPivot}}, then the centre of the circle lies exactly there.
 
 ![The pattern in "Circle" mode with a rise and a radius change per copy: the copies climb and widen like a spiral.](shot:pattern-spiral)
 
-The copies first appear as a preview. Only {{ui:array.apply}} creates them. If the copies are holes, group them afterwards with the body they should cut into.
+Only {{ui:array.apply}} (or [[Enter]]) creates the copies. If they are holes, group them afterwards with the body they should cut into.
 
 ## Hole pattern on a face
 
@@ -103,8 +117,8 @@ For vents, speaker grilles, baskets and enclosures the {{ui:holePattern.title}} 
 2. In the window, set how the holes look and lie:
    - **{{ui:holePattern.form}}:** {{ui:holePattern.form.round}}, {{ui:holePattern.form.square}}, {{ui:holePattern.form.rectangle}}, {{ui:holePattern.form.hexagon}} or {{ui:holePattern.form.slot}}.
    - **Size:** the {{ui:holePattern.size.diameter}} of a round hole, the {{ui:holePattern.size.side}} of a square one, {{ui:holePattern.size.width}} and {{ui:holePattern.size.height}} for a rectangle and a slot. For the hexagon the size is the {{ui:holePattern.size.corners}}.
-   - **{{ui:holePattern.spacing}}:** the distance from one hole's middle to the next. If it is smaller than the holes allow, layerling raises it to the smallest possible value so a wall stays between the holes.
-   - **{{ui:holePattern.wall}}:** the same distance said another way: the wall left between two neighbouring holes, which is the wall thickness in the print. Set it and the spacing centre to centre follows, and the other way round. For hexagons, rectangles and slots layerling measures the least distance between their edges.
+   - **{{ui:holePattern.spacing}}:** the distance from one hole's middle to the next. If it is smaller than the holes allow, Pare 3D raises it to the smallest possible value so a wall stays between the holes.
+   - **{{ui:holePattern.wall}}:** the same distance said another way: the wall left between two neighbouring holes, which is the wall thickness in the print. Set it and the spacing centre to centre follows, and the other way round. For hexagons, rectangles and slots Pare 3D measures the least distance between their edges.
    - **{{ui:holePattern.arrangement}}:** {{ui:holePattern.arrangement.grid}} puts the holes in rows and columns. {{ui:holePattern.arrangement.staggered}} shifts every second row by half a spacing and moves the rows closer, so every hole has neighbours at the same distance - with hexagons that makes a honeycomb.
    - **{{ui:holePattern.margin}}:** the clear distance between the holes and the edge of the face. Only holes that lie wholly inside the face minus this margin are made; anything that would reach beyond it is left out. The margin also holds around openings in the face.
    - **{{ui:holePattern.depth}}:** {{ui:holePattern.depth.through}} (the default) cuts through the whole wall. With {{ui:holePattern.depth.custom}} you give the depth in millimetres, for recesses, say.
@@ -117,22 +131,46 @@ An AI can do the same through the MCP bridge with `layerling_perforate_face` (se
 
 ## Pushing a face out or in
 
-For a thicker wall, a raised pad on a face or a pocket cut into it, the {{ui:faceTool.title}} tool works on one flat face. It works on an imported STL too, where there is no sketch to change. Select exactly one body and click {{ui:faceTool.title}} in the {{ui:editor.group.modify}} group of the toolbar, next to the hole pattern. You can also right-click the body, or find it with [[Ctrl]]+[[K]].
+For a thicker wall, a raised pad on a face or a pocket cut into it, the {{ui:faceTool.title}} tool works on one flat face, the way Press/Pull does in Fusion. It works on an imported STL too, where there is no sketch to change. Select exactly one body and click {{ui:faceTool.title}} in the {{ui:editor.group.modify}} group of the toolbar. You can also right-click the body, or find it with [[Ctrl]]+[[K]].
 
-1. Click a flat face of the body. As with the hole pattern, the whole flat face around your click counts; a curved face does not work.
-2. In the window:
-   - **{{ui:faceTool.direction}}:** choose {{ui:faceTool.direction.out}} for material standing on the face or {{ui:faceTool.direction.in}} for a pocket cut into it. A pocket goes no deeper than the body behind the face; on a hollow body it can still reach the cavity.
-   - **{{ui:faceTool.inset}}:** how far the new outline stays inside the face's edge. Going out, 0 takes the whole face, which makes a wall thicker. Openings in the face grow by the same amount.
-   - **{{ui:faceTool.radius}}:** rounds every corner of the outline, the inner ones too, so a sharp tip ends in an arc. A notch narrower than twice the radius closes, and a part of the face narrower than twice the inset and the radius together is left out.
-   - **{{ui:faceTool.depth}}:** how far the new part stands out of the face, or how deep the pocket goes.
-3. The result shows at once as a preview and follows every value. {{ui:faceTool.repick}} chooses another face, [[Esc]] closes the tool.
-4. Only {{ui:faceTool.apply}} makes it.
+### With the mouse
 
-What the tool adds is an ordinary sketch body grouped with the body: nothing is baked in. {{ui:group.edit}} opens the group, and {{ui:inspector.editSketch}} on the new part shows the outline it follows. On the top or the bottom of a plain sketch body - one area, not grouped, mirrored, tapered, twisted or leaning, and without a stroke, key ring, fillet or chamfer - that is the body's own outline, set in when it is built, so its lines and arcs stay exact wherever the CAD kernel can set them in, for the edge tools and the STEP export. Resized later, the part keeps its inset. On any other face, and on every face of an imported mesh, the outline follows the face's triangles, and a curve is made of short straight pieces. The whole thing is one step for {{ui:editor.tool.undo}}. To change the inset or the radius later, undo and run the tool again. To round the top edge afterwards, use {{ui:editor.tool.fillet}} with {{ui:edge.topEdges}} on the group as the last step: like every edge treatment on a group, it joins the group into one body.
+1. Press on a flat face of the body and hold the button down. The whole flat face around the pointer counts, not just one triangle; a curved face does not work.
+2. Drag out of the body to add material, or into it to cut a pocket. The body changes as you move, and a label beside the pointer shows the distance: **+** going out, **−** going in. It follows the grid's snap step; hold [[Shift]] for steps of 0.1 mm.
+3. Want an exact number? Type it while you are still holding the button - say 12, or -3 for a pocket - and the label shows it with ↵. [[Backspace]] takes back a digit. A number without a sign keeps the way you were dragging.
+4. Let go. The new part stays as a preview, still open to change: grab the face again and drag on, or use the controls in the window. [[Esc]] while dragging puts the face back where it was.
+5. [[Enter]] or {{ui:faceTool.apply}} makes it.
+
+### With the window
+
+Instead of dragging, click the face once and set it in the window:
+
+- **{{ui:faceTool.direction}}:** {{ui:faceTool.direction.out}} for material standing on the face or {{ui:faceTool.direction.in}} for a pocket cut into it. A pocket goes no deeper than the body behind the face; on a hollow body it can still reach the cavity.
+- **{{ui:faceTool.inset}}:** how far the new outline stays inside the face's edge. Going out, 0 takes the whole face, which makes a wall thicker. Openings in the face grow by the same amount.
+- **{{ui:faceTool.radius}}:** rounds every corner of the outline, the inner ones too, so a sharp tip ends in an arc. A notch narrower than twice the radius closes, and a part of the face narrower than twice the inset and the radius together is left out.
+- **{{ui:faceTool.depth}}:** how far the new part stands out of the face, or how deep the pocket goes.
+
+The drag and the window work together: drag the depth roughly, then round the corners with the radius, and the preview follows each change. {{ui:faceTool.repick}} chooses another face.
+
+### What you get
+
+What the tool adds is an ordinary sketch body grouped with the body: nothing is baked in. {{ui:group.edit}} opens the group, and {{ui:inspector.editSketch}} on the new part shows the outline it follows. On the top or the bottom of a plain sketch body - one area, not grouped, mirrored, tapered, twisted or leaning, and without a stroke, key ring, fillet or chamfer - that is the body's own outline, so its lines and arcs stay exact for the edge tools and the STEP export. On any other face, and on every face of an imported mesh, the outline follows the face's triangles, and a curve is made of short straight pieces. A pocket that runs right across the face takes off exactly the depth you set. The whole thing is one step for {{ui:editor.tool.undo}}.
+
+To round the new edges afterwards, use {{ui:editor.tool.fillet}} on the group and click the top face of the new part to pick its edges (see [Chamfering and filleting edges](chapter:edges-and-hollowing)). Like every edge treatment on a group, it joins the group into one body.
 
 An AI can do the same through the MCP bridge with `layerling_push_face` (see the chapter [AI with MCP](chapter:ai-with-mcp)).
 
+## Spacing parts out
+
+{{ui:distribute.title}} in the arrange group of the toolbar lines up several parts with even gaps. Select the parts, click it and choose the axis under {{ui:distribute.along}}:
+
+- **{{ui:distribute.even}}:** the two outer parts stay put; the ones between get equal gaps. It needs at least three parts.
+- **A set {{ui:distribute.gap}}:** every part the gap you type from the next, edge to edge, starting from the first one.
+- **{{ui:distribute.arrange}}:** all the selected parts in tidy rows on the plate, centred, with the gap between them - handy before exporting a plate of parts.
+
 ## Changing several parts at once
+
+With several parts selected, a {{ui:selectionSize.title}} card shows how wide, deep and tall they are together. Type a new size there and every part scales with it, the gaps between them too, as if the selection were one part.
 
 With several parts selected, the properties panel on the right shows how many there are and offers what applies to all of them together: {{ui:inspector.solid}} or {{ui:inspector.hole}}, one colour for all (a click on {{ui:inspector.solid}} opens the colours) and the lock. With a mixed selection, one click makes them all solids or all holes. If any of the parts is locked, only the lock can be used. Sizes are changed with the handles, with {{ui:scalePercent.title}} or by typing a number into a size label. With several parts the number is the size of the whole selection: every part grows with it, the spaces between them too, as when you drag a handle. Solid and hole also work with a right-click or the [[S]] and [[H]] keys.
 
@@ -157,7 +195,7 @@ Only {{ui:scalePercent.apply}} changes the design, and one step back undoes it. 
 
 {{ui:editor.tool.history}}, next to undo and redo, opens a view of your history without changing anything. The work area shows the design as it was, and a slider at the bottom runs through every undo step: all the way to the right is the current state, each step to the left is one undo earlier, and states you have undone sit to the right of the current one. The arrow keys step through the states, [[Esc]] returns to the current state. You can turn and zoom the view meanwhile and click objects to bring them back (see below), but nothing can be moved; the design itself stays exactly as it is. If the bar covers something, drag it away by its title bar; a double-click on it brings it back.
 
-Two things you can take along from an earlier state. {{ui:historyView.createProject}} puts that state into a new design in the overview, named after this one with the time of that state in brackets - a design saved before layerling recorded times says "copy" instead - and with the history up to that point, so undo keeps working there. {{ui:historyView.export}} opens the usual export with that state as the design, so you can save it as STL, 3MF, STEP, a picture or a LYL file with the history up to that state.
+Two things you can take along from an earlier state. {{ui:historyView.createProject}} puts that state into a new design in the overview, named after this one with the time of that state in brackets - a design saved before Pare 3D recorded times says "copy" instead - and with the history up to that point, so undo keeps working there. {{ui:historyView.export}} opens the usual export with that state as the design, so you can save it as STL, 3MF, STEP, a picture or a LYL file with the history up to that state.
 
 You can also bring single objects back into the design. Click an object in the state shown - [[Shift]]+click adds more or takes one off again, a click on empty space picks nothing - and choose {{ui:historyView.bringBack}}. The view closes and a copy of each object lands in the current design exactly as it was in that state and at the spot it had there, selected, next to whatever the design holds now; nothing else changes. It is one step, so undo takes it back. Use it for a version of a part you changed since, or for one you deleted. A group comes back whole; notes and reference points on an object stay behind. Its name carries the time of that state, such as “Box (12:32)”, so it is easy to tell from the version the design has now. To bring back a part from inside a group, select the group and choose {{ui:historyView.openGroup}} or press [[E]], as in the design: its parts are laid out where editing the group would put them, ready to pick, and the bar says which group you are in. {{ui:historyView.backOut}} closes it again. This is only to look - the group, the design and the history stay as they are.
 

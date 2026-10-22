@@ -27,7 +27,7 @@ export const LANGUAGE_INFO = registry.LANGUAGE_INFO;
 export const GUIDE_LANGUAGES = Object.fromEntries(
   LANGUAGE_CODES.map((code) => {
     const info = LANGUAGE_INFO[code];
-    return [code, { dir: info.guideDir, htmlLang: info.htmlLang, quotes: info.quotes, forumUrl: info.communityUrl, ...LANGUAGE_INFO.en.guide, ...info.guide }];
+    return [code, { dir: info.guideDir, htmlLang: info.htmlLang, quotes: info.quotes, forumUrl: "https://github.com/rakeshjivan/pare-3d/issues", /* fork: Pare 3D feedback, not layerling's forum */ ...LANGUAGE_INFO.en.guide, ...info.guide }];
   }),
 );
 
@@ -683,13 +683,13 @@ function pageShell({ language, title, description, path, alternates, chapters, c
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:description" content="${escapeHtml(description)}">
     <meta property="og:image" content="${SITE}/assets/layerling/layerling-social.png">
-    <link rel="icon" href="/assets/layerling/layerling-logo.svg">
+    <link rel="icon" href="/assets/pare3d/pare3d-icon.svg">
     <script>${THEME_SCRIPT}</script>
     <style>${STYLE}</style>
   </head>
   <body${bodyClass ? ` class="${bodyClass}"` : ""}>
     <header class="bar"><div class="bar-inner">
-      <a class="brand" href="/${strings.dir}/index.html"><img src="/assets/layerling/layerling-logo.svg" alt=""><span class="brand-text"><b>layerling</b><span class="brand-note">${escapeHtml(strings.home)}</span></span></a>
+      <a class="brand" href="/${strings.dir}/index.html"><img src="/assets/pare3d/pare3d-icon.svg" alt=""><span class="brand-text"><b>Pare 3D</b><span class="brand-note">${escapeHtml(strings.home)}</span></span></a>
       ${searchForm(strings, language)}
       ${languageMenu(languageLinks, language, strings)}
       <a class="button" id="open-editor" href="/">${escapeHtml(strings.openEditor)}</a>

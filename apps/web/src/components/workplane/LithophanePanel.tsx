@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, ImagePlus, X } from "lucide-react";
+import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { useEffect, useRef, useState } from "react";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { t } from "@/lib/i18n";
@@ -114,6 +115,7 @@ export function LithophanePanel({ busy, onCreate, onClose }: { busy: boolean; on
             <span>{t("lithophane.subtitle")}</span>
           </div>
           <div className="panel-header-actions">
+            <GuideHelpLink section="makeFromPhoto" />
             <button type="button" aria-label={t("common.cancel")} onClick={onClose}><X size={20} /></button>
           </div>
         </div>

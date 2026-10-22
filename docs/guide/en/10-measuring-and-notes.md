@@ -3,7 +3,7 @@ title: Measuring and notes
 summary: Tape measure, ruler and framing square, distances to the origin, notes that stay attached to a part, and reference points that things snap to.
 ---
 
-To build a part exactly, you need to measure. layerling has several tools for that. None of them ends up in an export. Wall thickness and gaps inside a part are best measured in the [section view](chapter:view-and-workplane) with {{ui:camera.sectionMeasure}}.
+To build a part exactly, you need to measure. Pare 3D has several tools for that. None of them ends up in an export. Wall thickness and gaps inside a part are best measured in the [section view](chapter:view-and-workplane) with {{ui:camera.sectionMeasure}}.
 
 ## The tape measure
 
@@ -15,7 +15,7 @@ The tape measure sits at the lower end of the camera bar on the left edge ({{ui:
 2. **{{ui:camera.moveMeasurement}}:** Grab the points and move them, the number follows.
 3. **{{ui:camera.deleteMeasurement}}:** Afterwards click a measurement to remove it. While **{{ui:camera.addMeasurement}}** is active, holding [[Shift]] or [[Ctrl]] ([[Cmd]] on a Mac) and clicking a measurement point or line deletes it right away without switching modes.
 4. **{{ui:camera.tapeWholeEdges}}:** A click on an edge measures all of it, the length of a circle for example. With this switched off, a click puts a point on the edge instead, and the second point goes anywhere, so you can measure the diameter or any other distance. [[Alt]] turns the switch round for one click. On a circle, the point across from the first one snaps in when the pointer comes near, and the points sit on the true circle, so the diameter comes out exact.
-5. **{{ui:camera.deleteAllMeasurements}}:** Removes every measurement at once. Because this cannot be undone, layerling asks first; with no measurements there is nothing to do.
+5. **{{ui:camera.deleteAllMeasurements}}:** Removes every measurement at once. Because this cannot be undone, Pare 3D asks first; with no measurements there is nothing to do.
 6. **{{ui:camera.tapeMarkMiddle}}:** Under the number of every measurement sits a small crosshair button. It puts a [reference point](#reference-points) in the middle of the measurement: after a click on a round edge, such as the rim of a hole, in the centre of that circle - on an imported mesh too, where nothing else marks the middle of a hole - and for a diameter or any straight measurement halfway along it. A shape you drag then snaps to the point with its centre. A point that is there already is not made twice. The tape measure snaps to a reference point like to a corner, so you can measure from the centre of a circle or from the middle of a line: mark it, then click the point.
 
 [[Esc]] leaves measuring mode.

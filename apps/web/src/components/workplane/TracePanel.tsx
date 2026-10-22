@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, ImagePlus, X } from "lucide-react";
+import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { useMemo, useRef, useState } from "react";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { Field, readImage, type LithophaneImage } from "@/components/workplane/LithophanePanel";
@@ -30,6 +31,7 @@ export function TracePanel({ busy, onCreate, onClose }: { busy: boolean; onCreat
             <span>{t("trace.subtitle")}</span>
           </div>
           <div className="panel-header-actions">
+            <GuideHelpLink section="makeFromPhoto" />
             <button type="button" aria-label={t("common.cancel")} onClick={onClose}><X size={20} /></button>
           </div>
         </div>

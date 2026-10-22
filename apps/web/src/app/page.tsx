@@ -13,7 +13,6 @@ import { buildReadyPart } from "@/lib/readyPartsBuild";
 import { placeCustomShape } from "@/lib/customShapePackage";
 import { OPEN_TINKERCAD_GUIDE_EVENT, TinkercadGuide } from "@/components/TinkercadGuide";
 import { AUTO_BACKUP_INTERVAL_MS, getAutoBackupStatus, initAutoBackup, subscribeAutoBackup, writeAutoBackup } from "@/lib/autoBackup";
-import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { useAppUpdate } from "@/lib/useAppUpdate";
 import { sharedProjectSaveTarget } from "@/lib/sharedProjectTarget";
@@ -44,7 +43,7 @@ import { loadStoredCustomFonts } from "@/lib/customFontStore";
 import { fetchServerDefaults, type NewDesignsOnServerSetting } from "@/lib/serverDefaults";
 import { applyAppTheme, getAppThemePreference, hasStoredAppTheme, readStoredAppTheme, resolveAppTheme, setAppTheme, storeAppTheme, subscribeToAppTheme, type AppThemePreference, type ResolvedAppTheme } from "@/lib/appTheme";
 import { hydrateEditorHistoryState, notesForHistoryIndex, type EditorHistoryEntry } from "@/lib/editorHistory";
-import { detectLanguage, setLanguage, t, translate, type Language } from "@/lib/i18n";
+import { setLanguage, t, translate, type Language } from "@/lib/i18n";
 import { localizedError } from "@/lib/userErrors";
 import { historyTrimSteps, isProjectTooLargeError, isStorageFullError, trimHistoryWindow } from "@/lib/historyTrim";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
@@ -1100,7 +1099,8 @@ export default function Home() {
     migrateLegacyStorageKeys(window.localStorage);
     // Die erste Darstellung ist immer englisch, damit sie zum ausgelieferten
     // HTML passt; die gespeicherte oder erkannte Sprache greift direkt danach.
-    setLanguage(detectLanguage(), false);
+    // Fork (build 26): Pare 3D is English only; a language chosen in an older build is set aside.
+    setLanguage("en", false);
     // Left behind by the retired Challenges tutorials; nothing reads it now.
     window.localStorage.removeItem("layerling.activeChallengeTutorial");
     // The design name stays in the toolbar; the old switch is gone.
@@ -3229,7 +3229,6 @@ function Dashboard({
         <div className="dashboard-topbar-actions">
           <PareVersionStatus />
           <ThemeSwitch />
-          <LanguageSwitch />
         </div>
       </header>
 

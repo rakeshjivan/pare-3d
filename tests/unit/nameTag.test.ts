@@ -270,7 +270,7 @@ describe("finding the name tag (#215)", () => {
     const tag = { kind: "mesh" as const, groupedShapes: [{}], groupOperation: "bundle", layeredText: true };
     expect(guideSectionForShape(tag)).toBe("textLayers");
     expect(guideHref("en", guideChapterForShape(tag), guideSectionForShape(tag))).toBe("/guide/text.html#layers-and-name-tags");
-    expect(guideHref("de", guideChapterForShape(tag), guideSectionForShape(tag))).toBe("/anleitung/text.html#schichten-und-namensschilder");
+    expect(guideHref("de", guideChapterForShape(tag), guideSectionForShape(tag))).toBe("/guide/text.html#layers-and-name-tags");
     // A plain bundle still opens the bundle's section.
     expect(guideSectionForShape({ kind: "mesh", groupedShapes: [{}], groupOperation: "bundle" })).toBe("bundling");
   });
