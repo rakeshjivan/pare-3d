@@ -17,15 +17,21 @@ import type { WorkplaneShape } from "@/types/layerling";
 type Vec = { x: number; y: number; z: number };
 
 export type BlendSettings = {
-  /** 0 a straight taper, 100 a full S-curve square to both faces. */
+  /** 0 a straight taper, 100 a full S-curve square to both faces. With `linked` off, only the first part's end. */
   smoothness: number;
+  /** Fork (build 29): the second part's end, used when `linked` is off - Fusion's tangency weight per profile. */
+  smoothnessEnd: number;
+  /** Both ends the same (the default). */
+  linked: boolean;
   /** Turns where the two outlines are matched, in steps of 1/RING of a turn: undoes a twist. */
   twist: number;
+  /** Fork (build 29): true joins the two parts and the piece into one group (Fusion's Join); false leaves the piece a part of its own (New body). */
+  join: boolean;
   /** Fork (build 28): when both faces have an opening (two hollow parts), the piece is a sleeve open through. */
   hollow: boolean;
 };
 
-export const DEFAULT_BLEND: BlendSettings = { smoothness: 70, twist: 0, hollow: true };
+export const DEFAULT_BLEND: BlendSettings = { smoothness: 70, smoothnessEnd: 70, linked: true, twist: 0, hollow: true, join: true };
 export const BLEND_RING = 96;
 const BLEND_SECTIONS = 40;
 /** How far the piece reaches into each body, so they join without a skin. */
@@ -34,7 +40,9 @@ export const BLEND_OVERLAP = 0.2;
 export function normalizeBlend(settings: Partial<BlendSettings>): BlendSettings {
   const smoothness = Number.isFinite(settings.smoothness) ? Math.min(100, Math.max(0, settings.smoothness as number)) : DEFAULT_BLEND.smoothness;
   const twist = Number.isFinite(settings.twist) ? Math.round(settings.twist as number) : 0;
-  return { smoothness, twist: ((twist % BLEND_RING) + BLEND_RING) % BLEND_RING, hollow: settings.hollow !== false };
+  const linked = settings.linked !== false;
+  const end = Number.isFinite(settings.smoothnessEnd) ? Math.min(100, Math.max(0, settings.smoothnessEnd as number)) : smoothness;
+  return { smoothness, smoothnessEnd: linked ? smoothness : end, linked, twist: ((twist % BLEND_RING) + BLEND_RING) % BLEND_RING, hollow: settings.hollow !== false, join: settings.join !== false };
 }
 
 /** The triangles of a body in the world, nine numbers each. */
@@ -147,6 +155,20 @@ function openingLoopWorld(face: PerforableFace): THREE.Vector3[] | null {
   return loops.length >= 2 ? loopWorld(face, loops[1]) : null;
 }
 
+/**
+ * Fork (build 29): a point on the face, in its material, to find the face again later: a corner of its
+ * outline moved a little in toward the middle (the middle itself may be the opening of a ring).
+ */
+export function blendFacePoint(face: BlendFace): { x: number; y: number; z: number } {
+  const outer = outerLoopWorld(face.face);
+  const middle = centroidOf(outer);
+  const corner = outer[0];
+  const toward = middle.clone().sub(corner);
+  const step = Math.min(0.3, toward.length() * 0.02);
+  const point = toward.lengthSq() > 0 ? corner.clone().addScaledVector(toward.normalize(), step) : corner.clone();
+  return { x: point.x, y: point.y, z: point.z };
+}
+
 /** True when both faces have an opening, so the piece can be a sleeve. */
 export function blendCanBeHollow(a: BlendFace, b: BlendFace): boolean {
   return Boolean(openingLoopWorld(a.face) && openingLoopWorld(b.face));
@@ -233,12 +255,17 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings) {
   const { ringA, ringB, ca, cb } = matchedLoops(loopA, loopB, nA, settings.twist);
   const distance = ca.distanceTo(cb);
   if (distance < 0.05) return null;
-  const k = settings.smoothness / 100;
+  // How smoothly each end leaves its face; one value for both when linked. The middle of the piece
+  // takes their mean.
+  const kA = settings.smoothness / 100;
+  const kB = (settings.linked === false ? settings.smoothnessEnd : settings.smoothness) / 100;
+  const k = (kA + kB) / 2;
   // The path: a curve from face to face leaving each one straight out; at 0 a straight line.
-  const reach = k * 0.5 * distance;
+  const reachA = kA * 0.5 * distance;
+  const reachB = kB * 0.5 * distance;
   const p0 = ca;
-  const p1 = ca.clone().addScaledVector(nA, reach);
-  const p2 = cb.clone().addScaledVector(nB, reach);
+  const p1 = ca.clone().addScaledVector(nA, reachA);
+  const p2 = cb.clone().addScaledVector(nB, reachB);
   const p3 = cb;
   const curve = new THREE.CubicBezierCurve3(p0, p1, p2, p3);
   const offsetsA = ringA.map((point) => point.clone().sub(ca));
@@ -265,7 +292,9 @@ function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings) {
     tangents.push(nA.clone());
     for (let section = 0; section <= BLEND_SECTIONS; section += 1) {
       const t = section / BLEND_SECTIONS;
-      const s = (1 - k) * t + k * (t * t * (3 - 2 * t));
+      // From one outline to the other: a cubic leaving each end with slope 1 - k there - a straight
+      // taper at 0, flat (square to the face) at 100. Both ends alike, it is the smoothstep blend of before.
+      const s = (t * t * t - 2 * t * t + t) * (1 - kA) + (-2 * t * t * t + 3 * t * t) + (t * t * t - t * t) * (1 - kB);
       const at = curve.getPoint(t);
       const tangent = curve.getTangent(t).normalize();
       // As in Fusion's loft, a slice stands across the path; otherwise a path that runs sideways

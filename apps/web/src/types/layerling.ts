@@ -956,6 +956,17 @@ export type WorkplaneShape = {
   sketchRevolve?: SketchRevolveSettings;
   edgeTreatments?: EdgeTreatmentFeature[];
   edgeTreatmentHistory?: EdgeTreatmentHistoryEntry[];
+  /**
+   * Fork (build 29): a piece made by Blend, so it can be opened again and changed. On the group when
+   * the piece was joined, on the piece itself when it was kept separate. `picks` is a point on each
+   * joined face and its outward normal, in the world, as when the blend was made.
+   */
+  blendSource?: {
+    parts: [string, string];
+    piece: string;
+    settings: { smoothness: number; smoothnessEnd: number; linked: boolean; twist: number; hollow: boolean; join: boolean };
+    picks: [{ point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } }, { point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } }];
+  };
   cadDisplayEdges?: CadDisplayEdge[];
   cadDisplayEdgesVersion?: 2;
   edgeResizeMode?: "scale" | "preserve";

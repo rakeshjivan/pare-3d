@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 29,
+    items: [
+      "Blend makes an exact CAD piece: fillet, chamfer and hollow now work on blended parts (before, they stopped at \"This mesh has 16,512 triangles\"), and STEP keeps the blend exact.",
+      "Change a blend later: select it and click Blend again - its settings and faces come back; change them and click Update.",
+      "Smoothness per end: switch off \"Same at both ends\" to flare out square from one part and ease gently into the other, like the tangency weight of a Fusion loft.",
+      "Join into one part, or keep the piece separate (Fusion's Join / New body).",
+    ],
+  },
+  {
     build: 28,
     items: [
       "Blend keeps hollows: blending two hollow parts (tubes, a hollowed box and a hollowed cylinder) makes a sleeve, so the result is one tube open all the way through. \"Hollow through\" in the Blend window switches it off for a solid piece.",

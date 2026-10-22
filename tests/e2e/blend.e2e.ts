@@ -117,3 +117,27 @@ describe("Blend keeps two hollow parts open through (build 28)", () => {
     expect(await genus(piece)).toEqual({ ok: true, genus: 0 });
   });
 });
+
+describe("Blend options (build 29)", () => {
+  it("with both ends alike, gives exactly the shape of before", () => {
+    const pair = facingFaces(cylinder("big", 30, 10, 0), cylinder("small", 12, 10, 30, 8))!;
+    for (const smoothness of [0, 35, 70, 100]) {
+      const linked = blendShape(pair.a, pair.b, normalizeBlend({ smoothness }), { name: "B", color: "#888" })!;
+      const apart = blendShape(pair.a, pair.b, normalizeBlend({ smoothness, smoothnessEnd: smoothness, linked: false }), { name: "B", color: "#888" })!;
+      expect(apart.importedMesh!.positions).toEqual(linked.importedMesh!.positions);
+    }
+  });
+
+  it("flares one end and eases the other when the ends differ, still closed", async () => {
+    const pair = facingFaces(cylinder("big", 30, 10, 0), cylinder("small", 12, 10, 30))!;
+    const even = blendShape(pair.a, pair.b, normalizeBlend({ smoothness: 50 }), { name: "B", color: "#888" })!;
+    const uneven = blendShape(pair.a, pair.b, normalizeBlend({ smoothness: 100, smoothnessEnd: 0, linked: false }), { name: "B", color: "#888" })!;
+    expect(uneven.importedMesh!.positions).not.toEqual(even.importedMesh!.positions);
+    expect(await isClosedSolid(uneven)).toBe(true);
+  });
+
+  it("keeps old settings working: a blend saved before has both ends alike and joins", () => {
+    const old = normalizeBlend({ smoothness: 40, twist: 3 } as never);
+    expect(old).toMatchObject({ smoothness: 40, smoothnessEnd: 40, linked: true, join: true, hollow: true, twist: 3 });
+  });
+});

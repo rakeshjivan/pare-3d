@@ -17,6 +17,7 @@ export function BlendPanel({
   names,
   ready,
   canHollow,
+  editing = false,
   settings,
   workspace,
   busy,
@@ -29,6 +30,8 @@ export function BlendPanel({
   ready: boolean;
   /** Both faces have an opening: the piece can be a sleeve. */
   canHollow: boolean;
+  /** Fork (build 29): reopened on a blend made earlier - Create reads Update. */
+  editing?: boolean;
   settings: BlendSettings;
   workspace: WorkplaneWorkspaceSettings;
   busy: boolean;
@@ -57,17 +60,46 @@ export function BlendPanel({
         <span role="status">{ready ? t("blend.ready") : t("blend.pick")}</span>
       </div>
 
-      <EdgeModifierSlider
-        label={t("blend.smoothness")}
-        value={settings.smoothness}
-        min={0}
-        max={100}
-        step={5}
-        unit="%"
-        workspace={workspace}
-        onChange={(value) => onChange({ smoothness: value })}
-      />
-      <p className="blend-hint">{t("blend.smoothnessHint")}</p>
+      {settings.linked ? (
+        <EdgeModifierSlider
+          label={t("blend.smoothness")}
+          value={settings.smoothness}
+          min={0}
+          max={100}
+          step={5}
+          unit="%"
+          workspace={workspace}
+          onChange={(value) => onChange({ smoothness: value, smoothnessEnd: value })}
+        />
+      ) : (
+        <>
+          <EdgeModifierSlider
+            label={t("blend.smoothnessAt", { name: names[0] })}
+            value={settings.smoothness}
+            min={0}
+            max={100}
+            step={5}
+            unit="%"
+            workspace={workspace}
+            onChange={(value) => onChange({ smoothness: value })}
+          />
+          <EdgeModifierSlider
+            label={t("blend.smoothnessAt", { name: names[1] })}
+            value={settings.smoothnessEnd}
+            min={0}
+            max={100}
+            step={5}
+            unit="%"
+            workspace={workspace}
+            onChange={(value) => onChange({ smoothnessEnd: value })}
+          />
+        </>
+      )}
+      <p className="blend-hint">{t(settings.linked ? "blend.smoothnessHint" : "blend.endsHint")}</p>
+      <label className="blend-hollow">
+        <input type="checkbox" checked={settings.linked} onChange={(event) => onChange({ linked: event.currentTarget.checked, smoothnessEnd: settings.smoothness })} />
+        <span><strong>{t("blend.linkEnds")}</strong></span>
+      </label>
 
       <div className="edge-modifier-field blend-twist">
         <span>{t("blend.twist")}</span>
@@ -88,11 +120,19 @@ export function BlendPanel({
         </label>
       ) : null}
 
+      <label className="blend-hollow">
+        <input type="checkbox" checked={settings.join} onChange={(event) => onChange({ join: event.currentTarget.checked })} />
+        <span>
+          <strong>{t("blend.join")}</strong>
+          <small>{t("blend.joinHint")}</small>
+        </span>
+      </label>
+
       <div className="edge-modifier-footer">
         <button type="button" className="secondary" onClick={onCancel}>{t("common.cancel")}</button>
         <button type="button" className="primary" disabled={!ready || busy} onClick={onApply}>
           <Check size={17} />
-          {t("blend.apply")}
+          {t(editing ? "blend.update" : "blend.apply")}
         </button>
       </div>
       </>)}

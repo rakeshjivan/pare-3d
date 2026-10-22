@@ -58,12 +58,17 @@ Sometimes parts should only stay together without becoming one - a white logo on
 1. Place the two parts where they should be, with a gap between them. Both must be solid parts.
 2. Select both and click {{ui:blend.title}} in the {{ui:editor.group.combine}} group of the toolbar.
 3. Pare 3D finds the flat faces that face each other - the top of the lower cylinder and the bottom of the upper one, say - and shows the piece between them as a preview. To use another flat face, click it; a curved face cannot be used.
-4. Set the {{ui:blend.smoothness}}: 0 is a straight taper from one face to the other; 100 leaves both faces square and flares smoothly in between, like a hose adapter. The parts need not sit in line: the piece curves from one face to the other.
+4. Set the {{ui:blend.smoothness}}: 0 is a straight taper from one face to the other; 100 leaves both faces square and flares smoothly in between, like a hose adapter. The parts need not sit in line: the piece curves from one face to the other. Switch off {{ui:blend.linkEnds}} to set each end on its own - like the tangency weight of a loft in Fusion: flare out square from the wide part and ease gently into the narrow one, say.
 5. If the piece looks twisted - a square running into a hexagon, say - {{ui:blend.twist}} turns one outline a step against the other until the corners line up.
 6. Joining two hollow parts - two tubes, a hollowed box and a hollowed cylinder? When both faces have an opening, {{ui:blend.hollow}} is on: the piece is a sleeve, its inner wall runs from one opening to the other, and the result is one tube open all the way through. Switch it off for a solid piece.
-7. [[Enter]] or {{ui:blend.apply}} makes it. [[Esc]] closes the tool without it.
+7. {{ui:blend.join}} (on by default) makes the two parts and the piece one group, so they print as one body - Fusion's Join. Switched off, the piece is a part of its own beside the two - Fusion's New body.
+8. [[Enter]] or {{ui:blend.apply}} makes it. [[Esc]] closes the tool without it.
 
-The two parts and the piece between them become one group, so they print as one body; {{ui:editor.tool.ungroup}} takes them apart again and the piece is an ordinary part you can delete. The faces can be any flat outline - circles, squares, a sketch, a polygon. For a smooth result, round shapes should have plenty of sides (see [How round is round?](chapter:shapes)).
+The piece is an exact CAD body, like a box or a cylinder: {{ui:editor.tool.fillet}}, {{ui:editor.tool.chamfer}} and {{ui:editor.tool.hollow}} work on the blended part, and STEP keeps it exact.
+
+### Changing a blend
+
+Select the blend - the group, or the piece if it was kept separate - and click {{ui:blend.title}} again. The window opens with the blend's settings and faces; change anything, including joining or separating, and click {{ui:blend.update}}. [[Esc]] leaves it as it was. Once a blend has been filleted, chamfered or hollowed, or its parts were changed inside the group, it can no longer be opened this way: undo those first. {{ui:editor.tool.ungroup}} still takes the group apart, and the piece is an ordinary part you can delete. The faces can be any flat outline - circles, squares, a sketch, a polygon. For a smooth result, round shapes should have plenty of sides (see [How round is round?](chapter:shapes)).
 
 ## Editing a group
 

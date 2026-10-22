@@ -15,6 +15,7 @@ import { gridfinityPartSolid } from "@/lib/gridfinitySolid";
 import { fuzzyCut } from "@/lib/cadFuzzyCut";
 import { helicalGearPartSolid } from "@/lib/gearSolid";
 import { meshTreatedBody } from "@/lib/cadMeshAccuracy";
+import { blendLoftSolid } from "@/lib/cadBlendLoft";
 import { planarMeshFaces } from "@/lib/cadPlanarMesh";
 import { buildMessage } from "@/lib/buildStamp";
 import { CAD_MODIFIER_KERNEL_RESTART_MESSAGE, CAD_MODIFIER_RUNTIME_BASE, cadModifierCappedDeflection, cadModifierTessellationDeflection, cadModifierTopologyEdgeIsSelectable, cadTransformRequiresGeneralTransform, isCadModifierKernelExhausted, isCadModifierWasmMemoryFault } from "@/lib/cadModifierRuntime";
@@ -883,6 +884,22 @@ async function bearbeiteAnfrage(request: CadModifierWorkerRequest, halter: { cad
       sourceType: activeCad.getShapeType(baseShape),
       ...(faces ? { faces } : {}),
     }, faces?.mesh ? [faces.mesh.positions.buffer, faces.mesh.indices.buffer, faces.mesh.triangleFaces.buffer] : []);
+    return;
+  }
+  if (request.type === "blendLoft") {
+    // Stands apart from the edge tool's session: nothing prepared is touched.
+    const solid = blendLoftSolid(activeCad, { rings: request.rings, innerRings: request.innerRings });
+    try {
+      const deflection = cadModifierTessellationDeflection("standard", 1);
+      const mesh = copyCadMesh(activeCad.tessellate(solid, tessellationOptions(deflection)));
+      const displayEdges = collectEdges(activeCad, solid, 0).displayEdges;
+      post(
+        { type: "preview", requestId: request.requestId, positions: mesh.positions, normals: mesh.normals, indices: mesh.indices, triangleCount: mesh.triangleCount, brep: storedBrep(activeCad, solid), displayEdges, deflection },
+        [mesh.positions.buffer, mesh.normals.buffer, mesh.indices.buffer],
+      );
+    } finally {
+      activeCad.release(solid);
+    }
     return;
   }
   if (baseShape === null) throw new Error("Prepare an object before previewing the modifier");

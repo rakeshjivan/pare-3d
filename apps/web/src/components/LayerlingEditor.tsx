@@ -109,7 +109,7 @@ import { HolePatternPanel } from "./workplane/HolePatternPanel";
 import { FaceToolPanel } from "./workplane/FaceToolPanel";
 import { DEFAULT_FACE_TOOL, FACE_TOOL_MIN_DEPTH, faceToolSettingsOn, normalizeFaceTool, type FaceToolSettings } from "@/lib/faceTool";
 import { pullToFaceTool } from "@/lib/facePull";
-import { blendCanBeHollow, blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend, type BlendFace, type BlendSettings } from "@/lib/blend";
+import { blendCanBeHollow, blendFacePoint, blendLoftInput, blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend, type BlendFace, type BlendSettings } from "@/lib/blend";
 import { BlendPanel } from "./workplane/BlendPanel";
 import { faceToolBody } from "@/lib/faceToolBody";
 import { DEFAULT_HOLE_PATTERN, normalizeHolePattern, type HolePatternSettings } from "@/lib/holePattern";
@@ -3627,10 +3627,16 @@ export function LayerlingEditor({
     faces: [BlendFace | null, BlendFace | null];
     settings: BlendSettings;
     busy: boolean;
+    /**
+     * Fork (build 29): reopened on a blend made earlier. `source` is the group (joined) or the piece
+     * (separate); `parts` are the two bodies, out of the group, and `shown` what the work area shows
+     * in place of the source while the blend is changed.
+     */
+    edit?: { source: WorkplaneShape; parts: [WorkplaneShape, WorkplaneShape]; shown: WorkplaneShape[] };
   } | null>(null);
   const blendPreview = useMemo(() => {
     if (!blendTool?.faces[0] || !blendTool.faces[1]) return null;
-    const first = shapes.find((shape) => shape.id === blendTool.ids[0]);
+    const first = blendTool.edit?.parts[0] ?? shapes.find((shape) => shape.id === blendTool.ids[0]);
     try {
       return blendShape(blendTool.faces[0], blendTool.faces[1], blendTool.settings, { name: t("blend.pieceName"), color: first?.color ?? "#888888", id: BLEND_PREVIEW_ID });
     } catch {
@@ -3651,6 +3657,8 @@ export function LayerlingEditor({
         ? [...shapes, ...holePatternPreview.holes]
         : faceToolPreview?.shape
         ? [...shapes, faceToolPreview.shape]
+        : blendTool?.edit
+        ? [...shapes.flatMap((shape) => (shape.id === blendTool.edit?.source.id ? blendTool.edit.shown : [shape])), ...(blendPreview ? [blendPreview] : [])]
         : blendPreview
         ? [...shapes, blendPreview]
         : edgeModifier?.preview && cadModifierBaseShapeRef.current
@@ -3660,7 +3668,7 @@ export function LayerlingEditor({
         : mirrorMode && mirrorPreviewAxis
           ? mirroredShapesForSelection(shapes, selectedIds, selectedShapes, mirrorPreviewAxis).nextShapes
           : shapes,
-    [alignAxes, alignMode, alignPreview, arrayPreview, blendPreview, edgeModifier?.preview, effectiveAlignAnchorId, faceToolPreview, holePatternPreview, mirrorMode, mirrorPreviewAxis, selectedIds, selectedShapes, shapes],
+    [alignAxes, alignMode, alignPreview, arrayPreview, blendPreview, blendTool?.edit, edgeModifier?.preview, effectiveAlignAnchorId, faceToolPreview, holePatternPreview, mirrorMode, mirrorPreviewAxis, selectedIds, selectedShapes, shapes],
   );
   // The preview of an intersection (#372): the operands see-through, and what they share as a body of its own on top.
   const [intersectPreviewIds, setIntersectPreviewIds] = useState<string[] | null>(null);
@@ -8390,6 +8398,43 @@ export function LayerlingEditor({
       return;
     }
     if (refuseLockedSelection()) return;
+    // Fork (build 29): one blend made earlier - open it again with its settings and faces.
+    const madeBefore = selectedShapes.length === 1 ? selectedShapes[0].blendSource : undefined;
+    if (madeBefore) {
+      const source = selectedShapes[0];
+      const joined = source.id !== madeBefore.piece;
+      const children = joined ? restoreGroupedChildren(source) : [];
+      const find = (id: string) => (joined ? children.find((child) => child.id === id) : shapesRef.current.find((shape) => shape.id === id));
+      const parts = [find(madeBefore.parts[0]), find(madeBefore.parts[1])];
+      const piece = joined ? children.find((child) => child.id === madeBefore.piece) : source;
+      // A blend filleted or hollowed afterwards, or whose parts changed inside the group, is no longer that blend.
+      if (!parts[0] || !parts[1] || !piece || (joined && (children.length !== 3 || (source.edgeTreatments?.length ?? 0) > 0))) {
+        setNotice(t("blend.editGone"));
+        return;
+      }
+      const [a, b] = parts as [WorkplaneShape, WorkplaneShape];
+      if (edgeModifier || shellTool || deleteFaceTool || splitSession || simplifyToolId || faceTool) {
+        setNotice(t("status.faceToolOtherTool"));
+        return;
+      }
+      stopCruise();
+      setHolePatternTool(null);
+      setMateTool(null);
+      setArrayTool(null);
+      const faceAt = (body: WorkplaneShape, pick: (typeof madeBefore.picks)[number]): BlendFace | null => {
+        const read = readPerforableFace(worldTrianglePositions(body), pick.point, pick.normal);
+        return read.ok ? { shapeId: body.id, face: read.face, normal: pick.normal } : null;
+      };
+      let faces: [BlendFace | null, BlendFace | null] = [faceAt(a, madeBefore.picks[0]), faceAt(b, madeBefore.picks[1])];
+      if (!faces[0] || !faces[1]) {
+        // Moved since: the faces that face each other now.
+        const pair = facingFaces(a, b);
+        faces = pair ? [pair.a, pair.b] : [null, null];
+      }
+      setBlendTool({ ids: [a.id, b.id], faces, settings: normalizeBlend(madeBefore.settings), busy: false, edit: { source, parts: [a, b], shown: joined ? [a, b] : [] } });
+      setNotice(t("blend.editing"));
+      return;
+    }
     const solids = selectedShapes.filter((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind));
     if (selectedShapes.length !== 2 || solids.length !== 2) {
       setNotice(t("blend.selectTwo"));
@@ -8411,7 +8456,7 @@ export function LayerlingEditor({
     setBlendTool((tool) => {
       if (!tool) return tool;
       const side = pick ? tool.ids.indexOf(pick.shapeId) : -1;
-      const body = side >= 0 ? shapesRef.current.find((shape) => shape.id === tool.ids[side]) : null;
+      const body = side >= 0 ? (tool.edit?.parts[side] ?? shapesRef.current.find((shape) => shape.id === tool.ids[side])) : null;
       if (!pick || side < 0 || !body) {
         setNotice(t("blend.missed"));
         return tool;
@@ -8430,11 +8475,53 @@ export function LayerlingEditor({
   const applyBlend = useCallback(async () => {
     const tool = blendTool;
     if (!tool || tool.busy || !blendPreview) return;
-    const bodies = tool.ids.map((id) => shapesRef.current.find((shape) => shape.id === id));
-    if (!bodies[0] || !bodies[1]) return;
+    const bodies = tool.edit ? [...tool.edit.parts] : tool.ids.map((id) => shapesRef.current.find((shape) => shape.id === id));
+    if (!bodies[0] || !bodies[1] || !tool.faces[0] || !tool.faces[1]) return;
     setBlendTool({ ...tool, busy: true });
-    const piece = { ...blendPreview, id: createLocalId("mesh"), name: t("blend.pieceName") };
     const fingerprint = projectShapesFingerprint(shapesRef.current);
+    let piece: WorkplaneShape = { ...blendPreview, id: createLocalId("mesh"), name: t("blend.pieceName") };
+    // Fork (build 29): the piece as an exact CAD loft, so fillets, chamfers, hollowing and STEP work
+    // on it like any solid. Should the kernel refuse, the mesh piece of the preview is used as before.
+    if (tool.faces[0] && tool.faces[1]) {
+      try {
+        const input = blendLoftInput(tool.faces[0], tool.faces[1], tool.settings);
+        if (input) {
+          const response = await postCadModifierRequestAsync({ type: "blendLoft", rings: input.rings, ...(input.innerRings ? { innerRings: input.innerRings } : {}) }, [], 45000);
+          if (response.type === "preview") {
+            const exact = shapeFromCadMesh(piece, response.positions, response.normals, response.indices, response.brep, response.deflection);
+            if (exact) piece = canonicalizeShape({ ...exact, cadDisplayEdges: cadDisplayEdgesForShape(exact, response.displayEdges), cadDisplayEdgesVersion: 2 as const });
+          }
+        }
+      } catch {
+        // The mesh piece stays.
+      }
+    }
+    const blendSource: NonNullable<WorkplaneShape["blendSource"]> = {
+      parts: [bodies[0].id, bodies[1].id],
+      piece: piece.id,
+      settings: { ...tool.settings },
+      picks: [
+        { point: blendFacePoint(tool.faces[0]), normal: { ...tool.faces[0].normal } },
+        { point: blendFacePoint(tool.faces[1]), normal: { ...tool.faces[1].normal } },
+      ],
+    };
+    const editedId = tool.edit?.source.id;
+    // Everything but what this blend replaces: the two parts, or the blend being changed.
+    const others = () => shapesRef.current.filter((shape) => (editedId ? shape.id !== editedId : !tool.ids.includes(shape.id)));
+    const notice = t(tool.edit ? "blend.updated" : tool.settings.join ? "blend.created" : "blend.createdSeparate");
+    if (!tool.settings.join) {
+      // New body: the two parts stay as they are; the piece carries the blend.
+      const separate = canonicalizeShape({ ...piece, blendSource });
+      if (projectShapesFingerprint(shapesRef.current) !== fingerprint) {
+        setBlendTool(null);
+        setNotice(t("status.groupChanged"));
+        return;
+      }
+      setBlendTool(null);
+      const kept = tool.edit && tool.edit.source.id !== tool.edit.source.blendSource?.piece ? [...tool.edit.parts] : [];
+      commitShapes([...others(), ...kept, separate], separate.id, notice);
+      return;
+    }
     const result = await buildGroupedShapeFromSelection([bodies[0], bodies[1], piece], workspaceSettingsRef.current.booleanTriangleLimit);
     if (projectShapesFingerprint(shapesRef.current) !== fingerprint) {
       setBlendTool(null);
@@ -8446,14 +8533,18 @@ export function LayerlingEditor({
       setNotice(result.failureNotice);
       return;
     }
-    const group = canonicalizeShape({ ...result.group, groupOperation: "group" });
+    const group = canonicalizeShape({ ...result.group, groupOperation: "group", blendSource });
     setBlendTool(null);
-    commitShapes([...shapesRef.current.filter((shape) => !tool.ids.includes(shape.id)), group], group.id, t("blend.created"));
-  }, [blendPreview, blendTool, commitShapes]);
+    // A separate piece being joined now: its two parts leave the scene into the group.
+    const joinedParts = tool.edit && tool.edit.source.id === tool.edit.source.blendSource?.piece ? [...tool.ids] : ([] as string[]);
+    commitShapes([...others().filter((shape) => !joinedParts.includes(shape.id)), group], group.id, notice);
+  }, [blendPreview, blendTool, commitShapes, postCadModifierRequestAsync]);
   // The tool belongs to the two bodies it was started for.
   useEffect(() => {
     if (!blendTool) return;
-    const same = selectedIds.length === 2 && blendTool.ids.every((id) => selectedIds.includes(id));
+    const same = blendTool.edit
+      ? selectedIds.length === 1 && selectedIds[0] === blendTool.edit.source.id
+      : selectedIds.length === 2 && blendTool.ids.every((id) => selectedIds.includes(id));
     if (!same || faceTool || edgeModifier || shellTool || splitSession) setBlendTool(null);
   }, [blendTool, edgeModifier, faceTool, selectedIds, shellTool, splitSession]);
   useEffect(() => {
@@ -13059,7 +13150,7 @@ export function LayerlingEditor({
         faceToolActive={Boolean(faceTool)}
         onBlendBodies={toggleBlendTool}
         blendBodiesActive={Boolean(blendTool)}
-        canBlendBodies={!selectionLocked && selectedShapes.length === 2 && selectedShapes.every((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind))}
+        canBlendBodies={!selectionLocked && ((selectedShapes.length === 2 && selectedShapes.every((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind))) || (selectedShapes.length === 1 && Boolean(selectedShapes[0].blendSource)))}
         canFaceTool={selectedShapes.length === 1 && Boolean(selectedShape && !selectedShape.locked && !selectedShape.hole && !isNonSolidShapeKind(selectedShape.kind))}
         onGroup={groupSelected}
         onBundle={bundleSelected}
@@ -13650,10 +13741,11 @@ export function LayerlingEditor({
       {blendTool ? (
         <BlendPanel
           names={[0, 1].map((side) => {
-            const body = shapes.find((shape) => shape.id === blendTool.ids[side]);
+            const body = blendTool.edit?.parts[side] ?? shapes.find((shape) => shape.id === blendTool.ids[side]);
             return body ? displayShapeName(body) : "";
           }) as [string, string]}
           ready={Boolean(blendPreview)}
+          editing={Boolean(blendTool.edit)}
           canHollow={Boolean(blendTool.faces[0] && blendTool.faces[1] && blendCanBeHollow(blendTool.faces[0], blendTool.faces[1]))}
           settings={blendTool.settings}
           workspace={workspaceSettings}
