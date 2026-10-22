@@ -128,19 +128,20 @@ jobs:
             **Windows:** extract the folder, double-click "Pare 3D.exe". If SmartScreen warns, choose More info → Run anyway. If the window does not start, double-click "Pare 3D (browser).vbs" instead and please report it.
             Chrome or Edge gives Pare 3D its own window and automatic backup.
             Already installed (build 2 or later)? It updates itself: the next time you open it, or when it asks you to reload.
+            **Installed a new download but it still shows an older build?** Restart your computer once (an older copy was still running in the background). From build 29 on, the app replaces an older copy by itself.
 
             Pare 3D is based on [layerling](https://github.com/henmedia/layerling) (AGPL-3.0-only); this release's source is this repository at this tag.
-      # The releases page lists tags as text (pare-9 before pare-21), so only the newest build and
-      # the one before it (to roll back to) are kept; older builds and test builds are removed.
+      # Only the newest build is kept on the releases page, so there is one thing to download; older
+      # builds and test builds are removed (the page also lists tags as text, pare-9 before pare-21).
       # Their tags stay, so every build's source is still in the repository.
-      - name: Keep only the newest two builds on the releases page
+      - name: Keep only the newest build on the releases page
         if: github.ref_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
           releases=$(gh api "repos/$REPO/releases?per_page=100" --paginate --jq '.[] | "\(.id) \(.tag_name)"')
-          keep=$(echo "$releases" | awk '$2 ~ /^pare-[0-9]+$/ { sub("pare-", "", $2); print $2 }' | sort -n | tail -2 | sed 's/^/pare-/')
+          keep=$(echo "$releases" | awk '$2 ~ /^pare-[0-9]+$/ { sub("pare-", "", $2); print $2 }' | sort -n | tail -1 | sed 's/^/pare-/')
           echo "Keeping: $keep"
           echo "$releases" | while read -r id tag; do
             [ -z "$id" ] && continue

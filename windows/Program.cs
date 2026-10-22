@@ -81,6 +81,57 @@ sealed class MainForm : Form
         }
     }
 
+    /// The runtime of the serve.mjs this app carries (RUNTIME_VERSION there).
+    const int OwnRuntime = 4;
+
+    /// Fork (build 29): a Pare 3D server already on the port is reused only when it is at least as new as
+    /// this app; one left running by an older app is replaced on the same port (designs are kept per address).
+    static async Task<bool> ServerIsCurrentAsync(int candidate)
+    {
+        var body = await Ask(candidate, "/__pare3d/update");
+        if (body == null) return false;
+        try
+        {
+            using var state = System.Text.Json.JsonDocument.Parse(body);
+            var root = state.RootElement;
+            var runtime = root.TryGetProperty("runtime", out var r) && r.TryGetInt32(out var rv) ? rv : 0;
+            var serving = root.TryGetProperty("serving", out var s) && s.TryGetInt32(out var sv) ? sv : 0;
+            var bundled = 0;
+            try { bundled = int.Parse(File.ReadAllText(Path.Combine(AppDir, "app", "pare-build.txt")).Trim()); } catch { }
+            return runtime >= OwnRuntime && serving >= bundled;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// Stops the Pare 3D server on the port: politely if it knows how, otherwise by the process listening there.
+    static async Task StopServerAsync(int candidate)
+    {
+        try { using var _ = await Http.PostAsync($"http://127.0.0.1:{candidate}/__pare3d/quit", null); } catch { }
+        for (var i = 0; i < 20 && await Ask(candidate, "/") != null; i++) await Task.Delay(100);
+        if (await Ask(candidate, "/") == null) return;
+        try
+        {
+            var netstat = Process.Start(new ProcessStartInfo("netstat", "-ano -p tcp") { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true });
+            var output = netstat == null ? "" : await netstat.StandardOutput.ReadToEndAsync();
+            foreach (var line in output.Split('\n'))
+            {
+                var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 5 && parts[1].EndsWith($":{candidate}") && parts[3] == "LISTENING" && int.TryParse(parts[4], out var pid) && pid != Environment.ProcessId)
+                {
+                    try { Process.GetProcessById(pid).Kill(true); } catch { }
+                }
+            }
+        }
+        catch
+        {
+            // Nothing more to try; the next port is used instead.
+        }
+        for (var i = 0; i < 30 && await Ask(candidate, "/") != null; i++) await Task.Delay(100);
+    }
+
     /// The designs are stored per address, so the same port is used every time when it can be.
     async Task<bool> StartServerAsync()
     {
@@ -88,9 +139,14 @@ sealed class MainForm : Form
         {
             if (await Ask(candidate, "/__pare3d") == "pare3d")
             {
-                port = candidate;
-                Log($"reusing the Pare 3D server on {candidate}");
-                return true;
+                if (await ServerIsCurrentAsync(candidate))
+                {
+                    port = candidate;
+                    Log($"reusing the Pare 3D server on {candidate}");
+                    return true;
+                }
+                Log($"replacing an older Pare 3D server on {candidate}");
+                await StopServerAsync(candidate);
             }
             if (await Ask(candidate, "/") != null)
             {

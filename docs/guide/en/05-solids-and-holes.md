@@ -64,7 +64,7 @@ Sometimes parts should only stay together without becoming one - a white logo on
 7. {{ui:blend.join}} (on by default) makes the two parts and the piece one group, so they print as one body - Fusion's Join. Switched off, the piece is a part of its own beside the two - Fusion's New body.
 8. [[Enter]] or {{ui:blend.apply}} makes it. [[Esc]] closes the tool without it.
 
-The piece is an exact CAD body, like a box or a cylinder: {{ui:editor.tool.fillet}}, {{ui:editor.tool.chamfer}} and {{ui:editor.tool.hollow}} work on the blended part, and STEP keeps it exact.
+The piece is an exact CAD body, like a box or a cylinder: {{ui:editor.tool.fillet}}, {{ui:editor.tool.chamfer}} and {{ui:editor.tool.hollow}} work on the blended part, and STEP keeps it exact. Two exceptions, and the message after Create says which: when the faces face each other but are far apart sideways, the piece's slices are kept parallel to the faces so it can stay exact; and when a piece has to turn more tightly than it is wide - an elbow between two faces at right angles with little room - it is kept as a mesh, which cannot be filleted. Move the parts further apart, or pick faces that face each other.
 
 ### Changing a blend
 

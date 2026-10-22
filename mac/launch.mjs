@@ -33,10 +33,31 @@ async function isBusy(port) {
 }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Build 29: a server left running by an older app is replaced, not reused.
+const OWN_RUNTIME = 4;
+async function isCurrent(port) {
+  try {
+    const state = await (await fetch(`http://localhost:${port}/__pare3d/update`, { signal: AbortSignal.timeout(800) })).json();
+    let bundled = 0;
+    try { bundled = Number((await import("node:fs")).readFileSync(join(here, "app", "pare-build.txt"), "utf8").trim()) || 0; } catch {}
+    return (state.runtime ?? 0) >= OWN_RUNTIME && (state.serving ?? 0) >= bundled;
+  } catch {
+    return false;
+  }
+}
+async function stopServer(port) {
+  try { await fetch(`http://localhost:${port}/__pare3d/quit`, { method: "POST", signal: AbortSignal.timeout(1000) }); } catch {}
+  for (let i = 0; i < 30 && (await isBusy(port)); i += 1) await sleep(100);
+}
+
 let port = null;
 let server = null;
 for (const candidate of [47177, 47178, 47179, 47180, 47181]) {
-  if (await isOurs(candidate)) { port = candidate; log(`reusing server on ${port}`); break; }
+  if (await isOurs(candidate)) {
+    if (await isCurrent(candidate)) { port = candidate; log(`reusing server on ${port}`); break; }
+    log(`replacing an older server on ${candidate}`);
+    await stopServer(candidate);
+  }
   if (await isBusy(candidate)) { log(`port ${candidate} used by something else`); continue; }
   server = spawn(process.execPath, [join(here, "serve.mjs")], { env: { ...process.env, PORT: String(candidate) }, stdio: "ignore", windowsHide: true, detached: true });
   for (let i = 0; i < 100 && !(await isOurs(candidate)); i += 1) await sleep(100);

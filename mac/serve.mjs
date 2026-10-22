@@ -19,7 +19,8 @@ import { fileURLToPath } from "node:url";
 const bundledRoot = join(fileURLToPath(new URL(".", import.meta.url)), "app");
 const port = Number(process.env.PORT || 47177);
 /** Raise when the launcher or this server change in a way new app files depend on. */
-const RUNTIME_VERSION = 3;
+// 4 (build 29): /__pare3d/quit, and launchers replace a server older than themselves.
+const RUNTIME_VERSION = 4;
 const RELEASES_API = process.env.PARE3D_RELEASES_API || "https://api.github.com/repos/rakeshjivan/pare-3d/releases/latest";
 // Only for the automated tests: lets a local test server stand in for GitHub.
 const TEST_ORIGIN = process.env.PARE3D_TEST_ORIGIN || "";
@@ -495,6 +496,12 @@ createServer(async (req, res) => {
   if (path === "/__pare3d") {
     res.writeHead(200, { "content-type": "text/plain", "x-pare3d": "1" });
     res.end("pare3d");
+    return;
+  }
+  // Fork (build 29): a newer app asks an older server still running in the background to make way.
+  if (path === "/__pare3d/quit" && req.method === "POST") {
+    json(res, 200, { ok: true });
+    setTimeout(() => process.exit(0), 100);
     return;
   }
   if (path === "/__pare3d/update") {

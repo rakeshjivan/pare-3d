@@ -110,6 +110,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         ask(port, "/__pare3d", timeout: timeout)?.body == "pare3d"
     }
 
+    /// The runtime of the serve.mjs this app carries (RUNTIME_VERSION there).
+    private let ownRuntime = 4
+
+    /// Fork (build 29): a Pare 3D server already on the port is reused only when it is at least as new as
+    /// this app - its runtime and the build it serves. One left running by an older app is replaced,
+    /// on the same port, so the designs (kept per address) stay where they are.
+    private func serverIsCurrent(_ port: Int) -> Bool {
+        guard let answer = ask(port, "/__pare3d/update"), answer.status == 200,
+              let data = answer.body.data(using: .utf8),
+              let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        let runtime = (state["runtime"] as? NSNumber)?.intValue ?? 0
+        let serving = (state["serving"] as? NSNumber)?.intValue ?? 0
+        let bundledText = (try? String(contentsOf: resources.appendingPathComponent("app/pare-build.txt"), encoding: .utf8)) ?? "0"
+        let bundled = Int(bundledText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        return runtime >= ownRuntime && serving >= bundled
+    }
+
+    /// Stops the Pare 3D server on the port: politely if it knows how, otherwise by its process.
+    private func stopServer(on port: Int) {
+        if let url = URL(string: "http://127.0.0.1:\(port)/__pare3d/quit") {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 1
+            let done = DispatchSemaphore(value: 0)
+            URLSession.shared.dataTask(with: request) { _, _, _ in done.signal() }.resume()
+            _ = done.wait(timeout: .now() + 1.5)
+        }
+        for _ in 0..<20 where ask(port, "/", timeout: 0.3) != nil { Thread.sleep(forTimeInterval: 0.1) }
+        guard ask(port, "/", timeout: 0.3) != nil else { return }
+        // An older server has no quit: end the process listening on the port (ours - is_ours said so).
+        let lsof = Process()
+        lsof.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        lsof.arguments = ["-ti", "tcp:\(port)", "-sTCP:LISTEN"]
+        let pipe = Pipe()
+        lsof.standardOutput = pipe
+        lsof.standardError = FileHandle.nullDevice
+        try? lsof.run()
+        lsof.waitUntilExit()
+        let pids = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        for pid in pids.split(separator: "\n").compactMap({ Int32($0.trimmingCharacters(in: .whitespaces)) }) where pid != getpid() {
+            kill(pid, SIGTERM)
+        }
+        for _ in 0..<30 where ask(port, "/", timeout: 0.3) != nil { Thread.sleep(forTimeInterval: 0.1) }
+    }
+
     /// The designs are stored per address, so the same port is used every time when it can be.
     private func startServer() -> Bool {
         #if arch(arm64)
@@ -119,9 +164,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         #endif
         for candidate in [47177, 47178, 47179, 47180, 47181] {
             if isPare3D(candidate) {
-                port = candidate
-                log("reusing the Pare 3D server on \(candidate)")
-                return true
+                if serverIsCurrent(candidate) {
+                    port = candidate
+                    log("reusing the Pare 3D server on \(candidate)")
+                    return true
+                }
+                log("replacing an older Pare 3D server on \(candidate)")
+                stopServer(on: candidate)
             }
             if ask(candidate, "/") != nil {
                 log("port \(candidate) is used by something else")

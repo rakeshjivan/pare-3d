@@ -14,13 +14,32 @@ if [ "$(/usr/bin/uname -m)" = "arm64" ]; then BUN="$RES/bun-arm64"; else BUN="$R
 [ -x "$BUN" ] || BUN="$RES/bun"
 
 is_ours() { [ "$(/usr/bin/curl -s --max-time 1 "http://localhost:$1/__pare3d")" = "pare3d" ]; }
+# Build 29: a server left running by an older app is replaced, not reused (runtime and served build).
+OWN_RUNTIME=4
+OWN_BUILD="$(tr -dc '0-9' < "$RES/app/pare-build.txt" 2>/dev/null)"; OWN_BUILD="${OWN_BUILD:-0}"
+is_current() {
+  local state runtime serving
+  state="$(/usr/bin/curl -s --max-time 1 "http://localhost:$1/__pare3d/update")"
+  runtime="$(printf '%s' "$state" | /usr/bin/sed -n 's/.*"runtime":\([0-9]*\).*/\1/p')"
+  serving="$(printf '%s' "$state" | /usr/bin/sed -n 's/.*"serving":\([0-9]*\).*/\1/p')"
+  [ "${runtime:-0}" -ge "$OWN_RUNTIME" ] && [ "${serving:-0}" -ge "$OWN_BUILD" ]
+}
+stop_server() {
+  /usr/bin/curl -s -X POST --max-time 1 "http://localhost:$1/__pare3d/quit" >/dev/null 2>&1
+  for _ in $(seq 1 20); do port_busy "$1" || return 0; sleep 0.1; done
+  for PID in $(/usr/sbin/lsof -ti "tcp:$1" -sTCP:LISTEN 2>/dev/null); do kill "$PID" 2>/dev/null; done
+  for _ in $(seq 1 30); do port_busy "$1" || return 0; sleep 0.1; done
+}
 port_busy() { /usr/bin/curl -s -o /dev/null --max-time 1 "http://localhost:$1/"; }
 
 # Our own port, well away from common ones. If something else holds it, try the next few.
 PORT=""
 SERVER=""
 for CANDIDATE in 47177 47178 47179 47180 47181; do
-  if is_ours "$CANDIDATE"; then PORT=$CANDIDATE; echo "reusing Pare 3D server on $PORT"; break; fi
+  if is_ours "$CANDIDATE"; then
+    if is_current "$CANDIDATE"; then PORT=$CANDIDATE; echo "reusing Pare 3D server on $PORT"; break; fi
+    echo "replacing an older Pare 3D server on $CANDIDATE"; stop_server "$CANDIDATE"
+  fi
   if ! port_busy "$CANDIDATE"; then
     PORT=$CANDIDATE "$BUN" "$RES/serve.mjs" &
     SERVER=$!

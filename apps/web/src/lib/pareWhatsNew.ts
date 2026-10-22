@@ -10,6 +10,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Change a blend later: select it and click Blend again - its settings and faces come back; change them and click Update.",
       "Smoothness per end: switch off \"Same at both ends\" to flare out square from one part and ease gently into the other, like the tangency weight of a Fusion loft.",
       "Join into one part, or keep the piece separate (Fusion's Join / New body).",
+      "Opening Pare 3D after installing a new download no longer shows an older build: an older copy still running in the background is replaced. (If an app from before build 29 shows an old build, restart your computer once.)",
     ],
   },
   {

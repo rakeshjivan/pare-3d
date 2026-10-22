@@ -8508,7 +8508,6 @@ export function LayerlingEditor({
         console.warn(`[blend] exact loft${straight ? " (straight slices)" : ""} failed`, error);
       }
     }
-    console.info("[blend] piece", piece.cadBrep ? (straightened ? "exact, straightened" : "exact") : "mesh");
     const blendSource: NonNullable<WorkplaneShape["blendSource"]> = {
       parts: [bodies[0].id, bodies[1].id],
       piece: piece.id,

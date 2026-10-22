@@ -21,6 +21,8 @@ Pare 3D updates itself. A few seconds after it opens, and every few hours while 
 - **A new build is ready** - open Pare 3D again, or click Reload there, and you are on it. Your open design is saved first.
 - **Download the new version** - this new build needs a newer app around it; download it again from the releases page as above.
 
+**Installed a new download but Pare 3D still shows an older build?** An older copy was still running in the background. From build 29 on, the app notices and replaces it by itself; with an app older than that, restart your computer once and open Pare 3D again. Your designs are not affected.
+
 After an update, a **What's new** card lists what the build brought. You can read it again any time from **Help › What's new**.
 
 A few things are built into the app itself rather than into the parts that update - choosing your own folders for exports and backups is one. If your app is older than those, **Settings › Files** says so and offers the download. To replace the app: use {{ui:dashboard.backupAll}} first, delete the old app (on a Mac, drag it from Applications to the Bin; on Windows, delete its folder) and install the new one as above. Your designs stay.
