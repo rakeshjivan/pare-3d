@@ -2757,7 +2757,7 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "edge.groupedObjects": "{count} objets groupés",
   "edge.existingFeatureOne": "· 1 fonctionnalité de bord existante",
   "edge.existingFeatureMany": "· {count} fonctionnalités de bord existantes",
-  "edge.selectionHelp": "Cliquez sur les bords du modèle en surbrillance pour les basculer. Maintenez Shift pour ajouter ou supprimer un seul bord.",
+  "edge.selectionHelp": "Cliquez des arêtes pour les choisir, ou une face pour choisir toutes ses arêtes. Tirez une arête choisie vers l'intérieur pour régler la taille. Maj : une seule arête, ou des pas plus fins en tirant.",
   "edge.loading": "Chargement des données CAD Edge à partir du navigateur local.",
   "edge.previewBusy": "Calcul de l'aperçu. Continuez à ajuster - seule la valeur sur laquelle vous vous arrêtez est calculée.",
   "edge.allSharpEdges": "Tous les bords tranchants",
@@ -3298,4 +3298,5 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "blend.pieceName": "Raccord",
   "blend.created": "Raccordé : les deux pièces et la pièce entre elles forment un groupe",
   "blend.cancelled": "Raccord annulé",
+  "edge.faceNoEdges": "Aucune arête de cette face ne peut être arrondie à ce seuil. Cliquez plutôt une arête.",
 };

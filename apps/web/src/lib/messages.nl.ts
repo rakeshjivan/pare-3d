@@ -2778,7 +2778,7 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "edge.groupedObjects": "{count} gegroepeerde objecten",
   "edge.existingFeatureOne": " · 1 bestaande randbewerking",
   "edge.existingFeatureMany": " · {count} bestaande randbewerkingen",
-  "edge.selectionHelp": "Klik op gemarkeerde randen van het model om ze aan of uit te zetten. Houd Shift ingedrukt om één rand toe te voegen of te verwijderen.",
+  "edge.selectionHelp": "Klik randen om ze te kiezen, of klik een vlak om al zijn randen te kiezen. Sleep een gekozen rand de vorm in om de maat te zetten. Shift: één rand, of fijnere stappen tijdens het slepen.",
   "edge.loading": "CAD-randgegevens laden uit de lokale browserworker.",
   "edge.previewBusy": "Voorbeeld wordt berekend. Blijf gerust aanpassen - alleen de waarde waarop je stopt wordt berekend.",
   "edge.allSharpEdges": "Alle scherpe randen",
@@ -3322,4 +3322,5 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "blend.pieceName": "Overgang",
   "blend.created": "Verbonden: de twee onderdelen en het stuk ertussen zijn één groep",
   "blend.cancelled": "Overgang geannuleerd",
+  "edge.faceNoEdges": "Geen rand van dat vlak kan bij deze drempel worden afgerond. Klik in plaats daarvan op een rand.",
 };

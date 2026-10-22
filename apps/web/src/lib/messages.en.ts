@@ -2808,7 +2808,7 @@ export const MESSAGES_EN = {
   "edge.groupedObjects": "{count} grouped objects",
   "edge.existingFeatureOne": " · 1 existing edge feature",
   "edge.existingFeatureMany": " · {count} existing edge features",
-  "edge.selectionHelp": "Click highlighted model edges to toggle them. Hold Shift to add or remove a single edge.",
+  "edge.selectionHelp": "Click edges to pick them, or click a face to pick all its edges. Drag a picked edge into the part to set the size. Shift: a single edge, or finer steps while dragging.",
   "edge.loading": "Loading CAD edge data from the local browser worker.",
   "edge.previewBusy": "Computing the preview. Keep adjusting - only the value you stop on gets computed.",
   "edge.allSharpEdges": "All sharp edges",
@@ -3323,6 +3323,7 @@ export const MESSAGES_EN = {
   "blend.pieceName": "Blend",
   "blend.created": "Blended: the two parts and the piece between them are one group",
   "blend.cancelled": "Blend cancelled",
+  "edge.faceNoEdges": "No edge of that face can be rounded at this threshold. Click an edge instead.",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

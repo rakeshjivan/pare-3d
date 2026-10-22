@@ -488,6 +488,15 @@ type WorkplaneViewportProps = {
   /** Draw and pick only the edges the body does not hide from this view. */
   modifierOnlyVisibleEdges?: boolean;
   onModifierEdgeToggle?: (id: number, singleEdge: boolean) => void;
+  /**
+   * Fork (build 25): pressing on a picked edge and dragging sets the fillet radius or chamfer size, as
+   * Fusion's arrow does: into the body is bigger. A press without a drag still toggles the edge.
+   */
+  /** Fork (build 25): a click on a face, not an edge: the editor picks the face's edges. */
+  onModifierFacePick?: (point: { x: number; y: number; z: number }, normal: { x: number; y: number; z: number }) => void;
+  modifierAmount?: number;
+  modifierAmountLabel?: string;
+  onModifierAmountDrag?: (amount: number) => void;
   themePreference?: AppThemePreference;
   resolvedTheme?: ResolvedAppTheme;
   onThemePreferenceChange?: (preference: AppThemePreference) => void;
@@ -3465,6 +3474,10 @@ export function WorkplaneViewport({
   failedModifierEdgeIds = [],
   modifierOnlyVisibleEdges = false,
   onModifierEdgeToggle,
+  onModifierFacePick,
+  modifierAmount = 0,
+  modifierAmountLabel = "",
+  onModifierAmountDrag,
   themePreference = "system",
   resolvedTheme = "light",
   onThemePreferenceChange,
@@ -3732,6 +3745,8 @@ export function WorkplaneViewport({
   const modifierActiveRef = useRef(modifierActive);
   const modifierPreviewActiveRef = useRef(modifierPreviewActive);
   const modifierEdgesRef = useRef(modifierEdges);
+  const edgeDragRef = useRef({ selected: selectedModifierEdgeIds, amount: modifierAmount, label: modifierAmountLabel, onDrag: onModifierAmountDrag });
+  edgeDragRef.current = { selected: selectedModifierEdgeIds, amount: modifierAmount, label: modifierAmountLabel, onDrag: onModifierAmountDrag };
   const modifierEdgePickOptionsRef = useRef({ onlyVisible: modifierOnlyVisibleEdges, alwaysIds: failedModifierEdgeIds });
   modifierEdgePickOptionsRef.current = { onlyVisible: modifierOnlyVisibleEdges, alwaysIds: failedModifierEdgeIds };
   const [hoverModifierEdgeId, setHoverModifierEdgeId] = useState<number | null>(null);
@@ -7276,6 +7291,102 @@ export function WorkplaneViewport({
     };
   }, []);
 
+  /** Fork (build 25): drags the size of a fillet or chamfer from a picked edge, into the body. */
+  const beginEdgeAmountDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>, state: ThreeState, edgeId: number) => {
+    const edges = modifierEdgesRef.current;
+    const edge = edges.find((entry) => entry.id === edgeId);
+    if (!edge || edge.points.length < 6) return;
+    const points: THREE.Vector3[] = [];
+    for (let index = 0; index + 2 < edge.points.length; index += 3) points.push(new THREE.Vector3(edge.points[index], edge.points[index + 1], edge.points[index + 2]));
+    // Where on the edge it was grabbed, and which way the edge runs there.
+    const ray = pointerRayFor(state, event.clientX, event.clientY).clone();
+    let grabbed = points[0].clone();
+    let along = points[1].clone().sub(points[0]);
+    let nearest = Infinity;
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const onRay = new THREE.Vector3();
+      const onEdge = new THREE.Vector3();
+      const gap = ray.distanceSqToSegment(points[index], points[index + 1], onRay, onEdge);
+      if (gap < nearest) {
+        nearest = gap;
+        grabbed = onEdge;
+        along = points[index + 1].clone().sub(points[index]);
+      }
+    }
+    // Into the body: towards the middle of all its edges, square to the edge.
+    const middle = new THREE.Vector3();
+    let count = 0;
+    edges.forEach((entry) => {
+      for (let index = 0; index + 2 < entry.points.length; index += 3) {
+        middle.add(new THREE.Vector3(entry.points[index], entry.points[index + 1], entry.points[index + 2]));
+        count += 1;
+      }
+    });
+    middle.divideScalar(Math.max(1, count));
+    const tangent = along.lengthSq() > 1e-12 ? along.normalize() : new THREE.Vector3(1, 0, 0);
+    const inward = middle.clone().sub(grabbed);
+    inward.addScaledVector(tangent, -inward.dot(tangent));
+    if (inward.lengthSq() < 1e-9) return;
+    inward.normalize();
+    const element = event.currentTarget;
+    const view = element.ownerDocument.defaultView ?? window;
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const start = edgeDragRef.current.amount;
+    const shiftOnPress = event.shiftKey;
+    let moved = false;
+    let amount = start;
+    capturePointer(element, pointerId);
+    state.controls.enabled = false;
+    onInteractionActiveChange?.(true);
+    const show = (clientX: number, clientY: number) => {
+      const rect = state.renderer.domElement.getBoundingClientRect();
+      setFacePullReadout({ x: clientX - rect.left + 20, y: clientY - rect.top - 30, text: `${edgeDragRef.current.label} ${formatMeasure(amount, workspaceRef.current.accuracy)}`, pocket: false });
+    };
+    const move = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      if (!moved && Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < 4) return;
+      moved = true;
+      const pointer = pointerRayFor(state, moveEvent.clientX, moveEvent.clientY);
+      const raw = pullDistanceAlongNormal(grabbed, inward, pointer.origin, pointer.direction) ?? (startY - moveEvent.clientY) * 0.1;
+      // Snapped to 0.1 mm, or to 0.01 mm with Shift held.
+      const step = moveEvent.shiftKey ? 0.01 : 0.1;
+      const next = Math.max(step, Math.round((start + raw) / step) * step);
+      if (Math.abs(next - amount) > 1e-9) {
+        amount = Number(next.toFixed(3));
+        edgeDragRef.current.onDrag?.(amount);
+      }
+      show(moveEvent.clientX, moveEvent.clientY);
+    };
+    const stop = () => {
+      view.removeEventListener("pointermove", move, true);
+      view.removeEventListener("pointerup", up, true);
+      view.removeEventListener("pointercancel", up, true);
+      view.removeEventListener("keydown", key, true);
+      state.controls.enabled = true;
+      setFacePullReadout(null);
+      onInteractionActiveChange?.(false);
+    };
+    const up = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      stop();
+      // A press without a drag is a click: it toggles the edge, as before.
+      if (!moved) onModifierEdgeToggle?.(edgeId, shiftOnPress);
+    };
+    const key = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key !== "Escape") return;
+      keyEvent.preventDefault();
+      keyEvent.stopPropagation();
+      stop();
+      edgeDragRef.current.onDrag?.(start);
+    };
+    view.addEventListener("pointermove", move, true);
+    view.addEventListener("pointerup", up, true);
+    view.addEventListener("pointercancel", up, true);
+    view.addEventListener("keydown", key, true);
+  }, [onInteractionActiveChange, onModifierEdgeToggle]);
+
   /** Fork (build 23): grabs the face under the pointer and pulls it until the button is let go. */
   const beginFacePull = useCallback((event: ReactPointerEvent<HTMLDivElement>, state: ThreeState) => {
     const target = facePullRef.current;
@@ -7512,7 +7623,15 @@ export function WorkplaneViewport({
       if (modifierActive) {
         event.preventDefault();
         const edgeId = pickModifierEdge(event.clientX, event.clientY);
+        if (edgeId !== null && event.button === 0 && edgeDragRef.current.onDrag && edgeDragRef.current.selected.includes(edgeId)) {
+          beginEdgeAmountDrag(event, state, edgeId);
+          return;
+        }
         if (edgeId !== null) onModifierEdgeToggle?.(edgeId, event.shiftKey);
+        else if (event.button === 0 && onModifierFacePick) {
+          const face = pickLayFlatFace(state, event.clientX, event.clientY);
+          if (face) onModifierFacePick(face.point, face.normal);
+        }
         return;
       }
 
@@ -7951,6 +8070,7 @@ export function WorkplaneViewport({
       onInteractionActiveChange?.(true);
     },
     [
+      beginEdgeAmountDrag,
       beginFacePull,
       clearMoveDimensions,
       modifierActive,
@@ -7958,6 +8078,7 @@ export function WorkplaneViewport({
       onDuplicateShapesMoved,
       onInteractionActiveChange,
       onModifierEdgeToggle,
+      onModifierFacePick,
       onPivotPick,
       onLayFlatPick,
       onMateFacePick,

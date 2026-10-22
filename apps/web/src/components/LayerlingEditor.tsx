@@ -3541,6 +3541,30 @@ export function LayerlingEditor({
     setEdgeModifier((latest) => latest ? { ...latest, sharpAngle, selectedEdgeIds: [...next], preview: null, busy: next.size > 0, error: next.size ? null : t("edge.selectAtLeastOne") } : latest);
     if (notice) setNotice(notice, true);
   }, []);
+  // Fork (build 25): a click on a flat face picks all its edges, as in Fusion (again: puts them back).
+  const toggleModifierFaceEdges = useCallback((point: { x: number; y: number; z: number }, normal: { x: number; y: number; z: number }) => {
+    const current = edgeModifierRef.current;
+    if (!current || current.busy) return;
+    const length = Math.hypot(normal.x, normal.y, normal.z) || 1;
+    const n = { x: normal.x / length, y: normal.y / length, z: normal.z / length };
+    const offset = n.x * point.x + n.y * point.y + n.z * point.z;
+    const allowed = new Set(current.edges.filter((edge) => selectableCadModifierEdge(edge, current.sharpAngle)).map((edge) => edge.id));
+    const onFace = current.edges.filter((edge) => {
+      if (!allowed.has(edge.id) || edge.points.length < 6) return false;
+      for (let index = 0; index + 2 < edge.points.length; index += 3) {
+        if (Math.abs(n.x * edge.points[index] + n.y * edge.points[index + 1] + n.z * edge.points[index + 2] - offset) > 0.02) return false;
+      }
+      return true;
+    }).map((edge) => edge.id);
+    if (!onFace.length) {
+      setNotice(t("edge.faceNoEdges"));
+      return;
+    }
+    const next = new Set(current.selectedEdgeIds);
+    const remove = onFace.every((id) => next.has(id));
+    onFace.forEach((id) => (remove ? next.delete(id) : next.add(id)));
+    setEdgeModifier((latest) => latest ? { ...latest, selectedEdgeIds: [...next], preview: null, busy: next.size > 0, error: next.size ? null : t("edge.selectAtLeastOne") } : latest);
+  }, []);
   // Edges the CAD kernel will treat too: OpenCascade takes a picked edge together with every
   // edge that runs on from it smoothly, whatever was clicked (#161).
   const edgeModifierImpliedEdges = useMemo(() => {
@@ -13231,6 +13255,14 @@ export function LayerlingEditor({
           failedModifierEdgeIds={edgeModifier?.error ? edgeModifier.failedEdgeIds ?? NO_EDGE_IDS : NO_EDGE_IDS}
           modifierOnlyVisibleEdges={edgeModifier?.onlyVisibleEdges ?? false}
           onModifierEdgeToggle={toggleModifierEdge}
+          onModifierFacePick={toggleModifierFaceEdges}
+          modifierAmount={edgeModifier?.amount ?? 0}
+          modifierAmountLabel={edgeModifier ? t(edgeModifier.kind === "fillet" ? "edge.radius" : "edge.distance") : ""}
+          onModifierAmountDrag={edgeModifier?.prepared ? (value) => setEdgeModifier((current) => {
+            if (!current?.prepared) return current;
+            const amount = Math.max(MIN_EDGE_MODIFIER_AMOUNT, Math.min(edgeModifierMaxAmount, value));
+            return amount === current.amount ? current : { ...current, amount, preview: null, busy: current.selectedEdgeIds.length > 0, error: null };
+          }) : undefined}
           themePreference={themePreference}
           resolvedTheme={resolvedTheme}
           onThemePreferenceChange={onThemePreferenceChange}

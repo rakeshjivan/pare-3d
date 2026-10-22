@@ -2807,7 +2807,7 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "edge.groupedObjects": "{count} gruppierte Objekte",
   "edge.existingFeatureOne": " · 1 vorhandene Kantenbearbeitung",
   "edge.existingFeatureMany": " · {count} vorhandene Kantenbearbeitungen",
-  "edge.selectionHelp": "Klicke die hervorgehobenen Kanten an, um sie ein- und auszuschalten. Mit Umschalt fügst du eine einzelne Kante hinzu oder nimmst sie weg.",
+  "edge.selectionHelp": "Kanten anklicken, um sie zu wählen, oder eine Fläche anklicken, um alle ihre Kanten zu wählen. Eine gewählte Kante ins Teil ziehen setzt die Größe. Umschalt: eine einzelne Kante, oder feinere Schritte beim Ziehen.",
   "edge.loading": "CAD-Kantendaten werden im Browser vorbereitet.",
   "edge.previewBusy": "Die Vorschau wird berechnet. Du kannst weiter einstellen – gerechnet wird immer der zuletzt gewählte Wert.",
   "edge.allSharpEdges": "Alle scharfen Kanten",
@@ -3322,4 +3322,5 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "blend.pieceName": "Übergang",
   "blend.created": "Verbunden: die beiden Teile und das Stück dazwischen sind eine Gruppe",
   "blend.cancelled": "Übergang abgebrochen",
+  "edge.faceNoEdges": "Keine Kante dieser Fläche lässt sich bei dieser Schwelle verrunden. Stattdessen eine Kante anklicken.",
 };

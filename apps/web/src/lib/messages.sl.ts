@@ -3300,4 +3300,5 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "blend.pieceName": "Blend",
   "blend.created": "Blended: the two parts and the piece between them are one group",
   "blend.cancelled": "Blend cancelled",
+  "edge.faceNoEdges": "No edge of that face can be rounded at this threshold. Click an edge instead.",
 };
