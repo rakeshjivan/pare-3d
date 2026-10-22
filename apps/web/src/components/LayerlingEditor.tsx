@@ -103,6 +103,8 @@ import { EdgeModifierPanel, type EdgeChamferStyle } from "./workplane/EdgeModifi
 import { FitCheckPanel } from "./workplane/FitCheckPanel";
 import { MeshRoundPanel } from "./workplane/MeshRoundPanel";
 import { FlexiModelPanel } from "./workplane/FlexiModelPanel";
+import { SurfaceTextPanel, type SurfaceTextSettings } from "./workplane/SurfaceTextPanel";
+import { SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK, surfaceTextPositions } from "@/lib/surfaceText";
 import { DEFAULT_FLEXI_MODEL, flexiModelSegments, type FlexiModelOptions } from "@/lib/flexiModel";
 import { checkFit, hullPositions, type FitReport } from "@/lib/partTools";
 import { roundMeshPositions, smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
@@ -207,7 +209,7 @@ import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames"
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
 import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
-import { BookOpen, Import, Keyboard, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, StickyNote, Upload, Waves } from "lucide-react";
+import { BookOpen, Import, Keyboard, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, StickyNote, Type, Upload, Waves } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -2083,11 +2085,15 @@ function uprightCylinderDiameter(shape: WorkplaneShape): number | null {
  * middle faces the click, at the click's height. Cut-in text (sink > 0) goes that deep into the wall.
  */
 function textWrappedOnCylinder(text: WorkplaneShape, cylinder: WorkplaneShape, hit: PlacementPoint, sink: number): WorkplaneShape | CylinderWrapError {
-  const diameter = uprightCylinderDiameter(cylinder);
-  if (!diameter) return "invalidDiameter";
+  const wall = uprightCylinderDiameter(cylinder);
+  if (!wall) return "invalidDiameter";
   // The text lying flat, as it came from the Ready-made parts window; cut-in text as deep as it goes in.
-  const flat = canonicalizeShape({ ...text, x: 0, z: 0, elevation: 0, rotation: 0, rotationX: 0, rotationZ: 0, ...(sink > 0 ? { height: sink } : {}) });
+  // Raised text starts a little inside the wall (build 34): the cylinder is drawn with flat facets that
+  // lie inside the true circle, and letters standing exactly on it floated over the facets.
+  const raisedSink = sink > 0 ? 0 : SURFACE_TEXT_SINK;
+  const flat = canonicalizeShape({ ...text, x: 0, z: 0, elevation: 0, rotation: 0, rotationX: 0, rotationZ: 0, ...(sink > 0 ? { height: sink } : { height: text.height + raisedSink }) });
   const mesh = meshForShape(flat);
+  const diameter = wall - 2 * raisedSink;
   const result = wrapMeshAroundCylinder({ vertices: mesh.vertices, faces: mesh.faces }, { diameter, inward: sink > 0 });
   if ("error" in result) return result.error;
   // Turn the wrapped body (its middle faces +z) towards the click, round the cylinder's axis.
@@ -2103,12 +2109,12 @@ function textWrappedOnCylinder(text: WorkplaneShape, cylinder: WorkplaneShape, h
     world[i + 1] = result.positions[i + 1] + lift;
     world[i + 2] = cylinder.z - x * sin + z * cos;
   }
-  return canonicalizeShape({ ...shapeWithWorldPositions(text, world), cylinderWrap: { diameter, ...(sink > 0 ? { inward: true } : {}) } });
+  return canonicalizeShape({ ...shapeWithWorldPositions(text, world), cylinderWrap: { diameter: wall, ...(sink > 0 ? { inward: true } : {}) } });
 }
 
 function canWrapAroundCylinder(shape: WorkplaneShape | null | undefined) {
   // A shape that is wrapped already is a mesh of the wrapped thing: wrapping that again gave nonsense (#329).
-  return Boolean(shape && !shape.locked && !shape.cylinderWrap && shape.groupOperation !== "bundle" && !isNonSolidShapeKind(shape.kind));
+  return Boolean(shape && !shape.locked && !shape.cylinderWrap && !shape.surfaceText && shape.groupOperation !== "bundle" && !isNonSolidShapeKind(shape.kind));
 }
 
 
@@ -3755,6 +3761,16 @@ export function LayerlingEditor({
   intersectPreviewIdsRef.current = intersectPreviewIds;
   const intersectPreviewRunRef = useRef(0);
   const intersectPreviewEmptyRef = useRef(false);
+  // Fork (build 34): text on any surface.
+  const [surfaceTextTool, setSurfaceTextTool] = useState<{
+    settings: SurfaceTextSettings;
+    placement: { targetId: string; origin: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } } | null;
+    editingId: string | null;
+    busy: boolean;
+    error: string | null;
+    offSurface: number;
+    preview: WorkplaneShape | null;
+  } | null>(null);
   // Fork (build 33): Fit check - the parts it checks, and what they share drawn in red on top.
   const [fitCheck, setFitCheck] = useState<{ clearance: number; ids: string[] | null } | null>(null);
   const [fitReport, setFitReport] = useState<FitReport | null>(null);
@@ -3768,13 +3784,18 @@ export function LayerlingEditor({
       const ghosts = result.map((shape) => (operands.has(shape.id) && !shape.hole ? { ...shape, transparent: true } : shape));
       result = intersectPreviewShape ? [...ghosts, intersectPreviewShape] : ghosts;
     }
+    if (surfaceTextTool?.preview) {
+      // While a text is edited, the old one is hidden behind its new preview.
+      const editing = surfaceTextTool.editingId;
+      result = [...(editing ? result.filter((shape) => shape.id !== editing) : result), surfaceTextTool.preview];
+    }
     if (fitCheck && fitOverlay.length) {
       // The overlapping parts see-through, so the red overlap inside them shows.
       const overlapping = new Set((fitReport?.findings ?? []).filter((finding) => finding.kind === "overlap").flatMap((finding) => [finding.a, finding.b]));
       result = [...result.map((shape) => (overlapping.has(shape.id) ? { ...shape, transparent: true } : shape)), ...fitOverlay];
     }
     return result;
-  }, [baseViewportShapes, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape]);
+  }, [baseViewportShapes, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape, surfaceTextTool?.editingId, surfaceTextTool?.preview]);
   // A revolve sketch on the base plate is a side view: the bodies are shown from the front, as the profile is drawn (#525).
   // Opened again to edit a body that stands upright, it is the same side view: that body stands at its height, not on the plate's workplane.
   const editedRevolveShape = sketchActive && sketchOperation === "revolve" && editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) : undefined;
@@ -9258,6 +9279,117 @@ export function LayerlingEditor({
     if (flexiTool && !(selectedIds.length === 1 && selectedIds[0] === flexiTool.shapeId) && !flexiTool.busy) setFlexiTool(null);
   }, [flexiTool, selectedIds]);
 
+
+  const surfaceTextRunRef = useRef(0);
+  const lastSurfaceTextSettingsRef = useRef<SurfaceTextSettings>({ text: "TEXT", font: "Multilanguage", letterHeight: 8, depth: 1, mode: "raised", rotation: 0 });
+  const toggleSurfaceText = useCallback(() => {
+    if (surfaceTextTool) {
+      setSurfaceTextTool(null);
+      return;
+    }
+    const editing = selectedShapes.length === 1 && selectedShapes[0].surfaceText ? selectedShapes[0] : null;
+    const record = editing?.surfaceText;
+    setSurfaceTextTool({
+      settings: record ? { text: record.text, font: record.font, letterHeight: record.letterHeight, depth: record.depth, mode: record.mode, rotation: record.rotation } : lastSurfaceTextSettingsRef.current,
+      placement: record ? { targetId: record.targetId, origin: record.origin, normal: record.normal } : null,
+      editingId: editing?.id ?? null,
+      busy: false,
+      error: null,
+      offSurface: 0,
+      preview: null,
+    });
+    setNotice(t(record ? "surfaceText.editing" : "surfaceText.clickToPlace"), true);
+  }, [selectedShapes, surfaceTextTool]);
+  const pickSurfaceText = useCallback((pick: LayFlatPick | null) => {
+    if (!pick) {
+      setNotice(t("surfaceText.missed"));
+      return;
+    }
+    setSurfaceTextTool((current) => current ? { ...current, placement: { targetId: pick.shapeId, origin: pick.point, normal: pick.normal }, error: null } : current);
+  }, []);
+  // The text is laid again a moment after every change of its settings or its place.
+  useEffect(() => {
+    const tool = surfaceTextTool;
+    if (!tool?.placement || !tool.settings.text.trim()) return;
+    const run = surfaceTextRunRef.current + 1;
+    surfaceTextRunRef.current = run;
+    const { settings, placement } = tool;
+    const timer = window.setTimeout(async () => {
+      const target = shapesRef.current.find((shape) => shape.id === placement.targetId);
+      if (!target) {
+        setSurfaceTextTool((current) => current ? { ...current, error: t("surfaceText.targetGone") } : current);
+        return;
+      }
+      setSurfaceTextTool((current) => current ? { ...current, busy: true } : current);
+      try {
+        const thickness = settings.mode === "engraved" ? settings.depth + SURFACE_TEXT_OVERSHOOT : settings.depth;
+        const textAsset = libraryShapeAssets.find((asset) => asset.id === "text")!;
+        const flat = canonicalizeShape({
+          ...makeShapeFromAsset(textAsset, { x: 0, z: 0, elevation: 0 }, { text: settings.text.trim(), width: Math.max(settings.letterHeight, settings.text.length * settings.letterHeight * 1.3), depth: settings.letterHeight, height: thickness }),
+          text: settings.text.trim(),
+          font: settings.font,
+        } as WorkplaneShape);
+        let result: { positions: number[]; offSurface: number };
+        const normalLength = Math.hypot(placement.normal.x, placement.normal.y, placement.normal.z) || 1;
+        if (settings.rotation === 0 && uprightCylinderDiameter(target) && Math.abs(placement.normal.y) < 0.35 * normalLength) {
+          // The side of an upright cylinder or tube: wrapped exactly round it, however far the text runs.
+          const wrapped = textWrappedOnCylinder({ ...flat, height: settings.depth }, target, placement.origin, settings.mode === "engraved" ? settings.depth : 0);
+          if (typeof wrapped === "string") throw new Error(t(wrapped === "tooWide" ? "faceText.tooWide" : "faceText.wrapFailed"));
+          const wrappedMesh = meshForShape(wrapped);
+          result = { positions: wrappedMesh.faces.flatMap((face) => face.flatMap((index) => wrappedMesh.vertices[index])), offSurface: 0 };
+        } else {
+          const mesh = meshForShape(flat);
+          const letters = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
+          result = await surfaceTextPositions(letters, worldTriangles(target), { origin: placement.origin, normal: placement.normal, rotation: settings.rotation }, { depth: settings.depth, mode: settings.mode, letterHeight: settings.letterHeight });
+        }
+        if (surfaceTextRunRef.current !== run) return;
+        const name = settings.text.trim();
+        const preview = {
+          ...shapeWithWorldPositions(meshShapeFromPositions(name, settings.mode === "engraved" ? "#999999" : target.color, result.positions), result.positions),
+          id: "surface-text-preview",
+          name,
+          hole: settings.mode === "engraved" || undefined,
+          locked: true,
+          previewOnly: true,
+        } as WorkplaneShape;
+        setSurfaceTextTool((current) => current ? { ...current, preview, busy: false, offSurface: result.offSurface, error: null } : current);
+      } catch (error) {
+        if (surfaceTextRunRef.current === run) setSurfaceTextTool((current) => current ? { ...current, busy: false, preview: null, error: error instanceof Error ? localizedError(error.message) : String(error) } : current);
+      }
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [surfaceTextTool?.placement, surfaceTextTool?.settings]);
+  const applySurfaceText = useCallback(() => {
+    const tool = surfaceTextTool;
+    if (!tool?.preview || !tool.placement || tool.busy) return;
+    const record = { ...tool.settings, text: tool.settings.text.trim(), ...tool.placement };
+    lastSurfaceTextSettingsRef.current = tool.settings;
+    const base = shapesRef.current.find((shape) => shape.id === tool.editingId);
+    const made = canonicalizeShape({
+      ...tool.preview,
+      id: base?.id ?? createLocalId("text"),
+      name: base?.name && base.name !== base.surfaceText?.text ? base.name : record.text,
+      color: base && !base.hole && tool.settings.mode === "raised" ? base.color : tool.preview.color,
+      locked: false,
+      previewOnly: undefined,
+      surfaceText: record,
+    } as WorkplaneShape);
+    const target = shapesRef.current.find((shape) => shape.id === record.targetId);
+    const next = base ? shapesRef.current.map((shape) => (shape.id === base.id ? made : shape)) : [...shapesRef.current, made];
+    commitShapes(next, made.id, t(tool.settings.mode === "engraved" ? "surfaceText.doneEngraved" : "surfaceText.doneRaised", { name: target ? displayShapeName(target) : "" }));
+    setSurfaceTextTool(null);
+  }, [commitShapes, surfaceTextTool]);
+
+  useEffect(() => {
+    if (!surfaceTextTool) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSurfaceTextTool(null);
+      else if (event.key === "Enter" && !(event.target instanceof HTMLElement && event.target.closest("input, select, textarea"))) applySurfaceText();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [applySurfaceText, surfaceTextTool]);
+
   /** Fork (build 33): opens or closes Fit check, on the selected parts (two or more) or else on every visible part. */
   const toggleFitCheck = useCallback(() => {
     if (fitCheck) {
@@ -13608,6 +13740,7 @@ export function LayerlingEditor({
         { key: "hollow", label: t("editor.tool.hollow"), onSelect: startShellTool },
         { key: "deleteFace", label: t("editor.tool.deleteFace"), onSelect: startDeleteFaceTool },
         { key: "roundMesh", label: t("meshRound.menu"), onSelect: toggleMeshRound },
+        { key: "surfaceText", label: t(selectedShapes.length === 1 && selectedShapes[0].surfaceText ? "surfaceText.editMenu" : "surfaceText.menu"), onSelect: toggleSurfaceText },
         { key: "flexiModel", label: t("flexiModel.menu"), onSelect: toggleFlexiTool },
       );
       if (!single.hole && !isNonSolidShapeKind(single.kind)) {
@@ -13756,6 +13889,8 @@ export function LayerlingEditor({
           onRound: toggleMeshRound,
           flexiActive: Boolean(flexiTool),
           onFlexi: toggleFlexiTool,
+          textActive: Boolean(surfaceTextTool),
+          onText: toggleSurfaceText,
         }}
         canBlendBodies={!selectionLocked && ((selectedShapes.length === 2 && selectedShapes.every((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind))) || (selectedShapes.length === 1 && Boolean(selectedShapes[0].blendSource)))}
         canFaceTool={selectedShapes.length === 1 && Boolean(selectedShape && !selectedShape.locked && !selectedShape.hole && !isNonSolidShapeKind(selectedShape.kind))}
@@ -13820,6 +13955,12 @@ export function LayerlingEditor({
             onMake={(maker) => {
               close();
               setMakerPanel(maker);
+            }}
+            onTextTool={(text) => {
+              close();
+              lastSurfaceTextSettingsRef.current = { ...lastSurfaceTextSettingsRef.current, ...text };
+              setSurfaceTextTool({ settings: lastSurfaceTextSettingsRef.current, placement: null, editingId: null, busy: false, error: null, offSurface: 0, preview: null });
+              setNotice(t("surfaceText.clickToPlace"), true);
             }}
           />
         )}
@@ -14086,7 +14227,9 @@ export function LayerlingEditor({
           onPivotPick={pickRotationPivot}
           layFlatPickMode={layFlatPickMode}
           onLayFlatPick={layFlatOnFace}
-          mateFacePick={mateTool && mateTool.step !== "ready"
+          mateFacePick={surfaceTextTool
+            ? { shapeIds: shapes.filter((shape) => !shape.hidden && shape.id !== surfaceTextTool.editingId && !isNonSolidShapeKind(shape.kind)).map((shape) => shape.id) }
+            : mateTool && mateTool.step !== "ready"
             ? { shapeIds: mateTool.step === "source" ? [mateTool.sourceId] : shapes.filter((shape) => shape.id !== mateTool.sourceId && !shape.hidden).map((shape) => shape.id) }
             : holePatternTool?.step === "pick"
               ? { shapeIds: [holePatternTool.sourceId] }
@@ -14125,7 +14268,7 @@ export function LayerlingEditor({
           onFacePullCancel={shellTool ? () => {
             shellPullFaceRef.current = null;
           } : cancelFacePull}
-          onMateFacePick={mateTool ? pickMateFace : faceTool ? pickFaceToolFace : blendTool ? pickBlendFace : fillHoleTool ? pickFillHole : pickHolePatternFace}
+          onMateFacePick={surfaceTextTool ? pickSurfaceText : mateTool ? pickMateFace : faceTool ? pickFaceToolFace : blendTool ? pickBlendFace : fillHoleTool ? pickFillHole : pickHolePatternFace}
           cadFacePick={historyViewState ? null : cadFacePick}
           onCadFacePick={toggleDeleteFace}
           onNoteAdd={addNote}
@@ -14488,6 +14631,21 @@ export function LayerlingEditor({
           onClearanceChange={(clearance) => setFitCheck((current) => current ? { ...current, clearance: Math.max(0, Math.min(2, clearance)) } : current)}
           onSelectPair={(a, b) => selectShape([a, b])}
           onClose={() => setFitCheck(null)}
+        />
+      ) : null}
+      {surfaceTextTool ? (
+        <SurfaceTextPanel
+          settings={surfaceTextTool.settings}
+          placed={Boolean(surfaceTextTool.placement && surfaceTextTool.preview)}
+          targetName={surfaceTextTool.placement ? displayShapeName(shapes.find((shape) => shape.id === surfaceTextTool.placement?.targetId) ?? ({ name: "" } as WorkplaneShape)) : null}
+          editing={Boolean(surfaceTextTool.editingId)}
+          busy={surfaceTextTool.busy}
+          offSurface={surfaceTextTool.offSurface}
+          error={surfaceTextTool.error}
+          workspace={workspaceSettings}
+          onChange={(patch) => setSurfaceTextTool((current) => current ? { ...current, settings: { ...current.settings, ...patch } } : current)}
+          onApply={applySurfaceText}
+          onCancel={() => setSurfaceTextTool(null)}
         />
       ) : null}
       {flexiTool ? (
@@ -15108,7 +15266,7 @@ function SecondaryToolbar({
   onFaceTool: () => void;
   onBlendBodies: () => void;
   /** Fork (build 33): Hull, Fit check and Round a mesh. */
-  build33: { canHull: boolean; onHull: () => void; fitActive: boolean; onFitCheck: () => void; canRound: boolean; roundActive: boolean; onRound: () => void; flexiActive: boolean; onFlexi: () => void };
+  build33: { canHull: boolean; onHull: () => void; fitActive: boolean; onFitCheck: () => void; canRound: boolean; roundActive: boolean; onRound: () => void; flexiActive: boolean; onFlexi: () => void; textActive: boolean; onText: () => void };
   blendBodiesActive: boolean;
   canBlendBodies: boolean;
   faceToolActive: boolean;
@@ -15485,6 +15643,7 @@ function SecondaryToolbar({
     { id: "fillet", label: t("editor.tool.fillet"), icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify, active: edgeModifierKind === "fillet" },
     { id: "hollow", label: t("editor.tool.hollow"), icon: ToolbarHollowIcon, action: onHollow, enabled: canEdgeModify, active: hollowActive },
     { id: "deleteFace", label: t("editor.tool.deleteFace"), icon: ToolbarDeleteFaceIcon, action: onDeleteFace, enabled: canEdgeModify, active: deleteFaceActive },
+    { id: "surfaceText", label: t("editor.tool.surfaceText"), icon: Type, action: build33.onText, enabled: true, active: build33.textActive },
     { id: "roundAll", label: t("meshRound.title"), icon: Squircle, action: build33.onRound, enabled: build33.canRound || build33.roundActive, active: build33.roundActive },
     { id: "flexiModel", label: t("flexiModel.title"), icon: Waves, action: build33.onFlexi, enabled: build33.canRound || build33.flexiActive, active: build33.flexiActive },
   ];

@@ -927,6 +927,18 @@ export type WorkplaneShape = {
    * that box rather than the arc the mesh actually covers.
    */
   cylinderWrap?: { diameter: number; inward?: boolean };
+  /** Fork (build 34): text laid on another part's surface, kept so it can be edited and laid again. */
+  surfaceText?: {
+    text: string;
+    font: string;
+    letterHeight: number;
+    depth: number;
+    mode: "raised" | "engraved";
+    rotation: number;
+    targetId: string;
+    origin: { x: number; y: number; z: number };
+    normal: { x: number; y: number; z: number };
+  };
   importedMesh?: {
     positions: number[];
     normals?: number[];

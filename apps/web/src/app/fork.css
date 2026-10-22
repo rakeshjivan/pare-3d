@@ -1354,3 +1354,8 @@ html[data-theme="dark"] .fit-check-summary.ok { color: #5fd47c; }
 .mesh-dropdown { display: grid; gap: 4px; }
 .toolbar-overflow-section { position: relative; }
 .mesh-dropdown .visibility-dropdown-action.active { border-color: var(--accent, #1662b3); }
+
+/* Fork (build 34): text on any surface. */
+.surface-text-field { display: grid; gap: 4px; margin: 4px 0 8px; font: 600 12px var(--font-ui); color: var(--foreground); }
+.surface-text-field input, .surface-text-field select { height: 32px; padding: 0 10px; border: 1px solid var(--border, #d6dbe1); border-radius: 7px; background: var(--panel, #fff); color: var(--foreground); font: 500 14px var(--font-ui); }
+.surface-text-field input:focus, .surface-text-field select:focus { outline: none; border-color: var(--accent, #1662b3); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #1662b3) 18%, transparent); }

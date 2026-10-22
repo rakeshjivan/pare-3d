@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 34,
+    items: [
+      "Text on any surface, like Bambu Studio: click the T in Modify (or right-click a part > Add text here), type, click anywhere on a part - the letters hug flat, curved, domed and imported surfaces, raised or cut in. Click elsewhere to move it; font, size, depth and turn change it at once.",
+      "The text stays editable: select it and click T again to change the words or move it, then Update. Group it with the part when it is final.",
+      "On the side of a cylinder or tube the text wraps exactly round it; raised text now sits a little into the wall so it always joins it.",
+    ],
+  },
+  {
     build: 33,
     items: [
       "Tool tracing into a Gridfinity bin: lay several tools on one sheet of paper, photograph them, and Photo to outline > Gridfinity bin makes a bin just big enough, with a pocket (and a finger notch) for each tool.",

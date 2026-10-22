@@ -37,7 +37,7 @@ import {
 } from "@/lib/readyParts";
 
 /** Fork: the Shapes panel's "Ready-made parts" - built from ordinary shapes, placed with a click. */
-export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: ReadyPart[], options?: { sink?: number; carry?: boolean }) => void; onMake?: (maker: "lithophane" | "trace" | "voronoi") => void }) {
+export function ReadyPartsSection({ onInsert, onMake, onTextTool }: { onInsert: (parts: ReadyPart[], options?: { sink?: number; carry?: boolean }) => void; onMake?: (maker: "lithophane" | "trace" | "voronoi") => void; onTextTool?: (text: { text: string; letterHeight: number; depth: number; mode: "engraved" | "raised" }) => void }) {
   useLanguage();
   const [insertSize, setInsertSize] = useState<MetricSize>("M3");
   const [nutSize, setNutSize] = useState<MetricSize>("M3");
@@ -314,6 +314,11 @@ export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: Read
                 type="button"
                 className="ready-part-make"
                 onClick={() => {
+                  // Fork (build 34): the text tool that hugs any surface takes it from here.
+                  if (onTextTool) {
+                    onTextTool({ text: faceText.text || "TEXT", letterHeight: faceText.letterHeight, depth: faceText.depth, mode: faceText.mode });
+                    return;
+                  }
                   const part = faceTextPart(faceText, faceText.text || "TEXT");
                   onInsert([part], { sink: part.sink, carry: true });
                 }}

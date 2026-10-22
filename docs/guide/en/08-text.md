@@ -20,6 +20,25 @@ Text is at first a single body. If you want to treat the letters individually, c
 
 The edges of text can be chamfered or filleted too, straight or curved, see [Breaking edges and hollowing bodies](chapter:edges-and-hollowing). Use small sizes such as 0.2 to 0.5 mm, because the strokes of the letters are narrow.
 
+## Text on any surface
+
+To put lettering on a part - a name on a mug, a label on a curved lid, a number on a scanned model - use **{{ui:editor.tool.surfaceText}}** in the {{ui:editor.group.modify}} group (the **T**), or right-click a part and choose {{ui:surfaceText.menu}}. It works like the text tool in Bambu Studio:
+
+1. Type the text, and choose the {{ui:surfaceText.font}}, {{ui:readyParts.raised}} or {{ui:readyParts.engraved}}, the {{ui:readyParts.letterHeight}} and the {{ui:readyParts.textDepth}}.
+2. Click on any part where the text should go. The letters hug the surface there - flat, sloped, curved, a dome, an imported STL - standing out of it or reaching into it by the depth.
+3. Click elsewhere to move it; change any setting and the text is laid again at once. {{ui:surfaceText.rotation}} turns it on the surface.
+4. {{ui:surfaceText.apply}} (or [[Enter]]) adds it.
+
+The text stays editable: select it and click the **T** again (or right-click it and choose {{ui:surfaceText.editMenu}}) to change the words, font, size, depth or where it sits, then {{ui:surfaceText.update}}.
+
+When it is final, select the text and the part and group them ([[Ctrl]]+[[G]]): raised text joins the part, cut-in text is cut out of it.
+
+Good to know:
+
+- On the side of an upright cylinder or tube (with {{ui:surfaceText.rotation}} at 0°) the text is wrapped exactly round it, however far it runs. Elsewhere it is projected onto the surface along the direction of the face you clicked, so text running far round a tight curve gets stretched - make it smaller, or split it in two.
+- Text across a sharp edge or a deep crease bends with it, as in any slicer's text tool.
+- If part of the text runs off the part, the window says how much; move it or make it smaller.
+
 ## Your own fonts
 
 Besides the eight built-in fonts you can use any font of your own: a font file from your computer or, in Chrome and Edge, a font installed on your computer. Choose {{ui:font.manage}} at the bottom of {{ui:prop.font}}. The {{ui:font.title}} window opens.

@@ -105,6 +105,7 @@ export const GUIDE_SECTIONS = {
   fitCheck: { chapter: "printing", en: "fit-check-overlaps-and-tight-gaps" },
   meshRound: { chapter: "files", en: "rounding-a-mesh" },
   flexiModel: { chapter: "threads", en: "making-any-model-flexi" },
+  surfaceText: { chapter: "text", en: "text-on-any-surface" },
   makeFromPhoto: { chapter: "shapes", en: "making-from-a-photo-or-a-pattern" },
   spaceOut: { chapter: "select", en: "spacing-parts-out" },
   printCheck: { chapter: "printing", en: "ready-to-print" },
