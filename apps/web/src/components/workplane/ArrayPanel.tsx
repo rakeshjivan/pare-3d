@@ -64,6 +64,7 @@ export function ArrayPanel({
       <div className="edge-modifier-target">
         <strong>{targetName}</strong>
         <span>{t(settings.mode === "grid" ? "array.helpGrid" : settings.mode === "row" ? (settings.measure === "gap" ? "array.helpRowGap" : "array.helpRow") : pivotSet ? "array.helpCirclePivot" : "array.helpCircle")}</span>
+        {settings.mode === "grid" ? null : <span>{t(settings.mode === "row" ? "array.dragHintRow" : "array.dragHintCircle")}</span>}
       </div>
 
       <div className="edge-modifier-field shell-openings" role="radiogroup" aria-label={t("array.mode")}>

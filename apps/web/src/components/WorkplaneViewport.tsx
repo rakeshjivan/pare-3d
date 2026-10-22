@@ -164,6 +164,8 @@ import { syncHistoryPickHighlight } from "@/components/workplane/historyPickHigh
 import { orbitViewBy, panViewBy } from "@/lib/viewArrowKeys";
 import { useViewportKeyboardHooks } from "@/components/workplane/viewportKeyboard";
 import { pullDistanceAlongNormal, snapPullDistance, typedPull } from "@/lib/facePull";
+
+type Vec3Like = { x: number; y: number; z: number };
 import { aimPickRay, firstShapeHit, pickLayFlatFace, pickRotationPivot, pickShapeAt, pickShapeIdAt, pointerRayFor, rayPointOnRotationPlane, RENDER_LAYER_SHAPES, splitAxisParameter, usePickOnlyPointer, type LayFlatPick, type PickOnlySelection } from "@/components/workplane/viewportPicking";
 export type { LayFlatPick } from "@/components/workplane/viewportPicking";
 import { RENDER_LAYER_HELPERS, sharedOverlayLineMaterial, sharedShapeGeometryCache, sharedEdgesGeometryCache, sharedShapeMaterialCache, type PointCardOffset, type ShapeRenderRecord, type ThreeState, type MoveDimensionSession, type NoteOverlayState, type TapePoint, type TapeAttachment, type TapeEdgeAttachment, type TapeModel, type TapeOverlayState, type TapeCandidate, type RotationHandleSide, type RotationHandleSides, type DragItem, quaternionForShape, projectToScreen, syncMoveDimensionWorldLines, syncTransformGuideWorldLines, tapeShapeDimensions, tapePointWorld, tapeEdgeWorldPoints, tapeSegmentWorldPoints, syncTapeOverlay, syncNoteOverlay, NoteOverlay, TapeOverlay, type RulerDimensionOverlayItem, type RulerDimensionOverlayState, syncRulerDimensionOverlay, RulerDimensionOverlay, type CornerRulerInstance, type CornerRulerOverlayState, syncCornerRulerToolOverlay, CornerRulerToolOverlay, syncOriginDimensionWorldLines, shapeCenter, shapeLocalExtents, projectShapeExtent, projectShapesExtent, type OriginDimensionFrame, setObjectRenderLayer, freezeStaticObjectMatrices, formatMeasure, findShapeObject, trimSharedShapeGeometryCache, releaseSharedShapeGeometry, trimSharedShapeMaterialCache, releaseSharedShapeMaterials, disposeMaterialResource, disposeChildren, disposeObject } from "@/components/workplane/ViewportOverlays";
@@ -457,6 +459,15 @@ type WorkplaneViewportProps = {
    */
   /** `inward`: the value is how far into the body (a wall thickness), shown as `label` and a positive number. */
   facePull?: { shapeIds: string[]; inward?: boolean; label?: string } | null;
+  /**
+   * Fork (build 25): Pattern by dragging. Pressing on one of these preview copies and dragging reports
+   * how far along `direction` from `anchor` the pointer is, and where it is on the level plane through
+   * `anchor`; + and - change the count. The editor answers with the text shown beside the pointer.
+   */
+  arrayHandle?: { shapeIds: string[]; anchor: Vec3Like; direction: Vec3Like } | null;
+  onArrayHandleDrag?: (drag: { grabbedId: string; distance: number; point: Vec3Like | null; countChange: number; fine: boolean }) => string;
+  onArrayHandleEnd?: (moved: boolean) => void;
+  onArrayHandleCancel?: () => void;
   /** False refuses the press; a number is the depth the face already stands at (grabbing the preview again). */
   onFacePullStart?: (pick: LayFlatPick) => boolean | number;
   /** The whole depth: out positive, in negative (typed or dragged). */
@@ -3451,6 +3462,10 @@ export function WorkplaneViewport({
   mateFacePick = null,
   onMateFacePick,
   facePull = null,
+  arrayHandle = null,
+  onArrayHandleDrag,
+  onArrayHandleEnd,
+  onArrayHandleCancel,
   onFacePullStart,
   onFacePullDrag,
   onFacePullEnd,
@@ -3507,6 +3522,8 @@ export function WorkplaneViewport({
   const [facePullReadout, setFacePullReadout] = useState<{ x: number; y: number; text: string; pocket: boolean } | null>(null);
   const facePullRef = useRef(facePull);
   facePullRef.current = facePull;
+  const arrayHandleRef = useRef({ handle: arrayHandle, onDrag: onArrayHandleDrag, onEnd: onArrayHandleEnd, onCancel: onArrayHandleCancel });
+  arrayHandleRef.current = { handle: arrayHandle, onDrag: onArrayHandleDrag, onEnd: onArrayHandleEnd, onCancel: onArrayHandleCancel };
   const facePullCallbacksRef = useRef({ onFacePullStart, onFacePullDrag, onFacePullEnd, onFacePullCancel });
   facePullCallbacksRef.current = { onFacePullStart, onFacePullDrag, onFacePullEnd, onFacePullCancel };
   // A turned body's angles under it, named like its position: Y across the
@@ -7292,6 +7309,91 @@ export function WorkplaneViewport({
     };
   }, []);
 
+  /** Fork (build 25): drags a pattern's copies further apart or closer (or round the circle). */
+  const beginArrayHandleDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>, state: ThreeState, grabbedId: string) => {
+    const handle = arrayHandleRef.current.handle;
+    if (!handle) return;
+    const anchor = new THREE.Vector3(handle.anchor.x, handle.anchor.y, handle.anchor.z);
+    const direction = new THREE.Vector3(handle.direction.x, handle.direction.y, handle.direction.z);
+    const level = new THREE.Plane(new THREE.Vector3(0, 1, 0), -anchor.y);
+    const element = event.currentTarget;
+    const view = element.ownerDocument.defaultView ?? window;
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let lastX = startX;
+    let lastY = startY;
+    let moved = false;
+    let countChange = 0;
+    let fine = event.shiftKey;
+    capturePointer(element, pointerId);
+    state.controls.enabled = false;
+    onInteractionActiveChange?.(true);
+    // Measured from where the copy was grabbed, so nothing jumps on the first move.
+    const along = (clientX: number, clientY: number) => {
+      const ray = pointerRayFor(state, clientX, clientY);
+      return direction.lengthSq() > 1e-9 ? pullDistanceAlongNormal(anchor, direction, ray.origin, ray.direction) : null;
+    };
+    const startAlong = along(startX, startY);
+    const report = () => {
+      const ray = pointerRayFor(state, lastX, lastY);
+      const now = along(lastX, lastY);
+      const distance = now !== null && startAlong !== null ? now - startAlong : (startY - lastY) * 0.1;
+      const hit = ray.intersectPlane(level, new THREE.Vector3());
+      const text = arrayHandleRef.current.onDrag?.({ grabbedId, distance: moved ? distance : 0, point: moved && hit ? { x: hit.x, y: hit.y, z: hit.z } : null, countChange, fine }) ?? "";
+      const rect = state.renderer.domElement.getBoundingClientRect();
+      setFacePullReadout({ x: lastX - rect.left + 20, y: lastY - rect.top - 30, text, pocket: false });
+    };
+    const move = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      lastX = moveEvent.clientX;
+      lastY = moveEvent.clientY;
+      fine = moveEvent.shiftKey;
+      if (!moved && Math.hypot(lastX - startX, lastY - startY) < 4) return;
+      moved = true;
+      report();
+    };
+    const stop = () => {
+      view.removeEventListener("pointermove", move, true);
+      view.removeEventListener("pointerup", up, true);
+      view.removeEventListener("pointercancel", cancel, true);
+      view.removeEventListener("keydown", key, true);
+      state.controls.enabled = true;
+      setFacePullReadout(null);
+      onInteractionActiveChange?.(false);
+    };
+    const up = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      stop();
+      arrayHandleRef.current.onEnd?.(moved || countChange !== 0);
+    };
+    const cancel = (cancelEvent: PointerEvent) => {
+      if (cancelEvent.pointerId !== pointerId) return;
+      stop();
+      arrayHandleRef.current.onCancel?.();
+    };
+    const key = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key === "Escape") {
+        keyEvent.preventDefault();
+        keyEvent.stopPropagation();
+        stop();
+        arrayHandleRef.current.onCancel?.();
+        return;
+      }
+      if (keyEvent.key === "+" || keyEvent.key === "=" || keyEvent.key === "-" || keyEvent.key === "_") {
+        keyEvent.preventDefault();
+        keyEvent.stopPropagation();
+        countChange += keyEvent.key === "-" || keyEvent.key === "_" ? -1 : 1;
+        report();
+      }
+    };
+    view.addEventListener("pointermove", move, true);
+    view.addEventListener("pointerup", up, true);
+    view.addEventListener("pointercancel", cancel, true);
+    view.addEventListener("keydown", key, true);
+    report();
+  }, [onInteractionActiveChange]);
+
   /** Fork (build 25): drags the size of a fillet or chamfer from a picked edge, into the body. */
   const beginEdgeAmountDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>, state: ThreeState, edgeId: number) => {
     const edges = modifierEdgesRef.current;
@@ -7691,6 +7793,15 @@ export function WorkplaneViewport({
         return;
       }
 
+      if (arrayHandleRef.current.handle && event.button === 0) {
+        const grabbed = pickLayFlatFace(state, event.clientX, event.clientY);
+        if (grabbed && arrayHandleRef.current.handle.shapeIds.includes(grabbed.shapeId)) {
+          event.preventDefault();
+          beginArrayHandleDrag(event, state, grabbed.shapeId);
+          return;
+        }
+      }
+
       if (mateFacePickRef.current) {
         event.preventDefault();
         onMateFacePick?.(pickLayFlatFace(state, event.clientX, event.clientY));
@@ -8074,6 +8185,7 @@ export function WorkplaneViewport({
       onInteractionActiveChange?.(true);
     },
     [
+      beginArrayHandleDrag,
       beginEdgeAmountDrag,
       beginFacePull,
       clearMoveDimensions,

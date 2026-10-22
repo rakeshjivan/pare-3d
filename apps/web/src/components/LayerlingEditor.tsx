@@ -5888,6 +5888,95 @@ export function LayerlingEditor({
     commitShapes([...shapes, ...copies], [...selectedIds, ...copies.map((shape) => shape.id)], t("status.arrayCreated", { count: copies.length }));
   }, [arrayTool, commitShapes, selectedIds, selectedShapes, shapes]);
 
+  // Fork (build 25): Pattern by dragging, as in Fusion: drag a preview copy to spread the copies or
+  // bring them closer (a row) or to swing them round (a circle); + and - change the count.
+  const centreOf = (list: WorkplaneShape[]) => {
+    const box = new THREE.Box3();
+    list.forEach((shape) => meshForShape(shape).vertices.forEach(([x, y, z]) => box.expandByPoint(new THREE.Vector3(x, y, z))));
+    return box.isEmpty() ? null : box.getCenter(new THREE.Vector3());
+  };
+  const arrayHandle = useMemo(() => {
+    if (!arrayTool || !arrayPreview?.length || arrayTool.mode === "grid" || selectedShapes.length === 0) return null;
+    const last = arrayPreview.slice(-selectedShapes.length);
+    const anchor = centreOf(last);
+    const origin = centreOf(selectedShapes);
+    if (!anchor || !origin) return null;
+    const direction = anchor.clone().sub(origin);
+    if (arrayTool.mode === "row" && direction.lengthSq() < 1e-6) return null;
+    if (direction.lengthSq() > 1e-9) direction.normalize();
+    return { shapeIds: arrayPreview.map((shape) => shape.id), anchor: { x: anchor.x, y: anchor.y, z: anchor.z }, direction: { x: direction.x, y: direction.y, z: direction.z }, origin, length: anchor.distanceTo(origin) };
+  }, [arrayPreview, arrayTool, selectedShapes]);
+  const arrayDragBaseRef = useRef<{ settings: ArraySettings; length: number; origin: THREE.Vector3; grabbedStep: number; grabbedAngle: number } | null>(null);
+  const dragArrayHandle = useCallback((drag: { grabbedId: string; distance: number; point: { x: number; y: number; z: number } | null; countChange: number; fine: boolean }): string => {
+    const current = arrayTool;
+    if (!current || !arrayHandle) return "";
+    if (!arrayDragBaseRef.current) {
+      // Which copy was grabbed: the first copy is one step from the original, the last count-1 steps.
+      const at = arrayPreview ? arrayPreview.findIndex((shape) => shape.id === drag.grabbedId) : -1;
+      const grabbedStep = at >= 0 ? Math.floor(at / Math.max(1, selectedShapes.length)) + 1 : Math.max(1, current.count - 1);
+      const grabbedAngle = current.mode === "circle" ? circleStepDegrees(clampArrayCount(current.count), current.angle) * grabbedStep : 0;
+      arrayDragBaseRef.current = { settings: current, length: arrayHandle.length, origin: arrayHandle.origin.clone(), grabbedStep, grabbedAngle };
+    }
+    const base = arrayDragBaseRef.current;
+    const count = clampArrayCount(base.settings.count + drag.countChange);
+    const accuracy = workspaceSettingsRef.current.accuracy;
+    if (base.settings.mode === "circle") {
+      const centre = new THREE.Vector3(base.settings.centerX, 0, -base.settings.centerY);
+      const angleOf = (point: { x: number; z: number }) => Math.atan2(-(point.z - centre.z), point.x - centre.x);
+      let angle = base.settings.angle;
+      if (drag.point) {
+        // The grabbed copy follows the pointer round: the whole span grows by as much per step.
+        let at = THREE.MathUtils.radToDeg(angleOf(drag.point) - angleOf(base.origin));
+        at = ((at % 360) + 360) % 360;
+        const span = (at / base.grabbedStep) * Math.max(1, base.settings.count - 1);
+        const step = drag.fine ? 1 : 5;
+        angle = span >= 357 ? 360 : Math.max(step, Math.min(360, Math.round(span / step) * step));
+      }
+      const next = { ...base.settings, count, angle };
+      setArrayTool(next);
+      return `×${count} · ${Number(angle.toFixed(1))}°`;
+    }
+    // A row: the dragged copy is the last of the count it started with; the step follows it.
+    const steps = Math.max(1, base.settings.count - 1);
+    const grid = drag.fine ? 0.1 : 1;
+    const oldStep = base.length / steps;
+    // The grabbed copy follows the pointer: each step grows by the drag over its number of steps.
+    const newStep = Math.max(grid, Math.round((oldStep + drag.distance / base.grabbedStep) / grid) * grid);
+    let next: ArraySettings;
+    if (base.settings.measure === "gap") {
+      // Measured as a gap: the gap grows by what the step grows (it may not go below touching).
+      const gap = Number.isFinite(base.settings.gap) ? (base.settings.gap as number) : 5;
+      const size = oldStep - gap;
+      next = { ...base.settings, count, gap: Number(Math.max(-size + grid, gap + (newStep - oldStep)).toFixed(3)) };
+    } else {
+      const factor = oldStep > 1e-9 ? newStep / oldStep : 1;
+      next = { ...base.settings, count, spacingX: Number((base.settings.spacingX * factor).toFixed(3)), spacingY: Number((base.settings.spacingY * factor).toFixed(3)), spacingZ: Number((base.settings.spacingZ * factor).toFixed(3)) };
+    }
+    setArrayTool(next);
+    return `×${count} · ${newStep.toFixed(Math.max(1, Math.min(3, accuracy)))} mm`;
+  }, [arrayHandle, arrayPreview, arrayTool, selectedShapes.length]);
+  useEffect(() => {
+    if (!arrayTool) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.tagName === "BUTTON" || target.isContentEditable)) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        applyArrayTool();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [applyArrayTool, arrayTool]);
+  const endArrayHandle = useCallback(() => {
+    arrayDragBaseRef.current = null;
+  }, []);
+  const cancelArrayHandle = useCallback(() => {
+    const base = arrayDragBaseRef.current;
+    arrayDragBaseRef.current = null;
+    if (base) setArrayTool(base.settings);
+  }, []);
+
   const duplicateShapeAt = useCallback((id: string, position: { x: number; z: number }) => {
     const shape = shapesRef.current.find((entry) => entry.id === id);
     if (!shape) return;
@@ -13307,6 +13396,10 @@ export function LayerlingEditor({
             }
             shellThicknessFromPull(distance);
           } : endFacePull}
+          arrayHandle={arrayHandle ? { shapeIds: arrayHandle.shapeIds, anchor: arrayHandle.anchor, direction: arrayHandle.direction } : null}
+          onArrayHandleDrag={dragArrayHandle}
+          onArrayHandleEnd={endArrayHandle}
+          onArrayHandleCancel={cancelArrayHandle}
           onFacePullCancel={shellTool ? () => {
             shellPullFaceRef.current = null;
           } : cancelFacePull}

@@ -3303,4 +3303,6 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "edge.faceNoEdges": "No edge of that face can be rounded at this threshold. Click an edge instead.",
   "shell.sideNotOpenable": "Only a face pointing straight up, down, front, back, left or right can be left open.",
   "shell.pickHint": "Click a face of the part to open or close it. Drag a face inward to set the wall thickness. Enter hollows.",
+  "array.dragHintRow": "Or drag a copy to space them out or bring them closer; + and − while dragging change the count. Enter creates.",
+  "array.dragHintCircle": "Or drag a copy round to set how far the circle goes; + and − while dragging change the count. Enter creates.",
 };

@@ -3325,4 +3325,6 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "edge.faceNoEdges": "Keine Kante dieser Fläche lässt sich bei dieser Schwelle verrunden. Stattdessen eine Kante anklicken.",
   "shell.sideNotOpenable": "Nur eine Fläche, die gerade nach oben, unten, vorn, hinten, links oder rechts zeigt, kann offen bleiben.",
   "shell.pickHint": "Eine Fläche des Teils anklicken öffnet oder schließt sie. Eine Fläche nach innen ziehen setzt die Wandstärke. Enter höhlt aus.",
+  "array.dragHintRow": "Oder eine Kopie ziehen, um die Abstände zu vergrößern oder zu verkleinern; + und − beim Ziehen ändern die Anzahl. Enter erstellt.",
+  "array.dragHintCircle": "Oder eine Kopie herumziehen, um festzulegen, wie weit der Kreis reicht; + und − beim Ziehen ändern die Anzahl. Enter erstellt.",
 };

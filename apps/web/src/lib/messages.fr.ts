@@ -3301,4 +3301,6 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "edge.faceNoEdges": "Aucune arête de cette face ne peut être arrondie à ce seuil. Cliquez plutôt une arête.",
   "shell.sideNotOpenable": "Seule une face orientée droit vers le haut, le bas, l'avant, l'arrière, la gauche ou la droite peut rester ouverte.",
   "shell.pickHint": "Cliquez une face de la pièce pour l'ouvrir ou la fermer. Tirez une face vers l'intérieur pour régler l'épaisseur. Entrée évide.",
+  "array.dragHintRow": "Ou tirez une copie pour écarter ou rapprocher les copies ; + et − pendant le glissement changent le nombre. Entrée crée.",
+  "array.dragHintCircle": "Ou tirez une copie autour pour régler l'étendue du cercle ; + et − pendant le glissement changent le nombre. Entrée crée.",
 };
