@@ -125,3 +125,29 @@ export function EnclosurePartIcon() {
     </PartIcon>
   );
 }
+
+export function JarPartIcon() {
+  return (
+    <PartIcon>
+      <rect x="11" y="17" width="26" height="25" rx="4" {...SOFT} />
+      <rect x="11" y="17" width="26" height="25" rx="4" />
+      <rect x="9" y="6" width="30" height="7" rx="2.5" {...ACCENT} />
+      <path d="M15 17v-2.5M33 17v-2.5M17 21.5h14M17 25.5h14" />
+    </PartIcon>
+  );
+}
+
+export function FlexiPartIcon() {
+  return (
+    <PartIcon>
+      <rect x="4" y="18" width="10" height="12" rx="2.5" {...SOFT} />
+      <rect x="4" y="18" width="10" height="12" rx="2.5" />
+      <rect x="19" y="18" width="10" height="12" rx="2.5" {...SOFT} />
+      <rect x="19" y="18" width="10" height="12" rx="2.5" />
+      <rect x="34" y="18" width="10" height="12" rx="2.5" {...SOFT} />
+      <rect x="34" y="18" width="10" height="12" rx="2.5" />
+      <circle cx="16.5" cy="24" r="2.2" {...ACCENT} />
+      <circle cx="31.5" cy="24" r="2.2" {...ACCENT} />
+    </PartIcon>
+  );
+}

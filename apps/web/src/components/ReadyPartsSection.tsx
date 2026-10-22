@@ -1,6 +1,8 @@
 "use client";
 
-import { BoxPartIcon, HingePartIcon, InsertPartIcon, NutPartIcon, ParaboloidPartIcon, SnapPartIcon, TextPartIcon } from "@/components/readyPartIcons";
+import { BoxPartIcon, FlexiPartIcon, HingePartIcon, InsertPartIcon, JarPartIcon, NutPartIcon, ParaboloidPartIcon, SnapPartIcon, TextPartIcon } from "@/components/readyPartIcons";
+import { DEFAULT_JAR, jarParts, normalizeJar, type JarOptions } from "@/lib/readyJar";
+import { DEFAULT_FLEXI_CHAIN, flexiChainParts, normalizeFlexiChain, type FlexiChainOptions } from "@/lib/flexiJoint";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -40,11 +42,13 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
   const [nutSize, setNutSize] = useState<MetricSize>("M3");
   const [boxOpen, setBoxOpen] = useState(false);
   const [box, setBox] = useState<BoxWithLidOptions>(DEFAULT_BOX_WITH_LID);
-  const [openForm, setOpenForm] = useState<"snap" | "hinge" | "text" | null>(null);
+  const [openForm, setOpenForm] = useState<"snap" | "hinge" | "text" | "jar" | "flexi" | null>(null);
+  const [jar, setJar] = useState<JarOptions>(DEFAULT_JAR);
+  const [flexi, setFlexi] = useState<FlexiChainOptions>(DEFAULT_FLEXI_CHAIN);
   const [snap, setSnap] = useState<SnapFitOptions>(DEFAULT_SNAP_FIT);
   const [hinge, setHinge] = useState<LivingHingeOptions>(DEFAULT_LIVING_HINGE);
   const [faceText, setFaceText] = useState<FaceTextOptions>(DEFAULT_FACE_TEXT);
-  const toggleForm = (form: "snap" | "hinge" | "text") => setOpenForm(openForm === form ? null : form);
+  const toggleForm = (form: "snap" | "hinge" | "text" | "jar" | "flexi") => setOpenForm(openForm === form ? null : form);
   const safeBend = snapFitSafeBend(snap);
   const insert = INSERT_HOLES[insertSize];
   const nut = NUTS[nutSize];
@@ -195,6 +199,59 @@ export function ReadyPartsSection({ onInsert }: { onInsert: (parts: ReadyPart[],
               <p className="ready-part-note">{t("readyParts.hingeNote")}</p>
               <button type="button" className="ready-part-make" onClick={() => onInsert([livingHingePart(hinge, t("readyParts.livingHinge"))])}>
                 {t("readyParts.makeHinge")}
+              </button>
+            </div>
+          ) : null}
+
+          <div className="ready-part ready-part-box">
+            <JarPartIcon />
+            <div>
+              <strong>{t("readyParts.jar")}</strong>
+              <span>{t("readyParts.jarHint")}</span>
+            </div>
+            <button type="button" className="ready-part-add" aria-expanded={openForm === "jar"} onClick={() => toggleForm("jar")}>
+              {openForm === "jar" ? t("readyParts.hide") : t("readyParts.setUp")}
+            </button>
+          </div>
+          {openForm === "jar" ? (
+            <div className="ready-part-form">
+              <div className="ready-part-fields">
+                <MmField label={t("readyParts.jarInside")} value={jar.inside} onChange={(inside) => setJar(normalizeJar({ ...jar, inside }))} />
+                <MmField label={t("readyParts.jarHeight")} value={jar.height} onChange={(height) => setJar(normalizeJar({ ...jar, height }))} />
+                <MmField label={t("readyParts.boxWall")} value={jar.wall} onChange={(wall) => setJar(normalizeJar({ ...jar, wall }))} />
+                <MmField label={t("readyParts.jarNeck")} value={jar.neck} onChange={(neck) => setJar(normalizeJar({ ...jar, neck }))} />
+                <MmField label={t("readyParts.jarPitch")} value={jar.pitch} onChange={(pitch) => setJar(normalizeJar({ ...jar, pitch }))} />
+                <MmField label={t("readyParts.jarClearance")} value={jar.clearance} onChange={(clearance) => setJar(normalizeJar({ ...jar, clearance }))} />
+              </div>
+              <p className="ready-part-note">{t("readyParts.jarNote")}</p>
+              <button type="button" className="ready-part-make" onClick={() => onInsert(jarParts(jar, { jar: t("readyParts.jar"), lid: t("readyParts.lidName") }))}>
+                {t("readyParts.makeJar")}
+              </button>
+            </div>
+          ) : null}
+
+          <div className="ready-part ready-part-box">
+            <FlexiPartIcon />
+            <div>
+              <strong>{t("readyParts.flexi")}</strong>
+              <span>{t("readyParts.flexiHint")}</span>
+            </div>
+            <button type="button" className="ready-part-add" aria-expanded={openForm === "flexi"} onClick={() => toggleForm("flexi")}>
+              {openForm === "flexi" ? t("readyParts.hide") : t("readyParts.setUp")}
+            </button>
+          </div>
+          {openForm === "flexi" ? (
+            <div className="ready-part-form">
+              <div className="ready-part-fields">
+                <MmField label={t("readyParts.flexiSegments")} unit="" value={flexi.segments} onChange={(segments) => setFlexi(normalizeFlexiChain({ ...flexi, segments }))} />
+                <MmField label={t("readyParts.flexiLength")} value={flexi.length} onChange={(length) => setFlexi(normalizeFlexiChain({ ...flexi, length }))} />
+                <MmField label={t("readyParts.flexiWidth")} value={flexi.width} onChange={(width) => setFlexi(normalizeFlexiChain({ ...flexi, width }))} />
+                <MmField label={t("readyParts.flexiThickness")} value={flexi.thickness} onChange={(thickness) => setFlexi(normalizeFlexiChain({ ...flexi, thickness }))} />
+                <MmField label={t("readyParts.flexiClearance")} value={flexi.clearance} onChange={(clearance) => setFlexi(normalizeFlexiChain({ ...flexi, clearance }))} />
+              </div>
+              <p className="ready-part-note">{t("readyParts.flexiNote")}</p>
+              <button type="button" className="ready-part-make" onClick={() => onInsert(flexiChainParts(flexi, t("readyParts.flexi")))}>
+                {t("readyParts.makeFlexi")}
               </button>
             </div>
           ) : null}

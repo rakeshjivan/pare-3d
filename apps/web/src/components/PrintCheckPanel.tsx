@@ -6,6 +6,7 @@ import type { PrintIssue } from "@/lib/printCheck";
 
 export const PRINT_CHECK_EVENT = "pare3d:print-check";
 export const SPLIT_TO_FIT_EVENT = "pare3d:split-to-fit";
+export const CUT_BELOW_BED_EVENT = "pare3d:cut-below-bed";
 const CHECK_BEFORE_SEND_KEY = "pare3d.checkBeforeSend";
 
 export function checkBeforeSending() {
@@ -27,6 +28,7 @@ function message(issue: PrintIssue, printer: string) {
   switch (issue.kind) {
     case "nothing": return t("printCheck.nothing");
     case "outside": return t(many ? "printCheck.outsideMany" : "printCheck.outside", { names: subject, printer });
+    case "belowBed": return t(many ? "printCheck.belowBedMany" : "printCheck.belowBed", { names: subject });
     case "floating": return t(many ? "printCheck.floatingMany" : "printCheck.floating", { names: subject });
     case "looseHole": return t(many ? "printCheck.looseHoleMany" : "printCheck.looseHole", { names: subject });
     case "thin": return t(many ? "printCheck.thinMany" : "printCheck.thin", { names: subject, mm: issue.amount ?? 0.8 });
@@ -45,6 +47,7 @@ export function PrintCheckPanel({
   sending,
   onSelect,
   onSplitToFit,
+  onCutBelowBed,
   onShowOverhangs,
   onSend,
   onClose,
@@ -55,6 +58,7 @@ export function PrintCheckPanel({
   sending: boolean;
   onSelect: (ids: string[]) => void;
   onSplitToFit: (ids: string[]) => void;
+  onCutBelowBed: (ids: string[]) => void;
   onShowOverhangs: () => void;
   onSend: () => void;
   onClose: () => void;
@@ -85,6 +89,9 @@ export function PrintCheckPanel({
                 ) : null}
                 {issue.kind === "outside" ? (
                   <button type="button" onClick={() => onSplitToFit(issue.ids)}>{t("splitToFit.button")}</button>
+                ) : null}
+                {issue.kind === "belowBed" ? (
+                  <button type="button" onClick={() => onCutBelowBed(issue.ids)}>{t("cutBelowBed.button")}</button>
                 ) : null}
                 {issue.kind === "overhang" ? (
                   <button type="button" onClick={onShowOverhangs}>{t("printCheck.showOverhangs")}</button>

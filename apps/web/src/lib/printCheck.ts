@@ -1,5 +1,6 @@
 import { bedOverhangs, shapeBedFootprint, shapeVerticalExtent } from "@/lib/printBed";
 import { overhangDownwardLimit } from "@/lib/overhangLimits";
+import { shapeBelowBed } from "@/lib/cutBelowBed";
 import { isNonSolidShapeKind, shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
 import type { MeshData } from "@/lib/editorMeshCore";
 import type { WorkplaneShape } from "@/types/layerling";
@@ -10,7 +11,7 @@ import type { WorkplaneShape } from "@/types/layerling";
  * the panel can select them.
  */
 
-export type PrintIssueKind = "nothing" | "outside" | "floating" | "looseHole" | "thin" | "overhang" | "hidden";
+export type PrintIssueKind = "nothing" | "outside" | "belowBed" | "floating" | "looseHole" | "thin" | "overhang" | "hidden";
 
 export type PrintIssue = {
   kind: PrintIssueKind;
@@ -71,6 +72,16 @@ export function checkForPrinting(shapes: readonly WorkplaneShape[], options: Opt
     const outside = bedOverhangs(printed, options.bed.width, options.bed.depth, options.bed.height).map((entry) => entry.shape);
     if (outside.length) issues.push({ kind: "outside", level: "problem", ...named(outside) });
   }
+
+  // Fork (build 30): sunk below the plate - the slicer cuts that off, often by surprise.
+  const sunk = printed.filter((shape) => {
+    try {
+      return shapeBelowBed(shape) !== null;
+    } catch {
+      return false;
+    }
+  });
+  if (sunk.length) issues.push({ kind: "belowBed", level: "advice", ...named(sunk) });
 
   // Floating: above the lowest part, and nothing printed under it to stand on.
   const extents = new Map(printed.map((shape) => [shape.id, shapeVerticalExtent(shape)]));

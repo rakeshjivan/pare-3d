@@ -143,7 +143,10 @@ import { beginBusy, setBusyCount } from "@/lib/busy";
 import { SaveStatus } from "./SaveStatus";
 import { WhatsNew } from "./WhatsNew";
 import { FastModeHint } from "./FastModeHint";
-import { checkBeforeSending, PRINT_CHECK_EVENT, PrintCheckPanel, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
+import { checkBeforeSending, CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, PrintCheckPanel, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
+import { belowBedCutter } from "@/lib/cutBelowBed";
+import { fillHoleAt, isManifoldSolid, makeSolidPositions, meshHealth, shapeWithWorldPositions } from "@/lib/meshRepair";
+import { worldTriangles } from "@/lib/blend";
 import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
 import { tracedSolidPositions, type TraceOptions, type TraceResult } from "@/lib/photoTrace";
 import { TracePanel } from "@/components/workplane/TracePanel";
@@ -308,6 +311,9 @@ type TopPanel = "import" | "export" | null;
 /** Fork (build 24): the face tool's live preview, which can be grabbed and dragged again. */
 const FACE_TOOL_PREVIEW_ID = "face-tool-preview";
 const BLEND_PREVIEW_ID = "blend-preview";
+// Fork (build 30): the mesh check and Fill a hole, from the command search.
+const MESH_CHECK_EVENT = "pare3d:mesh-check";
+const FILL_HOLE_EVENT = "pare3d:fill-hole";
 const libraryShapeIds: ReadonlySet<string> = new Set(libraryShapeAssets.map((shape) => shape.id));
 
 const HISTORY_VIEW_COMMANDS = new Set(["history", "export", "guide", "shortcuts"]);
@@ -3622,6 +3628,9 @@ export function LayerlingEditor({
   );
   // The holes a hole pattern would cut, shown on the face until "Create".
   // Fork (build 25): Blend's state and its live piece (the tool itself is further down).
+  // Fork (build 30): imported meshes that are not watertight, offered for repair; Fill a hole's part.
+  const [meshCheck, setMeshCheck] = useState<{ ids: string[]; message: string } | null>(null);
+  const [fillHoleTool, setFillHoleTool] = useState<{ shapeId: string; busy: boolean } | null>(null);
   const [blendTool, setBlendTool] = useState<{
     ids: [string, string];
     faces: [BlendFace | null, BlendFace | null];
@@ -11762,6 +11771,139 @@ export function LayerlingEditor({
     commitShapes(next, laid.map((shape) => shape.id), t("splitToFit.done", { pieces, dowels }));
   }, [commitShapes]);
 
+  // Fork (build 30): Make solid - openings capped, triangles turned outward, checked as a closed solid.
+  const makePartsSolid = useCallback(async (ids: readonly string[]) => {
+    const targets = shapesRef.current.filter((shape) => ids.includes(shape.id) && !shape.locked && shape.importedMesh && !shape.groupedShapes?.length);
+    if (!targets.length) {
+      setNotice(t("status.selectShapeFirst"));
+      return;
+    }
+    const fingerprint = projectShapesFingerprint(shapesRef.current);
+    const replacements = new Map<string, WorkplaneShape>();
+    const messages: string[] = [];
+    for (const shape of targets) {
+      const positions = worldTriangles(shape);
+      if (meshHealth(positions).watertight && (await isManifoldSolid(positions))) {
+        messages.push(t("meshCheck.ok", { name: displayShapeName(shape) }));
+        continue;
+      }
+      const repaired = makeSolidPositions(positions);
+      const solid = await isManifoldSolid(repaired.positions);
+      replacements.set(shape.id, canonicalizeShape(shapeWithWorldPositions(shape, repaired.positions)));
+      messages.push(t(solid ? "meshCheck.repaired" : "meshCheck.partly", { name: displayShapeName(shape), count: repaired.capped }));
+    }
+    setMeshCheck(null);
+    if (!replacements.size) {
+      setNotice(messages.join(" "));
+      return;
+    }
+    if (projectShapesFingerprint(shapesRef.current) !== fingerprint) {
+      setNotice(t("status.groupChanged"));
+      return;
+    }
+    commitShapes(shapesRef.current.map((shape) => replacements.get(shape.id) ?? shape), [...replacements.keys()], messages.join(" "));
+  }, [commitShapes]);
+
+  // Fork (build 30): Fill a hole - a click on the wall of a hole in an imported part fills it.
+  const startFillHole = useCallback(() => {
+    if (fillHoleTool) {
+      setFillHoleTool(null);
+      return;
+    }
+    const target = selectedShapes.length === 1 ? selectedShapes[0] : null;
+    if (!target || target.hole || target.locked) {
+      setNotice(t("status.selectShapeFirst"));
+      return;
+    }
+    if (!target.importedMesh || target.groupedShapes?.length) {
+      setNotice(t("fillHole.useGroup"));
+      return;
+    }
+    setFillHoleTool({ shapeId: target.id, busy: false });
+    setNotice(t("fillHole.pick"), true);
+  }, [fillHoleTool, selectedShapes]);
+  const pickFillHole = useCallback((pick: LayFlatPick | null) => {
+    const tool = fillHoleTool;
+    if (!tool || tool.busy) return;
+    const shape = shapesRef.current.find((candidate) => candidate.id === tool.shapeId);
+    if (!pick || !shape || pick.shapeId !== shape.id) {
+      setNotice(t("fillHole.missed"));
+      return;
+    }
+    setFillHoleTool({ ...tool, busy: true });
+    const fingerprint = projectShapesFingerprint(shapesRef.current);
+    void whileBusy("combine", () => fillHoleAt(worldTriangles(shape), pick.point, pick.normal)).then((result) => {
+      setFillHoleTool((current) => (current ? { ...current, busy: false } : current));
+      if (!result.ok) {
+        setNotice(t(result.reason === "notHole" ? "fillHole.notHole" : result.reason === "tooBig" ? "fillHole.tooBig" : result.reason === "missed" ? "fillHole.missed" : "fillHole.failed"));
+        return;
+      }
+      if (projectShapesFingerprint(shapesRef.current) !== fingerprint) {
+        setNotice(t("status.groupChanged"));
+        return;
+      }
+      const filled = canonicalizeShape(shapeWithWorldPositions(shape, result.positions));
+      commitShapes(shapesRef.current.map((candidate) => (candidate.id === shape.id ? filled : candidate)), filled.id, t("fillHole.done"));
+    });
+  }, [commitShapes, fillHoleTool]);
+  // Fill a hole belongs to its part, and Esc puts it away.
+  useEffect(() => {
+    if (!fillHoleTool) return;
+    if (!(selectedIds.length === 1 && selectedIds[0] === fillHoleTool.shapeId)) {
+      setFillHoleTool(null);
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFillHoleTool(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fillHoleTool, selectedIds]);
+  useEffect(() => {
+    const onCheck = () => void makePartsSolid(selectedIdsRef.current);
+    const onFill = () => startFillHole();
+    window.addEventListener(MESH_CHECK_EVENT, onCheck);
+    window.addEventListener(FILL_HOLE_EVENT, onFill);
+    return () => {
+      window.removeEventListener(MESH_CHECK_EVENT, onCheck);
+      window.removeEventListener(FILL_HOLE_EVENT, onFill);
+    };
+  }, [makePartsSolid, startFillHole]);
+
+  // Fork (build 30): Cut below the bed - each sunk part grouped with a hole box under the plate.
+  // The selected parts, or every part when nothing is selected.
+  const cutPartsBelowBed = useCallback(async (ids: readonly string[]) => {
+    const pool = ids.length ? shapesRef.current.filter((shape) => ids.includes(shape.id)) : shapesRef.current;
+    const targets = pool.filter((shape) => !shape.locked && !shape.hole && !shape.hidden && !isNonSolidShapeKind(shape.kind));
+    const fingerprint = projectShapesFingerprint(shapesRef.current);
+    const replacements = new Map<string, WorkplaneShape>();
+    for (const shape of targets) {
+      let cutter: WorkplaneShape | null = null;
+      try {
+        cutter = belowBedCutter(shape);
+      } catch {
+        cutter = null;
+      }
+      if (!cutter) continue;
+      const result = await whileBusy("combine", () => buildGroupedShapeFromSelection([shape, cutter as WorkplaneShape], workspaceSettingsRef.current.booleanTriangleLimit));
+      if (!result.group) {
+        setNotice(result.failureNotice);
+        return;
+      }
+      replacements.set(shape.id, canonicalizeShape({ ...result.group, name: shape.name, groupOperation: "group" }));
+    }
+    if (!replacements.size) {
+      setNotice(t("cutBelowBed.nothing"));
+      return;
+    }
+    if (projectShapesFingerprint(shapesRef.current) !== fingerprint) {
+      setNotice(t("status.groupChanged"));
+      return;
+    }
+    const next = shapesRef.current.map((shape) => replacements.get(shape.id) ?? shape);
+    commitShapes(next, [...replacements.values()].map((shape) => shape.id), t("cutBelowBed.done", { count: replacements.size }));
+  }, [commitShapes]);
+
   // Fork (build 19): "Ready to print?" - run before Send to Bambu Studio (unless turned off), or on its own.
   const [printCheck, setPrintCheck] = useState<{ issues: PrintIssue[]; sending: BambuSendFormat | null } | null>(null);
   const runPrintCheck = useCallback(() => {
@@ -11788,15 +11930,18 @@ export function LayerlingEditor({
     };
     const onCheck = () => setPrintCheck({ issues: runPrintCheck(), sending: null });
     const onSplit = () => void splitPartsToFit(selectedIdsRef.current);
+    const onCutBelow = () => void cutPartsBelowBed(selectedIdsRef.current);
     window.addEventListener(SPLIT_TO_FIT_EVENT, onSplit);
+    window.addEventListener(CUT_BELOW_BED_EVENT, onCutBelow);
     window.addEventListener(SEND_TO_BAMBU_EVENT, onSend);
     window.addEventListener(PRINT_CHECK_EVENT, onCheck);
     return () => {
       window.removeEventListener(SEND_TO_BAMBU_EVENT, onSend);
       window.removeEventListener(PRINT_CHECK_EVENT, onCheck);
       window.removeEventListener(SPLIT_TO_FIT_EVENT, onSplit);
+      window.removeEventListener(CUT_BELOW_BED_EVENT, onCutBelow);
     };
-  }, [runPrintCheck, splitPartsToFit]);
+  }, [cutPartsBelowBed, runPrintCheck, splitPartsToFit]);
 
   /**
    * The drawing of a set of bodies, from the same bodies as the export (visible solids, holes taken
@@ -12371,6 +12516,22 @@ export function LayerlingEditor({
       [successSummary, ...notes].join(" ") + failureSummary,
     );
     setTopPanel(null);
+    // Fork (build 30): every imported mesh checked for openings and broken spots.
+    const unsound = importedShapes.flatMap((shape) => {
+      if (!shape.importedMesh?.positions?.length || shape.groupedShapes?.length) return [];
+      try {
+        const health = meshHealth(shape.importedMesh.positions);
+        return health.watertight ? [] : [{ shape, health }];
+      } catch {
+        return [];
+      }
+    });
+    if (unsound.length) {
+      setMeshCheck({
+        ids: unsound.map((entry) => entry.shape.id),
+        message: unsound.map((entry) => t("meshCheck.problem", { name: displayShapeName(entry.shape), openings: entry.health.openings, broken: entry.health.brokenEdges })).join(" "),
+      });
+    }
     return { importedIds: importedShapes.map((shape) => shape.id), failures };
   }, [commitShapes, onOpenLylProjectFile]);
   importFilesRef.current = importFiles;
@@ -13053,6 +13214,12 @@ export function LayerlingEditor({
       );
     }
     if (single && offersMeshSimplify(single) && !selectionLocked) items.push({ key: "simplify", label: t("contextMenu.simplify"), separated: true, onSelect: startSimplifyTool });
+    if (single && single.importedMesh && !single.groupedShapes?.length && !single.hole && !selectionLocked) {
+      items.push(
+        { key: "makeSolid", label: t("contextMenu.makeSolid"), separated: !offersMeshSimplify(single), onSelect: () => void makePartsSolid([single.id]) },
+        { key: "fillHole", label: t("contextMenu.fillHole"), onSelect: startFillHole },
+      );
+    }
     if (!allHoles) {
       items.push(
         { key: "markCenter", label: t("contextMenu.markCenter"), separated: true, onSelect: () => markSelectionPoints("center") },
@@ -13504,6 +13671,8 @@ export function LayerlingEditor({
                 ? { shapeIds: [faceTool.sourceId] }
                 : blendTool && !blendTool.busy
                   ? { shapeIds: [...blendTool.ids] }
+                  : fillHoleTool && !fillHoleTool.busy
+                  ? { shapeIds: [fillHoleTool.shapeId] }
                   : shellTool && !shellTool.busy && selectedShape
                     ? { shapeIds: [selectedShape.id] }
                     : null}
@@ -13533,7 +13702,7 @@ export function LayerlingEditor({
           onFacePullCancel={shellTool ? () => {
             shellPullFaceRef.current = null;
           } : cancelFacePull}
-          onMateFacePick={mateTool ? pickMateFace : faceTool ? pickFaceToolFace : blendTool ? pickBlendFace : pickHolePatternFace}
+          onMateFacePick={mateTool ? pickMateFace : faceTool ? pickFaceToolFace : blendTool ? pickBlendFace : fillHoleTool ? pickFillHole : pickHolePatternFace}
           cadFacePick={historyViewState ? null : cadFacePick}
           onCadFacePick={toggleDeleteFace}
           onNoteAdd={addNote}
@@ -13579,6 +13748,16 @@ export function LayerlingEditor({
           onClose={closeShapeContextMenu}
         />
       ) : null}
+      {meshCheck ? (
+        <div className="mesh-check-card" role="status">
+          <AlertTriangle size={18} aria-hidden="true" />
+          <p>{meshCheck.message}</p>
+          <div className="mesh-check-actions">
+            <button type="button" onClick={() => setMeshCheck(null)}>{t("meshCheck.leave")}</button>
+            <button type="button" className="primary" onClick={() => void makePartsSolid(meshCheck.ids)}>{t("meshCheck.makeSolid")}</button>
+          </div>
+        </div>
+      ) : null}
       {printCheck ? (
         <PrintCheckPanel
           issues={printCheck.issues}
@@ -13591,6 +13770,10 @@ export function LayerlingEditor({
           onSplitToFit={(ids) => {
             setPrintCheck(null);
             void splitPartsToFit(ids);
+          }}
+          onCutBelowBed={(ids) => {
+            setPrintCheck(null);
+            void cutPartsBelowBed(ids);
           }}
           onShowOverhangs={() => {
             if (!overhangsVisible) toggleOverhangsVisible();
@@ -14964,6 +15147,9 @@ function SecondaryToolbar({
       plain("export", t("editor.export"), manageGroup, true, () => onTopPanel("export"), { icon: ToolbarVectorExportIcon }),
       plain("print-check", t("printCheck.command"), manageGroup, true, () => window.dispatchEvent(new Event(PRINT_CHECK_EVENT))),
       plain("split-to-fit", t("splitToFit.command"), manageGroup, true, () => window.dispatchEvent(new Event(SPLIT_TO_FIT_EVENT))),
+      plain("cut-below-bed", t("cutBelowBed.command"), manageGroup, true, () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT))),
+      plain("mesh-check", t("meshCheck.command"), manageGroup, hasSelection, () => window.dispatchEvent(new Event(MESH_CHECK_EVENT))),
+      plain("fill-hole", t("fillHole.command"), t("editor.group.modify"), hasSelection, () => window.dispatchEvent(new Event(FILL_HOLE_EVENT))),
       plain("settings", t("editor.workspaceSettings"), manageGroup, true, () => window.dispatchEvent(new Event("layerling:open-workspace-settings")), { icon: ToolbarSettingsIcon }),
       plain("mode-sketch", t("palette.switchSketch"), t("palette.group.mode"), true, () => selectToolbarMode("sketch")),
       ...helpCommands,
