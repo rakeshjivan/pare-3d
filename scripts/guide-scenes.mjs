@@ -46,8 +46,8 @@ export const scenes = {
 
   async "editor-overview"(ctx) {
     await freshEditor(ctx);
-    const { box } = await sampleParts(ctx);
-    await select(ctx, [box]);
+    const { cylinder } = await sampleParts(ctx);
+    await select(ctx, [cylinder]);
     await quiet(ctx);
     await ctx.shot("editor-overview");
   },
@@ -215,7 +215,9 @@ export const scenes = {
   async "shortcuts"(ctx) {
     await freshEditor(ctx);
     await sampleParts(ctx);
-    await ctx.click(ctx.t("editor.keyboardShortcuts"));
+    // Fork (build 32): the shortcuts sit in the Help menu.
+    await ctx.click(ctx.t("helpMenu.title"));
+    await ctx.click(ctx.t("editor.keyboardShortcuts"), undefined, true);
     await ctx.wait(1000);
     await ctx.shot("shortcuts");
   },
@@ -245,10 +247,8 @@ export const scenes = {
 /** Opens the sketch editor for an extruded sketch and draws an L-shaped outline. */
 async function drawOutline(ctx) {
   await ctx.goto("/?editor=1");
-  await ctx.click(ctx.t("editor.modeSketch"));
-  await ctx.wait(1500);
-  // The "Sketch to 3D" menu is gone: the sketch ribbon offers the extrude button itself.
-  await ctx.click(ctx.t("sketch.extrude"), undefined, true);
+  // Fork (build 32): "New sketch" starts one straight away.
+  await ctx.click(ctx.t("sketch.newSketch"));
   await ctx.wait(2500);
   const points = [[430, 250], [640, 250], [640, 400], [540, 400], [540, 560], [430, 560], [430, 250]];
   for (const [x, y] of points) await ctx.mouse(x, y);
@@ -295,7 +295,7 @@ scenes["open-group"] = async (ctx) => {
   await ctx.wait(2500);
   // The object list is open from the start; a click is needed only when it was hidden.
   await ctx.click(ctx.t("editor.tool.showOutliner")).catch(() => {});
-  await ctx.click(ctx.t("group.edit"));
+  await ctx.click(ctx.t("group.edit")).catch(() => ctx.click(ctx.t("group.edit"), undefined, true)).catch(() => ctx.key("e"));
   await ctx.wait(2500);
   await ctx.shot("open-group");
 };
@@ -323,8 +323,8 @@ scenes["printer-overhang"] = async (ctx) => {
   await ctx.wait(1500);
   await ctx.click(ctx.t("camera.home"));
   await ctx.wait(1500);
-  await ctx.click(ctx.t("camera.zoomOut"));
-  await ctx.click(ctx.t("camera.zoomOut"));
+  await ctx.click(ctx.t("camera.zoomOut")).catch(() => {});
+  await ctx.click(ctx.t("camera.zoomOut")).catch(() => {});
   await ctx.wait(1500);
   await ctx.mcp("select_objects", { ids: [] });
   await ctx.shot("printer-overhang");
@@ -345,7 +345,8 @@ scenes["editor-dark"] = async (ctx) => {
 scenes["quick-guide"] = async (ctx) => {
   await freshEditor(ctx);
   await sampleParts(ctx);
-  await ctx.click(ctx.t("editor.guide"));
+  await ctx.click(ctx.t("helpMenu.title"));
+  await ctx.click(ctx.t("editor.guide"), undefined, true);
   await ctx.wait(1200);
   await ctx.shot("quick-guide");
 };
@@ -398,6 +399,8 @@ scenes["pattern-spiral"] = async (ctx) => {
   await ctx.wait(3000);
   await ctx.click(ctx.t("array.mode.circle"));
   await ctx.wait(800);
+  // Fork (build 32): the spiral settings are under More options.
+  await ctx.click(ctx.t("common.moreOptions")).catch(() => {});
   await setSliderValue(ctx, ctx.t("array.count"), 14);
   await setSliderValue(ctx, ctx.t("array.rise"), 3);
   await setSliderValue(ctx, ctx.t("array.radiusChange"), 1);

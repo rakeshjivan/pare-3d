@@ -2,6 +2,7 @@
 # Builds the Pare 3D downloads from the static export (run `node scripts/build-static-export.mjs` first):
 #   dist/Pare-3D-Mac.zip       Pare 3D.app for Apple silicon and Intel Macs
 #   dist/Pare-3D-Windows.zip   a folder with "Pare 3D.vbs" for Windows 10/11 (64-bit)
+#   dist/Pare-3D-Linux.tar.gz  a folder with the ./pare3d launcher for 64-bit Linux (Intel/AMD or ARM)
 #   dist/Pare-3D-app.tar.gz    just the app files, which installed copies update themselves from
 #   dist/pare3d-update.json    the build number and checksum of that package
 # The JavaScript runtime (Bun) comes from npm, so nothing else needs installing.
@@ -86,6 +87,18 @@ cp "$ROOT/LICENSE" "$WIN/LICENSE.txt"
 cp "$(fetch_bun bun-windows-x64)/bun.exe" "$WIN/"
 copy_app "$WIN/app"
 (cd "$WORK/win" && zip -qr -9 "$OUT/Pare-3D-Windows.zip" "Pare 3D")
+
+# Linux (build 32). The launcher opens the app in Chrome or Chromium as its own window, like the
+# Mac script launcher; ./pare3d --install adds it to the applications menu.
+LNX="$WORK/linux/Pare 3D"
+mkdir -p "$LNX"
+cp "$ROOT/mac/serve.mjs" "$ROOT/mac/NOTICE.txt" "$ROOT/linux/pare3d" "$ROOT/linux/pare3d.png" "$ROOT/linux/READ ME FIRST.txt" "$LNX/"
+cp "$ROOT/LICENSE" "$LNX/LICENSE.txt"
+cp "$(fetch_bun bun-linux-x64)/bun" "$LNX/bun-x64"
+cp "$(fetch_bun bun-linux-aarch64)/bun" "$LNX/bun-arm64"
+chmod +x "$LNX/pare3d" "$LNX/bun-x64" "$LNX/bun-arm64"
+copy_app "$LNX/app"
+tar -czf "$OUT/Pare-3D-Linux.tar.gz" -C "$WORK/linux" "Pare 3D"
 
 # Update package: the app folder's contents at the top of the archive.
 copy_app "$WORK/update"

@@ -5,11 +5,12 @@ summary: The Pare 3D app for Mac and Windows, how it keeps itself up to date, an
 
 ## Installing as an app
 
-Pare 3D is a program for your Mac or Windows PC. It works without internet; it only goes online to look for updates.
+Pare 3D is a program for your Mac, Windows PC or Linux computer. It works without internet; it only goes online to look for updates.
 
-1. Open the [Pare 3D releases page](https://github.com/rakeshjivan/pare-3d/releases/latest) and download the file for your computer: `Pare-3D-Mac.zip` for a Mac (Apple silicon or Intel), `Pare-3D-Windows.zip` for Windows 10 or 11.
+1. Open the [Pare 3D releases page](https://github.com/rakeshjivan/pare-3d/releases/latest) and download the file for your computer: `Pare-3D-Mac.zip` for a Mac (Apple silicon or Intel), `Pare-3D-Windows.zip` for Windows 10 or 11, `Pare-3D-Linux.tar.gz` for 64-bit Linux.
 2. **Mac:** unzip it and drag **Pare 3D** into your Applications folder, then open it. The first time, macOS asks whether to trust it: go to System Settings › Privacy & Security and click **Open Anyway**.
 3. **Windows:** extract the folder and double-click **Pare 3D.exe**. If SmartScreen warns, choose **More info** › **Run anyway**.
+4. **Linux:** unpack the folder somewhere it can stay and run `./pare3d`. Run `./pare3d --install` once to add Pare 3D to your applications menu (`--uninstall` takes it out again). With Google Chrome, Chromium, Edge, Brave or Vivaldi installed it opens in a window of its own; otherwise in your default browser. Designs are kept in `~/.pare3d/designs`.
 
 Your designs live inside the app on this computer and are kept when the app updates or is replaced. Use {{ui:dashboard.backupAll}} now and then to keep a copy in a single file as well - see [Backing up and passing on](chapter:files-and-saving).
 

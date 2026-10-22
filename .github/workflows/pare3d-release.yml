@@ -108,6 +108,7 @@ jobs:
           files: |
             dist/Pare-3D-Mac.zip
             dist/Pare-3D-Windows.zip
+            dist/Pare-3D-Linux.tar.gz
           body: Test build for checking before release. Installed copies do not update to it.
       - uses: softprops/action-gh-release@v2
         if: github.ref_name == 'release'
@@ -119,13 +120,15 @@ jobs:
           files: |
             dist/Pare-3D-Mac.zip
             dist/Pare-3D-Windows.zip
+            dist/Pare-3D-Linux.tar.gz
             dist/Pare-3D-app.tar.gz
             dist/pare3d-update.json
           body: |
-            **Download:** `Pare-3D-Mac.zip` for a Mac (Apple silicon or Intel), `Pare-3D-Windows.zip` for Windows 10/11.
+            **Download:** `Pare-3D-Mac.zip` for a Mac (Apple silicon or Intel), `Pare-3D-Windows.zip` for Windows 10/11, `Pare-3D-Linux.tar.gz` for 64-bit Linux.
 
             **Mac:** unzip, drag Pare 3D into Applications, open it. The first time, go to System Settings → Privacy & Security → Open Anyway.
             **Windows:** extract the folder, double-click "Pare 3D.exe". If SmartScreen warns, choose More info → Run anyway. If the window does not start, double-click "Pare 3D (browser).vbs" instead and please report it.
+            **Linux:** unpack the folder, run `./pare3d` (and once `./pare3d --install` to add it to the applications menu). Chrome or Chromium gives it its own window.
             Chrome or Edge gives Pare 3D its own window and automatic backup.
             Already installed (build 2 or later)? It updates itself: the next time you open it, or when it asks you to reload.
             **Installed a new download but it still shows an older build?** Restart your computer once (an older copy was still running in the background). From build 29 on, the app replaces an older copy by itself.

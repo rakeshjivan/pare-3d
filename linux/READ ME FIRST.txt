@@ -1,0 +1,13 @@
+Pare 3D for Linux (64-bit Intel/AMD or ARM)
+
+1. Unpack this folder somewhere it can stay, for example ~/Applications/Pare 3D.
+2. Run ./pare3d  (double-click it, or start it from a terminal).
+3. Optional: run ./pare3d --install once to add Pare 3D to your applications menu.
+
+Pare 3D opens in its own window when Google Chrome, Chromium, Edge, Brave or Vivaldi is
+installed; otherwise in your default browser.
+
+Your designs are kept in ~/.pare3d/designs and backups in ~/Documents/Pare 3D Backups.
+Pare 3D updates itself when a new build is out.
+
+Pare 3D is based on layerling (https://github.com/henmedia/layerling), AGPL-3.0-only.

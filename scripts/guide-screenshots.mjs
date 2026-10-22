@@ -63,6 +63,11 @@ async function session(language, port) {
     return response.result?.value;
   };
   await send("Page.enable");
+  // Fork (build 32): a "leave this page?" or other dialog would stop every later scene; accept it.
+  socket.addEventListener("message", (event) => {
+    const message = JSON.parse(event.data);
+    if (message.method === "Page.javascriptDialogOpening") void send("Page.handleJavaScriptDialog", { accept: true });
+  });
   await send("Emulation.setDeviceMetricsOverride", { width: WIDTH, height: HEIGHT, deviceScaleFactor: 1, mobile: false });
   await send("Emulation.setFocusEmulationEnabled", { enabled: true });
   await send("Page.setWebLifecycleState", { state: "active" });
@@ -80,6 +85,15 @@ async function run(language, port) {
   const imageDirectory = join(root, "docs", "guide", "images", language);
   mkdirSync(imageDirectory, { recursive: true });
 
+  /** Waits (up to two minutes) until the page is ours and has finished loading. */
+  const loaded = async () => {
+    for (let i = 0; i < 240; i += 1) {
+      try {
+        if (await evaluate(`location.href.startsWith(${JSON.stringify(BASE)}) && document.readyState === "complete"`)) return;
+      } catch { /* navigating */ }
+      await wait(500);
+    }
+  };
   const ctx = {
     language, wait, evaluate, send, BASE,
     /** The interface's own wording, so a scene finds buttons by the name a reader sees. */
@@ -91,6 +105,7 @@ async function run(language, port) {
     async goto(path = "/?editor=1", settle = 6000) {
       await send("Page.navigate", { url: `${BASE}${path}` });
       await wait(settle);
+      await loaded();
       // The status pill keeps the last message of the bridge; it is not part of what a reader should look at.
       await evaluate(`document.head.insertAdjacentHTML("beforeend", "<style>.editor-status{display:none !important}</style>"); true`);
     },
@@ -151,6 +166,8 @@ async function run(language, port) {
           input = scope?.querySelector("input:not([type=range]):not([type=checkbox]), textarea");
         }
         if (!input) return "no input";
+        // Focused first: a value box commits what was typed when it loses the focus.
+        input.focus();
         const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value").set;
         setter.call(input, ${JSON.stringify(String(value))});
         input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -211,7 +228,9 @@ async function run(language, port) {
 
   await send("Page.navigate", { url: `${BASE}/` });
   await wait(3000);
-  await evaluate(`localStorage.setItem("layerling.language", ${JSON.stringify(language)}); localStorage.setItem("layerling.theme", "light"); true`);
+  // Fork (build 32): the dev server compiles the first page slowly; wait until it is really there.
+  await loaded();
+  await evaluate(`localStorage.setItem("layerling.language", ${JSON.stringify(language)}); localStorage.setItem("layerling.theme", "light"); sessionStorage.setItem("layerling.editor.inspectorCards", JSON.stringify({ properties: true })); true`);
 
   const wanted = Object.entries(scenes).filter(([name]) => !only?.length || only.includes(name));
   for (const [name, scene] of wanted) {

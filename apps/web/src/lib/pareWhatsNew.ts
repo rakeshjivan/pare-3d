@@ -13,6 +13,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "One Make button: ready-made parts in groups (fixings, containers, moving parts, print helpers), with Lithophane, Photo to outline and Voronoi in the same window.",
       "A Mesh group appears in the toolbar while an imported model is selected: Make solid, Fill hole, Simplify and Cut below.",
       "Blend, Hollow and Pattern show the main settings first; the rest is under More options.",
+      "A Linux version: Pare-3D-Linux.tar.gz on the releases page, beside the Mac and Windows downloads.",
     ],
   },
   {

@@ -619,7 +619,11 @@ async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntr
   // Fork (build 32): in the app, on disk; any copy left in the browser's storage is dropped to free its room.
   if (await designDiskAvailable() && designDiskId(projectId)) {
     await designDiskPut(projectId, entry.revision, lylPackage);
-    void deleteProjectShapesFromBrowser(projectId).catch(() => undefined);
+    // Once per design and session is enough: after that the browser's storage holds no copy of it.
+    if (!clearedFromBrowser.has(projectId)) {
+      clearedFromBrowser.add(projectId);
+      void deleteProjectShapesFromBrowser(projectId).catch(() => undefined);
+    }
     return { historyTrimmed };
   }
   const database = await openProjectShapesDb();
@@ -750,6 +754,8 @@ async function moveProjectShapeRecordToDisk(record: ProjectShapeRecord): Promise
 }
 
 let projectsMovedToDisk: Promise<number> | null = null;
+/** Fork (build 32): designs whose copy in the browser's storage was already dropped this session. */
+const clearedFromBrowser = new Set<string>();
 /**
  * Fork (build 32): once per session in the app, every design still in the browser's storage moves to
  * disk. Older records without a package (shapes kept loose) stay where they are and move when opened.
