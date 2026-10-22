@@ -223,8 +223,8 @@ export function matchedLoops(a: THREE.Vector3[], b: THREE.Vector3[], axis: THREE
   return { ringA, ringB: ringA.map((_, index) => ringB[(index + shift) % count]), ca, cb };
 }
 
-/** The triangles of the blend piece, in the world, outward-facing. Null when the faces cannot be joined. */
-export function blendPositions(a: BlendFace, b: BlendFace, settings: BlendSettings): number[] | null {
+/** The sections of the blend piece: outer rings, the inner rings of a sleeve, and their centres along the path. */
+function blendSlices(a: BlendFace, b: BlendFace, settings: BlendSettings) {
   const loopA = outerLoopWorld(a.face);
   const loopB = outerLoopWorld(b.face);
   if (loopA.length < 3 || loopB.length < 3) return null;
@@ -301,8 +301,34 @@ export function blendPositions(a: BlendFace, b: BlendFace, settings: BlendSettin
       break;
     }
   }
-  const { rings, innerRings, centres } = built;
-  const sleeve = innerRings.length === rings.length;
+  return { ...built, sleeve: built.innerRings.length === built.rings.length, nA, nB, ringA };
+}
+
+/**
+ * Fork (build 29): what the CAD worker needs to build the piece as an exact loft (cadBlendLoft.ts):
+ * every other section of the sweep (the ends and the straight first and last steps kept), and for a
+ * sleeve the inner sections reaching a further half millimetre out at both ends.
+ */
+export function blendLoftInput(a: BlendFace, b: BlendFace, settings: BlendSettings): { rings: number[][]; innerRings?: number[][] } | null {
+  const built = blendSlices(a, b, settings);
+  if (!built) return null;
+  const last = built.rings.length - 1;
+  const keep = built.rings.map((_, index) => index).filter((index) => index <= 1 || index >= last - 1 || index % 2 === 0);
+  const flat = (ring: THREE.Vector3[]) => ring.flatMap((point) => [point.x, point.y, point.z]);
+  const rings = keep.map((index) => flat(built.rings[index]));
+  if (!built.sleeve) return { rings };
+  const inner = keep.map((index) => built.innerRings[index]);
+  const reach = 0.5;
+  inner[0] = inner[0].map((point) => point.clone().addScaledVector(built.nA, -reach));
+  inner[inner.length - 1] = inner[inner.length - 1].map((point) => point.clone().addScaledVector(built.nB, -reach));
+  return { rings, innerRings: inner.map(flat) };
+}
+
+/** The triangles of the blend piece, in the world, outward-facing. Null when the faces cannot be joined. */
+export function blendPositions(a: BlendFace, b: BlendFace, settings: BlendSettings): number[] | null {
+  const built = blendSlices(a, b, settings);
+  if (!built) return null;
+  const { rings, innerRings, centres, sleeve, nA, nB, ringA } = built;
 
   const positions: number[] = [];
   // Each triangle is turned to face `outward` (any vector on its outer side).
