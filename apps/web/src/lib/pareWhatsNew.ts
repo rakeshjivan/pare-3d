@@ -4,6 +4,16 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 30,
+    items: [
+      "Imported meshes are checked: if an STL, OBJ or 3MF is not watertight, a card says so and Make solid repairs it (a face with a hole in it closes as a ring, the hole stays open). Right-click > Check and make solid runs it any time.",
+      "Fill a hole: right-click an imported part > Fill a hole, then click the inside wall of a screw hole, bore or nut trap - it is filled flush. Round, square and hex holes, through or blind.",
+      "Cut below the bed: trims what sinks under the plate (as the slicer would) - from Ready to print? or the command search. Ungroup takes it back.",
+      "New ready-made parts: a jar with a screw-on lid, and a flexi chain of segments with print-in-place joints.",
+      "An STL whose file has no normals no longer shows up black.",
+    ],
+  },
+  {
     build: 29,
     items: [
       "Blend makes an exact CAD piece: fillet, chamfer and hollow now work on blended parts (before, they stopped at \"This mesh has 16,512 triangles\"), and STEP keeps the blend exact.",

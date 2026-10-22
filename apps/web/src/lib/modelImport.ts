@@ -1,4 +1,5 @@
 import { unzipSync } from "fflate";
+import { pendingMeshChecks } from "@/lib/meshRepair";
 import { t } from "@/lib/i18n";
 import { importExtensionSupported } from "@/lib/importExtensions";
 import { importedShapesFromObj } from "@/lib/objImport";
@@ -202,7 +203,10 @@ export async function importModelFiles(
       });
     }
   }
-  return options.cancelled?.() ? null : result;
+  if (options.cancelled?.()) return null;
+  // Fork (build 30): imported triangle meshes are checked for openings in the editor.
+  for (const shape of result.shapes) if (shape.kind === "mesh" && shape.importedMesh?.positions?.length) pendingMeshChecks.add(shape.id);
+  return result;
 }
 
 /** Die Fehlerzeile unter einer Importmeldung, oder nichts. */

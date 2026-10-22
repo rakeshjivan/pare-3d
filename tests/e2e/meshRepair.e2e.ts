@@ -94,4 +94,21 @@ describe("Mesh check and repair (build 30)", () => {
     const result = await fillHoleAt(soup(bracket), { x: 5, y: 5, z: 0 }, { x: 0, y: 1, z: 0 });
     expect(result.ok).toBe(false);
   });
+
+  it("closes a removed face with a hole in it as a ring, leaving the hole open", async () => {
+    const drilled = (await buildGroupedShapeFromSelection([box, bore], 400000)).group!;
+    const all = soup(drilled);
+    const full = volume(all);
+    const open: number[] = [];
+    for (let i = 0; i < all.length; i += 9) {
+      if (all[i + 1] > 19.99 && all[i + 4] > 19.99 && all[i + 7] > 19.99) continue;
+      open.push(...all.slice(i, i + 9));
+    }
+    expect(meshHealth(open).openings).toBe(2);
+    const repaired = makeSolidPositions(open);
+    expect(meshHealth(repaired.positions).watertight).toBe(true);
+    expect(await isManifoldSolid(repaired.positions)).toBe(true);
+    // The same volume as the drilled block: the bore is still open.
+    expect(volume(repaired.positions)).toBeCloseTo(full, 0);
+  });
 });

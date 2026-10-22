@@ -145,7 +145,7 @@ import { WhatsNew } from "./WhatsNew";
 import { FastModeHint } from "./FastModeHint";
 import { checkBeforeSending, CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, PrintCheckPanel, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
 import { belowBedCutter } from "@/lib/cutBelowBed";
-import { fillHoleAt, isManifoldSolid, makeSolidPositions, meshHealth, shapeWithWorldPositions } from "@/lib/meshRepair";
+import { fillHoleAt, isManifoldSolid, makeSolidPositions, meshHealth, pendingMeshChecks, shapeWithWorldPositions } from "@/lib/meshRepair";
 import { worldTriangles } from "@/lib/blend";
 import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
 import { tracedSolidPositions, type TraceOptions, type TraceResult } from "@/lib/photoTrace";
@@ -11771,6 +11771,29 @@ export function LayerlingEditor({
     commitShapes(next, laid.map((shape) => shape.id), t("splitToFit.done", { pieces, dowels }));
   }, [commitShapes]);
 
+  // Fork (build 30): meshes just imported (here or from the start page) are checked once they appear.
+  useEffect(() => {
+    if (!pendingMeshChecks.size) return;
+    const arrived = shapes.filter((shape) => pendingMeshChecks.has(shape.id));
+    if (!arrived.length) return;
+    arrived.forEach((shape) => pendingMeshChecks.delete(shape.id));
+    const unsound = arrived.flatMap((shape) => {
+      if (!shape.importedMesh?.positions?.length || shape.groupedShapes?.length) return [];
+      try {
+        const health = meshHealth(shape.importedMesh.positions);
+        return health.watertight ? [] : [{ shape, health }];
+      } catch {
+        return [];
+      }
+    });
+    if (unsound.length) {
+      setMeshCheck({
+        ids: unsound.map((entry) => entry.shape.id),
+        message: unsound.map((entry) => t("meshCheck.problem", { name: displayShapeName(entry.shape), openings: entry.health.openings, broken: entry.health.brokenEdges })).join(" "),
+      });
+    }
+  }, [shapes]);
+
   // Fork (build 30): Make solid - openings capped, triangles turned outward, checked as a closed solid.
   const makePartsSolid = useCallback(async (ids: readonly string[]) => {
     const targets = shapesRef.current.filter((shape) => ids.includes(shape.id) && !shape.locked && shape.importedMesh && !shape.groupedShapes?.length);
@@ -12516,22 +12539,7 @@ export function LayerlingEditor({
       [successSummary, ...notes].join(" ") + failureSummary,
     );
     setTopPanel(null);
-    // Fork (build 30): every imported mesh checked for openings and broken spots.
-    const unsound = importedShapes.flatMap((shape) => {
-      if (!shape.importedMesh?.positions?.length || shape.groupedShapes?.length) return [];
-      try {
-        const health = meshHealth(shape.importedMesh.positions);
-        return health.watertight ? [] : [{ shape, health }];
-      } catch {
-        return [];
-      }
-    });
-    if (unsound.length) {
-      setMeshCheck({
-        ids: unsound.map((entry) => entry.shape.id),
-        message: unsound.map((entry) => t("meshCheck.problem", { name: displayShapeName(entry.shape), openings: entry.health.openings, broken: entry.health.brokenEdges })).join(" "),
-      });
-    }
+
     return { importedIds: importedShapes.map((shape) => shape.id), failures };
   }, [commitShapes, onOpenLylProjectFile]);
   importFilesRef.current = importFiles;

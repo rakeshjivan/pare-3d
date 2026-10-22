@@ -46,6 +46,10 @@ In the menu next to the eye ({{ui:editor.group.visibility}}), **Show overhangs**
 
 How steep your printer manages is set in the settings under {{ui:workspace.appearance}}: from 30° (careful) to 70° (for printers with good part cooling). A face resting on another body is still marked - Pare 3D only looks at the face itself.
 
+## Cut below the bed
+
+Sometimes you sink a part partly below the plate on purpose, to give a round or uneven part a flat base. The slicer cuts off whatever is below the plate. {{ui:cutBelowBed.button}} does the same in Pare 3D, so you see what will print: each part that sinks below the plate is grouped with a hole box filling everything under the plate beneath it. With nothing selected, every part is cut; otherwise the selected ones. It stays an ordinary group - {{ui:editor.tool.ungroup}} takes the cut back. Find it in {{ui:printCheck.title}}, or search for it with [[Ctrl]]+[[K]].
+
 ## Holes that fit: Print fit
 
 A printed hole comes out a little smaller than drawn, so a 5 mm peg will not go into a 5 mm hole. Select a hole and open {{ui:printHelpers.title}} in its properties: the {{ui:printFit.title}} card makes the hole bigger by the right amount, shared evenly on every side, while the size you typed stays as it is.
@@ -67,6 +71,7 @@ Every printer is a little different. {{ui:fitTest.title}} in **Ready-made parts*
 Before you send a design to the printer, {{ui:printCheck.title}} looks it over for the things that spoil a print, and says which part each one is on:
 
 - a part that goes past the edge of the plate - with {{ui:splitToFit.button}} right there;
+- a part that sinks below the plate - the slicer cuts that off - with {{ui:cutBelowBed.button}} right there;
 - a part floating in the air with nothing under it;
 - a hole on its own, which cuts nothing until it is grouped with a part;
 - a wall too thin to print;

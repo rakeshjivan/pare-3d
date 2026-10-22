@@ -48,7 +48,9 @@ export function importedShapeFromTriangleSoup(
 ): WorkplaneShape {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(rawPositions, 3));
-  if (rawNormals?.length === rawPositions.length) {
+  // Fork (build 30): a file whose normals are all zero (some exporters write none) gets them worked out.
+  const usableNormals = rawNormals?.length === rawPositions.length && rawNormals.some((value) => Math.abs(value) > 1e-6);
+  if (usableNormals && rawNormals) {
     geometry.setAttribute("normal", new THREE.Float32BufferAttribute(rawNormals, 3));
   } else {
     geometry.computeVertexNormals();

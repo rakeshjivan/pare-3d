@@ -96,6 +96,21 @@ A design saved with a **newer Pare 3D** may hold things your version does not kn
 
 Template pictures are added in sketch mode, see [Sketches](chapter:sketches).
 
+## Checking and repairing an imported mesh
+
+Downloaded STL, OBJ and 3MF files are often not quite solid: a face is missing, so the surface has an opening, or triangles are doubled or face the wrong way. A slicer may print such a file wrongly or not at all. Pare 3D checks every mesh you import. When one is not watertight, a card at the bottom of the work area says how many openings and broken spots it found:
+
+- **{{ui:meshCheck.makeSolid}}** closes every opening with a flat cap - an opening with another inside it, like the rim of a missing face that had a hole in it, gets a ring-shaped cap, so the hole stays open - turns all the triangles outward and checks that the result is a closed solid. If it can only be partly repaired, the message says so.
+- **{{ui:meshCheck.leave}}** keeps the mesh as it is.
+
+You can run the check again any time: right-click the part and choose {{ui:contextMenu.makeSolid}}, or search for it with [[Ctrl]]+[[K]].
+
+### Filling a hole
+
+To fill a screw hole, a bore or a nut trap in an imported part - to drill it again somewhere else, say - right-click the part, choose {{ui:contextMenu.fillHole}} and click the inside wall of the hole. Pare 3D finds the hole's surface around your click, makes a plug that fits it and joins it to the part, flush with the faces around it. Round, square and hexagonal holes work, through or blind; a counterbore or countersink is filled one step at a time, a click for each. Click the next hole, or press [[Esc]] when you are done. A click on an outside face or into an inside corner is refused - that is not a hole.
+
+Fill a hole is for imported meshes. In a part built in Pare 3D the hole is a part of its own: open the group with [[E]] and delete it.
+
 ## Simplifying an imported mesh
 
 A scanned or sculpted mesh often has far more triangles than its shape needs, and every one of them is carried along while you move, cut and save. {{ui:simplify.title}} in the Modify group (or in the right-click menu of the body) shows the mesh as it is next to what a chosen share of its triangles would leave of it; both views turn and zoom together with the mouse buttons of the workplane. Set how much to keep as a percentage or a number of triangles, and {{ui:simplify.apply}} takes the lighter mesh. The result is a plain mesh: for the result of a cut or merge, {{ui:group.edit}} and its original parts are given up.

@@ -18,6 +18,12 @@ import type { WorkplaneShape } from "@/types/layerling";
 
 const WELD = 1e4; // corners within 0.1 µm are one corner
 
+/**
+ * Parts just imported whose mesh the editor should check, by id. The import may happen on the start
+ * page (a new design) or in the editor; the editor checks them when they appear. Kept for the session.
+ */
+export const pendingMeshChecks = new Set<string>();
+
 export type Welded = { points: number[][]; triangles: number[][] };
 
 /** Corners at the same place joined; triangles that collapse to a line or point dropped. */
@@ -147,6 +153,67 @@ function capLoop(points: number[][], loop: number[]): number[][] {
   });
 }
 
+/**
+ * Caps for all openings. Openings in one plane are taken together: one lying inside another is a
+ * hole in that one's cap (the rim of a removed face with a hole in it), so the hole stays open.
+ */
+function capLoops(points: number[][], loops: number[][]): number[][] {
+  type Flat = { loop: number[]; normal: THREE.Vector3; offset: number; area: number };
+  const flats: Flat[] = loops.map((loop) => {
+    const v = loop.map((id) => new THREE.Vector3(...points[id]));
+    const normal = new THREE.Vector3();
+    for (let i = 0; i < v.length; i += 1) {
+      const p = v[i], q = v[(i + 1) % v.length];
+      normal.x += (p.y - q.y) * (p.z + q.z);
+      normal.y += (p.z - q.z) * (p.x + q.x);
+      normal.z += (p.x - q.x) * (p.y + q.y);
+    }
+    const area = normal.length() / 2;
+    if (area > 0) normal.normalize();
+    const centre = v.reduce((sum, point) => sum.add(point), new THREE.Vector3()).divideScalar(v.length);
+    // Flat only when every corner lies on the plane: only those can share a cap.
+    const flat = area > 0 && v.every((point) => Math.abs(point.clone().sub(centre).dot(normal)) < 1e-3);
+    return { loop, normal: flat ? normal : new THREE.Vector3(), offset: flat ? centre.dot(normal) : NaN, area };
+  });
+  const used = new Set<number>();
+  const caps: number[][] = [];
+  flats.forEach((flat, index) => {
+    if (used.has(index)) return;
+    if (!Number.isFinite(flat.offset)) {
+      used.add(index);
+      caps.push(...capLoop(points, flat.loop));
+      return;
+    }
+    // Every flat opening in the same plane (either way round).
+    const group = flats.map((other, at) => ({ other, at })).filter(({ other, at }) => !used.has(at) && Number.isFinite(other.offset)
+      && Math.abs(Math.abs(other.normal.dot(flat.normal)) - 1) < 1e-4
+      && Math.abs(other.offset * Math.sign(other.normal.dot(flat.normal)) - flat.offset) < 1e-3);
+    group.forEach(({ at }) => used.add(at));
+    const u = (Math.abs(flat.normal.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)).sub(flat.normal.clone().multiplyScalar(Math.abs(flat.normal.x) < 0.9 ? flat.normal.x : flat.normal.y)).normalize();
+    const w = new THREE.Vector3().crossVectors(flat.normal, u);
+    const to2 = (id: number) => { const point = new THREE.Vector3(...points[id]); return new THREE.Vector2(point.dot(u), point.dot(w)); };
+    const rings = group.map(({ other }) => ({ loop: other.loop, flat: other.loop.map(to2), area: other.area }));
+    // Nesting depth: how many other rings each ring lies inside. Even = an outline, odd = a hole in the one around it.
+    const inside = (point: THREE.Vector2, polygon: THREE.Vector2[]) => {
+      let hit = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const a = polygon[i], b = polygon[j];
+        if ((a.y > point.y) !== (b.y > point.y) && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) hit = !hit;
+      }
+      return hit;
+    };
+    const depth = rings.map((ring, i) => rings.filter((other, j) => j !== i && other.area > ring.area && inside(ring.flat[0], other.flat)).length);
+    rings.forEach((ring, i) => {
+      if (depth[i] % 2 === 1) return;
+      // The holes of this outline: rings one level deeper that lie inside it.
+      const holes = rings.filter((other, j) => depth[j] === depth[i] + 1 && inside(other.flat[0], ring.flat));
+      const all = [...ring.loop, ...holes.flatMap((hole) => hole.loop)];
+      THREE.ShapeUtils.triangulateShape(ring.flat, holes.map((hole) => hole.flat)).forEach(([a, b, c]) => caps.push([all[a], all[b], all[c]]));
+    });
+  });
+  return caps;
+}
+
 /** Every triangle turned the same way as its neighbours, then all of them outward (positive volume). */
 function orient(points: number[][], triangles: number[][]): number[][] {
   const out = triangles.map((tri) => [...tri]);
@@ -207,7 +274,7 @@ export function makeSolidPositions(positions: ArrayLike<number>): { positions: n
     return true;
   });
   const loops = boundaryLoops({ points: welded.points, triangles });
-  const caps = loops.flatMap((loop) => capLoop(welded.points, loop));
+  const caps = capLoops(welded.points, loops);
   return { positions: flatten(welded.points, orient(welded.points, [...triangles, ...caps])), capped: loops.length };
 }
 
