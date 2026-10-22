@@ -50,6 +50,16 @@ How steep your printer manages is set in the settings under {{ui:workspace.appea
 
 Sometimes you sink a part partly below the plate on purpose, to give a round or uneven part a flat base. The slicer cuts off whatever is below the plate. {{ui:cutBelowBed.button}} does the same in Pare 3D, so you see what will print: each part that sinks below the plate is grouped with a hole box filling everything under the plate beneath it. With nothing selected, every part is cut; otherwise the selected ones. It stays an ordinary group - {{ui:editor.tool.ungroup}} takes the cut back. Find it in {{ui:printCheck.title}}, or search for it with [[Ctrl]]+[[K]].
 
+## Fit check: overlaps and tight gaps
+
+Parts that move against each other - a lid, a hinge, a print-in-place joint, a gear on a shaft - need a gap between them, or they fuse when printed. **{{ui:fitCheck.title}}** in the Arrange group finds where that goes wrong:
+
+- With two or more parts selected it checks those; otherwise every visible part.
+- Where parts **overlap**, what they share shows in red on the plate, and the list gives its volume.
+- Where parts come **closer than the {{ui:fitCheck.clearance}}** (0.3 mm to begin with), the list says how far apart they are. 0.2 to 0.4 mm suits most printers for parts that print together and must move; the fit test under "Holes that fit" below tells you what yours needs.
+
+Click a line in the list to select its two parts. The check runs again by itself whenever a part moves, so you can nudge parts apart with the window open and watch the list empty. {{ui:edge.done}} closes it.
+
 ## Holes that fit: Print fit
 
 A printed hole comes out a little smaller than drawn, so a 5 mm peg will not go into a 5 mm hole. Select a hole and open {{ui:printHelpers.title}} in its properties: the {{ui:printFit.title}} card makes the hole bigger by the right amount, shared evenly on every side, while the size you typed stays as it is.

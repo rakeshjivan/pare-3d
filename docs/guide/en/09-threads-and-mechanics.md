@@ -142,6 +142,16 @@ The {{ui:shape.hinge}} prints in one piece and moves afterwards (print-in-place)
 
 {{ui:prop.hingeClearance}} is the gap between the moving parts: around the pin, between the knuckles and in front of the leaves. With 0.4 mm a well-tuned printer usually breaks free with a small twist; if the parts fuse, raise it, if it wobbles too much, lower it. Print the hinge lying down as it appears on the plate, without supports. If you would rather use a pin of your own, such as a piece of filament or wire, which is smoother than a printed pin on a small hinge, switch on {{ui:prop.hingePinless}}: the printed pin is left out and the bore, the pin diameter plus the clearance, runs through every knuckle, the ends included. You can add holes to the leaves or group them into a larger part, such as a lid.
 
+## Making any model flexi
+
+**{{ui:flexiModel.title}}** turns a model into a flexi toy: it cuts the model across its length into segments joined by print-in-place joints, so it prints in one go, already assembled, and wiggles once each joint is bent free. Select one model - a fish, a snake, a dragon lying flat - and choose {{ui:flexiModel.title}} under {{ui:editor.group.modify}} › {{ui:editor.more}} or in the right-click menu ({{ui:flexiModel.menu}}).
+
+- {{ui:flexiModel.segments}}: how many pieces; about one every 20 mm to begin with.
+- {{ui:fitCheck.clearance}}: the gap in every joint; 0.4 mm suits most printers.
+- {{ui:flexiModel.swing}}: how far each joint turns to either side; the cut faces are angled to make the room.
+
+Each joint is a knuckle: a tongue with a hole on one segment, a fork with a pin through it on the next. A joint needs about 5 mm of width and 4.5 mm of height where it is cut; where the model is thinner the cut is left out, and the message says how many. The segments are separate parts: print them together, as they are, and check them with {{ui:fitCheck.title}} first if you moved any.
+
 ## Knurling
 
 The {{ui:shape.knurl}} is a round grip with grooves all around, for knobs, thumb wheels and tool handles. Under {{ui:prop.knurlPattern}} you pick {{ui:knurl.straight}}, grooves along the axis as on a control knob, {{ui:knurl.diamond}}: two slanted rows of grooves cross into small diamonds, or {{ui:knurl.round}}: grooves and ridges along the axis as a soft wave of arcs, a pleasant grip without sharp ridges. Round grooves stay shallower than half a pitch, or the ridges would bulge at their foot; a depth too great gives way. You set the {{ui:prop.diameter}} and the {{ui:prop.height}}, the number of {{ui:prop.knurlCount}} and the {{ui:prop.knurlDepth}}; for crossed knurling also the {{ui:prop.knurlAngle}} to the axis. The {{ui:prop.knurlChamfer}} breaks both ends at 45 degrees, as on a turned knob; 0 leaves them sharp.

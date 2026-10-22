@@ -71,6 +71,12 @@ The piece is an exact CAD body, like a box or a cylinder: {{ui:editor.tool.fille
 
 Select the blend - the group, or the piece if it was kept separate - and click {{ui:blend.title}} again. The window opens with the blend's settings and faces; change anything, including joining or separating, and click {{ui:blend.update}}. [[Esc]] leaves it as it was. Once a blend has been filleted, chamfered or hollowed, or its parts were changed inside the group, it can no longer be opened this way: undo those first. {{ui:editor.tool.ungroup}} still takes the group apart, and the piece is an ordinary part you can delete. The faces can be any flat outline - circles, squares, a sketch, a polygon. For a smooth result, round shapes should have plenty of sides (see [How round is round?](chapter:shapes)).
 
+## Hull: wrapping parts in one body
+
+**{{ui:hull.title}}** in the Combine group wraps the selected parts in one smooth body, as if shrink-wrapped: the tightest shape that holds them all, with no dents. Two cylinders side by side become a rounded slot; a few spheres make an organic bracket; a cylinder and a box make a tapered handle. Select two or more parts (or one group) and click it. The parts are replaced by the hull - [[Ctrl]]+[[Z]] brings them back. Holes are left out of the hull.
+
+A hull never has dents, so it does not follow an L shape round its inside corner: for that, build the parts as they are and group them.
+
 ## Editing a group
 
 If a bore turned out too small, you do not have to dissolve the group and rebuild. Select the group and click {{ui:group.edit}} in its settings, the folder icon in the object list, or press [[E]]. A double click on the group does the same, as in Tinkercad, on a bundle too; if you would rather not, switch off {{ui:workspace.doubleClickOpensGroup}} in the settings. A part only starts to move once the pointer has been dragged a few pixels, so a shaky click or double click does not nudge it. The parts now lie separately and you change them with every tool: make a hole larger, move a body, add a hole.

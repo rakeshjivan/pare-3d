@@ -382,7 +382,7 @@ type WorkplaneViewportProps = {
   onAddShape: (shape: ShapeAsset, point?: PlacementPoint, workplane?: PlacementWorkplane) => void;
   /** Parts picked up with C, following the pointer over faces until a click sets them down (#195). */
   carryIds?: string[] | null;
-  onCarryDrop?: (target: { point: PlacementPoint; normal: PlacementPoint; workplane: PlacementWorkplane }) => void;
+  onCarryDrop?: (target: { point: PlacementPoint; normal: PlacementPoint; workplane: PlacementWorkplane; shapeId?: string; hit?: PlacementPoint }) => void;
   /** A custom shape dropped on the workplane, by its id. */
   onDropMyShape?: (id: string, point: PlacementPoint) => void;
   /** Shape following the cursor until a click drops it. Null places immediately. */
@@ -5156,7 +5156,8 @@ export function WorkplaneViewport({
   const cruiseTarget = useCallback((clientX: number, clientY: number, skip?: ReadonlySet<string>) => {
     // pickPlacementSurface is declared further down; it is reached through its ref.
     const surface = pickPlacementSurfaceRef.current?.(clientX, clientY, false, skip) ?? null;
-    if (surface) return { point: surface.workplane.origin, workplane: surface.workplane, normal: surface.workplane.normal };
+    // Fork (build 33): which part was hit too, so text set down on a cylinder can wrap round it.
+    if (surface) return { point: surface.workplane.origin, workplane: surface.workplane, normal: surface.workplane.normal, shapeId: surface.shapeId as string | undefined, hit: { x: surface.point.x, y: surface.point.y, z: surface.point.z } };
     const point = toFreePlacementWorkplanePoint(clientX, clientY);
     if (!point) return null;
     const workplane = placementWorkplaneRef.current;

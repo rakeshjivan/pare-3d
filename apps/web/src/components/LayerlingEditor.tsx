@@ -16,7 +16,7 @@ import { loftShapePatch, type LoftMeasures } from "@/lib/loftGeometry";
 import { hingeWorldParts } from "@/lib/hingeParts";
 import { copyViaSelectionField, decodeClipboardPayload, encodeClipboardPayload, LOCAL_CLIPBOARD_LIMIT, newestClipboard, type ClipboardPayload } from "@/lib/clipboardPayload";
 import { bentTubeNaturalDimensions, normalizedBentTubeFields } from "@/lib/bentTubeGeometry";
-import { gridfinityListPatch } from "@/lib/gridfinityGeometry";
+import { GRIDFINITY_CLEARANCE, GRIDFINITY_GRID, GRIDFINITY_HEIGHT_UNIT, MAX_GRIDFINITY_HEIGHT_UNITS, MAX_GRIDFINITY_UNITS, MIN_GRIDFINITY_FLOOR_HEIGHT, gridfinityListPatch, gridfinitySize } from "@/lib/gridfinityGeometry";
 import { DEFAULT_THREAD_PROFILE, defaultThreadHeadHeight, normalizeThreadHeadHeight, threadNaturalFootprint, threadSettings } from "@/lib/threadGeometry";
 import { curvedTextPatch, MAX_TEXT_SPACING, MIN_TEXT_SPACING } from "@/lib/textGeometry";
 import { normalizeTextEdge } from "@/lib/textEdge";
@@ -100,6 +100,12 @@ import { WorkplaneViewport, type LayFlatPick, type ViewportToolMemory } from "./
 import { layFlatRotation } from "@/lib/layFlat";
 import { SketchWorkspace, type SketchMeasurement, type SketchPrimitive, type SketchSelection, type SketchTool } from "./SketchWorkspace";
 import { EdgeModifierPanel, type EdgeChamferStyle } from "./workplane/EdgeModifierPanel";
+import { FitCheckPanel } from "./workplane/FitCheckPanel";
+import { MeshRoundPanel } from "./workplane/MeshRoundPanel";
+import { FlexiModelPanel } from "./workplane/FlexiModelPanel";
+import { DEFAULT_FLEXI_MODEL, flexiModelSegments, type FlexiModelOptions } from "@/lib/flexiModel";
+import { checkFit, hullPositions, type FitReport } from "@/lib/partTools";
+import { roundMeshPositions, smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
 import { ShellPanel } from "./workplane/ShellPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
 import { MateFacesPanel } from "./workplane/MateFacesPanel";
@@ -148,7 +154,7 @@ import { belowBedCutter } from "@/lib/cutBelowBed";
 import { fillHoleAt, isManifoldSolid, makeSolidPositions, meshHealth, pendingMeshChecks, shapeWithWorldPositions } from "@/lib/meshRepair";
 import { worldTriangles } from "@/lib/blend";
 import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
-import { tracedSolidPositions, type TraceOptions, type TraceResult } from "@/lib/photoTrace";
+import { toolLayout, toolPocketPositions, tracedSolidPositions, type ToolBinOptions, type TraceOptions, type TraceResult } from "@/lib/photoTrace";
 import { TracePanel } from "@/components/workplane/TracePanel";
 import { layOutOnPlate, splitToFit } from "@/lib/splitToFit";
 import { whileBusy } from "@/lib/busy";
@@ -200,8 +206,8 @@ import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, tra
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
-import { FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
-import { BookOpen, Import, Keyboard, PaintBucket, Scissors, Settings as LucideSettings, ShieldCheck, StickyNote, Upload } from "lucide-react";
+import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
+import { BookOpen, Import, Keyboard, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, StickyNote, Upload, Waves } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -2062,6 +2068,44 @@ function cylinderWrappedShape(shape: WorkplaneShape, diameter: number, inward: b
   });
 }
 
+/** Fork (build 33): the diameter of a cylinder or tube that stands upright (not tilted), or null. */
+function uprightCylinderDiameter(shape: WorkplaneShape): number | null {
+  if (shape.kind !== "cylinder" && shape.kind !== "tube") return null;
+  if (Math.abs(shape.rotationX ?? 0) > 0.01 || Math.abs(shape.rotationZ ?? 0) > 0.01) return null;
+  const width = shapeWidth(shape);
+  const depth = shapeDepth(shape);
+  if (Math.abs(width - depth) > 0.01 * Math.max(width, depth)) return null;
+  return width;
+}
+
+/**
+ * Fork (build 33): face text wrapped round an upright cylinder, centred on the clicked point: its
+ * middle faces the click, at the click's height. Cut-in text (sink > 0) goes that deep into the wall.
+ */
+function textWrappedOnCylinder(text: WorkplaneShape, cylinder: WorkplaneShape, hit: PlacementPoint, sink: number): WorkplaneShape | CylinderWrapError {
+  const diameter = uprightCylinderDiameter(cylinder);
+  if (!diameter) return "invalidDiameter";
+  // The text lying flat, as it came from the Ready-made parts window; cut-in text as deep as it goes in.
+  const flat = canonicalizeShape({ ...text, x: 0, z: 0, elevation: 0, rotation: 0, rotationX: 0, rotationZ: 0, ...(sink > 0 ? { height: sink } : {}) });
+  const mesh = meshForShape(flat);
+  const result = wrapMeshAroundCylinder({ vertices: mesh.vertices, faces: mesh.faces }, { diameter, inward: sink > 0 });
+  if ("error" in result) return result.error;
+  // Turn the wrapped body (its middle faces +z) towards the click, round the cylinder's axis.
+  const angle = Math.atan2(hit.x - cylinder.x, hit.z - cylinder.z);
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const lift = hit.y - result.height / 2;
+  const world: number[] = new Array(result.positions.length);
+  for (let i = 0; i < result.positions.length; i += 3) {
+    const x = result.positions[i];
+    const z = result.positions[i + 2];
+    world[i] = cylinder.x + x * cos + z * sin;
+    world[i + 1] = result.positions[i + 1] + lift;
+    world[i + 2] = cylinder.z - x * sin + z * cos;
+  }
+  return canonicalizeShape({ ...shapeWithWorldPositions(text, world), cylinderWrap: { diameter, ...(sink > 0 ? { inward: true } : {}) } });
+}
+
 function canWrapAroundCylinder(shape: WorkplaneShape | null | undefined) {
   // A shape that is wrapped already is a mesh of the wrapped thing: wrapping that again gave nonsense (#329).
   return Boolean(shape && !shape.locked && !shape.cylinderWrap && shape.groupOperation !== "bundle" && !isNonSolidShapeKind(shape.kind));
@@ -3711,12 +3755,26 @@ export function LayerlingEditor({
   intersectPreviewIdsRef.current = intersectPreviewIds;
   const intersectPreviewRunRef = useRef(0);
   const intersectPreviewEmptyRef = useRef(false);
+  // Fork (build 33): Fit check - the parts it checks, and what they share drawn in red on top.
+  const [fitCheck, setFitCheck] = useState<{ clearance: number; ids: string[] | null } | null>(null);
+  const [fitReport, setFitReport] = useState<FitReport | null>(null);
+  const [fitBusy, setFitBusy] = useState(false);
+  const [fitOverlay, setFitOverlay] = useState<WorkplaneShape[]>([]);
+  const fitRunRef = useRef(0);
   const viewportShapes = useMemo(() => {
-    if (!intersectPreviewIds) return baseViewportShapes;
-    const operands = new Set(intersectPreviewIds);
-    const ghosts = baseViewportShapes.map((shape) => (operands.has(shape.id) && !shape.hole ? { ...shape, transparent: true } : shape));
-    return intersectPreviewShape ? [...ghosts, intersectPreviewShape] : ghosts;
-  }, [baseViewportShapes, intersectPreviewIds, intersectPreviewShape]);
+    let result = baseViewportShapes;
+    if (intersectPreviewIds) {
+      const operands = new Set(intersectPreviewIds);
+      const ghosts = result.map((shape) => (operands.has(shape.id) && !shape.hole ? { ...shape, transparent: true } : shape));
+      result = intersectPreviewShape ? [...ghosts, intersectPreviewShape] : ghosts;
+    }
+    if (fitCheck && fitOverlay.length) {
+      // The overlapping parts see-through, so the red overlap inside them shows.
+      const overlapping = new Set((fitReport?.findings ?? []).filter((finding) => finding.kind === "overlap").flatMap((finding) => [finding.a, finding.b]));
+      result = [...result.map((shape) => (overlapping.has(shape.id) ? { ...shape, transparent: true } : shape)), ...fitOverlay];
+    }
+    return result;
+  }, [baseViewportShapes, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape]);
   // A revolve sketch on the base plate is a side view: the bodies are shown from the front, as the profile is drawn (#525).
   // Opened again to edit a body that stands upright, it is the same side view: that body stands at its height, not on the plate's workplane.
   const editedRevolveShape = sketchActive && sketchOperation === "revolve" && editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) : undefined;
@@ -5618,10 +5676,31 @@ export function LayerlingEditor({
   );
 
   /** Sets the parts picked up with C down on the face (or the workplane) that was clicked, as one step. */
-  const dropCarried = useCallback((target: { point: PlacementPoint; normal: PlacementPoint; workplane: PlacementWorkplane }) => {
+  const carryFaceTextRef = useRef(false);
+  const dropCarried = useCallback((target: { point: PlacementPoint; normal: PlacementPoint; workplane: PlacementWorkplane; shapeId?: string; hit?: PlacementPoint }) => {
     const ids = carryIdsRef.current;
     setCarryIds(null);
     if (!ids?.length) return;
+    // Fork (build 33): text from "Text on a face" set down on the side of an upright cylinder or tube
+    // wraps round it, raised or cut in, centred where it was clicked.
+    const onCylinder = target.shapeId ? shapes.find((shape) => shape.id === target.shapeId) : undefined;
+    if (carryFaceTextRef.current && ids.length === 1 && onCylinder && target.hit && uprightCylinderDiameter(onCylinder) && Math.abs(target.normal.y) < 0.35 * (Math.hypot(target.normal.x, target.normal.y, target.normal.z) || 1)) {
+      const text = shapes.find((shape) => shape.id === ids[0]);
+      const sink = carrySinkRef.current.get(ids[0]) ?? 0;
+      carryFaceTextRef.current = false;
+      if (text) {
+        const wrapped = textWrappedOnCylinder(text, onCylinder, target.hit, sink);
+        if (typeof wrapped === "string") {
+          setNotice(t(wrapped === "tooWide" ? "faceText.tooWide" : "faceText.wrapFailed"), true);
+        } else {
+          carryAfterNoticeRef.current = null;
+          carrySinkRef.current = new Map();
+          commitShapes(shapes.map((shape) => (shape.id === text.id ? wrapped : shape)), [text.id], t(text.hole ? "faceText.wrappedEngraved" : "faceText.wrappedRaised", { diameter: (uprightCylinderDiameter(onCylinder) ?? 0).toFixed(1) }));
+          return;
+        }
+      }
+    }
+    carryFaceTextRef.current = false;
     const patches = carriedOntoFace(shapes, ids, target, ids[0]);
     // Fork: parts that go into the face (cut-in text) move that far along the face's normal, inwards.
     const sinks = carrySinkRef.current;
@@ -6555,6 +6634,7 @@ export function LayerlingEditor({
       // Cut-in text goes into the face it is set down on by its depth (dropCarried).
       carrySinkRef.current = options.sink ? new Map(inserted.map((shape) => [shape.id, options.sink!])) : new Map();
       carryAfterNoticeRef.current = options.carry ? t("readyParts.textPlaced") : null;
+      carryFaceTextRef.current = Boolean(options.carry);
       setCarryIds(inserted.map((shape) => shape.id));
       setNotice(t(options.carry ? "readyParts.textPlaceHint" : "status.carryPlace"));
     }
@@ -6667,6 +6747,56 @@ export function LayerlingEditor({
       const shape = meshShapeFromPositions(options.mode === "cutout" ? t("trace.cutoutName", { name: label }) : label, options.mode === "cutout" ? "#999999" : "#2f7de1", positions);
       setMakerPanel(null);
       placeMade(options.mode === "cutout" ? { ...shape, hole: true } : shape, t(options.mode === "cutout" ? "trace.createdCutout" : "trace.createdSolid"));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMakerBusy(false);
+    }
+  }, [placeMade]);
+
+  /**
+   * Fork (build 33): every tool in the photo, as laid out on the paper, in a Gridfinity bin with a
+   * pocket for each: the bin's floor is raised to make a solid insert, and the pockets are cut into
+   * it from the top. Big enough for the layout and a margin, deep enough for the pockets.
+   */
+  const createToolBin = useCallback(async (traces: TraceResult[], options: ToolBinOptions, name: string) => {
+    setMakerBusy(true);
+    try {
+      const runtime = await getManifoldRuntime();
+      const layout = toolLayout(traces, options);
+      if (!layout) {
+        setNotice(t("trace.notFound"));
+        return;
+      }
+      const pocket = toolPocketPositions(runtime, layout, options);
+      // The lip stands 2.6 mm inside the bin's outline; the pockets keep the margin from it.
+      const inner = 2 * GRIDFINITY_CLEARANCE + 2 * 2.6 + 2 * options.margin;
+      const unitsX = Math.ceil((pocket.width + inner) / GRIDFINITY_GRID);
+      const unitsZ = Math.ceil((pocket.depth + inner) / GRIDFINITY_GRID);
+      if (unitsX > MAX_GRIDFINITY_UNITS || unitsZ > MAX_GRIDFINITY_UNITS) {
+        setNotice(t("trace.binTooBig", { width: Math.round(pocket.width), depth: Math.round(pocket.depth), max: MAX_GRIDFINITY_UNITS * GRIDFINITY_GRID }), true);
+        return;
+      }
+      // The raised floor tops out 1.65 mm under the bin's top (where the lip's support leaves the wall).
+      const floorTopBelowTop = 1.65;
+      const unitsY = Math.min(MAX_GRIDFINITY_HEIGHT_UNITS, Math.ceil((options.depth + MIN_GRIDFINITY_FLOOR_HEIGHT + floorTopBelowTop) / GRIDFINITY_HEIGHT_UNIT));
+      const top = unitsY * GRIDFINITY_HEIGHT_UNIT;
+      const floorTop = top - floorTopBelowTop;
+      const size = gridfinitySize("bin", { x: unitsX, z: unitsZ, y: unitsY }, true);
+      const gridfinityAsset = libraryShapeAssets.find((asset) => asset.id === "gridfinity")!;
+      const label = name || t("trace.title");
+      const centreX = pocket.centre[0];
+      const centreZ = -pocket.centre[1];
+      const binShape = canonicalizeShape({
+        ...makeShapeFromAsset(gridfinityAsset, { x: centreX, z: centreZ, elevation: 0 }, { ...size, gridfinityType: "bin", gridfinityLip: true }),
+        gridfinityFloorHeight: floorTop,
+        name: t("trace.binName", { name: label }),
+      } as WorkplaneShape);
+      const pockets = meshShapeFromPositions(t("trace.pocketsName"), "#999999", pocket.positions);
+      const placedPockets = { ...pockets, x: centreX, z: centreZ, elevation: floorTop - options.depth, hole: true };
+      const made = await buildReadyPart({ name: t("trace.binName", { name: label }), shapes: [binShape, placedPockets], group: true }, workspaceSettingsRef.current.booleanTriangleLimit);
+      setMakerPanel(null);
+      placeMade(made, t("trace.createdBin", { count: traces.length, x: unitsX, z: unitsZ, y: unitsY }));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -8993,6 +9123,181 @@ export function LayerlingEditor({
     setIntersectPreviewIds(null);
     setIntersectPreviewShape(null);
   }, []);
+
+  /** Fork (build 33): Hull - one body wrapped round the selected solids; they are replaced (Undo brings them back). */
+  const hullSelected = useCallback(async () => {
+    if (refuseLockedSelection()) return;
+    const solids = selectedShapes.filter((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind));
+    if (solids.length === 0) {
+      setNotice(t("hull.selectSolids"));
+      return;
+    }
+    const sourceFingerprint = projectShapesFingerprint(shapesRef.current);
+    let positions: number[] | null = null;
+    try {
+      positions = await hullPositions(solids);
+    } catch (error) {
+      noticeError(error);
+      return;
+    }
+    if (projectShapesFingerprint(shapesRef.current) !== sourceFingerprint) {
+      setNotice(t("hull.changed"));
+      return;
+    }
+    if (!positions) {
+      setNotice(t("hull.failed"));
+      return;
+    }
+    const base = meshShapeFromPositions(t("hull.name"), solids[0].color, positions);
+    const hull = canonicalizeShape(shapeWithWorldPositions(base, positions));
+    const replaced = new Set(solids.map((shape) => shape.id));
+    commitShapes([...shapesRef.current.filter((shape) => !replaced.has(shape.id)), hull], hull.id, t(solids.length === 1 ? "hull.doneOne" : "hull.doneMany", { count: solids.length }));
+  }, [commitShapes, refuseLockedSelection, selectedShapes]);
+
+  // Fork (build 33): Round a mesh.
+  const [meshRoundTool, setMeshRoundTool] = useState<{ shapeId: string; radius: number; mode: MeshRoundMode; busy: boolean; error: string | null; minRadius: number; maxRadius: number } | null>(null);
+  const toggleMeshRound = useCallback(() => {
+    if (meshRoundTool) {
+      setMeshRoundTool(null);
+      return;
+    }
+    if (refuseLockedSelection()) return;
+    const shape = selectedShapes.length === 1 ? selectedShapes[0] : null;
+    if (!shape || shape.hole || isNonSolidShapeKind(shape.kind)) {
+      setNotice(t("meshRound.selectOne"));
+      return;
+    }
+    const mesh = meshForShape(shape);
+    const positions = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
+    const minRadius = Math.ceil(smallestRoundingRadius(positions) * 10) / 10;
+    const smallest = Math.min(shapeWidth(shape), shapeDepth(shape), shape.height);
+    const maxRadius = Math.max(minRadius, Math.floor((smallest / 2) * 10) / 10);
+    setMeshRoundTool({ shapeId: shape.id, radius: Math.min(maxRadius, Math.max(minRadius, 2)), mode: "outside", busy: false, error: null, minRadius, maxRadius });
+  }, [meshRoundTool, refuseLockedSelection, selectedShapes]);
+  const applyMeshRound = useCallback(() => {
+    const tool = meshRoundTool;
+    const shape = tool ? shapesRef.current.find((candidate) => candidate.id === tool.shapeId) : null;
+    if (!tool || !shape) {
+      setMeshRoundTool(null);
+      return;
+    }
+    setMeshRoundTool({ ...tool, busy: true, error: null });
+    // A moment for the spinner to show: the rounding can take a few seconds on a big part.
+    window.setTimeout(async () => {
+      try {
+        const mesh = meshForShape(shape);
+        const positions = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
+        const result = await roundMeshPositions(positions, tool.radius, tool.mode);
+        const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
+        if (!current || projectShapesFingerprint([current]) !== projectShapesFingerprint([shape])) {
+          setMeshRoundTool(null);
+          setNotice(t("meshRound.changed"));
+          return;
+        }
+        const rounded = canonicalizeShape(shapeWithWorldPositions(shape, result.positions));
+        commitShapes(shapesRef.current.map((candidate) => (candidate.id === shape.id ? rounded : candidate)), rounded.id, t(result.coarse ? "meshRound.doneCoarse" : "meshRound.done", { radius: tool.radius.toFixed(1), voxel: result.voxel.toFixed(2) }));
+        setMeshRoundTool(null);
+      } catch (error) {
+        setMeshRoundTool((latest) => latest ? { ...latest, busy: false, error: error instanceof Error ? localizedError(error.message) : String(error) } : latest);
+      }
+    }, 30);
+  }, [commitShapes, meshRoundTool]);
+  // The tool belongs to its part: picking another closes it.
+  useEffect(() => {
+    if (meshRoundTool && !(selectedIds.length === 1 && selectedIds[0] === meshRoundTool.shapeId) && !meshRoundTool.busy) setMeshRoundTool(null);
+  }, [meshRoundTool, selectedIds]);
+
+  // Fork (build 33): Make it flexi.
+  const [flexiTool, setFlexiTool] = useState<{ shapeId: string; options: FlexiModelOptions; busy: boolean; error: string | null; length: number } | null>(null);
+  const toggleFlexiTool = useCallback(() => {
+    if (flexiTool) {
+      setFlexiTool(null);
+      return;
+    }
+    if (refuseLockedSelection()) return;
+    const shape = selectedShapes.length === 1 ? selectedShapes[0] : null;
+    if (!shape || shape.hole || isNonSolidShapeKind(shape.kind)) {
+      setNotice(t("flexiModel.selectOne"));
+      return;
+    }
+    const length = Math.max(shapeWidth(shape), shapeDepth(shape));
+    // About one segment per 20 mm, as flexi toys come.
+    setFlexiTool({ shapeId: shape.id, options: { ...DEFAULT_FLEXI_MODEL, segments: Math.max(2, Math.min(30, Math.round(length / 20))) }, busy: false, error: null, length });
+  }, [flexiTool, refuseLockedSelection, selectedShapes]);
+  const applyFlexi = useCallback(() => {
+    const tool = flexiTool;
+    const shape = tool ? shapesRef.current.find((candidate) => candidate.id === tool.shapeId) : null;
+    if (!tool || !shape) {
+      setFlexiTool(null);
+      return;
+    }
+    setFlexiTool({ ...tool, busy: true, error: null });
+    window.setTimeout(async () => {
+      try {
+        const mesh = meshForShape(shape);
+        const positions = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
+        const result = await flexiModelSegments(positions, tool.options);
+        const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
+        if (!current || projectShapesFingerprint([current]) !== projectShapesFingerprint([shape])) {
+          setFlexiTool(null);
+          setNotice(t("meshRound.changed"));
+          return;
+        }
+        const segments = result.segments.map((segment, index) => canonicalizeShape({
+          ...shapeWithWorldPositions(meshShapeFromPositions(`${displayShapeName(shape)} ${index + 1}`, shape.color, segment), segment),
+          name: `${displayShapeName(shape)} ${index + 1}`,
+        }));
+        commitShapes([...shapesRef.current.filter((candidate) => candidate.id !== shape.id), ...segments], segments.map((segment) => segment.id), t(result.skipped ? "flexiModel.doneSkipped" : "flexiModel.done", { count: segments.length, joints: result.joints, skipped: result.skipped }));
+        setFlexiTool(null);
+      } catch (error) {
+        setFlexiTool((latest) => latest ? { ...latest, busy: false, error: error instanceof Error ? localizedError(error.message) : String(error) } : latest);
+      }
+    }, 30);
+  }, [commitShapes, flexiTool]);
+  useEffect(() => {
+    if (flexiTool && !(selectedIds.length === 1 && selectedIds[0] === flexiTool.shapeId) && !flexiTool.busy) setFlexiTool(null);
+  }, [flexiTool, selectedIds]);
+
+  /** Fork (build 33): opens or closes Fit check, on the selected parts (two or more) or else on every visible part. */
+  const toggleFitCheck = useCallback(() => {
+    if (fitCheck) {
+      setFitCheck(null);
+      return;
+    }
+    const solids = selectedShapes.filter((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind));
+    setFitCheck({ clearance: 0.3, ids: solids.length >= 2 ? solids.map((shape) => shape.id) : null });
+  }, [fitCheck, selectedShapes]);
+
+  // Checked again a moment after every change, so parts can be moved apart while it is open.
+  useEffect(() => {
+    if (!fitCheck) {
+      fitRunRef.current += 1;
+      setFitReport(null);
+      setFitOverlay([]);
+      setFitBusy(false);
+      return;
+    }
+    const run = fitRunRef.current + 1;
+    fitRunRef.current = run;
+    setFitBusy(true);
+    const timer = window.setTimeout(async () => {
+      const ids = fitCheck.ids ? new Set(fitCheck.ids) : null;
+      const parts = expandBundles(shapes).filter((shape) => !shape.hidden && !shape.hole && !isNonSolidShapeKind(shape.kind) && (!ids || ids.has(shape.id)));
+      try {
+        const report = await checkFit(parts, fitCheck.clearance);
+        if (fitRunRef.current !== run) return;
+        setFitReport(report);
+        setFitOverlay(report.findings.flatMap((finding, index) => finding.positions?.length
+          ? [{ ...shapeWithWorldPositions(meshShapeFromPositions(t("fitCheck.overlapName"), "#e5322d", finding.positions), finding.positions), id: `fit-overlap-${index}`, locked: true, previewOnly: true } as WorkplaneShape]
+          : []));
+      } catch (error) {
+        if (fitRunRef.current === run) noticeError(error);
+      } finally {
+        if (fitRunRef.current === run) setFitBusy(false);
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [fitCheck, shapes]);
 
   /** Shows what the selected shapes share, and keeps showing it while they are moved one by one (#372). */
   const toggleIntersectPreview = useCallback(() => {
@@ -13302,6 +13607,8 @@ export function LayerlingEditor({
         { key: "fillet", label: t("editor.tool.fillet"), onSelect: () => startEdgeModifier("fillet") },
         { key: "hollow", label: t("editor.tool.hollow"), onSelect: startShellTool },
         { key: "deleteFace", label: t("editor.tool.deleteFace"), onSelect: startDeleteFaceTool },
+        { key: "roundMesh", label: t("meshRound.menu"), onSelect: toggleMeshRound },
+        { key: "flexiModel", label: t("flexiModel.menu"), onSelect: toggleFlexiTool },
       );
       if (!single.hole && !isNonSolidShapeKind(single.kind)) {
         items.push({ key: "holePattern", label: t("holePattern.title"), onSelect: toggleHolePattern });
@@ -13439,6 +13746,17 @@ export function LayerlingEditor({
         faceToolActive={Boolean(faceTool)}
         onBlendBodies={toggleBlendTool}
         blendBodiesActive={Boolean(blendTool)}
+        build33={{
+          canHull: !selectionLocked && selectedShapes.some((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind)) && (selectedShapes.length >= 2 || Boolean(selectedShapes[0]?.groupedShapes?.length) || selectedShapes[0]?.kind === "mesh"),
+          onHull: () => void hullSelected(),
+          fitActive: Boolean(fitCheck),
+          onFitCheck: toggleFitCheck,
+          canRound: !selectionLocked && selectedShapes.length === 1 && !selectedShapes[0].hole && !isNonSolidShapeKind(selectedShapes[0].kind),
+          roundActive: Boolean(meshRoundTool),
+          onRound: toggleMeshRound,
+          flexiActive: Boolean(flexiTool),
+          onFlexi: toggleFlexiTool,
+        }}
         canBlendBodies={!selectionLocked && ((selectedShapes.length === 2 && selectedShapes.every((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind))) || (selectedShapes.length === 1 && Boolean(selectedShapes[0].blendSource)))}
         canFaceTool={selectedShapes.length === 1 && Boolean(selectedShape && !selectedShape.locked && !selectedShape.hole && !isNonSolidShapeKind(selectedShape.kind))}
         onGroup={groupSelected}
@@ -13950,7 +14268,7 @@ export function LayerlingEditor({
         </div>
       ) : null}
       {makerPanel === "lithophane" ? <LithophanePanel busy={makerBusy} onCreate={(image, options) => void createLithophane(image, options)} onClose={() => setMakerPanel(null)} /> : null}
-      {makerPanel === "trace" ? <TracePanel busy={makerBusy} onCreate={(trace, options, name) => void createTrace(trace, options, name)} onClose={() => setMakerPanel(null)} /> : null}
+      {makerPanel === "trace" ? <TracePanel busy={makerBusy} onCreate={(trace, options, name) => void createTrace(trace, options, name)} onCreateBin={(traces, options, name) => void createToolBin(traces, options, name)} onClose={() => setMakerPanel(null)} /> : null}
       {makerPanel === "voronoi" ? <VoronoiPanel busy={makerBusy} onCreate={(options) => void createVoronoi(options)} onClose={() => setMakerPanel(null)} /> : null}
       {alignMode && selectedShapes.length >= 2 ? (
         <DistributePanel count={selectedShapes.length} onApply={distributeSelection} />
@@ -14157,6 +14475,48 @@ export function LayerlingEditor({
           connectorsInvalid={splitConnectorPreview?.invalid.length ?? 0}
           connectorsTooSmall={Boolean(splitConnectorPreview?.tooSmall)}
           onClearConnectors={() => setSplitConnectorPoints([])}
+        />
+      ) : null}
+      {fitCheck ? (
+        <FitCheckPanel
+          clearance={fitCheck.clearance}
+          report={fitReport}
+          busy={fitBusy}
+          scope={{ kind: fitCheck.ids ? "selected" : "all", count: fitCheck.ids?.length ?? expandBundles(shapes).filter((shape) => !shape.hidden && !shape.hole && !isNonSolidShapeKind(shape.kind)).length }}
+          names={new Map(expandBundles(shapes).map((shape) => [shape.id, displayShapeName(shape)]))}
+          workspace={workspaceSettings}
+          onClearanceChange={(clearance) => setFitCheck((current) => current ? { ...current, clearance: Math.max(0, Math.min(2, clearance)) } : current)}
+          onSelectPair={(a, b) => selectShape([a, b])}
+          onClose={() => setFitCheck(null)}
+        />
+      ) : null}
+      {flexiTool ? (
+        <FlexiModelPanel
+          targetName={displayShapeName(shapes.find((shape) => shape.id === flexiTool.shapeId) ?? ({ name: "" } as WorkplaneShape))}
+          options={flexiTool.options}
+          segmentLength={flexiTool.length / flexiTool.options.segments}
+          busy={flexiTool.busy}
+          error={flexiTool.error}
+          workspace={workspaceSettings}
+          onChange={(patch) => setFlexiTool((current) => current && !current.busy ? { ...current, options: { ...current.options, ...patch }, error: null } : current)}
+          onApply={applyFlexi}
+          onCancel={() => setFlexiTool(null)}
+        />
+      ) : null}
+      {meshRoundTool ? (
+        <MeshRoundPanel
+          targetName={displayShapeName(shapes.find((shape) => shape.id === meshRoundTool.shapeId) ?? ({ name: "" } as WorkplaneShape))}
+          radius={meshRoundTool.radius}
+          minRadius={meshRoundTool.minRadius}
+          maxRadius={meshRoundTool.maxRadius}
+          mode={meshRoundTool.mode}
+          busy={meshRoundTool.busy}
+          error={meshRoundTool.error}
+          workspace={workspaceSettings}
+          onRadiusChange={(radius) => setMeshRoundTool((current) => current && !current.busy ? { ...current, radius: Math.max(current.minRadius, Math.min(current.maxRadius, radius)), error: null } : current)}
+          onModeChange={(mode) => setMeshRoundTool((current) => current && !current.busy ? { ...current, mode, error: null } : current)}
+          onApply={applyMeshRound}
+          onCancel={() => setMeshRoundTool(null)}
         />
       ) : null}
       {edgeModifier ? (
@@ -14608,6 +14968,7 @@ function SecondaryToolbar({
   canHolePattern,
   onFaceTool,
   onBlendBodies,
+  build33,
   blendBodiesActive,
   canBlendBodies,
   faceToolActive,
@@ -14746,6 +15107,8 @@ function SecondaryToolbar({
   canHolePattern: boolean;
   onFaceTool: () => void;
   onBlendBodies: () => void;
+  /** Fork (build 33): Hull, Fit check and Round a mesh. */
+  build33: { canHull: boolean; onHull: () => void; fitActive: boolean; onFitCheck: () => void; canRound: boolean; roundActive: boolean; onRound: () => void; flexiActive: boolean; onFlexi: () => void };
   blendBodiesActive: boolean;
   canBlendBodies: boolean;
   faceToolActive: boolean;
@@ -14881,6 +15244,26 @@ function SecondaryToolbar({
     };
   }, []);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
+  const [meshMenuOpen, setMeshMenuOpen] = useState(false);
+  const [modifyMoreOpen, setModifyMoreOpen] = useState(false);
+  const modifyMoreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!modifyMoreOpen) return;
+    const onDown = (event: PointerEvent) => {
+      if (!modifyMoreRef.current?.contains(event.target as Node)) setModifyMoreOpen(false);
+    };
+    window.addEventListener("pointerdown", onDown);
+    return () => window.removeEventListener("pointerdown", onDown);
+  }, [modifyMoreOpen]);
+  const meshMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!meshMenuOpen) return;
+    const onDown = (event: PointerEvent) => {
+      if (!meshMenuRef.current?.contains(event.target as Node)) setMeshMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", onDown);
+    return () => window.removeEventListener("pointerdown", onDown);
+  }, [meshMenuOpen]);
   const [visibilityMenuPosition, setVisibilityMenuPosition] = useState({ top: 0, left: 0 });
   const shapesMenuRef = useRef<HTMLDivElement>(null);
   const visibilityMenuRef = useRef<HTMLDivElement>(null);
@@ -15088,6 +15471,8 @@ function SecondaryToolbar({
     { id: "intersect-preview", label: t("editor.tool.intersectPreview"), icon: Blend, action: onIntersectPreview, enabled: canIntersect || intersectPreviewActive, active: intersectPreviewActive },
     // Fork (build 25): a smooth piece joining two bodies.
     { id: "blendBodies", label: t("blend.title"), icon: ForkBlendIcon, action: onBlendBodies, enabled: canBlendBodies || blendBodiesActive, active: blendBodiesActive },
+    // Fork (build 33).
+    { id: "hull", label: t("hull.title"), icon: Spline, action: build33.onHull, enabled: build33.canHull },
   ];
   const modifyTools = [
     { id: "mirror", label: t("editor.tool.mirror"), icon: ToolbarMirrorIcon, action: onMirror, enabled: canModifySelection, active: mirrorMode },
@@ -15100,6 +15485,8 @@ function SecondaryToolbar({
     { id: "fillet", label: t("editor.tool.fillet"), icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify, active: edgeModifierKind === "fillet" },
     { id: "hollow", label: t("editor.tool.hollow"), icon: ToolbarHollowIcon, action: onHollow, enabled: canEdgeModify, active: hollowActive },
     { id: "deleteFace", label: t("editor.tool.deleteFace"), icon: ToolbarDeleteFaceIcon, action: onDeleteFace, enabled: canEdgeModify, active: deleteFaceActive },
+    { id: "roundAll", label: t("meshRound.title"), icon: Squircle, action: build33.onRound, enabled: build33.canRound || build33.roundActive, active: build33.roundActive },
+    { id: "flexiModel", label: t("flexiModel.title"), icon: Waves, action: build33.onFlexi, enabled: build33.canRound || build33.flexiActive, active: build33.flexiActive },
   ];
   // Fork (build 32): the tools for an imported mesh, in a section of their own that shows only while one is selected.
   const meshTools = [
@@ -15107,6 +15494,7 @@ function SecondaryToolbar({
     { id: "fillHole", label: t("fillHole.command"), icon: PaintBucket, action: () => window.dispatchEvent(new Event(FILL_HOLE_EVENT)), enabled: canSimplify },
     { id: "simplify", label: t("editor.tool.simplify"), icon: ToolbarSimplifyIcon, action: onSimplify, enabled: canSimplify, active: simplifyActive },
     { id: "cutBelowBed", label: t("cutBelowBed.command"), icon: Scissors, action: () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT)), enabled: canSimplify },
+    { id: "roundMesh", label: t("meshRound.title"), icon: Squircle, action: build33.onRound, enabled: build33.canRound || build33.roundActive, active: build33.roundActive },
   ];
   const arrangeTools = [
     { id: "align", label: t("editor.tool.align"), icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign, active: alignMode },
@@ -15117,6 +15505,7 @@ function SecondaryToolbar({
     { id: "center", label: t("editor.tool.centerOnWorkplane"), icon: ToolbarCenterOnWorkplaneIcon, action: onCenterOnWorkplane, enabled: canModifySelection },
     // Fork: spacing parts out has its own button (it opens Align with the Space out panel).
     { id: "spaceOut", label: t("distribute.title"), icon: ForkSpaceOutIcon, action: onAlign, enabled: canAlign, active: alignMode },
+    { id: "fitCheck", label: t("fitCheck.title"), icon: ScanSearch, action: build33.onFitCheck, enabled: true, active: build33.fitActive },
   ];
   // Fork: the makers - each opens its own panel.
   const makeTools = [
@@ -15547,14 +15936,93 @@ function SecondaryToolbar({
           <div className="toolbar-section-label">{t("editor.group.combine")}</div>
           <div className="toolbar-section-tools">{combineTools.map(renderToolButton)}</div>
         </div>
-        <div className="toolbar-section" data-group="modify">
+        <div className="toolbar-section toolbar-overflow-section" data-group="modify" ref={modifyMoreRef}>
           <div className="toolbar-section-label">{t("editor.group.modify")}</div>
-          <div className="toolbar-section-tools">{modifyTools.map(renderToolButton)}</div>
+          <div className="toolbar-section-tools">
+            {modifyTools.filter((tool) => !FORK_OVERFLOW_TOOLS.has(tool.id)).map(renderToolButton)}
+            {/* Fork (build 33): the less used tools under "More", so the row fits on a laptop screen. */}
+            <button
+              className={`toolbar-icon toolbar-more-trigger ${modifyMoreOpen || modifyTools.some((tool) => FORK_OVERFLOW_TOOLS.has(tool.id) && "active" in tool && tool.active) ? "active" : ""}`}
+              type="button"
+              data-layerling-tool="modifyMore"
+              aria-label={t("editor.moreTools")}
+              data-tip={t("editor.moreTools")}
+              aria-haspopup="menu"
+              aria-expanded={modifyMoreOpen}
+              onClick={() => setModifyMoreOpen((open) => !open)}
+            >
+              <MoreHorizontal />
+              <span className="tool-label" aria-hidden="true">{t("editor.more")}</span>
+            </button>
+          </div>
+          {modifyMoreOpen ? (
+            <div className="visibility-dropdown mesh-dropdown" role="menu" aria-label={t("editor.moreTools")}>
+              {modifyTools.filter((tool) => FORK_OVERFLOW_TOOLS.has(tool.id)).map((tool) => {
+                const Icon = FORK_TOOL_ICONS[tool.id] ?? tool.icon;
+                return (
+                  <button
+                    key={tool.id}
+                    className={`visibility-dropdown-action ${"active" in tool && tool.active ? "active" : ""}`}
+                    type="button"
+                    role="menuitem"
+                    data-layerling-tool={tool.id}
+                    disabled={!tool.enabled}
+                    onClick={() => {
+                      setModifyMoreOpen(false);
+                      tool.action();
+                    }}
+                  >
+                    <Icon width={18} height={18} />
+                    <span>{tool.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
         {canSimplify ? (
-          <div className="toolbar-section toolbar-mesh-section" data-group="mesh">
+          // Fork (build 33): one button with a menu, so the row does not wrap when a mesh is selected.
+          <div className="toolbar-section compact toolbar-mesh-section" data-group="mesh" ref={meshMenuRef}>
             <div className="toolbar-section-label">{t("editor.group.mesh")}</div>
-            <div className="toolbar-section-tools">{meshTools.map(renderToolButton)}</div>
+            <div className="toolbar-section-tools">
+              <button
+                className={`toolbar-icon mesh-menu-trigger ${meshMenuOpen ? "active" : ""}`}
+                type="button"
+                data-layerling-tool="meshMenu"
+                aria-label={t("editor.meshTools")}
+                data-tip={t("editor.meshTools")}
+                aria-haspopup="menu"
+                aria-expanded={meshMenuOpen}
+                onClick={() => setMeshMenuOpen((open) => !open)}
+              >
+                <ShieldCheck />
+                <span className="tool-label" aria-hidden="true">{t("editor.group.mesh")}</span>
+              </button>
+            </div>
+            {meshMenuOpen ? (
+              <div className="visibility-dropdown mesh-dropdown" role="menu" aria-label={t("editor.meshTools")}>
+                {meshTools.map((tool) => {
+                  const Icon = tool.icon;
+                  return (
+                    <button
+                      key={tool.id}
+                      className="visibility-dropdown-action"
+                      type="button"
+                      role="menuitem"
+                      data-layerling-tool={tool.id}
+                      disabled={!tool.enabled}
+                      onClick={() => {
+                        setMeshMenuOpen(false);
+                        tool.action();
+                      }}
+                    >
+                      <Icon size={16} />
+                      <span>{tool.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         ) : null}
         <div className="toolbar-section" data-group="arrange">

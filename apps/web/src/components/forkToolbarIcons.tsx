@@ -376,6 +376,11 @@ export const FORK_SHORT_LABELS_EN: Readonly<Record<string, string>> = {
   meshCheck: "Make solid",
   fillHole: "Fill hole",
   cutBelowBed: "Cut below",
+  hull: "Hull",
+  fitCheck: "Fit check",
+  roundMesh: "Round",
+  roundAll: "Round all",
+  flexiModel: "Flexi",
   align: "Align",
   snap: "Snap",
   drop: "Drop",
@@ -383,6 +388,9 @@ export const FORK_SHORT_LABELS_EN: Readonly<Record<string, string>> = {
   mateFaces: "Mate",
   center: "Center",
 };
+
+/** Fork (build 33): the Modify tools kept under its "More" button, so the toolbar fits on one row at 1280 px. */
+export const FORK_OVERFLOW_TOOLS: ReadonlySet<string> = new Set(["pivot", "holePattern", "faceTool", "deleteFace", "roundAll", "flexiModel"]);
 
 /** The advanced tools shown in the toolbar's "More" menu rather than on the row itself. */
 export const FORK_MORE_TOOLS: ReadonlySet<string> = new Set([
@@ -394,6 +402,8 @@ export const FORK_MORE_TOOLS: ReadonlySet<string> = new Set([
   "split",
   "hollow",
   "deleteFace",
+  "roundAll",
+  "flexiModel",
   "snap",
   "layFlat",
   "mateFaces",
@@ -433,6 +443,11 @@ export const FORK_TOOL_HINTS_EN: Readonly<Record<string, string>> = {
   meshCheck: "close the gaps in an imported model so it prints",
   fillHole: "click the wall of a hole in an imported model to fill it in",
   cutBelowBed: "trim off what sinks below the plate",
+  hull: "wrap the selected parts in one smooth body - two cylinders become a rounded slot",
+  fitCheck: "find parts that overlap or sit too close to print apart or move",
+  roundMesh: "round every edge by one radius, also on imported meshes",
+  roundAll: "round every edge by one radius, also where the fillet tool cannot",
+  flexiModel: "cut the selected model into segments joined by print-in-place joints - a flexi toy",
   align: "line parts up with each other",
   mateFaces: "put one part's face flat against another's",
   readyParts: "ready-made parts (boxes, inserts, clips, hinges, jars) and makers that start from a picture",

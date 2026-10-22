@@ -100,7 +100,7 @@ If you resize a hollowed body later, Pare 3D hollows it again at the new size ri
 
 A fillet in the way, a hole in the wrong place, a boss you no longer need: {{ui:editor.tool.deleteFace}} takes it off the body again, without building the body anew.
 
-1. Select the body and click {{ui:editor.tool.deleteFace}}, or right-click the body and pick it from the menu.
+1. Select the body and click {{ui:editor.tool.deleteFace}} (under {{ui:editor.more}} in the {{ui:editor.group.modify}} group), or right-click the body and pick it from the menu.
 2. Click every face of what should go: the faces of a rounded edge, the wall of a hole, the side and the top of a boss. A picked face lights up; another click takes it out again. The panel counts the faces.
 3. Click {{ui:deleteFace.apply}} or press [[Delete]]. [[Esc]] closes the tool without changing anything.
 

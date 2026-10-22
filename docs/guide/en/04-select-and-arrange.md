@@ -60,7 +60,7 @@ The key is [[L]]. [[Esc]] cancels.
 
 ## Rotating and setting the pivot
 
-You rotate with the curved arrows on the shape, with the numbers in the settings or with [[R]] in 45° steps. When you drag on the rotation circle, the turn snaps to every tick, that is every 22.5°; hold [[Shift]] for finer steps, and extra ticks appear every 11.25°. Drag outside the circle to turn freely in 1° steps, or in 45° steps with [[Shift]]. Normally the selection turns about its centre. Sometimes it should not, for example when a tilted tube is to be turned further at its end. For that there is {{ui:editor.tool.rotationPivot}}: afterwards click on a face. A flat face supplies its centre, for example the axis of a tube end. The selection now turns about that point. A second click on the tool removes it again.
+You rotate with the curved arrows on the shape, with the numbers in the settings or with [[R]] in 45° steps. When you drag on the rotation circle, the turn snaps to every tick, that is every 22.5°; hold [[Shift]] for finer steps, and extra ticks appear every 11.25°. Drag outside the circle to turn freely in 1° steps, or in 45° steps with [[Shift]]. Normally the selection turns about its centre. Sometimes it should not, for example when a tilted tube is to be turned further at its end. For that there is {{ui:editor.tool.rotationPivot}} (under {{ui:editor.more}} in the {{ui:editor.group.modify}} group): afterwards click on a face. A flat face supplies its centre, for example the axis of a tube end. The selection now turns about that point. A second click on the tool removes it again.
 
 The angles stay with the body. In its settings, {{ui:inspector.rotation}} shows them as {{ui:prop.rotateX}}, {{ui:prop.rotateY}} and {{ui:prop.rotateZ}}, named like the position: Y runs across the plate, Z is up. Each row has the colour of the arrow on the workplane that turns the body the same way - red about X, green about Y, blue about Z - and the arrows keep those colours from every side you look. Type an angle there and the body turns to it - about its centre, or about its own pivot if it has one. While a turned body is selected, its angles also show below it on the workplane; {{ui:workspace.showRotationAngles}} in the settings switches that off.
 
@@ -111,7 +111,7 @@ Only {{ui:array.apply}} (or [[Enter]]) creates the copies. If they are holes, gr
 
 ## Hole pattern on a face
 
-For vents, speaker grilles, baskets and enclosures the {{ui:holePattern.title}} spreads holes evenly over a flat face. You no longer have to make one hole, repeat it and set it onto the wall. Select exactly one body and click {{ui:holePattern.title}} in the {{ui:editor.group.modify}} group of the toolbar, next to the pattern. You can also right-click the body, or find it with [[Ctrl]]+[[K]].
+For vents, speaker grilles, baskets and enclosures the {{ui:holePattern.title}} spreads holes evenly over a flat face. You no longer have to make one hole, repeat it and set it onto the wall. Select exactly one body and click {{ui:holePattern.title}} under {{ui:editor.more}} in the {{ui:editor.group.modify}} group of the toolbar. You can also right-click the body, or find it with [[Ctrl]]+[[K]].
 
 1. Click a flat face of the body. The whole flat face around your click counts, not just the triangle under the pointer. A curved face does not work: you get a hint and click a flat one instead.
 2. In the window, set how the holes look and lie:
@@ -131,7 +131,7 @@ An AI can do the same through the MCP bridge with `layerling_perforate_face` (se
 
 ## Pushing a face out or in
 
-For a thicker wall, a raised pad on a face or a pocket cut into it, the {{ui:faceTool.title}} tool works on one flat face, the way Press/Pull does in Fusion. It works on an imported STL too, where there is no sketch to change. Select exactly one body and click {{ui:faceTool.title}} in the {{ui:editor.group.modify}} group of the toolbar. You can also right-click the body, or find it with [[Ctrl]]+[[K]].
+For a thicker wall, a raised pad on a face or a pocket cut into it, the {{ui:faceTool.title}} tool works on one flat face, the way Press/Pull does in Fusion. It works on an imported STL too, where there is no sketch to change. Select exactly one body and click {{ui:faceTool.title}} under {{ui:editor.more}} in the {{ui:editor.group.modify}} group of the toolbar. You can also right-click the body, or find it with [[Ctrl]]+[[K]].
 
 ### With the mouse
 

@@ -102,9 +102,18 @@ export function objectMask(image: TraceImage, options: { invert?: boolean } = {}
   const pool = inside.length ? inside : regions.map((region, id) => ({ ...region, id }));
   const best = pool.reduce((a, b) => (b.size > a.size ? b : a));
   if (best.size < 50) return null;
-  const mask = new Uint8Array(width * height);
-  for (let i = 0; i < mask.length; i += 1) mask[i] = label[i] === best.id ? 1 : 0;
-  return { mask, size: best.size, threshold };
+  const maskOf = (id: number) => {
+    const mask = new Uint8Array(width * height);
+    for (let i = 0; i < mask.length; i += 1) mask[i] = label[i] === id ? 1 : 0;
+    return mask;
+  };
+  // Fork (build 33): every other clear shape too, for several tools in one photo - down to a twentieth
+  // of the biggest, so specks and shadows stay out.
+  const others = () => pool
+    .filter((region) => region.id !== best.id && region.size >= Math.max(50, best.size / 20))
+    .sort((a, b) => b.size - a.size)
+    .map((region) => ({ mask: maskOf(region.id), size: region.size }));
+  return { mask: maskOf(best.id), size: best.size, threshold, others };
 }
 
 /** The outline round the masked region, pixel by pixel (Moore neighbour tracing). */
@@ -174,7 +183,20 @@ export type TraceResult = { outline: Point[]; widthPx: number; heightPx: number;
 export function traceImage(image: TraceImage, options: { invert?: boolean } = {}): TraceResult | null {
   const found = objectMask(image, options);
   if (!found) return null;
-  const boundary = traceBoundary(found.mask, image.width, image.height);
+  return traceMask(found.mask, image);
+}
+
+/** Fork (build 33): every clear shape in the photo, the biggest first - several tools laid out on one sheet. */
+export function traceImageAll(image: TraceImage, options: { invert?: boolean } = {}): TraceResult[] {
+  const found = objectMask(image, options);
+  if (!found) return [];
+  return [found.mask, ...found.others().map((other) => other.mask)]
+    .map((mask) => traceMask(mask, image))
+    .filter((trace): trace is TraceResult => trace !== null);
+}
+
+function traceMask(mask: Uint8Array, image: TraceImage): TraceResult | null {
+  const boundary = traceBoundary(mask, image.width, image.height);
   if (boundary.length < 8) return null;
   // A closed loop starts and ends on the same point, which leaves the simplifier no line to measure
   // from: split it at the point farthest from the start and simplify each half.
@@ -223,6 +245,98 @@ export function tracedSolidPositions(runtime: ManifoldToplevel, trace: TraceResu
       positions.push(mesh.vertProperties[vertex], mesh.vertProperties[vertex + 1], mesh.vertProperties[vertex + 2]);
     }
     return positions;
+  } finally {
+    created.forEach((entry) => entry.delete());
+  }
+}
+
+/*
+ * Fork (build 33): several tools in one photo, laid out as they lie on the paper, into a Gridfinity
+ * bin with a pocket for each (like tooltrace.ai). The scale comes from the longest side of the
+ * biggest tool; each pocket gets the clearance, and if asked a round finger notch on its long side,
+ * so the tool can be lifted out.
+ */
+export type ToolBinOptions = {
+  /** The real length of the biggest tool's longest side, in mm. */
+  length: number;
+  /** How deep the pockets go. */
+  depth: number;
+  clearance: number;
+  invert: boolean;
+  fingerNotches: boolean;
+  /** Room between the pockets and the bin's walls. */
+  margin: number;
+};
+export const DEFAULT_TOOL_BIN: ToolBinOptions = { length: 150, depth: 15, clearance: 1, invert: false, fingerNotches: true, margin: 4 };
+export const FINGER_NOTCH_DIAMETER = 20;
+
+/** The pockets' outlines in mm, centred on the whole layout (x across, y towards the back of the plan). */
+export function toolLayout(traces: readonly TraceResult[], o: Pick<ToolBinOptions, "length" | "fingerNotches">) {
+  if (!traces.length) return null;
+  const biggest = traces[0];
+  const scale = o.length / Math.max(biggest.widthPx, biggest.heightPx);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  traces.forEach((trace) => trace.outline.forEach(([x, y]) => {
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+  }));
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const polygons = traces.map((trace) => trace.outline.map(([x, y]) => [(x - cx) * scale, (y - cy) * scale] as [number, number]));
+  // A notch where the tool's middle meets its long side: across the narrow way, from the centre outwards.
+  const notches = o.fingerNotches ? polygons.map((polygon) => fingerNotchCentre(polygon)).filter((point): point is [number, number] => point !== null) : [];
+  return { polygons, notches, scale };
+}
+
+function fingerNotchCentre(polygon: readonly [number, number][]): [number, number] | null {
+  if (polygon.length < 3) return null;
+  const n = polygon.length;
+  const mx = polygon.reduce((sum, [x]) => sum + x, 0) / n;
+  const my = polygon.reduce((sum, [, y]) => sum + y, 0) / n;
+  let sxx = 0, syy = 0, sxy = 0;
+  polygon.forEach(([x, y]) => { sxx += (x - mx) ** 2; syy += (y - my) ** 2; sxy += (x - mx) * (y - my); });
+  // The long axis of the outline; the notch goes across it.
+  const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  const across: [number, number] = [-Math.sin(angle), Math.cos(angle)];
+  let reach = 0;
+  polygon.forEach(([x, y]) => { reach = Math.max(reach, (x - mx) * across[0] + (y - my) * across[1]); });
+  return [mx + across[0] * reach, my + across[1] * reach];
+}
+
+/**
+ * The pockets as one solid to cut (x across, y up, z towards the front), standing from 0 to
+ * `depth + overshoot`, and the layout's size with the clearance, in mm.
+ */
+export function toolPocketPositions(runtime: ManifoldToplevel, layout: NonNullable<ReturnType<typeof toolLayout>>, o: Pick<ToolBinOptions, "clearance" | "depth">, overshoot = 2) {
+  const created: { delete(): void }[] = [];
+  try {
+    let section = runtime.CrossSection.ofPolygons(layout.polygons, "Positive");
+    created.push(section);
+    const grow = o.clearance + layout.scale / 2;
+    if (grow > 0) {
+      section = section.offset(grow, "Round", 2, 32);
+      created.push(section);
+    }
+    if (layout.notches.length) {
+      const circles = layout.notches.map(([x, y]) => {
+        const circle = runtime.CrossSection.circle(FINGER_NOTCH_DIAMETER / 2, 48).translate([x, y]);
+        created.push(circle);
+        return circle;
+      });
+      section = runtime.CrossSection.union([section, ...circles]);
+      created.push(section);
+    }
+    const bounds = section.bounds();
+    const solid = runtime.Manifold.extrude(section, o.depth + overshoot);
+    created.push(solid);
+    const turned = solid.rotate([-90, 0, 0]);
+    created.push(turned);
+    const mesh = turned.getMesh();
+    const positions: number[] = [];
+    for (let index = 0; index < mesh.triVerts.length; index += 1) {
+      const vertex = mesh.triVerts[index] * mesh.numProp;
+      positions.push(mesh.vertProperties[vertex], mesh.vertProperties[vertex + 1], mesh.vertProperties[vertex + 2]);
+    }
+    return { positions, width: bounds.max[0] - bounds.min[0], depth: bounds.max[1] - bounds.min[1], centre: [(bounds.min[0] + bounds.max[0]) / 2, (bounds.min[1] + bounds.max[1]) / 2] as [number, number] };
   } finally {
     created.forEach((entry) => entry.delete());
   }

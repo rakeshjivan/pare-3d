@@ -1330,3 +1330,27 @@ html[data-theme="dark"] .edge-modifier-error-action { background: transparent; c
 .ready-parts-list > .ready-parts-category:first-of-type { margin-top: 4px; }
 .ready-part-maker-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 9px; background: var(--subbar, #f4f6f8); color: var(--accent, #1662b3); }
 .ready-part-maker-icon svg { width: 24px; height: 24px; }
+
+/* Fork (build 33): Fit check results. */
+.fit-check-results { display: grid; gap: 6px; margin: 4px 0 8px; }
+.fit-check-summary { display: flex; align-items: center; gap: 6px; margin: 0; font: 600 12.5px/1.4 var(--font-ui); color: var(--foreground); }
+.fit-check-summary.ok { color: #1f8a4c; }
+.fit-check-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; max-height: 260px; overflow: auto; }
+.fit-check-item { display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 7px 8px; text-align: left; border: 1px solid var(--border, #e3e7ec); border-radius: 8px; background: var(--panel, #fff); color: var(--foreground); cursor: pointer; }
+.fit-check-item:hover { border-color: var(--accent, #1662b3); }
+.fit-check-item span { display: grid; gap: 2px; }
+.fit-check-item strong { font: 600 12.5px var(--font-ui); }
+.fit-check-item small { font: 500 11.5px var(--font-ui); color: var(--muted-strong, #5b6673); }
+.fit-check-dot { width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; flex: 0 0 auto; }
+.fit-check-item.overlap .fit-check-dot { background: #e5322d; }
+.fit-check-item.tight .fit-check-dot { background: #e8a317; }
+.fit-check-note { margin: 0; font: 500 11.5px/1.4 var(--font-ui); color: var(--muted-strong, #5b6673); }
+html[data-theme="dark"] .fit-check-summary.ok { color: #5fd47c; }
+/* Fork (build 33): the Mesh tools menu hangs under its button. */
+.toolbar-mesh-section { position: relative; }
+.mesh-dropdown { position: absolute; top: calc(100% + 4px); left: 0; width: 290px; }
+.mesh-dropdown .visibility-dropdown-action { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
+.mesh-dropdown .visibility-dropdown-action:disabled { opacity: 0.45; cursor: default; }
+.mesh-dropdown { display: grid; gap: 4px; }
+.toolbar-overflow-section { position: relative; }
+.mesh-dropdown .visibility-dropdown-action.active { border-color: var(--accent, #1662b3); }

@@ -119,6 +119,17 @@ A scanned or sculpted mesh often has far more triangles than its shape needs, an
 
 Cutting, merging and intersecting an imported mesh is calculated in your browser, so the workspace settings limit how many triangles such a mesh may have ({{ui:workspace.booleanTriangleLimit}}). A mesh above the limit is not processed, and the message names its triangle count; simplify the mesh first, or raise the limit if your computer can take it.
 
+## Rounding a mesh
+
+The fillet tool needs exact CAD geometry, so a dense imported mesh, a scan or a part made from many booleans can be too much for it. **{{ui:meshRound.title}}** rounds every edge of such a part by one radius instead - as if a ball of that size were rolled along the surface. It is in the {{ui:editor.group.mesh}} menu, under {{ui:editor.group.modify}} › {{ui:editor.more}} for any part, and in the right-click menu as {{ui:meshRound.menu}}.
+
+- {{ui:meshRound.outside}} rounds the edges that stick out, {{ui:meshRound.inside}} fills the inside corners with a curve (which makes a part stronger), {{ui:meshRound.both}} does both.
+- The faces away from the edges stay exactly as they were; only the edges change.
+- It works on a grid of a third of the radius, so a big part with a small radius takes a few seconds, and the window says the smallest radius that rounds visibly. On a very big part the grid gets coarser, and the message says so.
+- The result is a mesh. [[Ctrl]]+[[Z]] takes it back.
+
+For a part built in Pare 3D, the fillet tool gives exact, smoother results - use {{ui:meshRound.title}} where that tool cannot go.
+
 ## Reporting a bug
 
 If Pare 3D does something unexpected, save a {{ui:editor.bugReport}}: the link sits in the footer at the bottom, next to the forum. It is a ZIP file, because GitHub and many forums refuse a bare .lyl: inside are your design as a .lyl and a short text file with the version, browser, screen size, the last messages and any errors. The start page opens the ZIP like a backup, or you unpack it and open the .lyl. Nothing personal is in it. Attach the file to your post in the forum or on GitHub, so the problem can be followed with exactly your design.

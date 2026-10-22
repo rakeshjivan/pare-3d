@@ -100,6 +100,11 @@ export const GUIDE_SECTIONS = {
   // Fork (build 26): Pare 3D's own tools.
   blend: { chapter: "solids", en: "blend" },
   readyParts: { chapter: "shapes", en: "ready-made-parts" },
+  // Fork (build 33).
+  hull: { chapter: "solids", en: "hull-wrapping-parts-in-one-body" },
+  fitCheck: { chapter: "printing", en: "fit-check-overlaps-and-tight-gaps" },
+  meshRound: { chapter: "files", en: "rounding-a-mesh" },
+  flexiModel: { chapter: "threads", en: "making-any-model-flexi" },
   makeFromPhoto: { chapter: "shapes", en: "making-from-a-photo-or-a-pattern" },
   spaceOut: { chapter: "select", en: "spacing-parts-out" },
   printCheck: { chapter: "printing", en: "ready-to-print" },

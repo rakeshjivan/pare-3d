@@ -4,6 +4,18 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 33,
+    items: [
+      "Tool tracing into a Gridfinity bin: lay several tools on one sheet of paper, photograph them, and Photo to outline > Gridfinity bin makes a bin just big enough, with a pocket (and a finger notch) for each tool.",
+      "Make it flexi: cut any model into segments joined by print-in-place joints - a flexi toy that prints in one go (Modify, or right-click).",
+      "Hull (Combine): wrap the selected parts in one smooth body - two cylinders become a rounded slot.",
+      "Fit check (Arrange): overlaps show in red, and pairs closer than the clearance are listed; it checks again as you move parts.",
+      "Round a mesh: round every edge of an imported model, a scan or any part by one radius - outside edges, inside corners or both - where the fillet tool cannot go.",
+      "Text on curved faces: Text on a face set down on the side of a cylinder or tube now wraps round it, raised or cut in.",
+      "The Mesh tools are one button with a menu, so the toolbar no longer wraps when an imported model is selected.",
+    ],
+  },
+  {
     build: 32,
     items: [
       "Saving no longer runs out of room in the Mac and Windows app: designs are now kept as files on your disk, and those saved before are moved there by themselves. (This needs the new download once - the auto-update cannot replace the part that stores them.)",
