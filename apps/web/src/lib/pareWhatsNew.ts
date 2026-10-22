@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 28,
+    items: [
+      "Blend keeps hollows: blending two hollow parts (tubes, a hollowed box and a hollowed cylinder) makes a sleeve, so the result is one tube open all the way through. \"Hollow through\" in the Blend window switches it off for a solid piece.",
+      "Hollow at will: on a part that is already hollow, clicking another face adds that side - a cup open at the top can be opened at the bottom too, without the top filling in.",
+      "The sides Hollow will leave open stay shaded grey on the part until you press Hollow.",
+      "Rotation rows match the arrows: About X is red, About Y green, About Z blue - the same colours as the turning arrows on the workplane.",
+    ],
+  },
+  {
     build: 27,
     items: [
       "Hollow fixed: clicking a face of the part now opens that side. Before, clicking the top (already open by default) closed it, so the box came out sealed and looked unchanged.",

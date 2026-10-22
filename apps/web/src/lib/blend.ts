@@ -21,9 +21,11 @@ export type BlendSettings = {
   smoothness: number;
   /** Turns where the two outlines are matched, in steps of 1/RING of a turn: undoes a twist. */
   twist: number;
+  /** Fork (build 28): when both faces have an opening (two hollow parts), the piece is a sleeve open through. */
+  hollow: boolean;
 };
 
-export const DEFAULT_BLEND: BlendSettings = { smoothness: 70, twist: 0 };
+export const DEFAULT_BLEND: BlendSettings = { smoothness: 70, twist: 0, hollow: true };
 export const BLEND_RING = 96;
 const BLEND_SECTIONS = 40;
 /** How far the piece reaches into each body, so they join without a skin. */
@@ -32,7 +34,7 @@ export const BLEND_OVERLAP = 0.2;
 export function normalizeBlend(settings: Partial<BlendSettings>): BlendSettings {
   const smoothness = Number.isFinite(settings.smoothness) ? Math.min(100, Math.max(0, settings.smoothness as number)) : DEFAULT_BLEND.smoothness;
   const twist = Number.isFinite(settings.twist) ? Math.round(settings.twist as number) : 0;
-  return { smoothness, twist: ((twist % BLEND_RING) + BLEND_RING) % BLEND_RING };
+  return { smoothness, twist: ((twist % BLEND_RING) + BLEND_RING) % BLEND_RING, hollow: settings.hollow !== false };
 }
 
 /** The triangles of a body in the world, nine numbers each. */
@@ -130,6 +132,26 @@ function loopArea(loop: Point2[]) {
   return area / 2;
 }
 
+function loopWorld(face: PerforableFace, loop: Point2[]): THREE.Vector3[] {
+  const { origin, xAxis, zAxis } = face.workplane;
+  return loop.map((point) => new THREE.Vector3(
+    origin.x + xAxis.x * point.u + zAxis.x * point.v,
+    origin.y + xAxis.y * point.u + zAxis.y * point.v,
+    origin.z + xAxis.z * point.u + zAxis.z * point.v,
+  ));
+}
+
+/** Fork (build 28): the face's biggest opening (the bore of a hollow part), in the world, or null. */
+function openingLoopWorld(face: PerforableFace): THREE.Vector3[] | null {
+  const loops = face.outline.loops.filter((loop) => loop.length >= 3).sort((p, q) => Math.abs(loopArea(q)) - Math.abs(loopArea(p)));
+  return loops.length >= 2 ? loopWorld(face, loops[1]) : null;
+}
+
+/** True when both faces have an opening, so the piece can be a sleeve. */
+export function blendCanBeHollow(a: BlendFace, b: BlendFace): boolean {
+  return Boolean(openingLoopWorld(a.face) && openingLoopWorld(b.face));
+}
+
 /** The face's outer edge (the loop with the largest area), in the world. */
 function outerLoopWorld(face: PerforableFace): THREE.Vector3[] {
   const loops = face.outline.loops.filter((loop) => loop.length >= 3);
@@ -221,14 +243,24 @@ export function blendPositions(a: BlendFace, b: BlendFace, settings: BlendSettin
   const curve = new THREE.CubicBezierCurve3(p0, p1, p2, p3);
   const offsetsA = ringA.map((point) => point.clone().sub(ca));
   const offsetsB = ringB.map((point) => point.clone().sub(cb));
+  // Fork (build 28): the openings of two hollow parts, swept the same way - the inner wall of a sleeve.
+  const openA = settings.hollow ? openingLoopWorld(a.face) : null;
+  const openB = settings.hollow ? openingLoopWorld(b.face) : null;
+  const inner = openA && openB ? matchedLoops(openA, openB, nA, settings.twist) : null;
+  const innerA = inner ? inner.ringA : null;
+  const innerB = inner ? inner.ringB : null;
+  const innerOffsetsA = innerA ? innerA.map((point) => point.clone().sub(ca)) : null;
+  const innerOffsetsB = innerB ? innerB.map((point) => point.clone().sub(cb)) : null;
   const towardB = nB.clone().negate();
   // The slices along the path, each turned by `amount` (0..1) of the way to stand across the path.
   const slices = (amount: number) => {
     const rings: THREE.Vector3[][] = [];
+    const innerRings: THREE.Vector3[][] = [];
     const centres: THREE.Vector3[] = [];
     const tangents: THREE.Vector3[] = [];
     // A little into body A, then the sweep, then a little into body B.
     rings.push(ringA.map((point) => point.clone().addScaledVector(nA, -BLEND_OVERLAP)));
+    if (innerA) innerRings.push(innerA.map((point) => point.clone().addScaledVector(nA, -BLEND_OVERLAP)));
     centres.push(ca.clone().addScaledVector(nA, -BLEND_OVERLAP));
     tangents.push(nA.clone());
     for (let section = 0; section <= BLEND_SECTIONS; section += 1) {
@@ -245,17 +277,19 @@ export function blendPositions(a: BlendFace, b: BlendFace, settings: BlendSettin
         turn.slerp(new THREE.Quaternion(), 1 - amount * Math.sin(Math.PI * t));
       }
       rings.push(offsetsA.map((offset, index) => offset.clone().multiplyScalar(1 - s).addScaledVector(offsetsB[index], s).applyQuaternion(turn).add(at)));
+      if (innerOffsetsA && innerOffsetsB) innerRings.push(innerOffsetsA.map((offset, index) => offset.clone().multiplyScalar(1 - s).addScaledVector(innerOffsetsB[index], s).applyQuaternion(turn).add(at)));
       centres.push(at);
       tangents.push(tangent);
     }
     rings.push(ringB.map((point) => point.clone().addScaledVector(nB, -BLEND_OVERLAP)));
+    if (innerB) innerRings.push(innerB.map((point) => point.clone().addScaledVector(nB, -BLEND_OVERLAP)));
     centres.push(cb.clone().addScaledVector(nB, -BLEND_OVERLAP));
     tangents.push(towardB.clone());
-    return { rings, centres, tangents };
+    return { rings, innerRings, centres, tangents };
   };
   // Slices that cross each other fold the piece inside out: every point of a slice must lie further
   // along the path than the same point of the slice before.
-  const folds = ({ rings, tangents }: ReturnType<typeof slices>) => rings.some((ring, index) => index > 0 && ring.some((point, at) => point.clone().sub(rings[index - 1][at]).dot(tangents[index - 1].clone().add(tangents[index]).normalize()) <= 1e-6));
+  const folds = ({ rings, innerRings, tangents }: ReturnType<typeof slices>) => [rings, innerRings].some((set) => set.some((ring, index) => index > 0 && ring.some((point, at) => point.clone().sub(rings[index - 1][at]).dot(tangents[index - 1].clone().add(tangents[index]).normalize()) <= 1e-6)));
   // A straight taper (smoothness 0) joins matching points with straight lines: no turning. Smoother
   // ones turn as far as they can without a fold.
   let built = slices(0);
@@ -267,7 +301,8 @@ export function blendPositions(a: BlendFace, b: BlendFace, settings: BlendSettin
       break;
     }
   }
-  const { rings, centres } = built;
+  const { rings, innerRings, centres } = built;
+  const sleeve = innerRings.length === rings.length;
 
   const positions: number[] = [];
   // Each triangle is turned to face `outward` (any vector on its outer side).
@@ -290,17 +325,37 @@ export function blendPositions(a: BlendFace, b: BlendFace, settings: BlendSettin
       push(p, r, u, away);
     }
   }
+  // The inner wall of a sleeve faces in, towards the path.
+  if (sleeve) {
+    const innerCount = innerRings[0].length;
+    for (let ring = 0; ring < innerRings.length - 1; ring += 1) {
+      const middle = centres[ring].clone().add(centres[ring + 1]).multiplyScalar(0.5);
+      for (let index = 0; index < innerCount; index += 1) {
+        const next = (index + 1) % innerCount;
+        const p = innerRings[ring][index];
+        const q = innerRings[ring][next];
+        const r = innerRings[ring + 1][next];
+        const u = innerRings[ring + 1][index];
+        const inward = middle.clone().sub(p.clone().add(q).add(r).add(u).multiplyScalar(0.25));
+        push(p, q, r, inward);
+        push(p, r, u, inward);
+      }
+    }
+  }
   // The two end caps, laid flat in their face's plane to be cut into triangles; each faces into its body.
-  const cap = (ring: THREE.Vector3[], face: PerforableFace, outward: THREE.Vector3) => {
+  // A sleeve's caps are rings round the opening.
+  const cap = (ring: THREE.Vector3[], face: PerforableFace, outward: THREE.Vector3, hole: THREE.Vector3[] | null) => {
     const { xAxis, zAxis } = face.workplane;
     const x = new THREE.Vector3(xAxis.x, xAxis.y, xAxis.z);
     const z = new THREE.Vector3(zAxis.x, zAxis.y, zAxis.z);
     const flat = ring.map((point) => new THREE.Vector2(point.dot(x), point.dot(z)));
-    const triangles = THREE.ShapeUtils.triangulateShape(flat, []);
-    triangles.forEach(([i, j, l]) => push(ring[i], ring[j], ring[l], outward));
+    const flatHole = hole ? hole.map((point) => new THREE.Vector2(point.dot(x), point.dot(z))) : null;
+    const all = hole ? [...ring, ...hole] : ring;
+    const triangles = THREE.ShapeUtils.triangulateShape(flat, flatHole ? [flatHole] : []);
+    triangles.forEach(([i, j, l]) => push(all[i], all[j], all[l], outward));
   };
-  cap(rings[0], a.face, nA.clone().negate());
-  cap(rings[rings.length - 1], b.face, nB.clone().negate());
+  cap(rings[0], a.face, nA.clone().negate(), sleeve ? innerRings[0] : null);
+  cap(rings[rings.length - 1], b.face, nB.clone().negate(), sleeve ? innerRings[innerRings.length - 1] : null);
 
   // Facing out: a closed body has a positive volume that way round.
   let volume = 0;

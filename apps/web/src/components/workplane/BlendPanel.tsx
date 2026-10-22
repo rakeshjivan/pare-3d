@@ -16,6 +16,7 @@ import type { WorkplaneWorkspaceSettings } from "@/types/layerling";
 export function BlendPanel({
   names,
   ready,
+  canHollow,
   settings,
   workspace,
   busy,
@@ -26,6 +27,8 @@ export function BlendPanel({
   names: [string, string];
   /** Both faces are known and the piece can be built. */
   ready: boolean;
+  /** Both faces have an opening: the piece can be a sleeve. */
+  canHollow: boolean;
   settings: BlendSettings;
   workspace: WorkplaneWorkspaceSettings;
   busy: boolean;
@@ -74,6 +77,16 @@ export function BlendPanel({
           {settings.twist ? <button type="button" className="quiet" onClick={() => onChange({ twist: 0 })}>{t("blend.twistReset")}</button> : null}
         </div>
       </div>
+
+      {canHollow ? (
+        <label className="edge-modifier-toggle blend-hollow">
+          <input type="checkbox" checked={settings.hollow} onChange={(event) => onChange({ hollow: event.currentTarget.checked })} />
+          <span>
+            <strong>{t("blend.hollow")}</strong>
+            <small>{t("blend.hollowHint")}</small>
+          </span>
+        </label>
+      ) : null}
 
       <div className="edge-modifier-footer">
         <button type="button" className="secondary" onClick={onCancel}>{t("common.cancel")}</button>

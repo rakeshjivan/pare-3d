@@ -109,7 +109,7 @@ import { HolePatternPanel } from "./workplane/HolePatternPanel";
 import { FaceToolPanel } from "./workplane/FaceToolPanel";
 import { DEFAULT_FACE_TOOL, FACE_TOOL_MIN_DEPTH, faceToolSettingsOn, normalizeFaceTool, type FaceToolSettings } from "@/lib/faceTool";
 import { pullToFaceTool } from "@/lib/facePull";
-import { blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend, type BlendFace, type BlendSettings } from "@/lib/blend";
+import { blendCanBeHollow, blendShape, DEFAULT_BLEND, facingFaces, normalizeBlend, type BlendFace, type BlendSettings } from "@/lib/blend";
 import { BlendPanel } from "./workplane/BlendPanel";
 import { faceToolBody } from "@/lib/faceToolBody";
 import { DEFAULT_HOLE_PATTERN, normalizeHolePattern, type HolePatternSettings } from "@/lib/holePattern";
@@ -7343,7 +7343,7 @@ export function LayerlingEditor({
     const history = selectedShape.edgeTreatmentHistory ?? [];
     const last = history[history.length - 1];
     if (last?.feature.kind === "shell") {
-      setShellTool({ thickness: last.feature.amount, openings: last.feature.openings ?? "top", edges: last.feature.shellEdges ?? "round", busy: false, error: null, replaces: last.id });
+      setShellTool({ thickness: last.feature.amount, openings: last.feature.openings ?? "top", edges: last.feature.shellEdges ?? "round", busy: false, error: null, replaces: last.id, picked: true });
       return;
     }
     const smallest = Math.min(shapeWidth(selectedShape), shapeDepth(selectedShape), selectedShape.height);
@@ -7378,6 +7378,11 @@ export function LayerlingEditor({
       });
   }, [commitShapes, selectedShape, selectedShapes.length, shellShape, shellTool]);
 
+  // Fork (build 28): the outward direction of each side Hollow can leave open, in scene axes (y up).
+  const SHELL_SIDE_NORMALS: Record<ShellSide, { x: number; y: number; z: number }> = {
+    top: { x: 0, y: 1, z: 0 }, bottom: { x: 0, y: -1, z: 0 }, front: { x: 0, y: 0, z: 1 },
+    back: { x: 0, y: 0, z: -1 }, right: { x: 1, y: 0, z: 0 }, left: { x: -1, y: 0, z: 0 },
+  };
   // Fork (build 25): Hollow on the part itself, as in Fusion's Shell: a click on a face opens or
   // closes that side; dragging a face inward sets the wall thickness; Enter hollows.
   const shellPullFaceRef = useRef<LayFlatPick | null>(null);
@@ -13436,6 +13441,7 @@ export function LayerlingEditor({
           modifierOnlyVisibleEdges={edgeModifier?.onlyVisibleEdges ?? false}
           onModifierEdgeToggle={toggleModifierEdge}
           onModifierFacePick={toggleModifierFaceEdges}
+          markedFaces={shellTool && selectedShape ? { shapeId: selectedShape.id, normals: shellOpenSides(shellTool.openings).map((side) => SHELL_SIDE_NORMALS[side]) } : null}
           modifierAmount={edgeModifier?.amount ?? 0}
           modifierAmountLabel={edgeModifier ? t(edgeModifier.kind === "fillet" ? "edge.radius" : "edge.distance") : ""}
           onModifierAmountDrag={edgeModifier?.prepared ? (value) => setEdgeModifier((current) => {
@@ -13648,6 +13654,7 @@ export function LayerlingEditor({
             return body ? displayShapeName(body) : "";
           }) as [string, string]}
           ready={Boolean(blendPreview)}
+          canHollow={Boolean(blendTool.faces[0] && blendTool.faces[1] && blendCanBeHollow(blendTool.faces[0], blendTool.faces[1]))}
           settings={blendTool.settings}
           workspace={workspaceSettings}
           busy={blendTool.busy}

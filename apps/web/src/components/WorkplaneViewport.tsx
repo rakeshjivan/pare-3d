@@ -506,6 +506,8 @@ type WorkplaneViewportProps = {
    */
   /** Fork (build 25): a click on a face, not an edge: the editor picks the face's edges. */
   onModifierFacePick?: (point: { x: number; y: number; z: number }, normal: { x: number; y: number; z: number }) => void;
+  /** Fork (build 28): flat faces drawn as picked while a tool is open - the open sides of Hollow. Normals in scene axes (y up). */
+  markedFaces?: { shapeId: string; normals: ReadonlyArray<{ x: number; y: number; z: number }> } | null;
   modifierAmount?: number;
   modifierAmountLabel?: string;
   onModifierAmountDrag?: (amount: number) => void;
@@ -3491,6 +3493,7 @@ export function WorkplaneViewport({
   modifierOnlyVisibleEdges = false,
   onModifierEdgeToggle,
   onModifierFacePick,
+  markedFaces = null,
   modifierAmount = 0,
   modifierAmountLabel = "",
   onModifierAmountDrag,
@@ -4465,6 +4468,12 @@ export function WorkplaneViewport({
   useEffect(() => {
     pivotPickModeRef.current = pivotPickMode;
   }, [pivotPickMode]);
+
+  useEffect(() => {
+    // Wait a frame so a body rebuilt by the same change is in the scene first.
+    const frame = requestAnimationFrame(() => syncMarkedFaces(threeRef.current, markedFaces, resolvedTheme));
+    return () => cancelAnimationFrame(frame);
+  }, [markedFaces, shapes, resolvedTheme]);
 
   useEffect(() => {
     if (!layFlatPickMode && !mateFacePick) syncLayFlatHover(threeRef.current, [], resolvedThemeRef.current, null, null);
@@ -13167,6 +13176,94 @@ function syncLayFlatHover(
   layer.userData.key = key;
   layer.visible = true;
   state.needsRender = true;
+}
+
+/**
+ * Fork (build 28): faces a tool has picked stay shaded grey until the tool closes (the sides Hollow
+ * leaves open). For each normal, the flat face furthest out along it on the body is found in the
+ * body's own mesh and laid over it.
+ */
+function syncMarkedFaces(
+  state: ThreeState | null,
+  marked: { shapeId: string; normals: ReadonlyArray<{ x: number; y: number; z: number }> } | null,
+  theme: ResolvedAppTheme,
+) {
+  if (!state) return;
+  let layer = state.scene.getObjectByName("MarkedFaces") as THREE.Group | undefined;
+  if (!layer) {
+    layer = new THREE.Group();
+    layer.name = "MarkedFaces";
+    layer.layers.set(RENDER_LAYER_PREVIEWS);
+    state.scene.add(layer);
+  }
+  disposeChildren(layer);
+  layer.visible = false;
+  state.needsRender = true;
+  if (!marked || marked.normals.length === 0) return;
+  const meshes: Array<THREE.Mesh<THREE.BufferGeometry>> = [];
+  state.scene.traverse((object) => {
+    const mesh = object as THREE.Mesh<THREE.BufferGeometry>;
+    if (mesh.isMesh && mesh.userData.shapeId === marked.shapeId && mesh.layers.isEnabled(RENDER_LAYER_SHAPES) && mesh.geometry?.getAttribute("position")) meshes.push(mesh);
+  });
+  const corner = new THREE.Vector3();
+  const vertices: number[] = [];
+  for (const mesh of meshes) {
+    mesh.updateWorldMatrix(true, false);
+    const position = mesh.geometry.getAttribute("position");
+    const index = mesh.geometry.getIndex();
+    const count = index ? index.count : position.count;
+    if (count > 1800000) continue;
+    const world = new Float64Array(count * 3);
+    for (let offset = 0; offset < count; offset += 1) {
+      corner.fromBufferAttribute(position, index ? index.getX(offset) : offset).applyMatrix4(mesh.matrixWorld);
+      world[offset * 3] = corner.x;
+      world[offset * 3 + 1] = corner.y;
+      world[offset * 3 + 2] = corner.z;
+    }
+    const triangleCount = Math.floor(count / 3);
+    for (const normal of marked.normals) {
+      let best = -1;
+      let bestReach = -Infinity;
+      for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+        const o = triangle * 9;
+        const ux = world[o + 3] - world[o], uy = world[o + 4] - world[o + 1], uz = world[o + 5] - world[o + 2];
+        const vx = world[o + 6] - world[o], vy = world[o + 7] - world[o + 1], vz = world[o + 8] - world[o + 2];
+        const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        const length = Math.hypot(nx, ny, nz);
+        if (length < 1e-9) continue;
+        if ((nx * normal.x + ny * normal.y + nz * normal.z) / length < 0.995) continue;
+        const reach = ((world[o] + world[o + 3] + world[o + 6]) * normal.x + (world[o + 1] + world[o + 4] + world[o + 7]) * normal.y + (world[o + 2] + world[o + 5] + world[o + 8]) * normal.z) / 3;
+        if (reach > bestReach + 1e-6) {
+          bestReach = reach;
+          best = triangle;
+        }
+      }
+      if (best < 0) continue;
+      const triangles = planarFaceTriangles(world, best)?.triangles ?? [best];
+      for (const triangle of triangles) for (let offset = 0; offset < 9; offset += 1) vertices.push(world[triangle * 9 + offset]);
+    }
+  }
+  if (!vertices.length) return;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(vertices), 3));
+  const shade = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      color: theme === "dark" ? "#c3cad4" : "#5d6672",
+      transparent: true,
+      opacity: 0.72,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    }),
+  );
+  shade.layers.set(RENDER_LAYER_PREVIEWS);
+  shade.renderOrder = 955;
+  shade.raycast = () => undefined;
+  layer.add(shade);
+  layer.visible = true;
 }
 
 /**

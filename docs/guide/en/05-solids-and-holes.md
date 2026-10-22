@@ -60,7 +60,8 @@ Sometimes parts should only stay together without becoming one - a white logo on
 3. Pare 3D finds the flat faces that face each other - the top of the lower cylinder and the bottom of the upper one, say - and shows the piece between them as a preview. To use another flat face, click it; a curved face cannot be used.
 4. Set the {{ui:blend.smoothness}}: 0 is a straight taper from one face to the other; 100 leaves both faces square and flares smoothly in between, like a hose adapter. The parts need not sit in line: the piece curves from one face to the other.
 5. If the piece looks twisted - a square running into a hexagon, say - {{ui:blend.twist}} turns one outline a step against the other until the corners line up.
-6. [[Enter]] or {{ui:blend.apply}} makes it. [[Esc]] closes the tool without it.
+6. Joining two hollow parts - two tubes, a hollowed box and a hollowed cylinder? When both faces have an opening, {{ui:blend.hollow}} is on: the piece is a sleeve, its inner wall runs from one opening to the other, and the result is one tube open all the way through. Switch it off for a solid piece.
+7. [[Enter]] or {{ui:blend.apply}} makes it. [[Esc]] closes the tool without it.
 
 The two parts and the piece between them become one group, so they print as one body; {{ui:editor.tool.ungroup}} takes them apart again and the piece is an ordinary part you can delete. The faces can be any flat outline - circles, squares, a sketch, a polygon. For a smooth result, round shapes should have plenty of sides (see [How round is round?](chapter:shapes)).
 

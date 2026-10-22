@@ -4397,7 +4397,7 @@ function RangeProperty({
     setDraft(formatShown(next));
   };
   const row = (
-    <label className="range-property" style={{ "--slider-pos": `${position}%` } as CSSProperties}>
+    <label className="range-property" data-property={id} style={{ "--slider-pos": `${position}%` } as CSSProperties}>
       <span className="range-property-header">
         <span className="range-property-name">{label}{onReset ? <PropertyResetButton onClick={onReset} /> : null}</span>
         <span className="range-value-control">

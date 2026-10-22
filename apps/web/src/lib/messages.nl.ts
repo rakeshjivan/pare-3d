@@ -3319,6 +3319,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "blend.twistRight": "Andere kant op draaien",
   "blend.twistReset": "Herstellen",
   "blend.apply": "Maken",
+  "blend.hollow": "Hol doorlopend",
+  "blend.hollowHint": "Beide vlakken hebben een opening: het stuk wordt een mof en de twee holle delen worden één open buis.",
   "blend.pieceName": "Overgang",
   "blend.created": "Verbonden: de twee onderdelen en het stuk ertussen zijn één groep",
   "blend.cancelled": "Overgang geannuleerd",

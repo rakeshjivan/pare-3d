@@ -81,3 +81,39 @@ describe("Blend ignores the strips of a round side (build 25)", () => {
     expect(pair.b.normal.y).toBeCloseTo(-1, 3);
   });
 });
+
+describe("Blend keeps two hollow parts open through (build 28)", () => {
+  const tube = (id: string, diameter: number, wall: number, height: number, elevation: number, x = 0) =>
+    ({ ...cylinder(id, diameter, height, elevation, x), kind: "tube", bevel: wall, sides: 64 }) as unknown as WorkplaneShape;
+  async function genus(shape: WorkplaneShape) {
+    const runtime = await getManifoldRuntime();
+    const mesh = meshForShape(shape);
+    const manifoldMesh = new runtime.Mesh({ numProp: 3, vertProperties: new Float32Array(mesh.vertices.flat()), triVerts: new Uint32Array(mesh.faces.flat()) });
+    manifoldMesh.merge();
+    const solid = new runtime.Manifold(manifoldMesh);
+    const result = { ok: solid.status() === "NoError" && solid.volume() > 0, genus: solid.genus() };
+    solid.delete();
+    return result;
+  }
+
+  it("makes a sleeve between two tubes, and the group is one open tube", async () => {
+    const a = tube("wide", 30, 3, 10, 0);
+    const b = tube("narrow", 16, 2, 10, 30, 6);
+    const pair = facingFaces(a, b)!;
+    for (const smoothness of [0, 70, 100]) {
+      const piece = blendShape(pair.a, pair.b, normalizeBlend({ smoothness }), { name: "Blend", color: "#888" })!;
+      expect(await genus(piece)).toEqual({ ok: true, genus: 1 });
+    }
+    const piece = blendShape(pair.a, pair.b, DEFAULT_BLEND, { name: "Blend", color: "#888" })!;
+    const joined = await buildGroupedShapeFromSelection([a, b, piece], 400000);
+    expect(await genus(joined.group!)).toEqual({ ok: true, genus: 1 });
+  });
+
+  it("closes the piece when Hollow through is off", async () => {
+    const a = tube("wide", 30, 3, 10, 0);
+    const b = tube("narrow", 16, 2, 10, 30);
+    const pair = facingFaces(a, b)!;
+    const piece = blendShape(pair.a, pair.b, normalizeBlend({ hollow: false }), { name: "Blend", color: "#888" })!;
+    expect(await genus(piece)).toEqual({ ok: true, genus: 0 });
+  });
+});

@@ -3295,6 +3295,8 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "blend.twistRight": "Tourner dans l'autre sens",
   "blend.twistReset": "Réinitialiser",
   "blend.apply": "Créer",
+  "blend.hollow": "Creux traversant",
+  "blend.hollowHint": "Les deux faces ont une ouverture : la pièce est un manchon et les deux pièces creuses forment un seul tube ouvert.",
   "blend.pieceName": "Raccord",
   "blend.created": "Raccordé : les deux pièces et la pièce entre elles forment un groupe",
   "blend.cancelled": "Raccord annulé",

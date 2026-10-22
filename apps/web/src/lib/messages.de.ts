@@ -3320,6 +3320,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "blend.twistRight": "In die andere Richtung drehen",
   "blend.twistReset": "Zurücksetzen",
   "blend.apply": "Erstellen",
+  "blend.hollow": "Hollow through",
+  "blend.hollowHint": "Both faces have an opening, so the piece is a sleeve and the two hollow parts become one open tube.",
   "blend.pieceName": "Übergang",
   "blend.created": "Verbunden: die beiden Teile und das Stück dazwischen sind eine Gruppe",
   "blend.cancelled": "Übergang abgebrochen",

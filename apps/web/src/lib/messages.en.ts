@@ -3320,6 +3320,8 @@ export const MESSAGES_EN = {
   "blend.twistRight": "Turn the other way",
   "blend.twistReset": "Reset",
   "blend.apply": "Create",
+  "blend.hollow": "Hollow through",
+  "blend.hollowHint": "Both faces have an opening, so the piece is a sleeve and the two hollow parts become one open tube.",
   "blend.pieceName": "Blend",
   "blend.created": "Blended: the two parts and the piece between them are one group",
   "blend.cancelled": "Blend cancelled",

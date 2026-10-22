@@ -1234,3 +1234,28 @@ html[data-theme="dark"] { --toolbar-icon-disabled: #7f776d; }
 .blend-twist-buttons { display: flex; gap: 4px; }
 .blend-twist-buttons button { display: inline-grid; place-items: center; min-width: 30px; height: 28px; padding: 0 8px; color: var(--foreground); background: var(--subbar); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font: 600 12px var(--font-ui); }
 .blend-twist-buttons button.quiet { color: var(--muted-strong); background: transparent; border-color: transparent; }
+
+/* Fork (build 28): the rotation rows wear the colour of the arrow that turns the part the same way -
+   red about X, green about Y, blue about Z (height). The arrows keep their axis whatever the view. */
+.range-property[data-property="rotateX"] { --axis-colour: #d6363c; }
+.range-property[data-property="rotateY"] { --axis-colour: #2f9a4b; }
+.range-property[data-property="rotateZ"] { --axis-colour: #2f6fe0; }
+html[data-theme="dark"] .range-property[data-property="rotateX"] { --axis-colour: #ff6b70; }
+html[data-theme="dark"] .range-property[data-property="rotateY"] { --axis-colour: #5fd47c; }
+html[data-theme="dark"] .range-property[data-property="rotateZ"] { --axis-colour: #6aa0ff; }
+.range-property[data-property^="rotate"] .range-property-name { color: var(--axis-colour); }
+.range-property[data-property^="rotate"] .range-property-name::before {
+  content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%;
+  background: var(--axis-colour); vertical-align: 0;
+}
+.range-property[data-property^="rotate"] .range-control input[type="range"]::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, var(--axis-colour) 0 var(--slider-pos), color-mix(in srgb, var(--axis-colour) 16%, transparent) var(--slider-pos) 100%);
+}
+.range-property[data-property^="rotate"] .range-control input[type="range"]::-webkit-slider-thumb { border-color: var(--axis-colour); }
+.range-property[data-property^="rotate"] .range-control input[type="range"]::-moz-range-progress { background: var(--axis-colour); }
+.range-property[data-property^="rotate"] .range-control input[type="range"]::-moz-range-thumb { border-color: var(--axis-colour); }
+.blend-hollow { display: flex; align-items: flex-start; gap: 9px; margin: 4px 14px 10px; cursor: pointer; }
+.blend-hollow input { margin-top: 2px; accent-color: var(--accent, #1662b3); }
+.blend-hollow span { display: grid; gap: 2px; }
+.blend-hollow strong { font: 600 13px var(--font-ui); color: var(--foreground); }
+.blend-hollow small { font: 500 11.5px/1.35 var(--font-ui); color: var(--muted-strong); }
