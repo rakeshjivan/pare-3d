@@ -9322,8 +9322,8 @@ export function LayerlingEditor({
       setNotice(t("meshRound.tiny", { size: largest.toFixed(1) }));
       return;
     }
-    const mesh = meshForShape(shape);
-    const positions = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
+    // Fork (build 43): the part's triangles worked out once per version of it, not on every open.
+    const positions = partGeom(shape).triangles;
     const minRadius = Math.ceil(smallestRoundingRadius(positions) * 10) / 10;
     if (smallest / 2 < minRadius) {
       setNotice(t("meshRound.tooThin", { size: smallest.toFixed(1) }));
@@ -9343,8 +9343,7 @@ export function LayerlingEditor({
     // A moment for the spinner to show: the rounding can take a few seconds on a big part.
     window.setTimeout(async () => {
       try {
-        const mesh = meshForShape(shape);
-        const positions = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
+        const positions = partGeom(shape).triangles;
         const result = await roundMeshInBackground(positions, tool.radius, tool.mode);
         const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
         if (!current || projectShapesFingerprint([current]) !== projectShapesFingerprint([shape])) {

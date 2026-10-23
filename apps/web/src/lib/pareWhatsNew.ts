@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 43,
+    items: [
+      "Smoother first moments: the brief pause the first time you drag, undo or open a tool in a session (while the graphics card prepares what it draws) is gone or much shorter.",
+      "Round a mesh opens straight away on big imported models, the second time and after.",
+    ],
+  },
+  {
     build: 42,
     items: [
       "Push/pull face: the Depth slider is called Height when pulling out, and two new sliders - Move left or right, Move up or down - slide the pulled shape across the face for fine tuning (Back to the middle resets them).",

@@ -10407,6 +10407,10 @@ export function WorkplaneViewport({
 
 function createThreeScene(host: HTMLDivElement): ThreeState {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: false, stencil: true });
+  // Fork (build 43): in the released app, a new material's shader is not checked for errors as it
+  // is first used - asking for the check makes the window wait for the graphics card to finish
+  // compiling, a pause at the first drag, undo or tool of a session. The development build keeps it.
+  if (process.env.NODE_ENV === "production") renderer.debug.checkShaderErrors = false;
   renderer.localClippingEnabled = true;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(host.clientWidth, host.clientHeight);
