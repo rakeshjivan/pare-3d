@@ -3610,4 +3610,12 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "sketch.modeBadgeExtrude": "Náčrt pro vysunutí",
   "sketch.operationHint": "Čím se tento náčrt stane: vysunutím, rotací nebo tažením po dráze",
   "status.sketchOperationChanged": "Nyní: {operation}. Dokonči náčrt a těleso se postaví",
+  "nameTag.side.free": "Volně",
+  "nameTag.side.freeHint": "Odebere otvor ze jmenovky a položí vedle ní samostatné ouško na kroužek, které posunete a otočíte jako každý tvar.",
+  "nameTag.keyringTab": "Ouško na kroužek",
+  "nameTag.keyringTabBundle": "Spojit se jmenovkou",
+  "nameTag.keyringTabBundleHint": "Spojí ouško s nejbližší jmenovkou do skupiny (Ctrl+B): pohybují se a otáčejí společně a barvy zůstanou.",
+  "status.keyringTabMade": "Vedle jmenovky je samostatné ouško na kroužek: posuňte ho a otočte na místo jako každý tvar a pak v jeho panelu stiskněte „Spojit se jmenovkou“.",
+  "status.keyringTabBundled": "Ouško na kroužek je spojené se jmenovkou.",
+  "status.keyringTabNoTag": "Není tu žádná jmenovka ani štítek s ikonou, se kterými by šlo ouško spojit.",
 };

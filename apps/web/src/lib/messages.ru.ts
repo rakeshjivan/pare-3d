@@ -3598,4 +3598,12 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "sketch.modeBadgeExtrude": "Эскиз выдавливания",
   "sketch.operationHint": "Чем станет этот эскиз: выдавливанием, вращением или протяжкой по траектории",
   "status.sketchOperationChanged": "Теперь: {operation}. Заверши эскиз, чтобы построить тело",
+  "nameTag.side.free": "Свободно",
+  "nameTag.side.freeHint": "Убирает отверстие с бирки и кладёт рядом отдельный язычок для колечка, который двигают и вращают как любую фигуру.",
+  "nameTag.keyringTab": "Язычок для колечка",
+  "nameTag.keyringTabBundle": "Связать с биркой",
+  "nameTag.keyringTabBundleHint": "Связывает язычок с ближайшей биркой (Ctrl+B): они двигаются и поворачиваются вместе, а цвета сохраняются.",
+  "status.keyringTabMade": "Рядом с биркой лежит отдельный язычок для колечка: передвиньте и поверните его на место, как любую фигуру, а затем нажмите «Связать с биркой» на его панели.",
+  "status.keyringTabBundled": "Язычок для колечка связан с биркой.",
+  "status.keyringTabNoTag": "Нет ни именной бирки, ни бирки с иконкой, с которой можно связать язычок.",
 };

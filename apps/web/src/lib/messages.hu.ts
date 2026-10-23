@@ -3104,4 +3104,12 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "sketch.modeBadgeExtrude": "Kihúzás vázlat",
   "sketch.operationHint": "Mi lesz ebből a vázlatból: kihúzás, forgatás vagy pálya menti húzás",
   "status.sketchOperationChanged": "Most: {operation}. Fejezd be a vázlatot a test felépítéséhez",
+  "nameTag.side.free": "Szabad",
+  "nameTag.side.freeHint": "Leveszi a lyukat a címkéről, és mellé tesz egy külön kulcstartófület, amelyet úgy mozgatsz és forgatsz, mint bármelyik alakzatot.",
+  "nameTag.keyringTab": "Kulcstartófül",
+  "nameTag.keyringTabBundle": "Összefogás a címkével",
+  "nameTag.keyringTabBundleHint": "Kötegként (Ctrl+B) összefogja a fület a legközelebbi címkével: együtt mozognak és forognak, a színük megmarad.",
+  "status.keyringTabMade": "A címke mellett egy külön kulcstartófül van: mozgasd és forgasd a helyére, mint bármelyik alakzatot, aztán a paneljén nyomd meg az „Összefogás a címkével” gombot.",
+  "status.keyringTabBundled": "A kulcstartófül össze van fogva a címkével.",
+  "status.keyringTabNoTag": "Nincs névcímke vagy ikoncímke, amellyel a kulcstartófület össze lehetne fogni.",
 };

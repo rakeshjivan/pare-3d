@@ -430,6 +430,8 @@ type WorkplaneViewportProps = {
   onWrapAroundCylinder?: (diameter: number, inward: boolean) => void;
   onLayerText?: (patch: TextLayerPatch) => void;
   onTextTags?: (names: string[], gap: number) => void;
+  /** Holds the selected key ring tab together with the nearest tag (#598). */
+  onBundleKeyringTab?: () => void;
   /** The selected name tag as its card shows it (#215). */
   textLayerStack?: NameTagStack | null;
   /** The icon tag card's wiring for the selected sketch body or icon tag. */
@@ -3467,6 +3469,7 @@ export function WorkplaneViewport({
   onWrapAroundCylinder,
   onLayerText,
   onTextTags,
+  onBundleKeyringTab,
   textLayerStack,
   iconTag,
   qrCode,
@@ -10328,6 +10331,7 @@ export function WorkplaneViewport({
           onWrapAroundCylinder={onWrapAroundCylinder}
           onLayerText={onLayerText}
           onTextTags={onTextTags}
+          onBundleKeyringTab={onBundleKeyringTab}
           textLayerStack={textLayerStack}
           iconTag={iconTag}
           qrCode={qrCode}

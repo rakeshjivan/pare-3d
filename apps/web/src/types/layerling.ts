@@ -942,6 +942,11 @@ export type WorkplaneShape = {
    */
   layeredIcon?: boolean;
   /**
+   * A key ring tab of its own (#598), made by a name tag's or icon tag's "Free": its properties
+   * panel offers to hold it together with the nearest tag in one click.
+   */
+  keyringTab?: boolean;
+  /**
    * A QR code (#553): the text and the choices it was made with, so the properties panel can make
    * it again. On the code body itself, or on the plate group or bundle that holds it.
    */

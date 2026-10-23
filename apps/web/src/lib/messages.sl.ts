@@ -3589,4 +3589,12 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "sketch.modeBadgeExtrude": "Skica za izvlek",
   "sketch.operationHint": "Kaj postane ta skica: izvlek, vrtenje ali vlečenje po poti",
   "status.sketchOperationChanged": "Zdaj: {operation}. Dokončaj skico, da se zgradi telo",
+  "status.keyringTabMade": "Poleg napisa je samostojen jeziček za obesek: premakni in zavrti ga na mesto kot vsako obliko, nato v njegovi plošči pritisni »Združi z napisom«.",
+  "status.keyringTabBundled": "Jeziček za obesek je združen z napisom.",
+  "status.keyringTabNoTag": "Ni napisa ali oznake z ikono, s katero bi lahko združil jeziček.",
+  "nameTag.side.free": "Prosto",
+  "nameTag.side.freeHint": "Odstrani luknjo z napisa in poleg postavi samostojen jeziček za obesek, ki ga premikaš in vrtiš kot vsako obliko.",
+  "nameTag.keyringTab": "Jeziček za obesek",
+  "nameTag.keyringTabBundle": "Združi z napisom",
+  "nameTag.keyringTabBundleHint": "Združi jeziček z najbližjim napisom v sveženj (Ctrl+B): premikata in vrtita se skupaj, barve ostanejo.",
 };

@@ -3611,4 +3611,12 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "sketch.modeBadgeExtrude": "Extrusionsskizze",
   "sketch.operationHint": "Was aus dieser Skizze wird: extrudiert, gedreht oder entlang eines Pfads gezogen",
   "status.sketchOperationChanged": "Jetzt: {operation}. Schließe die Skizze ab, um den Körper zu bauen",
+  "nameTag.side.free": "Frei",
+  "nameTag.side.freeHint": "Nimmt das Loch vom Schild und legt eine eigene Lasche für den Schlüsselring daneben, die du wie jede Form verschiebst und drehst.",
+  "nameTag.keyringTab": "Lasche für den Schlüsselring",
+  "nameTag.keyringTabBundle": "Mit dem Schild bündeln",
+  "nameTag.keyringTabBundleHint": "Hält die Lasche mit dem nächsten Schild zusammen, als Bündel (Strg+B): Beide bewegen und drehen sich gemeinsam und behalten ihre Farben.",
+  "status.keyringTabMade": "Neben dem Schild liegt eine eigene Lasche für den Schlüsselring: Verschieb und dreh sie wie jede Form an ihren Platz und drück dann in ihrem Bereich „Mit dem Schild bündeln“.",
+  "status.keyringTabBundled": "Die Lasche für den Schlüsselring ist mit dem Schild gebündelt.",
+  "status.keyringTabNoTag": "Es gibt kein Namensschild und kein Symbolschild, mit dem die Lasche gebündelt werden kann.",
 };

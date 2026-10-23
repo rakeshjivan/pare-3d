@@ -1313,6 +1313,9 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
   if (definition.layeredIcon !== undefined && typeof definition.layeredIcon !== "boolean") {
     throw new Error(`${label}.layeredIcon must be true or false`);
   }
+  if (definition.keyringTab !== undefined && typeof definition.keyringTab !== "boolean") {
+    throw new Error(`${label}.keyringTab must be true or false`);
+  }
   // A QR code's settings (#553): a text and known choices. Old projects have none.
   if (definition.qrCode !== undefined && !normalizeQrSettings(definition.qrCode)) {
     throw new Error(`${label}.qrCode must hold the code's text`);

@@ -3587,4 +3587,12 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "sketch.modeBadgeExtrude": "Esquisse extrudée",
   "sketch.operationHint": "Ce que devient cette esquisse : extrudée, en révolution ou suivant un chemin",
   "status.sketchOperationChanged": "Maintenant : {operation}. Termine l'esquisse pour construire le corps",
+  "nameTag.side.free": "Libre",
+  "nameTag.side.freeHint": "Retire le trou de l'étiquette et pose à côté une languette porte-clés indépendante, à déplacer et tourner comme toute forme.",
+  "nameTag.keyringTab": "Languette porte-clés",
+  "nameTag.keyringTabBundle": "Lier à l'étiquette",
+  "nameTag.keyringTabBundleHint": "Maintient la languette avec l'étiquette la plus proche, comme un groupe (Ctrl+B) : elles se déplacent et tournent ensemble et gardent leurs couleurs.",
+  "status.keyringTabMade": "Une languette porte-clés indépendante est à côté de l'étiquette : déplacez-la et tournez-la à sa place comme toute forme, puis appuyez sur « Lier à l'étiquette » dans son panneau.",
+  "status.keyringTabBundled": "La languette porte-clés est liée à l'étiquette.",
+  "status.keyringTabNoTag": "Il n'y a aucune étiquette de nom ni étiquette d'icône à laquelle lier la languette.",
 };

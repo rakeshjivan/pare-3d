@@ -4,7 +4,7 @@ import { displayY, displayYTurn, insideZ, insideZTurn } from "@/lib/displayAxes"
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { guideChapterForShape, guideSectionForShape } from "@/lib/guideLinks";
 import { useInspectorCard } from "@/lib/inspectorCards";
-import { ChevronDown, ChevronUp, Cylinder, Eye, EyeOff, FolderOpen, Grid3x3, Layers, Lock, Minus, Pencil, Plus, RefreshCw, RotateCcw, Split, Tags, Unlock } from "lucide-react";
+import { ChevronDown, ChevronUp, Cylinder, Eye, EyeOff, FolderOpen, Grid3x3, Layers, Link2, Lock, Minus, Pencil, Plus, RefreshCw, RotateCcw, Split, Tags, Unlock } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Fragment, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import {
@@ -2354,6 +2354,7 @@ export function ShapeInspector({
   onWrapAroundCylinder,
   onLayerText,
   onTextTags,
+  onBundleKeyringTab,
   textLayerStack: nameTagStack,
   iconTag,
   qrCode,
@@ -2384,6 +2385,8 @@ export function ShapeInspector({
   onLayerText?: (patch: TextLayerPatch) => void;
   /** One tag like this text or stack per name, laid out in rows (#215). */
   onTextTags?: (names: string[], gap: number) => void;
+  /** Holds a key ring tab of its own together with the nearest tag in one click (#598). */
+  onBundleKeyringTab?: () => void;
   /** The selected name tag's words, font and layers, read from its layers as they stand (#215). */
   textLayerStack?: NameTagStack | null;
   /** The icon tag card's wiring, for a sketch body or an icon tag; null for anything else. */
@@ -2692,6 +2695,7 @@ export function ShapeInspector({
           onInteractionActiveChange={onInteractionActiveChange}
         />
       ) : null}
+      {shape.keyringTab && onBundleKeyringTab ? <KeyringTabBundleButton disabled={locked} onBundle={onBundleKeyringTab} /> : null}
       {qrCode ? <QrCodeCard key={`qr-code-${shape.id}`} shapeId={shape.id} controls={qrCode} disabled={locked} /> : null}
       {iconTag?.isTag ? (
         <IconTagCard key={`icon-tag-${shape.id}`} shapeId={shape.id} controls={iconTag} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
@@ -3127,7 +3131,23 @@ export function ShapeInspector({
  * sliders are the same range rows as everywhere else, so a drag shows a live
  * preview and ends in a single undo step.
  */
-export type TextLayerPatch = { text?: string; font?: string; letterSize?: number; layers?: TextLayer[]; keyring?: NameTagKeyring | null };
+export type TextLayerPatch = { text?: string; font?: string; letterSize?: number; layers?: TextLayer[]; keyring?: NameTagKeyring | null; /** "Free" (#598): the hole comes off the tag and a key ring tab of its own is put beside it. */ keyringTab?: boolean };
+
+/**
+ * A key ring tab of its own (#598): once it is in place, one click holds it together with the
+ * nearest tag, as Ctrl+B would, so nobody needs to know the bundle to keep the two together.
+ */
+function KeyringTabBundleButton({ disabled, onBundle }: { disabled: boolean; onBundle: () => void }) {
+  return (
+    <div className="name-tag-start">
+      <button className="inspector-action-button name-tag-start-button" type="button" disabled={disabled} onClick={onBundle}>
+        <Link2 size={17} strokeWidth={2.5} />
+        <span>{t("nameTag.keyringTabBundle")}</span>
+      </button>
+      <p className="name-tag-hint">{t("nameTag.keyringTabBundleHint")}</p>
+    </div>
+  );
+}
 
 /**
  * A plain text's way to a name tag (#215), first in its settings so a beginner finds it: one
@@ -3447,6 +3467,9 @@ function NameTagCard({
                     {t(`nameTag.side.${side}`)}
                   </button>
                 ))}
+                <button type="button" title={t("nameTag.side.freeHint")} disabled={disabled} onClick={() => onLayerText({ keyringTab: true })}>
+                  {t("nameTag.side.free")}
+                </button>
               </div>
             </>
           ) : null}
@@ -3458,7 +3481,7 @@ function NameTagCard({
 }
 
 /** What the icon tag card changes: the icon's width and the layers; the rest stays as it is. */
-export type IconLayerPatch = { width?: number; layers?: TextLayer[]; keyring?: NameTagKeyring | null };
+export type IconLayerPatch = { width?: number; layers?: TextLayer[]; keyring?: NameTagKeyring | null; /** "Free" (#598): the hole comes off the tag and a key ring tab of its own is put beside it. */ keyringTab?: boolean };
 
 /**
  * The icon tag card's wiring: the stack as it stands, the build, the copies on the plate, and
@@ -3649,6 +3672,9 @@ function IconTagCard({ shapeId, controls, workspace, disabled, onInteractionActi
                     {t(`nameTag.side.${side}`)}
                   </button>
                 ))}
+                <button type="button" title={t("nameTag.side.freeHint")} disabled={disabled} onClick={() => onLayer({ keyringTab: true })}>
+                  {t("nameTag.side.free")}
+                </button>
               </div>
             </>
           ) : null}

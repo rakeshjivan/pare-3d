@@ -3612,6 +3612,14 @@ export const MESSAGES_EN = {
   "sketch.modeBadgeExtrude": "Extrude sketch",
   "sketch.operationHint": "What this sketch becomes: extruded, revolved or swept",
   "status.sketchOperationChanged": "Now: {operation}. Finish the sketch to build the body",
+  "nameTag.side.free": "Free",
+  "nameTag.side.freeHint": "Takes the hole off the tag and puts a key ring tab of its own beside it, to move and turn like any shape.",
+  "nameTag.keyringTab": "Key ring tab",
+  "nameTag.keyringTabBundle": "Keep with the tag",
+  "nameTag.keyringTabBundleHint": "Holds the tab together with the nearest tag, as a bundle (Ctrl+B): they move and turn together and stay apart in colour.",
+  "status.keyringTabMade": "A key ring tab of its own is beside the tag: move and turn it into place like any shape, then press \"Keep with the tag\" in its panel.",
+  "status.keyringTabBundled": "The key ring tab is held together with the tag.",
+  "status.keyringTabNoTag": "There is no name tag or icon tag to hold the key ring tab with.",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

@@ -3611,4 +3611,12 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "sketch.modeBadgeExtrude": "Extrusieschets",
   "sketch.operationHint": "Wat deze schets wordt: geëxtrudeerd, gedraaid of langs een pad",
   "status.sketchOperationChanged": "Nu: {operation}. Rond de schets af om het lichaam te bouwen",
+  "nameTag.side.free": "Vrij",
+  "nameTag.side.freeHint": "Haalt het gat van het bordje en legt er een eigen lip voor de sleutelring naast, die je verplaatst en draait zoals elke vorm.",
+  "nameTag.keyringTab": "Lip voor sleutelring",
+  "nameTag.keyringTabBundle": "Bundelen met het bordje",
+  "nameTag.keyringTabBundleHint": "Houdt de lip samen met het dichtstbijzijnde bordje, als bundel (Ctrl+B): ze bewegen en draaien samen en houden hun kleuren.",
+  "status.keyringTabMade": "Naast het bordje ligt een eigen lip voor de sleutelring: verplaats en draai die op zijn plek zoals elke vorm en druk dan in het paneel op \"Bundelen met het bordje\".",
+  "status.keyringTabBundled": "De lip voor de sleutelring is gebundeld met het bordje.",
+  "status.keyringTabNoTag": "Er is geen naambordje of icoonlabel om de lip mee te bundelen.",
 };

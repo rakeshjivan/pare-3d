@@ -325,7 +325,8 @@ import { debugShapeSummary, mcpPivotRequest, compactShapeSummary, mcpShapeSummar
 import { sweepPathFromParams, sweepSectionFromParams, sweepSketchProfile } from "@/lib/sweepSketch";
 import { emptySketchProfile, cadShapeFromSketchProfile, cadShapeFromSketchSweep, revolveBuildProfile, shapeFromRevolvedSketchProfile, shapeFromCadMesh, sketchBodyAsOperation, sketchBodyOperation, sketchProfileLeftOfAxis, sketchReferenceShapeOnWorkplane, defaultMcpSketchProfile } from "@/lib/editorSketchCad";
 import { drawingLabelsInLanguage } from "@/lib/drawingLabels";
-import { offersTextLayers, textLayerStack, layeredTextShape, nameTagSource, nameTagsFor, offersIconLayers, iconLayerStack, iconTagArea, layeredIconShape, iconTagCopies, svgIconArea, iconTagFromSvg } from "@/lib/editorTextTags";
+import { offersTextLayers, textLayerStack, layeredTextShape, nameTagSource, nameTagsFor, offersIconLayers, iconLayerStack, iconTagArea, layeredIconShape, iconTagCopies, svgIconArea, iconTagFromSvg, keyringTabShape, keyringTabTag } from "@/lib/editorTextTags";
+import { DEFAULT_KEYRING_DIAMETER } from "@/lib/textGeometry";
 
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
@@ -9305,6 +9306,22 @@ export function LayerlingEditor({
     commitShapes([...shapesRef.current.filter((shape) => !selected.has(shape.id)), bundle], bundle.id, t("status.bundledMany", { count: selectedShapes.length }));
   }, [refuseLockedSelection, commitShapes, selectedIds, selectedShapes]);
 
+  /** A key ring tab of its own (#598) held together with the nearest tag in one click, as Ctrl+B would. */
+  const bundleKeyringTab = useCallback(() => {
+    if (selectedShapes.length !== 1 || !selectedShape?.keyringTab) return;
+    if (refuseLockedSelection()) return;
+    const tag = keyringTabTag(selectedShape, shapesRef.current);
+    if (!tag) {
+      setNotice(t("status.keyringTabNoTag"));
+      return;
+    }
+    const group = groupedShape([tag, selectedShape]);
+    if (!group) return;
+    const parts = new Set([tag.id, selectedShape.id]);
+    const bundle = canonicalizeShape({ ...group, name: tag.name, groupOperation: "bundle" });
+    commitShapes([...shapesRef.current.filter((shape) => !parts.has(shape.id)), bundle], bundle.id, t("status.keyringTabBundled"));
+  }, [refuseLockedSelection, commitShapes, selectedShape, selectedShapes.length]);
+
   /** Ends the preview of an intersection: the operands show as they are again. */
   const exitIntersectPreview = useCallback(() => {
     intersectPreviewRunRef.current += 1;
@@ -10145,9 +10162,16 @@ export function LayerlingEditor({
     const source = nameTagSource(stack.source, patch);
     const layers = patch.layers ?? (wasText ? [...NAME_TAG_LAYERS] : stack.layers);
     // The key ring hole (#215) follows the letters: it is laid out from them on every build.
-    const keyring = patch.keyring !== undefined ? patch.keyring : stack.keyring;
+    // "Free" (#598) takes it off the tag and puts a key ring tab of its own beside it.
+    const keyring = patch.keyringTab ? null : patch.keyring !== undefined ? patch.keyring : stack.keyring;
     await keyringRuntimeReady(keyring);
     const next = layeredTextShape(source, layers, wasText ? [] : stack.ids, selectedShape.id, selectedShape, stack.source.text, keyring);
+    if (patch.keyringTab) {
+      const bottom = layers[layers.length - 1];
+      const tab = keyringTabShape(next, { color: bottom.color, height: bottom.height, elevation: stack.source.elevation ?? 0 }, stack.keyring?.diameter ?? DEFAULT_KEYRING_DIAMETER, t("nameTag.keyringTab"));
+      commitShapes([...shapesRef.current.map((shape) => (shape.id === selectedShape.id ? next : shape)), tab], [tab.id], t("status.keyringTabMade"));
+      return;
+    }
     commitShapes(
       shapesRef.current.map((shape) => (shape.id === selectedShape.id ? next : shape)),
       [next.id],
@@ -10204,12 +10228,19 @@ export function LayerlingEditor({
       setNotice(t("status.buildingSketch"), true);
       void (async () => {
         const area = await iconTagArea(stack.source, stack.width, wanted.patch.width ?? stack.width);
-        // The key ring hole stays as it is unless the patch sets or takes it off (null).
-        const keyring = wanted.patch.keyring === undefined ? stack.keyring : wanted.patch.keyring;
+        // The key ring hole stays as it is unless the patch sets or takes it off (null); "Free" (#598) takes it off too.
+        const keyring = wanted.patch.keyringTab ? null : wanted.patch.keyring === undefined ? stack.keyring : wanted.patch.keyring;
         return layeredIconShape(area, layers, stack.place, wasBody ? [] : stack.ids, current.id, wasBody ? { ...current, name: stack.name } : current, keyring);
       })()
         .then((next) => {
           if (iconLayerRequestRef.current !== request || !shapesRef.current.some((shape) => shape.id === next.id)) return;
+          if (wanted.patch.keyringTab) {
+            // A key ring tab of its own beside the tag, in the bottom layer's colour and height (#598).
+            const bottom = layers[layers.length - 1];
+            const tab = keyringTabShape(next, { color: bottom.color, height: bottom.height, elevation: stack.place.elevation }, stack.keyring?.diameter ?? DEFAULT_KEYRING_DIAMETER, t("nameTag.keyringTab"));
+            commitShapes([...shapesRef.current.map((shape) => (shape.id === next.id ? next : shape)), tab], [tab.id], t("status.keyringTabMade"));
+            return;
+          }
           commitShapes(
             shapesRef.current.map((shape) => (shape.id === next.id ? next : shape)),
             [next.id],
@@ -14602,6 +14633,7 @@ export function LayerlingEditor({
           onWrapAroundCylinder={selectedShapes.length === 1 && offersCylinderWrap(selectedShape) ? wrapSelectionAroundCylinder : undefined}
           onLayerText={selectedShapes.length === 1 && offersTextLayers(selectedShape) ? layerSelectedText : undefined}
           onTextTags={selectedShapes.length === 1 && offersTextLayers(selectedShape) ? makeTextTags : undefined}
+          onBundleKeyringTab={selectedShapes.length === 1 && selectedShape?.keyringTab && !historyViewState ? bundleKeyringTab : undefined}
           textLayerStack={selectedNameTag}
           iconTag={historyViewState ? null : iconTagControls}
           qrCode={historyViewState ? null : qrCodeControls}

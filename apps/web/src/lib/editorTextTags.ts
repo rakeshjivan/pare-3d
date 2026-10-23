@@ -7,6 +7,7 @@ import { nameTagOffsets, textLayerShapes, textLayersOf, type NameTagKeyring, typ
 import { textLetterSize, textLetterSizePatch } from "@/lib/nameTag";
 import { ICON_TAG_LAYERS, iconLayerElevations, iconLayerKeyrings, iconLayerProfile, iconLayersOf, iconSourceProfile, iconTagGrid, isIconLayerBody, MAX_ICON_TAG_WIDTH, MIN_ICON_TAG_WIDTH, normalizeIconTagCount, scaledIconProfile, type IconLayerStack, type IconTagPlace } from "@/lib/iconTag";
 import { shapeBedFootprint } from "@/lib/printBed";
+import { KEYRING_HOLE_EDGE_DISTANCE, keyringEarRadius } from "@/lib/textGeometry";
 import { canonicalizeShape, cloneWorkplaneShapeTreeWithFreshIds, shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
 import { createLocalId } from "@/lib/localIds";
 import { importedShapeFromSvg } from "@/lib/svgImport";
@@ -192,4 +193,79 @@ export async function svgIconArea(fileName: string, text: string, width: number)
 export async function iconTagFromSvg(fileName: string, text: string, width: number): Promise<WorkplaneShape> {
   const { area, name } = await svgIconArea(fileName, text, width);
   return layeredIconShape(area, ICON_TAG_LAYERS, { x: 0, z: 0, elevation: 0, rotation: 0, rotationX: 0, rotationZ: 0 }, [], createLocalId("icon-tag"), { locked: false, hidden: false, name });
+}
+
+/**
+ * A key ring tab of its own (#598), for "Free" on the name tag and the icon tag: a plain group -
+ * a capsule with the key ring hole cut through its round end - in the bottom layer's colour and
+ * height, standing on the tag's floor. It is moved and turned like any other shape and pushed
+ * onto the tag's edge; nothing links the two. Its measures are the side tab's (#215): as wide as
+ * the hole and a 1.75 mm wall either side, the hole's middle `diameter / 2 + 2` mm from where the
+ * plate would end and the straight part reaching half the tab's width further in. It starts on
+ * the left of the tag, pointing left, its hole's edge 2 mm beyond the tag's box.
+ */
+export function keyringTabShape(tag: WorkplaneShape, bottom: { color: string; height: number; elevation: number }, diameter: number, name: string): WorkplaneShape {
+  const footprint = shapeBedFootprint(tag);
+  const radius = keyringEarRadius(diameter);
+  const holeX = footprint.minX - KEYRING_HOLE_EDGE_DISTANCE - diameter / 2;
+  const holeZ = (footprint.minZ + footprint.maxZ) / 2;
+  // From the far side of the round end to half the tab's width inside the plate.
+  const inner = footprint.minX + radius;
+  const length = inner - (holeX - radius);
+  const round = (value: number) => Math.round(value * 1000) / 1000;
+  const base = { rotation: 0, locked: false, hidden: false, elevation: round(bottom.elevation), height: round(bottom.height) };
+  const capsule = canonicalizeShape({
+    ...base,
+    id: createLocalId("keyring-tab"),
+    name,
+    kind: "slot",
+    color: bottom.color,
+    hole: false,
+    x: round(holeX - radius + length / 2),
+    z: round(holeZ),
+    width: round(length),
+    depth: round(2 * radius),
+    size: round(length),
+  });
+  const hole = canonicalizeShape({
+    ...base,
+    id: createLocalId("keyring-hole"),
+    name: "Hole",
+    kind: "cylinder",
+    color: bottom.color,
+    hole: true,
+    x: round(holeX),
+    z: round(holeZ),
+    width: diameter,
+    depth: diameter,
+    size: diameter,
+  });
+  const group = groupedShape([capsule, hole]);
+  if (!group) throw new Error("Could not build the key ring tab");
+  return canonicalizeShape({ ...group, id: createLocalId("keyring-tab"), name, color: bottom.color, keyringTab: true });
+}
+
+/**
+ * The tag a key ring tab (#598) is held together with when its panel's button is pressed: the
+ * nearest name tag or icon tag that is neither locked nor hidden, measured between the middles
+ * of their footprints. null when there is none.
+ */
+export function keyringTabTag(tab: WorkplaneShape, shapes: readonly WorkplaneShape[]): WorkplaneShape | null {
+  const middle = (shape: WorkplaneShape) => {
+    const footprint = shapeBedFootprint(shape);
+    return { x: (footprint.minX + footprint.maxX) / 2, z: (footprint.minZ + footprint.maxZ) / 2 };
+  };
+  const from = middle(tab);
+  let best: WorkplaneShape | null = null;
+  let bestDistance = Infinity;
+  for (const shape of shapes) {
+    if (shape.id === tab.id || shape.locked || shape.hidden || shape.groupOperation !== "bundle" || !(shape.layeredText || shape.layeredIcon)) continue;
+    const to = middle(shape);
+    const distance = Math.hypot(to.x - from.x, to.z - from.z);
+    if (distance < bestDistance) {
+      best = shape;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }
