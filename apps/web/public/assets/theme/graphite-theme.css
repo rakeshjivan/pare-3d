@@ -1867,6 +1867,10 @@ html[data-theme="dark"]:where([data-palette="graphite"]) .shell-openings-summary
   border: 1px solid #dddddd;
 }
 
+:where(html[data-theme="dark"][data-palette="graphite"]) .shape-menu-item .shape-menu-thumb::after {
+  background: var(--shape-default-color);
+}
+
 :where(html[data-theme="dark"][data-palette="graphite"]) .shape-menu-dropdown:not(.sketch-shape-menu-dropdown) {
   --shape-menu-columns: 4;
   --shape-menu-width: calc(var(--shape-menu-columns) * 210px + (var(--shape-menu-columns) - 1) * 4px + 34px);

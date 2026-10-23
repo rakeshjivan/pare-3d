@@ -3139,4 +3139,6 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "workspace.simpleMode": "Egyszerű mód",
   "workspace.simpleModeHint": "Gyerekeknek és kezdőknek: kevesebb eszköz, rövid alakzatlista, nagyobb gombok és a layerlingből kivezető hivatkozások nélküli kezdőoldal.",
   "workspace.simpleModeOff": "Tartsa nyomva az egyszerű mód kikapcsolásához",
+  "workspace.shapeColors": "Alakzatok színesen",
+  "workspace.shapeColorsHint": "Az alakzatkönyvtár képei azt a színt mutatják, amellyel egy új alakzat kezdődik. Kapcsolja ki a szürke képekért.",
 };

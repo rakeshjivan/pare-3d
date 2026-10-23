@@ -3645,4 +3645,6 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "workspace.simpleMode": "Jednoduchý režim",
   "workspace.simpleModeHint": "Pro děti a začátečníky: méně nástrojů, krátký seznam tvarů, větší tlačítka a úvodní stránka bez odkazů mimo layerling.",
   "workspace.simpleModeOff": "Podržte pro vypnutí jednoduchého režimu",
+  "workspace.shapeColors": "Tvary v barvě",
+  "workspace.shapeColorsHint": "Obrázky v knihovně tvarů ukazují barvu, kterou nový tvar dostane. Vypněte pro šedé obrázky.",
 };

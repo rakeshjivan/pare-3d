@@ -300,5 +300,47 @@
       "sl": "Nastavitev velikosti orodne vrstice (majhna, srednja, velika) zdaj pomanjša ali poveča tudi ploščo lastnosti desno, ne le trak zgoraj in upravljanje kamere levo.",
       "tr": "Araç çubuğu boyutu ayarı (küçük, orta, büyük) artık yalnızca üstteki şeridi ve soldaki kamera kontrollerini değil, sağdaki özellikler panelini de küçültüp büyütüyor."
     }
+  },
+  {
+    "title": {
+      "de": "Gruppen im STEP-Export",
+      "en": "Groups in the STEP export",
+      "hu": "Csoportok a STEP-exportban"
+    },
+    "body": {
+      "de": "Eine Gruppe, etwa ein Würfel mit Gewindeloch, fehlte bisher im STEP, und es kam nur die Schraube heraus. Jetzt geht die Gruppe als die genauen Körper mit, die sie enthält, und ihre Löcher schneiden nur ihre eigenen Körper.",
+      "en": "A group, a block with a tapped hole say, was missing from the STEP, and only the screw came out. Now the group goes along as the exact bodies it holds, and its holes cut only its own bodies.",
+      "hu": "Egy csoport, például egy menetes furatú kocka, eddig hiányzott a STEP-ből, és csak a csavar került ki. Most a csoport a benne lévő pontos testekként kerül az exportba, és a lyukai csak a saját testeit vágják."
+    }
+  },
+  {
+    "title": {
+      "de": "Formenbibliothek in Farbe",
+      "en": "The shape library in colour"
+    },
+    "body": {
+      "de": "Die Bilder in der Formenbibliothek tragen jetzt die Farbe, in der die Form eingefügt wird: ein roter Quader, ein oranger Zylinder, eine blaue Kugel. Wer die grauen Bilder lieber mag, schaltet „Formen in Farbe“ in den Arbeitsbereich-Einstellungen aus.",
+      "en": "The pictures in the shape library now wear the colour the shape is added in: a red box, an orange cylinder, a blue sphere. If you prefer the grey pictures, switch off \"Shapes in colour\" in the workspace settings."
+    }
+  },
+  {
+    "title": {
+      "de": "Der Ansichtswürfel dreht sanft",
+      "en": "The view cube turns smoothly"
+    },
+    "body": {
+      "de": "Ein Klick auf eine Fläche, Kante oder Ecke des Ansichtswürfels lässt die Kamera jetzt in etwa einer Drittelsekunde dorthin drehen, statt zu springen. Ein Zug mit der Maus oder dem Finger beendet die Drehung sofort; wer Bewegung reduziert hat, bekommt weiter den Sprung.",
+      "en": "A click on a face, edge or corner of the view cube now turns the camera there in about a third of a second instead of jumping. A drag with the mouse or a finger ends the turn at once; if your system is set to reduce motion, you still get the jump."
+    }
+  },
+  {
+    "title": {
+      "de": "Texthöhe bleibt bei „Proportionen beibehalten“ frei",
+      "en": "A text's height ignores \"Keep proportions\""
+    },
+    "body": {
+      "de": "Mit „Proportionen beibehalten“ änderte die Eingabe der Höhe eines Textes auch Breite und Tiefe, also die Schriftgröße. Die Höhe eines Textes ist nur die Dicke der Buchstaben und bleibt jetzt außen vor.",
+      "en": "With \"Keep proportions\" on, typing a text's height also changed its width and depth, and with them the letter size. A text's height is only the thickness of its letters and is now left out."
+    }
   }
 ]

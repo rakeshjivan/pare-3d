@@ -62,6 +62,7 @@ function cameraViewOf(state: ThreeState): DesignView {
 }
 
 function applyCameraView(state: ThreeState, view: DesignView) {
+  state.cameraTurn = null;
   state.camera.up.fromArray(view.up);
   state.camera.position.fromArray(view.position);
   state.controls.target.fromArray(view.target);

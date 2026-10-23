@@ -3624,4 +3624,6 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "workspace.simpleMode": "Preprosti način",
   "workspace.simpleModeHint": "Za otroke in začetnike: manj orodij, kratek seznam oblik, večji gumbi in začetna stran brez povezav ven iz layerlinga.",
   "workspace.simpleModeOff": "Pridržite za izklop preprostega načina",
+  "workspace.shapeColors": "Oblike v barvi",
+  "workspace.shapeColorsHint": "Slike v knjižnici oblik kažejo barvo, v kateri se nova oblika začne. Izklopite za sive slike.",
 };

@@ -1,6 +1,7 @@
 
 import { Crosshair, Eye, EyeOff, Plus, Rows3, X } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
+import type { CameraTurn } from "@/lib/viewCubeTransition";
 import * as THREE from "three";
 import { disposeBoundsTree } from "three-mesh-bvh";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -91,6 +92,8 @@ export type ThreeState = {
   animationId: number;
   needsRender: boolean;
   wasCameraMoving: boolean;
+  /** The view cube turn under way: the camera eases to the clicked face instead of jumping. */
+  cameraTurn?: CameraTurn | null;
   lastOverlaySync: number;
   lastViewCubeSync: number;
   /** True while a handle of the align tool shows its preview: the drawn parts have moved then (#235). */

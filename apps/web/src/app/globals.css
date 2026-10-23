@@ -4747,6 +4747,42 @@ html[data-theme="dark"] .shell-openings-summary {
   font-size: 0.85em;
 }
 
+/* The colour a library entry lands in: its own, or the colour its kind saves in the shape defaults.
+   The grey icon keeps its shading; a colour layer masked by the icon's outline multiplies over it. */
+.shape-menu-item .shape-menu-thumb {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  max-width: none;
+  isolation: isolate;
+  pointer-events: none;
+}
+
+.shape-menu-item .shape-menu-thumb img {
+  display: block;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.shape-menu-item .shape-menu-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--shape-default-color);
+  -webkit-mask: var(--shape-icon) center / contain no-repeat;
+  mask: var(--shape-icon) center / contain no-repeat;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+/* The setting "Shapes in colour" (lib/shapeColors.ts): off leaves the grey pictures. */
+html[data-shape-colors="off"] .shape-menu-item .shape-menu-thumb::after {
+  display: none;
+}
+
 /* Custom shapes above the basic shapes (#109). Both scroll together in the
    menu body, so the library list itself no longer scrolls on its own there. */
 .shape-menu-body {
@@ -4844,7 +4880,7 @@ html[data-toolbar-size="large"] .shape-menu-dropdown:not(.sketch-shape-menu-drop
   padding: 5px;
 }
 
-.shape-menu-icons-only .shape-menu-item > span:not(.my-shape-no-preview) {
+.shape-menu-icons-only .shape-menu-item > span:not(.my-shape-no-preview):not(.shape-menu-thumb) {
   display: none;
 }
 

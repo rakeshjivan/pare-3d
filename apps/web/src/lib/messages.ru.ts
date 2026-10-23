@@ -3633,4 +3633,6 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "workspace.simpleMode": "Простой режим",
   "workspace.simpleModeHint": "Для детей и начинающих: меньше инструментов, короткий список фигур, крупные кнопки и стартовая страница без ссылок за пределы layerling.",
   "workspace.simpleModeOff": "Удерживайте, чтобы выключить простой режим",
+  "workspace.shapeColors": "Цветные фигуры",
+  "workspace.shapeColorsHint": "Картинки в библиотеке фигур показывают цвет, с которым появится новая фигура. Выключите, чтобы картинки были серыми.",
 };

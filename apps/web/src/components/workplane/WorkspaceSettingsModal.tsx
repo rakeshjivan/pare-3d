@@ -12,6 +12,8 @@ import { HexColorInput, HexColorPicker } from "react-colorful";
 import { APP_THEME_CHOICES, type AppThemePreference } from "@/lib/appTheme";
 import { setToolbarSize, TOOLBAR_SIZE_OPTIONS, type ToolbarSize } from "@/lib/toolbarSize";
 import { useToolbarSize } from "@/lib/useToolbarSize";
+import { useShapeColors } from "@/lib/useShapeColors";
+import { setShapeColors } from "@/lib/shapeColors";
 import { useViewCubePosition } from "@/lib/useViewCubePosition";
 import { setViewCubePosition, VIEW_CUBE_POSITION_OPTIONS, type ViewCubePosition } from "@/lib/viewCubePosition";
 import { gearCenterHoleLimits, gearToothPitch, gearTypeHasHelix, MAX_GEAR_TEETH, MIN_GEAR_TEETH } from "@/lib/gearGeometry";
@@ -484,6 +486,7 @@ export function WorkspaceSettingsModal({
     }
   };
   const toolbarSize = useToolbarSize();
+  const shapeColors = useShapeColors();
   const viewCubePosition = useViewCubePosition();
   const [selectedShapeKind, setSelectedShapeKind] = useState<ShapeKind>(toolbarShapeAssets[0].kind);
   const [dimensionDrafts, setDimensionDrafts] = useState(() => ({
@@ -795,6 +798,12 @@ export function WorkspaceSettingsModal({
                       ))}
                     </select>
                   </label>
+                  <WorkspaceToggle
+                    label={t("workspace.shapeColors")}
+                    description={t("workspace.shapeColorsHint")}
+                    checked={shapeColors}
+                    onChange={setShapeColors}
+                  />
                   <label className="workspace-select view-cube-position-setting" data-help={t("workspace.viewCubePosition")}>
                     <span>{t("workspace.viewCubePosition")}</span>
                     <select

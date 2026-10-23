@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ShapeAsset } from "@/types/layerling";
-import { clipboardShape, makeShapeFromAsset, parseDroppedShapeAsset, sceneShape, toolbarShapeAssets } from "@/lib/shapeCatalog";
+import { clipboardShape, makeShapeFromAsset, parseDroppedShapeAsset, sceneShape, shapeAssetColor, toolbarShapeAssets } from "@/lib/shapeCatalog";
 
 describe("shape catalog", () => {
   it("exposes roundedBox directly after box in the toolbar catalog", () => {
@@ -328,5 +328,19 @@ describe("clipboardShape (#642)", () => {
     expect(pasted?.elevation).toBe(0);
     expect(clipboardShape({ name: "Box", kind: "box" })).toBeNull();
     expect(clipboardShape("box")).toBeNull();
+  });
+});
+
+describe("the colour the library shows", () => {
+  const box = toolbarShapeAssets.find((asset) => asset.id === "box")!;
+
+  it("is the asset's own until the shape defaults name another", () => {
+    expect(shapeAssetColor(box)).toBe(box.color);
+    expect(shapeAssetColor(box, { color: "#123456" })).toBe("#123456");
+  });
+
+  it("is the same colour the shape is added in", () => {
+    expect(makeShapeFromAsset(box).color).toBe(box.color);
+    expect(makeShapeFromAsset(box, undefined, { color: "#123456" }).color).toBe("#123456");
   });
 });

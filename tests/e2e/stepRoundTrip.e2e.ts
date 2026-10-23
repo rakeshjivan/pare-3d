@@ -259,6 +259,32 @@ describe("STEP export round-trip (real OCCT kernel)", () => {
     expect(near(await reimportVolume(blob), expected, 1e-4)).toBe(true);
   });
 
+  it("exports a group as the bodies it holds, its holes cutting only its own solids (#709)", async () => {
+    const { threadNaturalFootprint, threadNaturalHeight, threadSettings } = await import("@/lib/threadGeometry");
+    const { cadModifierThreadForShape } = await import("@/lib/cadProfileExtrusion");
+    const { threadPartSolid } = await import("@/lib/threadSolid");
+    const { occtKernel } = await import("@/lib/brepKernel");
+    const thread = (overrides: Partial<WorkplaneShape>) => {
+      const fields = { threadDiameter: 6, threadPitch: 1, ...overrides } as WorkplaneShape;
+      const settings = threadSettings(fields);
+      const footprint = threadNaturalFootprint(settings);
+      return shape({ kind: "thread", width: footprint.width, depth: footprint.depth, size: footprint.width, height: threadNaturalHeight(settings), ...overrides });
+    };
+    // A block with a tapped hole, grouped; a screw stands in the same place outside the group.
+    const block = shape({ kind: "box", name: "Block", x: 0, width: 20, depth: 20, height: 12 });
+    const tapped = thread({ name: "Tapped hole", threadRole: "bore", hole: true, x: 0, height: 12 });
+    const group = shape({ kind: "mesh", name: "Group", x: 40, width: 20, depth: 20, height: 12, groupedShapes: [block, tapped] });
+    const screw = thread({ name: "Screw", threadRole: "rod", x: 40 });
+
+    const { blob, exportedCount, skipped } = await exportShapesToStep([group, screw]);
+    expect(skipped).toEqual([]);
+    expect(exportedCount).toBe(2);
+    const kernel = occtKernel()!;
+    const volume = (source: WorkplaneShape) => kernel.getVolume(threadPartSolid(kernel, cadModifierThreadForShape(source)!));
+    const expected = 20 * 20 * 12 - volume(tapped) + volume(screw);
+    expect(near(await reimportVolume(blob), expected, 1e-4)).toBe(true);
+  });
+
   it("exports springs as their exact bodies, round wire and all", async () => {
     const { springBuildPlan } = await import("@/lib/springGeometry");
     const plain = shape({ kind: "spring", name: "Spring", x: -30, width: 20, depth: 20, height: 30, springTurns: 6, springWire: 3 });

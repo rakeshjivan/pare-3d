@@ -318,6 +318,15 @@ export const qrCodeAsset: ToolbarShapeAsset = {
 export const libraryShapeAssets: ToolbarShapeAsset[] = toolbarShapeAssets.flatMap((asset) => (asset.id === "text" ? [asset, nameTagAsset, iconTagAsset, qrCodeAsset] : asset.id === "doubleCountersink" ? [] : [asset]));
 
 /**
+ * The colour a new shape of this asset starts with: the asset's own, unless the shape
+ * defaults saved for its kind name another. The library shows the same colour beside each
+ * entry, so the list tells what will land on the workplane.
+ */
+export function shapeAssetColor(asset: ShapeAsset, customization: ShapeCustomization = {}): string {
+  return customization.color ?? asset.color;
+}
+
+/**
  * Kinds a shape dragged from the library may have. Taken from the library
  * itself: a hand-kept list here missed the rounded box and the ruler, and
  * dragging them onto the workplane silently did nothing (#100).
@@ -865,7 +874,7 @@ export function makeShapeFromAsset(
     id: createLocalId(asset.id),
     name: asset.name,
     kind: asset.kind,
-    color: customization.color ?? asset.color,
+    color: shapeAssetColor(asset, customization),
     hole: asset.hole,
     x: point?.x ?? 0,
     z: point?.z ?? 0,

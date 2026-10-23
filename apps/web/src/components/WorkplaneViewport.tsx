@@ -52,6 +52,7 @@ import {
   type ViewCubeDrag,
   type ViewCubeFace,
 } from "@/lib/viewCubeDrag";
+import { cameraTurn, cameraTurnOffset, prefersReducedMotion } from "@/lib/viewCubeTransition";
 import { createGearGeometry } from "@/lib/gearGeometry";
 import { createStarGeometry } from "@/lib/starGeometry";
 import { createHeartGeometry } from "@/lib/heartGeometry";
@@ -60,6 +61,7 @@ import { createSlotGeometry } from "@/lib/slotGeometry";
 import { createDovetailGeometry } from "@/lib/dovetailGeometry";
 import { createLoftGeometry } from "@/lib/loftGeometry";
 import { carriedOntoFace } from "@/lib/carryOntoFace";
+import { keepsProportionsOnAxis } from "@/lib/keepProportions";
 import { createHingeGeometry } from "@/lib/hingeGeometry";
 import { createGridfinityGeometry, gridfinityFootprintPatch } from "@/lib/gridfinityGeometry";
 import { createKnurlGeometry } from "@/lib/knurlGeometry";
@@ -603,7 +605,7 @@ function patchWithKeptProportions(
   patch: Partial<WorkplaneShape>,
   axis: ShapeInspectorUpdateOptions["resizeAxis"],
 ): Partial<WorkplaneShape> {
-  if (!axis || "x" in patch || "z" in patch || "elevation" in patch) return patch;
+  if (!keepsProportionsOnAxis(shape, axis) || "x" in patch || "z" in patch || "elevation" in patch) return patch;
   const draft = { ...shape, ...patch } as WorkplaneShape;
   const before = axis === "width" ? shapeWidth(shape) : axis === "depth" ? shapeDepth(shape) : shape.height;
   const after = axis === "width" ? shapeWidth(draft) : axis === "depth" ? shapeDepth(draft) : draft.height;
@@ -4685,15 +4687,15 @@ export function WorkplaneViewport({
       renderFrame(state);
       return thumbnailPngDataUrl(state.renderer.domElement);
     };
-    window.layerlingOrbitView = (azimuthDegrees, polarDegrees) => { orbitViewBy(state, azimuthDegrees, polarDegrees); state.needsRender = true; };
-    window.layerlingPanView = (rightFraction, upFraction) => { panViewBy(state, rightFraction, upFraction); state.needsRender = true; };
+    window.layerlingOrbitView = (azimuthDegrees, polarDegrees) => { state.cameraTurn = null; orbitViewBy(state, azimuthDegrees, polarDegrees); state.needsRender = true; };
+    window.layerlingPanView = (rightFraction, upFraction) => { state.cameraTurn = null; panViewBy(state, rightFraction, upFraction); state.needsRender = true; };
     window.layerlingCaptureView = (face = "current") => {
       if (face === "home") {
         resetCamera(state);
       } else if (face !== "current") {
         const direction = viewDirectionFromName(face);
         if (!direction) throw new Error(`Unknown view "${face}": use a face, or two or three neighbouring faces joined with "-", like "front-right-top"`);
-        setCameraToViewDirection(state, direction);
+        setCameraToViewDirection(state, direction, false);
       }
       syncViewCube(state, viewCubeRef.current);
       fitCameraDepthRange(state.camera, state.controls.target);
@@ -4789,6 +4791,7 @@ export function WorkplaneViewport({
     const animate = () => {
       state.animationId = window.requestAnimationFrame(animate);
       const now = performance.now();
+      const turning = stepCameraTurn(state, now);
       const controlsChanged = state.controls.update();
       fitCameraDepthRange(state.camera, state.controls.target);
       const cameraSettled = state.wasCameraMoving && !controlsChanged;
@@ -4796,7 +4799,7 @@ export function WorkplaneViewport({
       const adapt = adaptiveResolution(state, state.renderer.domElement);
       const wantLow = adapt.base > 1 && now - adapt.lastMotion < ADAPTIVE_SETTLE_MS;
       const restorePending = adapt.low && !wantLow;
-      if (!controlsChanged && !state.needsRender && !cameraSettled && !restorePending) {
+      if (!turning && !controlsChanged && !state.needsRender && !cameraSettled && !restorePending) {
         return;
       }
       if (wantLow !== adapt.low) {
@@ -4809,7 +4812,7 @@ export function WorkplaneViewport({
       // can read the previous matrix unless we force the matrix world current here.
       // Removing this brings back the one-frame-late handle/line lag during camera motion.
       state.camera.updateMatrixWorld();
-      if (now - state.lastViewCubeSync > 48 || cameraSettled || state.needsRender) {
+      if (turning || now - state.lastViewCubeSync > 48 || cameraSettled || state.needsRender) {
         syncViewCube(state, viewCubeRef.current);
         state.lastViewCubeSync = now;
       }
@@ -8900,6 +8903,7 @@ export function WorkplaneViewport({
   const focusSelection = useCallback((ids?: readonly string[], margin = 1): boolean => {
     const state = threeRef.current;
     if (!state) return false;
+    state.cameraTurn = null;
     // The real selection, not renderSelectionIds: the workplane and edge tools hide
     // the outline while they are open, but the objects are still what to look at.
     const bounds = new THREE.Box3();
@@ -9032,6 +9036,7 @@ export function WorkplaneViewport({
     if (!state) {
       return;
     }
+    state.cameraTurn = null;
     orbitCameraByDrag(state, move.dx, move.dy);
     syncViewCube(state, viewCubeRef.current);
   }, []);
@@ -9065,6 +9070,7 @@ export function WorkplaneViewport({
     if (!state) {
       return;
     }
+    state.cameraTurn = null;
 
     const scaled = zoomDistanceScale(scale);
     if (scaled < 1) movePivotToDepthUnder(state, 0, 0);
@@ -10673,6 +10679,11 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     wheelDeltaOverride = null;
   };
   controls.addEventListener("change", requestRender);
+  // Any camera input (drag, wheel, touch) takes over from a view cube turn that is still running.
+  const cancelCameraTurn = () => {
+    state.cameraTurn = null;
+  };
+  controls.addEventListener("start", cancelCameraTurn);
   SAFARI_GESTURES.forEach((name) => renderer.domElement.addEventListener(name, preventSafariGesture));
   renderer.domElement.addEventListener("pointerdown", configureLayerlingMouseButtons, { capture: true });
   renderer.domElement.addEventListener("pointerup", resetLayerlingMouseButtons);
@@ -10693,6 +10704,7 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     renderer.domElement.removeEventListener("wheel", countWheelNotch, { capture: true });
     renderer.domElement.removeEventListener("wheel", endWheelNotch);
     controls.removeEventListener("change", requestRender);
+    controls.removeEventListener("start", cancelCameraTurn);
     renderer.domElement.removeEventListener("pointerdown", configureLayerlingMouseButtons, { capture: true });
     renderer.domElement.removeEventListener("pointerup", resetLayerlingMouseButtons);
     renderer.domElement.removeEventListener("pointercancel", resetLayerlingMouseButtons);
@@ -10785,6 +10797,7 @@ function animateCamera(state: ThreeState, change: () => void, onFrame?: () => vo
 }
 
 function resetCamera(state: ThreeState) {
+  state.cameraTurn = null;
   state.focusReach = null;
   state.camera.up.set(0, 1, 0);
   state.camera.position.copy(CAMERA_HOME);
@@ -10828,6 +10841,7 @@ function updateOrthographicFrustum(camera: THREE.OrthographicCamera, aspect: num
 }
 
 function toggleCameraProjection(state: ThreeState) {
+  state.cameraTurn = null;
   const current = state.camera;
   const target = state.controls.target;
   const canvas = state.renderer.domElement;
@@ -10885,10 +10899,19 @@ function setCameraToViewFace(state: ThreeState, face: ViewCubeFace) {
 }
 
 /** Looks at the orbit target from a unit direction, keeping the distance: a face, an edge or a corner of the view cube. */
-function setCameraToViewDirection(state: ThreeState, direction: THREE.Vector3) {
+function setCameraToViewDirection(state: ThreeState, direction: THREE.Vector3, animate = true) {
   const offset = state.camera.position.clone().sub(state.controls.target);
   const distance = clamp(offset.length(), CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE);
 
+  if (animate && !prefersReducedMotion()) {
+    // A click on the cube turns the view; the render loop eases the camera there and keeps
+    // drawing while it does. A second click starts from wherever the first has got to.
+    state.cameraTurn = cameraTurn(offset, direction.clone().normalize().multiplyScalar(distance), performance.now());
+    state.needsRender = true;
+    return;
+  }
+
+  state.cameraTurn = null;
   state.camera.up.set(0, 1, 0);
   state.camera.position.copy(state.controls.target).add(direction.multiplyScalar(distance));
   state.camera.lookAt(state.controls.target);
@@ -10897,8 +10920,22 @@ function setCameraToViewDirection(state: ThreeState, direction: THREE.Vector3) {
   state.needsRender = true;
 }
 
+/** One frame of the view cube turn, before OrbitControls orients the camera. */
+function stepCameraTurn(state: ThreeState, now: number): boolean {
+  const turn = state.cameraTurn;
+  if (!turn) return false;
+  const { offset, done } = cameraTurnOffset(turn, now);
+  state.camera.up.set(0, 1, 0);
+  state.camera.position.copy(state.controls.target).add(offset);
+  state.camera.lookAt(state.controls.target);
+  state.camera.updateProjectionMatrix();
+  if (done) state.cameraTurn = null;
+  return true;
+}
+
 /** Orbits the camera around the controls target for a drag on the view cube. */
 function orbitCameraByDrag(state: ThreeState, dx: number, dy: number) {
+  state.cameraTurn = null;
   const offset = orbitOffsetByDrag(state.camera.position.clone().sub(state.controls.target), dx, dy);
 
   state.camera.up.set(0, 1, 0);

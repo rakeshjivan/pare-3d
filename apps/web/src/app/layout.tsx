@@ -10,6 +10,7 @@ import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistratio
 import { DOM_MUTATION_GUARD_SCRIPT } from "@/lib/domMutationGuard";
 import { LANGUAGE_BOOT_SCRIPT } from "@/lib/i18n";
 import { LANGUAGES } from "@/lib/languages";
+import { SHAPE_COLORS_BOOT_SCRIPT } from "@/lib/shapeColors";
 import { TOOLBAR_SIZE_BOOT_SCRIPT } from "@/lib/toolbarSize";
 import { VIEW_CUBE_POSITION_BOOT_SCRIPT } from "@/lib/viewCubePosition";
 
@@ -101,6 +102,7 @@ export default function RootLayout({
         {/* Before any of React's scripts: a page rearranged by Translate must not crash it (#186). */}
         <script dangerouslySetInnerHTML={{ __html: DOM_MUTATION_GUARD_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: TOOLBAR_SIZE_BOOT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: SHAPE_COLORS_BOOT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: VIEW_CUBE_POSITION_BOOT_SCRIPT }} />
       </head>
       <body suppressHydrationWarning>
