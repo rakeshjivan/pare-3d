@@ -3654,6 +3654,8 @@ export const MESSAGES_EN = {
   "sketch.sweepAnchorLeft": "On the path: left edge",
   "sketch.sweepAnchorRight": "On the path: right edge",
   "status.sketchSweepAnchorChanged": "{anchor}. Finish the sketch to build the body",
+  "faceTool.separate": "As a body of its own (not grouped)",
+  "faceTool.separateHint": "The new part stands beside the body instead of in a group with it: you can resize it, move it or use it to cut right away. Without the switch it is grouped.",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

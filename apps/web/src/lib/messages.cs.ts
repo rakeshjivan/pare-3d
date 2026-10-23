@@ -3652,4 +3652,6 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "sketch.sweepAnchorLeft": "Na dráze: levý okraj",
   "sketch.sweepAnchorRight": "Na dráze: pravý okraj",
   "status.sketchSweepAnchorChanged": "{anchor}. Dokonči náčrt a těleso se postaví",
+  "faceTool.separate": "Jako samostatné těleso (neseskupené)",
+  "faceTool.separateHint": "Nová část stojí vedle tělesa, ne s ním ve skupině: můžete ji hned zvětšit či zmenšit, posunout nebo s ní řezat. Bez přepínače je seskupená.",
 };

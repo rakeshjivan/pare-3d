@@ -3653,4 +3653,6 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "sketch.sweepAnchorLeft": "Auf dem Pfad: linke Kante",
   "sketch.sweepAnchorRight": "Auf dem Pfad: rechte Kante",
   "status.sketchSweepAnchorChanged": "{anchor}. Schließe die Skizze ab, um den Körper zu bauen",
+  "faceTool.separate": "Als eigener Körper (nicht gruppiert)",
+  "faceTool.separateHint": "Das neue Teil steht neben dem Körper statt mit ihm in einer Gruppe: Du kannst es gleich in der Größe ändern, verschieben oder damit schneiden. Ohne den Schalter wird es gruppiert.",
 };

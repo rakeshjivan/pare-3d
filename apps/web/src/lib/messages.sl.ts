@@ -3631,4 +3631,6 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "sketch.sweepAnchorLeft": "Na poti: levi rob",
   "sketch.sweepAnchorRight": "Na poti: desni rob",
   "status.sketchSweepAnchorChanged": "{anchor}. Dokončaj skico, da se zgradi telo",
+  "faceTool.separate": "Kot samostojno telo (ni združeno)",
+  "faceTool.separateHint": "Novi del stoji ob telesu, ne v skupini z njim: takoj mu lahko spremeniš velikost, ga premakneš ali z njim rezkaš. Brez stikala je združen.",
 };

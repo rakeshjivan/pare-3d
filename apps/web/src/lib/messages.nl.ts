@@ -3653,4 +3653,6 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "sketch.sweepAnchorLeft": "Op het pad: linkerrand",
   "sketch.sweepAnchorRight": "Op het pad: rechterrand",
   "status.sketchSweepAnchorChanged": "{anchor}. Rond de schets af om het lichaam te bouwen",
+  "faceTool.separate": "Als een eigen lichaam (niet gegroepeerd)",
+  "faceTool.separateHint": "Het nieuwe deel staat naast het lichaam in plaats van er in een groep mee: je kunt het meteen een andere maat geven, verplaatsen of ermee snijden. Zonder de schakelaar wordt het gegroepeerd.",
 };

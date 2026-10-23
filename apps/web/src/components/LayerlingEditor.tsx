@@ -8713,6 +8713,18 @@ export function LayerlingEditor({
       setNotice(t("faceTool.empty"));
       return;
     }
+    const createdMessage = t(tool.settings.direction === "in" ? "status.faceToolPocketCreated" : "status.faceToolCreated", { depth: Number(faceToolSettingsOn(tool.face, tool.settings).depth.toFixed(2)) });
+    if (tool.settings.separate) {
+      // As a part of its own (#750): beside the body, not grouped with it, ready to be resized, moved or used to cut.
+      if (projectInfoRef.current.projectId !== sourceProjectId || projectShapesFingerprint(shapesRef.current) !== sourceFingerprint) {
+        setFaceTool(null);
+        setNotice(t("status.groupChanged"));
+        return;
+      }
+      setFaceTool(null);
+      commitShapes([...shapesRef.current, body], body.id, createdMessage);
+      return;
+    }
     const result = await buildGroupedShapeFromSelection([source, body], workspaceSettingsRef.current.booleanTriangleLimit);
     if (projectInfoRef.current.projectId !== sourceProjectId || projectShapesFingerprint(shapesRef.current) !== sourceFingerprint) {
       setFaceTool(null);
@@ -8729,7 +8741,7 @@ export function LayerlingEditor({
     commitShapes(
       [...shapesRef.current.filter((shape) => shape.id !== source.id), editableGroup],
       editableGroup.id,
-      t(tool.settings.direction === "in" ? "status.faceToolPocketCreated" : "status.faceToolCreated", { depth: Number(faceToolSettingsOn(tool.face, tool.settings).depth.toFixed(2)) }),
+      createdMessage,
     );
   }, [commitShapes, faceTool]);
 
@@ -11230,6 +11242,7 @@ export function LayerlingEditor({
           inset: mcpNumber(params.inset, 0),
           radius: mcpNumber(params.radius, 0),
           depth: mcpNumber(params.depth, DEFAULT_FACE_TOOL.depth),
+          separate: params.separate === true,
         });
         const read = readPerforableFace(worldTrianglePositions(target), point, normal);
         if (!read.ok) throw new Error(read.reason === "curved" ? "That face is curved; push_face needs a flat face" : "push_face found no flat face there");
@@ -11240,6 +11253,18 @@ export function LayerlingEditor({
           color: target.color,
         });
         if (!body) throw new Error("The inset leaves nothing of that face; make it smaller");
+        const pushedMessage = t(settings.direction === "in" ? "status.faceToolPocketCreated" : "status.faceToolCreated", { depth: Number(faceToolSettingsOn(read.face, settings).depth.toFixed(2)) });
+        if (settings.separate) {
+          if (projectInfoRef.current.projectId !== sourceProjectId || projectShapesFingerprint(currentShapes()) !== sourceFingerprint) {
+            throw new Error("The scene changed while pushing the face; run the command again");
+          }
+          commitShapes([...currentShapes(), body], body.id, pushedMessage);
+          return {
+            object: mcpShapeSummary(body),
+            settings: faceToolSettingsOn(read.face, settings),
+            normal: [normal.x, normal.y, normal.z].map((value) => Number(value.toFixed(4))),
+          };
+        }
         const result = await buildGroupedShapeFromSelection([target, body], workspaceSettingsRef.current.booleanTriangleLimit);
         if (projectInfoRef.current.projectId !== sourceProjectId || projectShapesFingerprint(currentShapes()) !== sourceFingerprint) {
           throw new Error("The scene changed while pushing the face; run the command again");
@@ -11249,7 +11274,7 @@ export function LayerlingEditor({
         commitShapes(
           [...currentShapes().filter((shape) => shape.id !== target.id), editableGroup],
           editableGroup.id,
-          t(settings.direction === "in" ? "status.faceToolPocketCreated" : "status.faceToolCreated", { depth: Number(faceToolSettingsOn(read.face, settings).depth.toFixed(2)) }),
+          pushedMessage,
         );
         return {
           object: mcpShapeSummary(editableGroup),

@@ -3640,4 +3640,6 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "sketch.sweepAnchorLeft": "На траектории: левый край",
   "sketch.sweepAnchorRight": "На траектории: правый край",
   "status.sketchSweepAnchorChanged": "{anchor}. Заверши эскиз, чтобы построить тело",
+  "faceTool.separate": "Как отдельное тело (без группы)",
+  "faceTool.separateHint": "Новая деталь встаёт рядом с телом, а не в группе с ним: её можно сразу изменить в размере, переместить или вырезать ею. Без переключателя она сгруппирована.",
 };

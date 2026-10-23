@@ -3629,4 +3629,6 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "sketch.sweepAnchorLeft": "Sur le chemin : bord gauche",
   "sketch.sweepAnchorRight": "Sur le chemin : bord droit",
   "status.sketchSweepAnchorChanged": "{anchor}. Termine l'esquisse pour construire le corps",
+  "faceTool.separate": "Comme un corps à part (non groupé)",
+  "faceTool.separateHint": "La nouvelle pièce se place à côté du corps au lieu d'être groupée avec lui : vous pouvez tout de suite la redimensionner, la déplacer ou couper avec. Sans l'interrupteur, elle est groupée.",
 };

@@ -584,6 +584,7 @@ export const tools = [
         inset: { type: "number", minimum: 0, maximum: 50, description: "How far the outline stays inside the face's edge, in millimetres (default 0)." },
         radius: { type: "number", minimum: 0, maximum: 30, description: "Corner radius of the outline in millimetres (default 0)." },
         depth: { type: "number", minimum: 0.2, maximum: 100, description: "How far the new part stands out, or the pocket reaches in, in millimetres (default 2)." },
+        separate: { type: "boolean", description: "true leaves the new part (or the pocket's hole) as a body of its own beside the pushed body instead of grouping it with it, so it can be resized, moved or used to cut at once (default false)." },
       },
     },
   },
