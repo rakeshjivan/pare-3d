@@ -139,6 +139,20 @@ describe("footprintCutOffset (#692)", () => {
     expect(area).toBeLessThan(Math.PI * 25 * 1.02);
   });
 
+  it("cuts at the workplane when a part reaches below it, so what stands on it is drawn (#727)", () => {
+    // A 20 mm cube on the workplane, and a bar tilted so that it goes 2.5 mm below it.
+    const cube = new THREE.BoxGeometry(20, 20, 20);
+    cube.translate(0, 10, 0);
+    const bar = new THREE.BoxGeometry(21, 7, 20);
+    bar.rotateZ(Math.PI / 4);
+    bar.translate(30, 3, 0);
+    const meshes = [meshFromGeometry(cube), meshFromGeometry(bar)];
+    const offset = footprintCutOffset(meshes);
+    expect(offset).toBeCloseTo(FOOTPRINT_CUT_HEIGHT, 6);
+    expect(closedAreas(meshes[0]!, "y", offset ?? 0)[0]).toBeCloseTo(400, 0);
+    expect(closedAreas(meshes[1]!, "y", offset ?? 0).length).toBeGreaterThan(0);
+  });
+
   it("has nothing to cut without bodies", () => {
     expect(footprintCutOffset([])).toBeNull();
   });
