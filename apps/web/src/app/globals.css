@@ -5173,6 +5173,12 @@ html[data-toolbar-size="large"] .shape-menu-dropdown:not(.sketch-shape-menu-drop
   border-radius: 6px;
 }
 
+.print-estimate-calculate {
+  justify-self: start;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
 .print-estimate-settings {
   display: flex;
   flex-wrap: wrap;
@@ -11833,6 +11839,11 @@ html[data-theme="dark"] .workspace-reset-row button {
   font-size: 11px;
   font-weight: 650;
   line-height: 1.5;
+}
+
+.workspace-footer-buttons {
+  display: flex;
+  gap: 8px;
 }
 
 .make-default-button {

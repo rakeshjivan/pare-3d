@@ -3656,6 +3656,11 @@ export const MESSAGES_EN = {
   "status.sketchSweepAnchorChanged": "{anchor}. Finish the sketch to build the body",
   "faceTool.separate": "As a body of its own (not grouped)",
   "faceTool.separateHint": "The new part stands beside the body instead of in a group with it: you can resize it, move it or use it to cut right away. Without the switch it is grouped.",
+  "export.estimateCalculate": "Calculate",
+  "workspace.stlAsDownload": "Save STL as a download",
+  "workspace.stlAsDownloadHint": "Chrome and Edge write an STL into the same file each time. Switch this on to get a plain download instead: the browser then numbers the files, name (1).stl, name (2).stl.",
+  "workspace.useMyDefault": "Use my default",
+  "workspace.useMyDefaultHint": "Puts the colours, grid and other settings you saved with “Make default” on this design. The size of the plate, the printer and the units stay.",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

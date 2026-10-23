@@ -2186,6 +2186,14 @@ export function cleanShapePatch(patch: ShapeUpdatePatch): Partial<WorkplaneShape
   return next;
 }
 
+function coneRadiiForWidth(cone: WorkplaneShape, width: number): Partial<WorkplaneShape> {
+  const factor = width / Math.max(0.001, shapeWidth(cone));
+  return {
+    baseRadius: (cone.baseRadius ?? shapeWidth(cone) / 2) * factor,
+    ...(cone.topRadius !== undefined ? { topRadius: cone.topRadius * factor } : {}),
+  };
+}
+
 export function restoreGroupedChildren(group: WorkplaneShape): WorkplaneShape[] {
   const children = group.groupedShapes ?? [];
   if (children.length === 0) {
@@ -2228,6 +2236,8 @@ export function restoreGroupedChildren(group: WorkplaneShape): WorkplaneShape[] 
       depth,
       height,
       size: resizedShapeSize(width, depth),
+      // A cone is shaped by its own radii, not by its width: they stretch with it (#756).
+      ...(child.kind === "cone" ? coneRadiiForWidth(child, width) : {}),
       rotation: childRotation.rotation,
       rotationX: childRotation.rotationX,
       rotationZ: childRotation.rotationZ,

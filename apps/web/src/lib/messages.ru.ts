@@ -3642,4 +3642,9 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "status.sketchSweepAnchorChanged": "{anchor}. Заверши эскиз, чтобы построить тело",
   "faceTool.separate": "Как отдельное тело (без группы)",
   "faceTool.separateHint": "Новая деталь встаёт рядом с телом, а не в группе с ним: её можно сразу изменить в размере, переместить или вырезать ею. Без переключателя она сгруппирована.",
+  "export.estimateCalculate": "Рассчитать",
+  "workspace.stlAsDownload": "Сохранять STL как загрузку",
+  "workspace.stlAsDownloadHint": "Chrome и Edge каждый раз записывают STL в один и тот же файл. Включите это, чтобы получать обычную загрузку: тогда браузер нумерует файлы, имя (1).stl, имя (2).stl.",
+  "workspace.useMyDefault": "Использовать мои настройки по умолчанию",
+  "workspace.useMyDefaultHint": "Применяет к этому проекту цвета, сетку и другие настройки, сохранённые кнопкой «Сделать по умолчанию». Размер стола, принтер и единицы остаются.",
 };

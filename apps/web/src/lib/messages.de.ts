@@ -3655,4 +3655,9 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "status.sketchSweepAnchorChanged": "{anchor}. Schließe die Skizze ab, um den Körper zu bauen",
   "faceTool.separate": "Als eigener Körper (nicht gruppiert)",
   "faceTool.separateHint": "Das neue Teil steht neben dem Körper statt mit ihm in einer Gruppe: Du kannst es gleich in der Größe ändern, verschieben oder damit schneiden. Ohne den Schalter wird es gruppiert.",
+  "export.estimateCalculate": "Berechnen",
+  "workspace.stlAsDownload": "STL als Download speichern",
+  "workspace.stlAsDownloadHint": "Chrome und Edge schreiben eine STL jedes Mal in dieselbe Datei. Mit diesem Schalter kommt stattdessen ein normaler Download: Der Browser nummeriert dann die Dateien, name (1).stl, name (2).stl.",
+  "workspace.useMyDefault": "Meine Vorgabe verwenden",
+  "workspace.useMyDefaultHint": "Legt die Farben, das Raster und die übrigen Einstellungen, die du mit „Als Vorgabe sichern“ gespeichert hast, auf diesen Entwurf. Größe der Platte, Drucker und Einheiten bleiben.",
 };

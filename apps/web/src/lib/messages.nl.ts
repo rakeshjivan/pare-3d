@@ -3655,4 +3655,9 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "status.sketchSweepAnchorChanged": "{anchor}. Rond de schets af om het lichaam te bouwen",
   "faceTool.separate": "Als een eigen lichaam (niet gegroepeerd)",
   "faceTool.separateHint": "Het nieuwe deel staat naast het lichaam in plaats van er in een groep mee: je kunt het meteen een andere maat geven, verplaatsen of ermee snijden. Zonder de schakelaar wordt het gegroepeerd.",
+  "export.estimateCalculate": "Berekenen",
+  "workspace.stlAsDownload": "STL opslaan als download",
+  "workspace.stlAsDownloadHint": "Chrome en Edge schrijven een STL elke keer naar hetzelfde bestand. Zet dit aan voor een gewone download: de browser nummert de bestanden dan, naam (1).stl, naam (2).stl.",
+  "workspace.useMyDefault": "Mijn standaard gebruiken",
+  "workspace.useMyDefaultHint": "Zet de kleuren, het raster en de andere instellingen die je met „Als standaard instellen” hebt bewaard op dit ontwerp. De grootte van het bed, de printer en de eenheden blijven.",
 };

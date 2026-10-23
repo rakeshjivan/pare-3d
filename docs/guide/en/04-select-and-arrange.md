@@ -187,7 +187,7 @@ With several parts you choose how they grow:
 - **{{ui:scalePercent.mode.together}}:** The parts grow around their common centre, and the gaps grow with them. The whole becomes larger as if it were one part.
 - **{{ui:scalePercent.mode.each}}:** Every part grows where it stands, and the gaps between them stay the same.
 
-Only {{ui:scalePercent.apply}} changes the design, and one step back undoes it. With a locked part in the selection it does not open.
+The percentage field has the focus when the window opens, so from the keyboard it is [[Ctrl]]+[[K]], the percentage, [[Enter]]; [[Esc]] closes the window. Only {{ui:scalePercent.apply}} (or [[Enter]] in the field) changes the design, and one step back undoes it. With a locked part in the selection it does not open.
 
 ## Undoing
 

@@ -3631,4 +3631,9 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "status.sketchSweepAnchorChanged": "{anchor}. Termine l'esquisse pour construire le corps",
   "faceTool.separate": "Comme un corps à part (non groupé)",
   "faceTool.separateHint": "La nouvelle pièce se place à côté du corps au lieu d'être groupée avec lui : vous pouvez tout de suite la redimensionner, la déplacer ou couper avec. Sans l'interrupteur, elle est groupée.",
+  "export.estimateCalculate": "Calculer",
+  "workspace.stlAsDownload": "Enregistrer le STL comme téléchargement",
+  "workspace.stlAsDownloadHint": "Chrome et Edge écrivent un STL à chaque fois dans le même fichier. Activez ceci pour obtenir un téléchargement ordinaire : le navigateur numérote alors les fichiers, nom (1).stl, nom (2).stl.",
+  "workspace.useMyDefault": "Utiliser mon réglage par défaut",
+  "workspace.useMyDefaultHint": "Applique à ce design les couleurs, la grille et les autres réglages enregistrés avec « Par défaut ». La taille du plateau, l’imprimante et les unités restent.",
 };

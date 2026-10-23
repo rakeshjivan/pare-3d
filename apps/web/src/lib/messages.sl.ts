@@ -3633,4 +3633,9 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "status.sketchSweepAnchorChanged": "{anchor}. Dokončaj skico, da se zgradi telo",
   "faceTool.separate": "Kot samostojno telo (ni združeno)",
   "faceTool.separateHint": "Novi del stoji ob telesu, ne v skupini z njim: takoj mu lahko spremeniš velikost, ga premakneš ali z njim rezkaš. Brez stikala je združen.",
+  "export.estimateCalculate": "Izračunaj",
+  "workspace.stlAsDownload": "Shrani STL kot prenos",
+  "workspace.stlAsDownloadHint": "Chrome in Edge STL vsakič zapišeta v isto datoteko. Vklopite to za navaden prenos: brskalnik nato datoteke oštevilči, ime (1).stl, ime (2).stl.",
+  "workspace.useMyDefault": "Uporabi mojo privzeto",
+  "workspace.useMyDefaultHint": "Na ta osnutek uporabi barve, mrežo in druge nastavitve, shranjene z „Nastavi kot privzeto“. Velikost plošče, tiskalnik in enote ostanejo.",
 };

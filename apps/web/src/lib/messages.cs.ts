@@ -3654,4 +3654,9 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "status.sketchSweepAnchorChanged": "{anchor}. Dokonči náčrt a těleso se postaví",
   "faceTool.separate": "Jako samostatné těleso (neseskupené)",
   "faceTool.separateHint": "Nová část stojí vedle tělesa, ne s ním ve skupině: můžete ji hned zvětšit či zmenšit, posunout nebo s ní řezat. Bez přepínače je seskupená.",
+  "export.estimateCalculate": "Spočítat",
+  "workspace.stlAsDownload": "Uložit STL jako stažení",
+  "workspace.stlAsDownloadHint": "Chrome a Edge zapisují STL pokaždé do stejného souboru. Zapněte to, aby se místo toho stáhl běžný soubor: prohlížeč pak soubory očísluje, název (1).stl, název (2).stl.",
+  "workspace.useMyDefault": "Použít moji výchozí",
+  "workspace.useMyDefaultHint": "Použije na tento návrh barvy, mřížku a další nastavení uložená přes „Nastavit jako výchozí“. Velikost desky, tiskárna a jednotky zůstanou.",
 };
