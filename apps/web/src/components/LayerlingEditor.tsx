@@ -203,7 +203,7 @@ import { CommandPalette, type PaletteCommand } from "./workplane/CommandPalette"
 import { COMMAND_KEYWORDS, SHAPE_KEYWORDS } from "@/lib/commandKeywords";
 import { ShapeContextMenu, type ShapeContextMenuItem } from "./workplane/ShapeContextMenu";
 import { nextSelectionTransparency } from "@/lib/selectionTransparency";
-import { canonicalizeShape, cloneWorkplaneShapeTreeWithFreshIds, cleanNearZero, cleanRotationDegrees, isNonSolidShapeKind, meshYawDegrees, preservesEdgeTreatmentSize, serializeShapesForSync, shapeDepth, shapeExtrudeDeformPatch, shapeHasShapeDeform, shapeTaperPatch, shapeTransformShouldRemainEditable, shapeWidth, shapeWithParametricSource, patchTouchesBodyParameters, withHoleMode, workplaneShapesEqual, shellNeedingRebuild } from "@/lib/workplaneShapes";
+import { canonicalizeShape, cloneWorkplaneShapeTreeWithFreshIds, cleanNearZero, cleanRotationDegrees, isNonSolidShapeKind, meshYawDegrees, preservesEdgeTreatmentSize, serializeShapesForSync, shapeDepth, shapeExtrudeDeformPatch, shapeHasShapeDeform, shapeTaperPatch, shapeTransformShouldRemainEditable, shapeWidth, shapeWithParametricSource, patchTouchesBodyParameters, withHoleMode, workplaneShapesEqual, shellNeedingRebuild, hollowStretchSincePicture } from "@/lib/workplaneShapes";
 import { workplaneCenteringOffset } from "@/lib/workplaneCentering";
 import { bakeCadMetadataForShapeTransform, cadBrepTransformForShape, cadModifierPrimitiveForAnalyticShape, cadModifierPrimitiveForBakedShape, importedStepPartForShape } from "@/lib/cadBakeMetadata";
 import { hasOneToOneCadComponentMapping } from "@/lib/cadModifierGroups";
@@ -7857,9 +7857,9 @@ export function LayerlingEditor({
       if (!entry) return;
       const fingerprint = projectShapesFingerprint([stale]);
       const { amount, openings, shellEdges } = entry.feature;
-      const applied = entry.appliedFrame!;
-      const width = entry.before.width * shapeWidth(stale) / Math.max(0.001, applied.width);
-      const depth = entry.before.depth * shapeDepth(stale) / Math.max(0.001, applied.depth);
+      const stretch = hollowStretchSincePicture(stale, entry);
+      const width = entry.before.width * stretch.x;
+      const depth = entry.before.depth * stretch.z;
       // A cylinder stays round; stretched unevenly it becomes the ellipse it now is.
       const source = entry.before.kind === "cylinder" && Math.abs(width - depth) > 0.005
         ? { ...entry, before: { ...entry.before, kind: "ellipse" as const } }
