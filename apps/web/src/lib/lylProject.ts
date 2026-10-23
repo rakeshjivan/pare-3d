@@ -1219,7 +1219,7 @@ function validateSketchProfile(value: unknown, label: string) {
       }
     });
   }
-  if (profile.keyring !== undefined && !isSketchKeyring(profile.keyring)) throw new Error(`${label}.keyring must be { side, diameter, x, z }`);
+  if (profile.keyring !== undefined && !isSketchKeyring(profile.keyring)) throw new Error(`${label}.keyring must be { side, diameter, x, z } and a free place (#598) with corners of -1 or 1 if it has one`);
   if (profile.inset !== undefined) {
     const inset = objectRecord(profile.inset, `${label}.inset`);
     const distance = finiteNumber(inset.distance, `${label}.inset.distance`);
@@ -1334,9 +1334,9 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
   if (textJoin !== undefined && !SKETCH_STROKE_JOINS.includes(textJoin as never)) {
     throw new Error(`${label}.textStroke.join must be miter, round or bevel`);
   }
-  // A name tag's key ring hole (#215): a known side, a diameter within range, how far beyond the letters it sits.
+  // A name tag's key ring hole (#215): a known side, a diameter within range, how far beyond the letters it sits; where it was put freely (#598).
   if (definition.textKeyring !== undefined && !isTextKeyring(definition.textKeyring)) {
-    throw new Error(`${label}.textKeyring must be a side (left, right or top), a diameter of 1 to 20 mm and an offset`);
+    throw new Error(`${label}.textKeyring must be a side (left, right or top), a diameter of 1 to 20 mm and an offset, and a free place (#598) with corners of -1 or 1 if it has one`);
   }
   if (definition.parametricSource !== undefined) {
     // Was der Koerper vor dem Drehen war. Fehlt oder stimmt hier etwas nicht,

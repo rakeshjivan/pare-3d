@@ -83,7 +83,7 @@ export function iconLayerProfile(area: SketchProfile, layer: TextLayer, keyring?
 export function iconLayerKeyrings(area: SketchProfile, layers: readonly TextLayer[], keyring: NameTagKeyring | null | undefined): (NonNullable<SketchProfile["keyring"]> | undefined)[] {
   if (!keyring || !layers.length) return layers.map(() => undefined);
   const reach = Math.max(0, ...layers.map((layer) => layer.grow));
-  const bottom = iconKeyringFor(area, reach, keyring.side, keyring.diameter, true, keyring.along, layers[layers.length - 1].grow);
+  const bottom = iconKeyringFor(area, reach, keyring.side, keyring.diameter, true, keyring.along, layers[layers.length - 1].grow, keyring.free);
   if (!bottom) return layers.map(() => undefined);
   const { ear: _ear, ...hole } = bottom;
   return layers.map((_, index) => (index === layers.length - 1 ? bottom : { ...hole }));
@@ -132,7 +132,12 @@ export function iconLayersOf(shapes: WorkplaneShape[]): IconLayerStack | null {
     width: top.width,
     layers,
     keyring: holed?.sketchProfile.keyring
-      ? { side: holed.sketchProfile.keyring.side, diameter: holed.sketchProfile.keyring.diameter, ...(holed.sketchProfile.keyring.along ? { along: holed.sketchProfile.keyring.along } : {}) }
+      ? {
+        side: holed.sketchProfile.keyring.side,
+        diameter: holed.sketchProfile.keyring.diameter,
+        ...(holed.sketchProfile.keyring.along ? { along: holed.sketchProfile.keyring.along } : {}),
+        ...(holed.sketchProfile.keyring.free ? { free: holed.sketchProfile.keyring.free } : {}),
+      }
       : null,
     ids: topDown.map((shape) => shape.id),
     place: {

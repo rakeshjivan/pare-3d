@@ -456,13 +456,22 @@ export type TextKeyringSide = "left" | "right" | "top";
  * its outline - the bottom layer of a name tag; the layers above only get the hole where it
  * reaches them. The box grows by the ear on that side; the letters keep their size.
  */
-export type TextKeyring = { side: TextKeyringSide; diameter: number; offset: number; along?: number; ear?: boolean };
+export type TextKeyring = { side: TextKeyringSide; diameter: number; offset: number; along?: number; ear?: boolean; free?: FreeKeyring };
+
+/**
+ * A key ring hole placed freely (#598), where a key ring tab of its own was put and then fixed to
+ * the tag: the hole's middle `dx`/`dz` mm from the corner of the letters' or icon's box it is
+ * nearest to (`ax` -1 left, 1 right; `az` -1 top, 1 bottom, seen from above), so it keeps to that
+ * corner when the words or the size change. The ear runs from the hole `length` mm towards
+ * `angle` degrees (0 along +x, 90 along +z) and ends straight there. `side` and `along` are not used with it.
+ */
+export type FreeKeyring = { ax: -1 | 1; az: -1 | 1; dx: number; dz: number; angle: number; length: number };
 
 /**
  * A key ring hole in an extruded sketch (#391): its middle in the sketch's own mm, its size, the side it is on and whether the layer has the ear.
- * `along` is how far the card moved it off the middle of its side (#671), kept so the card reads it back.
+ * `along` is how far the card moved it off the middle of its side (#671), kept so the card reads it back; `free` (#598) when it was placed freely.
  */
-export type SketchKeyring = { side: TextKeyringSide; diameter: number; x: number; z: number; along?: number; ear?: boolean };
+export type SketchKeyring = { side: TextKeyringSide; diameter: number; x: number; z: number; along?: number; ear?: boolean; free?: FreeKeyring };
 /**
  * A sketch built set in from its outlines: every edge `distance` mm inward, every corner rounded to
  * `radius` mm. The face tool keeps the outline of the face it pushes out or in here and builds the
@@ -947,7 +956,7 @@ export type WorkplaneShape = {
   layeredIcon?: boolean;
   /**
    * A key ring tab of its own (#598), made by a name tag's or icon tag's "Free": its properties
-   * panel offers to hold it together with the nearest tag in one click.
+   * panel offers to fix it to the nearest tag in one click, where it was put.
    */
   keyringTab?: boolean;
   /**

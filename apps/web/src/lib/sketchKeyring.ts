@@ -1,8 +1,8 @@
 import type { CrossSection, ManifoldToplevel } from "manifold-3d";
 import { orderedCadSketchPaths, silhouetteSketchProfile } from "@/lib/sketchCadProfile";
 import { sampledPath, strokedSketchProfile, type Keep } from "@/lib/sketchStroke";
-import { KEYRING_HOLE_EDGE_DISTANCE, keyringAlongLimit, keyringEarRadius, MAX_KEYRING_DIAMETER, MIN_KEYRING_DIAMETER, TEXT_KEYRING_SIDES } from "@/lib/textGeometry";
-import type { SketchKeyring, SketchProfile, TextKeyringSide } from "@/types/layerling";
+import { freeKeyringCenter, freeKeyringExtent, freeKeyringStrip, isFreeKeyring, KEYRING_HOLE_EDGE_DISTANCE, keyringAlongLimit, keyringEarRadius, MAX_KEYRING_DIAMETER, MIN_KEYRING_DIAMETER, normalizeFreeKeyring, TEXT_KEYRING_SIDES } from "@/lib/textGeometry";
+import type { FreeKeyring, SketchKeyring, SketchProfile, TextKeyringSide } from "@/types/layerling";
 
 /**
  * A key ring hole in an extruded sketch, as the name tag has one (#391): used by the icon tag, whose
@@ -22,6 +22,7 @@ export function normalizeSketchKeyring(value: unknown): SketchKeyring | undefine
   const z = Number(candidate.z);
   const along = Number(candidate.along ?? 0);
   if (![diameter, x, z].every(Number.isFinite) || diameter <= 0) return undefined;
+  const free = normalizeFreeKeyring(candidate.free);
   return {
     side: TEXT_KEYRING_SIDES.includes(candidate.side as TextKeyringSide) ? (candidate.side as TextKeyringSide) : "left",
     diameter: Math.min(MAX_KEYRING_DIAMETER, Math.max(MIN_KEYRING_DIAMETER, diameter)),
@@ -29,6 +30,7 @@ export function normalizeSketchKeyring(value: unknown): SketchKeyring | undefine
     z,
     ...(Number.isFinite(along) && along !== 0 ? { along } : {}),
     ...(candidate.ear ? { ear: true } : {}),
+    ...(free ? { free } : {}),
   };
 }
 
@@ -40,7 +42,8 @@ export function isSketchKeyring(value: unknown): value is SketchKeyring {
     && finite(candidate.diameter) && candidate.diameter >= MIN_KEYRING_DIAMETER && candidate.diameter <= MAX_KEYRING_DIAMETER
     && finite(candidate.x) && finite(candidate.z)
     && (candidate.along === undefined || finite(candidate.along))
-    && (candidate.ear === undefined || typeof candidate.ear === "boolean");
+    && (candidate.ear === undefined || typeof candidate.ear === "boolean")
+    && (candidate.free === undefined || isFreeKeyring(candidate.free));
 }
 
 type Bounds = { minX: number; maxX: number; minZ: number; maxZ: number };
@@ -64,9 +67,16 @@ export function sketchOutlineBounds(profile: SketchProfile): Bounds | null {
  * middle of its side, or `along` mm off it (#671: up on the left and right, to the right on top),
  * kept within the side of a bottom layer `bottomGrow` mm wider than the icon. Null when the area has no outline.
  */
-export function iconKeyringFor(area: SketchProfile, reach: number, side: TextKeyringSide, diameter: number, ear: boolean, along = 0, bottomGrow = 0): SketchKeyring | null {
+export function iconKeyringFor(area: SketchProfile, reach: number, side: TextKeyringSide, diameter: number, ear: boolean, along = 0, bottomGrow = 0, free?: FreeKeyring): SketchKeyring | null {
   const bounds = sketchOutlineBounds(area);
   if (!bounds) return null;
+  if (free) {
+    // A free hole (#598) keeps to a corner of the icon's box, where it was put.
+    const middle = freeKeyringCenter(free, { width: bounds.maxX - bounds.minX, depth: bounds.maxZ - bounds.minZ });
+    const x = (bounds.minX + bounds.maxX) / 2 + middle.x;
+    const z = (bounds.minZ + bounds.maxZ) / 2 + middle.z;
+    return { side, diameter, x, z, ...(ear ? { ear: true } : {}), free };
+  }
   const away = Math.max(0, reach) + KEYRING_HOLE_EDGE_DISTANCE + diameter / 2;
   const limit = iconKeyringAlongLimit(area, side, diameter, bottomGrow);
   const shift = Math.round(Math.min(limit, Math.max(-limit, along)) * 1000) / 1000;
@@ -102,11 +112,13 @@ export function iconEarOffset(area: SketchProfile, bottomGrow: number, keyring: 
   const grow = Math.max(0, bottomGrow);
   const radius = keyringEarRadius(keyring.diameter);
   const plate = { minX: bounds.minX - grow, maxX: bounds.maxX + grow, minZ: bounds.minZ - grow, maxZ: bounds.maxZ + grow };
+  // A free ear (#598) reaches as far as its strip and its disc; one on a side as far as its disc.
+  const ear = keyring.free ? freeKeyringExtent(keyring.diameter, keyring.free) : { minX: -radius, maxX: radius, minZ: -radius, maxZ: radius };
   const full = {
-    minX: Math.min(plate.minX, keyring.x - radius),
-    maxX: Math.max(plate.maxX, keyring.x + radius),
-    minZ: Math.min(plate.minZ, keyring.z - radius),
-    maxZ: Math.max(plate.maxZ, keyring.z + radius),
+    minX: Math.min(plate.minX, keyring.x + ear.minX),
+    maxX: Math.max(plate.maxX, keyring.x + ear.maxX),
+    minZ: Math.min(plate.minZ, keyring.z + ear.minZ),
+    maxZ: Math.max(plate.maxZ, keyring.z + ear.maxZ),
   };
   return { x: (full.minX + full.maxX) / 2 - (plate.minX + plate.maxX) / 2, z: (full.minZ + full.maxZ) / 2 - (plate.minZ + plate.maxZ) / 2 };
 }
@@ -139,7 +151,11 @@ export function keyringSketchProfile(runtime: ManifoldToplevel, profile: SketchP
     const filled = keep(new runtime.CrossSection(loops.map((loop) => loop.map(({ x, z }) => [x, z] as [number, number])), "EvenOdd"));
     const disc = (radius: number) => keep(keep(runtime.CrossSection.circle(radius, HOLE_SEGMENTS)).translate([keyring.x, keyring.z]));
     let region = filled;
-    if (keyring.ear && !filled.isEmpty()) {
+    if (keyring.ear && keyring.free) {
+      // A free ear (#598) is drawn as it was placed: the disc round the hole and the strip towards the tag.
+      const strip = keep(new runtime.CrossSection([freeKeyringStrip(keyring, keyring.diameter, keyring.free)], "Positive"));
+      region = keep(keep(filled.add(strip)).add(disc(keyringEarRadius(keyring.diameter))));
+    } else if (keyring.ear && !filled.isEmpty()) {
       const radius = keyringEarRadius(keyring.diameter);
       const rectangle = (x0: number, z0: number, x1: number, z1: number) => keep(new runtime.CrossSection([[
         [Math.min(x0, x1), Math.min(z0, z1)], [Math.max(x0, x1), Math.min(z0, z1)], [Math.max(x0, x1), Math.max(z0, z1)], [Math.min(x0, x1), Math.max(z0, z1)],

@@ -6,7 +6,7 @@ import { normalizeTextEdge, textEdgeLevels, textHasEdge } from "@/lib/textEdge";
 import { loftedTextEdge } from "@/lib/textEdgeLoft";
 import { loadedManifoldRuntime, requestManifoldRuntime } from "@/lib/manifoldHandle";
 import { normalizeSketchStroke, strokeRegion, type Keep } from "@/lib/sketchStroke";
-import { createTextGeometry, keyringBandCenter, keyringEarRadius, textGlyphShapes, textKeyringCenter, textKeyringOf, textLetterOffset } from "@/lib/textGeometry";
+import { createTextGeometry, freeKeyringStrip, keyringBandCenter, keyringEarRadius, textGlyphShapes, textKeyringCenter, textKeyringOf, textLetterOffset } from "@/lib/textGeometry";
 import type { TextKeyringSide, WorkplaneShape } from "@/types/layerling";
 
 /**
@@ -226,6 +226,11 @@ function withKeyringEar(runtime: ManifoldToplevel, keep: Keep, shape: WorkplaneS
   if (!keyring || !center) return filled;
   const disc = (radius: number) => keyringDisc(runtime, keep, center, radius);
   let outline = filled;
+  if (keyring.ear && keyring.free) {
+    // A free ear (#598) is drawn as it was placed: the disc round the hole and the strip towards the tag.
+    const strip = keep(new runtime.CrossSection([freeKeyringStrip(center, keyring.diameter, keyring.free)], "Positive"));
+    return keep(keep(filled.add(strip)).add(disc(keyringEarRadius(keyring.diameter))));
+  }
   if (keyring.ear && !filled.isEmpty()) {
     const radius = keyringEarRadius(keyring.diameter);
     const rectangle = (x0: number, z0: number, x1: number, z1: number) => keep(new runtime.CrossSection([[

@@ -2,18 +2,18 @@
 import * as THREE from "three";
 import { t } from "@/lib/i18n";
 import { quaternionForShape } from "@/lib/geometryRotation";
-import { iconEarOffset } from "@/lib/sketchKeyring";
+import { iconEarOffset, sketchOutlineBounds } from "@/lib/sketchKeyring";
 import { nameTagOffsets, textLayerShapes, textLayersOf, type NameTagKeyring, type TextLayer, type TextLayerStack } from "@/lib/textLayers";
 import { textLetterSize, textLetterSizePatch } from "@/lib/nameTag";
 import { ICON_TAG_LAYERS, iconLayerElevations, iconLayerKeyrings, iconLayerProfile, iconLayersOf, iconSourceProfile, iconTagGrid, isIconLayerBody, MAX_ICON_TAG_WIDTH, MIN_ICON_TAG_WIDTH, normalizeIconTagCount, scaledIconProfile, type IconLayerStack, type IconTagPlace } from "@/lib/iconTag";
 import { shapeBedFootprint } from "@/lib/printBed";
-import { KEYRING_HOLE_EDGE_DISTANCE, keyringEarRadius } from "@/lib/textGeometry";
+import { freeKeyringAt, freeKeyringCenter, KEYRING_HOLE_EDGE_DISTANCE, keyringEarRadius, MAX_KEYRING_DIAMETER, MIN_KEYRING_DIAMETER } from "@/lib/textGeometry";
 import { canonicalizeShape, cloneWorkplaneShapeTreeWithFreshIds, shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
 import { createLocalId } from "@/lib/localIds";
 import { importedShapeFromSvg } from "@/lib/svgImport";
 import { sketchProfileFromSvg, svgSketchMatchesMesh } from "@/lib/svgSketch";
 import { strokedSketchProfile } from "@/lib/sketchStroke";
-import type { SketchProfile, WorkplaneShape } from "@/types/layerling";
+import type { FreeKeyring, SketchProfile, WorkplaneShape } from "@/types/layerling";
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
 import { groupedShape, restoreGroupedChildren } from "@/lib/editorBooleans";
 import { cadShapeFromSketchProfile } from "@/lib/editorSketchCad";
@@ -195,25 +195,27 @@ export async function iconTagFromSvg(fileName: string, text: string, width: numb
   return layeredIconShape(area, ICON_TAG_LAYERS, { x: 0, z: 0, elevation: 0, rotation: 0, rotationX: 0, rotationZ: 0 }, [], createLocalId("icon-tag"), { locked: false, hidden: false, name });
 }
 
+/** Where a key ring tab of its own (#598) holds its hole, seen from above in the world: the hole's middle, the way the tab runs to its straight end, how far, and the hole's size. */
+export type KeyringTabPlace = { hole: { x: number; z: number }; direction: { x: number; z: number }; length: number; diameter: number };
+
 /**
  * A key ring tab of its own (#598), for "Free" on the name tag and the icon tag: a plain group -
  * a capsule with the key ring hole cut through its round end - in the bottom layer's colour and
- * height, standing on the tag's floor. It is moved and turned like any other shape and pushed
- * onto the tag's edge; nothing links the two. Its measures are the side tab's (#215): as wide as
- * the hole and a 1.75 mm wall either side, the hole's middle `diameter / 2 + 2` mm from where the
- * plate would end and the straight part reaching half the tab's width further in. It starts on
- * the left of the tag, pointing left, its hole's edge 2 mm beyond the tag's box.
+ * height, standing on the tag's floor. It is moved and turned like any other shape and then fixed
+ * to the tag where it was put. Its measures are the side tab's (#215): as wide as the hole and a
+ * 1.75 mm wall either side, a round end round the hole and a straight one `length` mm from the
+ * hole's middle along `direction`.
  */
-export function keyringTabShape(tag: WorkplaneShape, bottom: { color: string; height: number; elevation: number }, diameter: number, name: string): WorkplaneShape {
-  const footprint = shapeBedFootprint(tag);
+export function keyringTabAt(place: KeyringTabPlace, bottom: { color: string; height: number; elevation: number }, name: string): WorkplaneShape {
+  const { hole, length, diameter } = place;
+  const norm = Math.hypot(place.direction.x, place.direction.z) || 1;
+  const along = { x: place.direction.x / norm, z: place.direction.z / norm };
   const radius = keyringEarRadius(diameter);
-  const holeX = footprint.minX - KEYRING_HOLE_EDGE_DISTANCE - diameter / 2;
-  const holeZ = (footprint.minZ + footprint.maxZ) / 2;
-  // From the far side of the round end to half the tab's width inside the plate.
-  const inner = footprint.minX + radius;
-  const length = inner - (holeX - radius);
   const round = (value: number) => Math.round(value * 1000) / 1000;
-  const base = { rotation: 0, locked: false, hidden: false, elevation: round(bottom.elevation), height: round(bottom.height) };
+  const base = { locked: false, hidden: false, rotation: 0, elevation: round(bottom.elevation), height: round(bottom.height) };
+  // Built lying along +x with the hole's middle at the origin, from the far side of the round end
+  // to the straight end; the whole tab is then turned, so its handles and its turn show the way it runs.
+  const capsuleLength = length + radius;
   const capsule = canonicalizeShape({
     ...base,
     id: createLocalId("keyring-tab"),
@@ -221,32 +223,110 @@ export function keyringTabShape(tag: WorkplaneShape, bottom: { color: string; he
     kind: "slot",
     color: bottom.color,
     hole: false,
-    x: round(holeX - radius + length / 2),
-    z: round(holeZ),
-    width: round(length),
+    x: round((length - radius) / 2),
+    z: 0,
+    width: round(capsuleLength),
     depth: round(2 * radius),
-    size: round(length),
+    size: round(capsuleLength),
   });
-  const hole = canonicalizeShape({
+  const cut = canonicalizeShape({
     ...base,
     id: createLocalId("keyring-hole"),
     name: "Hole",
     kind: "cylinder",
     color: bottom.color,
     hole: true,
-    x: round(holeX),
-    z: round(holeZ),
+    x: 0,
+    z: 0,
     width: diameter,
     depth: diameter,
     size: diameter,
   });
-  const group = groupedShape([capsule, hole]);
+  const group = groupedShape([capsule, cut]);
   if (!group) throw new Error("Could not build the key ring tab");
-  return canonicalizeShape({ ...group, id: createLocalId("keyring-tab"), name, color: bottom.color, keyringTab: true });
+  const rotation = round(THREE.MathUtils.radToDeg(Math.atan2(-along.z, along.x)));
+  // The tab turns about its own middle; it is put where its hole comes to lie on `hole`.
+  const turned = new THREE.Vector3(-group.x, 0, -group.z).applyQuaternion(quaternionForShape({ rotation, rotationX: 0, rotationZ: 0 }));
+  return canonicalizeShape({ ...group, id: createLocalId("keyring-tab"), name, color: bottom.color, keyringTab: true, rotation, x: round(hole.x - turned.x), z: round(hole.z - turned.z) });
 }
 
 /**
- * The tag a key ring tab (#598) is held together with when its panel's button is pressed: the
+ * The tab "Free" puts beside a tag that has no free hole yet (#598): on the left of the tag,
+ * pointing left, its hole's edge 2 mm beyond the tag's box and its straight end half its width
+ * on the plate, as the side tab sits.
+ */
+export function keyringTabShape(tag: WorkplaneShape, bottom: { color: string; height: number; elevation: number }, diameter: number, name: string): WorkplaneShape {
+  const footprint = shapeBedFootprint(tag);
+  const radius = keyringEarRadius(diameter);
+  const holeX = footprint.minX - KEYRING_HOLE_EDGE_DISTANCE - diameter / 2;
+  const hole = { x: holeX, z: (footprint.minZ + footprint.maxZ) / 2 };
+  return keyringTabAt({ hole, direction: { x: 1, z: 0 }, length: footprint.minX + radius - holeX, diameter }, bottom, name);
+}
+
+/** Where a key ring tab of its own holds its hole (#598), read from its parts as they stand; null when it is not one any more. */
+export function keyringTabPlace(tab: WorkplaneShape): KeyringTabPlace | null {
+  if (!tab.groupedShapes?.length) return null;
+  const parts = restoreGroupedChildren(tab);
+  const cut = parts.find((part) => part.hole);
+  const capsule = parts.find((part) => !part.hole);
+  if (!cut || !capsule) return null;
+  const diameter = Math.min(MAX_KEYRING_DIAMETER, Math.max(MIN_KEYRING_DIAMETER, Math.min(shapeWidth(cut), shapeDepth(cut))));
+  const way = { x: capsule.x - cut.x, z: capsule.z - cut.z };
+  const apart = Math.hypot(way.x, way.z);
+  // The straight end lies half the capsule's length beyond its middle.
+  const turn = THREE.MathUtils.degToRad(capsule.rotation ?? 0);
+  const direction = apart > 1e-6 ? { x: way.x / apart, z: way.z / apart } : { x: Math.cos(turn), z: -Math.sin(turn) };
+  const length = Math.max(0, apart + shapeWidth(capsule) / 2);
+  return { hole: { x: cut.x, z: cut.z }, direction, length, diameter };
+}
+
+/** A world point and direction in a tag's own frame about `origin` (#598): its turn taken off, seen from above. */
+function intoFrame(origin: Pick<WorkplaneShape, "x" | "z" | "rotation" | "rotationX" | "rotationZ">, place: KeyringTabPlace) {
+  const back = quaternionForShape(origin).invert();
+  const point = new THREE.Vector3(place.hole.x - origin.x, 0, place.hole.z - origin.z).applyQuaternion(back);
+  const way = new THREE.Vector3(place.direction.x, 0, place.direction.z).applyQuaternion(back);
+  return { center: { x: point.x, z: point.z }, angle: THREE.MathUtils.radToDeg(Math.atan2(way.z, way.x)) };
+}
+
+/** A free hole (#598) in a tag's own frame about `origin` back in the world, as a tab would hold it. */
+function outOfFrame(origin: Pick<WorkplaneShape, "x" | "z" | "rotation" | "rotationX" | "rotationZ">, center: { x: number; z: number }, free: FreeKeyring, diameter: number): KeyringTabPlace {
+  const turn = quaternionForShape(origin);
+  const point = new THREE.Vector3(center.x, 0, center.z).applyQuaternion(turn);
+  const radians = THREE.MathUtils.degToRad(free.angle);
+  const way = new THREE.Vector3(Math.cos(radians), 0, Math.sin(radians)).applyQuaternion(turn);
+  return { hole: { x: origin.x + point.x, z: origin.z + point.z }, direction: { x: way.x, z: way.z }, length: free.length, diameter };
+}
+
+/** A name tag's free hole (#598) where the tab holds it: from the middle of its letters, kept to the nearest corner of their box. */
+export function textFreeKeyring(letters: WorkplaneShape, place: KeyringTabPlace): FreeKeyring {
+  const { center, angle } = intoFrame(letters, place);
+  return freeKeyringAt(center, { width: shapeWidth(letters), depth: shapeDepth(letters) }, angle, place.length);
+}
+
+/** Where a name tag's free hole (#598) stands in the world, as a tab would hold it again. */
+export function textFreeKeyringPlace(letters: WorkplaneShape, keyring: NameTagKeyring & { free: FreeKeyring }): KeyringTabPlace {
+  const center = freeKeyringCenter(keyring.free, { width: shapeWidth(letters), depth: shapeDepth(letters) });
+  return outOfFrame(letters, center, keyring.free, keyring.diameter);
+}
+
+/** An icon tag's free hole (#598) where the tab holds it: from the middle of the icon's box, kept to its nearest corner. */
+export function iconFreeKeyring(area: SketchProfile, place: IconTagPlace, tab: KeyringTabPlace): FreeKeyring | null {
+  const bounds = sketchOutlineBounds(area);
+  if (!bounds) return null;
+  const { center, angle } = intoFrame(place, tab);
+  return freeKeyringAt(center, { width: bounds.maxX - bounds.minX, depth: bounds.maxZ - bounds.minZ }, angle, tab.length);
+}
+
+/** Where an icon tag's free hole (#598) stands in the world, as a tab would hold it again. */
+export function iconFreeKeyringPlace(area: SketchProfile, place: IconTagPlace, keyring: NameTagKeyring & { free: FreeKeyring }): KeyringTabPlace | null {
+  const bounds = sketchOutlineBounds(area);
+  if (!bounds) return null;
+  const center = freeKeyringCenter(keyring.free, { width: bounds.maxX - bounds.minX, depth: bounds.maxZ - bounds.minZ });
+  return outOfFrame(place, center, keyring.free, keyring.diameter);
+}
+
+/**
+ * The tag a key ring tab (#598) is fixed to when its panel's button is pressed: the
  * nearest name tag or icon tag that is neither locked nor hidden, measured between the middles
  * of their footprints. null when there is none.
  */

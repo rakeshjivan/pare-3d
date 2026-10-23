@@ -933,14 +933,18 @@ export const tools = [
           },
         },
         keyring: {
-          description: "A key ring hole: { side, diameter } puts it on (a tab with a round end on the bottom layer, the hole through every layer it reaches), true puts a 3 mm hole on the left, false takes it off. Left out, it stays as it is. A side other than left, right or top, or a diameter outside 1 to 20 mm, is refused.",
+          description: "A key ring hole: { side, diameter } puts it on (a tab with a round end on the bottom layer, the hole through every layer it reaches), true puts a 3 mm hole on the left, false takes it off. Left out, it stays as it is. side free (#598) puts the hole anywhere: x and z are its middle in mm from the middle of the letters, seen from above in the tag's own frame (+x right, +z towards the bottom of the letters), the ear runs from it towards angle degrees (0 along +x, 90 along +z; left out, towards that middle) for length mm (left out, until it is half its width inside the letters' box) and joins the bottom layer, and the hole goes through every layer; the hole keeps to the nearest corner of the box when the words or the size change. A side other than left, right, top or free, a free hole without x and z, or a diameter outside 1 to 20 mm, is refused.",
           anyOf: [
             {
               type: "object",
               properties: {
-                side: { type: "string", enum: ["left", "right", "top"], description: "Where the ear sits, seen from above (default left)." },
+                side: { type: "string", enum: ["left", "right", "top", "free"], description: "Where the ear sits, seen from above (default left); free (#598) at x and z." },
                 diameter: { type: "number", minimum: 1, maximum: 20, description: "The hole's diameter in mm (default 3); the tab grows with it." },
                 along: { type: "number", description: "How far the tab sits off the middle of its side in mm (#671): up on the left and right, to the right on top, negative the other way; 0 or left out is the middle. Kept within the side, so the tab stays as wide as it is - move it to a letter that reaches out instead of a gap beside it." },
+                x: { type: "number", minimum: -1000, maximum: 1000, description: "With side free: the hole's middle in mm to the right (+) or left (-) of the middle, in the tag's own frame." },
+                z: { type: "number", minimum: -1000, maximum: 1000, description: "With side free: the hole's middle in mm below (+) or above (-) the middle, seen from above, in the tag's own frame." },
+                angle: { type: "number", description: "With side free: the way the ear runs from the hole, in degrees (0 along +x, 90 along +z); left out, towards the middle." },
+                length: { type: "number", minimum: 0, maximum: 1000, description: "With side free: from the hole's middle to the ear's straight end in mm; left out, until it is half its width inside the box." },
               },
             },
             { type: "boolean" },
@@ -979,14 +983,18 @@ export const tools = [
           },
         },
         keyring: {
-          description: "A key ring hole: { side, diameter } puts it on (a tab with a round end on the bottom layer, the hole through every layer, beyond the icon), true puts a 3 mm hole on the left, false takes it off. Left out, it stays as it is. A side other than left, right or top, or a diameter outside 1 to 20 mm, is refused.",
+          description: "A key ring hole: { side, diameter } puts it on (a tab with a round end on the bottom layer, the hole through every layer, beyond the icon), true puts a 3 mm hole on the left, false takes it off. Left out, it stays as it is. side free (#598) puts the hole anywhere: x and z are its middle in mm from the middle of the icon, seen from above in the tag's own frame (+x right, +z towards the bottom of the icon), the ear runs from it towards angle degrees (0 along +x, 90 along +z; left out, towards that middle) for length mm (left out, until it is half its width inside the icon's box) and joins the bottom layer, and the hole goes through every layer; the hole keeps to the nearest corner of the box when the width change. A side other than left, right, top or free, a free hole without x and z, or a diameter outside 1 to 20 mm, is refused.",
           anyOf: [
             {
               type: "object",
               properties: {
-                side: { type: "string", enum: ["left", "right", "top"], description: "Where the ear sits, seen from above (default left)." },
+                side: { type: "string", enum: ["left", "right", "top", "free"], description: "Where the ear sits, seen from above (default left); free (#598) at x and z." },
                 diameter: { type: "number", minimum: 1, maximum: 20, description: "The hole's diameter in mm (default 3); the tab grows with it." },
                 along: { type: "number", description: "How far the tab sits off the middle of its side in mm (#671): up on the left and right, to the right on top, negative the other way; 0 or left out is the middle. Kept within the side, so the tab stays as wide as it is - move it to a letter that reaches out instead of a gap beside it." },
+                x: { type: "number", minimum: -1000, maximum: 1000, description: "With side free: the hole's middle in mm to the right (+) or left (-) of the middle, in the tag's own frame." },
+                z: { type: "number", minimum: -1000, maximum: 1000, description: "With side free: the hole's middle in mm below (+) or above (-) the middle, seen from above, in the tag's own frame." },
+                angle: { type: "number", description: "With side free: the way the ear runs from the hole, in degrees (0 along +x, 90 along +z); left out, towards the middle." },
+                length: { type: "number", minimum: 0, maximum: 1000, description: "With side free: from the hole's middle to the ear's straight end in mm; left out, until it is half its width inside the box." },
               },
             },
             { type: "boolean" },

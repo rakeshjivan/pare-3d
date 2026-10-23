@@ -3,8 +3,8 @@ import { loadedManifoldRuntime } from "@/lib/manifoldHandle";
 import { normalizeSketchStroke, SKETCH_STROKE_JOINS } from "@/lib/sketchStroke";
 import { normalizeTextEdge } from "@/lib/textEdge";
 import { textOutlineClearance, textOutlineReach } from "@/lib/textFill";
-import { DEFAULT_KEYRING_DIAMETER, KEYRING_HOLE_EDGE_DISTANCE, keyringAlongLimit, keyringEarRadius, MAX_KEYRING_DIAMETER, MIN_KEYRING_DIAMETER, TEXT_KEYRING_SIDES, textFillExtent, textKeyringOf, textKeyringReach, textLetterBox, textLetterOffset } from "@/lib/textGeometry";
-import type { SketchStroke, SketchStrokeJoin, TextEdge, TextKeyring, TextKeyringSide, WorkplaneShape } from "@/types/layerling";
+import { DEFAULT_KEYRING_DIAMETER, freeKeyringAt, KEYRING_HOLE_EDGE_DISTANCE, keyringAlongLimit, keyringEarRadius, MAX_KEYRING_DIAMETER, MIN_KEYRING_DIAMETER, TEXT_KEYRING_SIDES, textFillExtent, textKeyringOf, textKeyringReaches, textLetterBox, textLetterOffset } from "@/lib/textGeometry";
+import type { FreeKeyring, SketchStroke, SketchStrokeJoin, TextEdge, TextKeyring, TextKeyringSide, WorkplaneShape } from "@/types/layerling";
 
 /**
  * Layered text (#215): one text as a stack of bodies for a multicolour print - the letters on
@@ -72,8 +72,9 @@ export function normalizeTextLayers(layers: unknown): TextLayer[] | null {
 /**
  * A name tag's key ring hole as the card sets it: the side, the hole's diameter and how far the tab
  * sits off the middle of its side (#671): up on the left and right, to the right on top; 0 or left out is the middle.
+ * `free` (#598) when it was placed freely, where a key ring tab of its own was fixed; side and along are not used then.
  */
-export type NameTagKeyring = { side: TextKeyringSide; diameter: number; along?: number };
+export type NameTagKeyring = { side: TextKeyringSide; diameter: number; along?: number; free?: FreeKeyring };
 
 /** The tab's shift along its side (#671), kept within the side. */
 function clampedAlong(along: number | undefined, limit: number) {
@@ -89,26 +90,69 @@ export function nameTagKeyringAlongLimit(source: WorkplaneShape, layers: readonl
 }
 
 /**
+ * A key ring as layerling_layer_text and layerling_layer_icon take it: a side, or (#598) `free`
+ * with the hole's middle `at` in mm from the middle of the letters or the icon, seen from above in
+ * the tag's own frame, and the ear's direction and length when given.
+ */
+export type KeyringArgument = NameTagKeyring & { at?: { x: number; z: number; angle?: number; length?: number } };
+
+/**
  * layerling_layer_text's `keyring` (#215): left out it stays as it is (undefined); false or null
  * takes it off; true puts a 4 mm hole on the left; { side, diameter, along } puts that one on, `along`
- * mm off the middle of its side (#671, kept within the side). A side other than left, right or top,
- * or a diameter out of range, is refused, not bent into range.
+ * mm off the middle of its side (#671, kept within the side); side "free" (#598) with x and z puts
+ * it there. A side other than left, right, top or free, a free hole without its place, or a number
+ * out of range, is refused, not bent into range.
  */
-export function layerTextKeyringArgument(value: unknown): { keyring: NameTagKeyring | null } | { error: string } | undefined {
+export function layerTextKeyringArgument(value: unknown): { keyring: KeyringArgument | null } | { error: string } | undefined {
   if (value === undefined) return undefined;
   if (value === null || value === false) return { keyring: null };
   if (value === true) return { keyring: { side: "left", diameter: DEFAULT_KEYRING_DIAMETER } };
   if (typeof value !== "object" || Array.isArray(value)) return { error: "keyring must be { side, diameter }, true, or false to take it off" };
   const candidate = value as Record<string, unknown>;
   const side = candidate.side ?? "left";
-  if (!TEXT_KEYRING_SIDES.includes(side as TextKeyringSide)) return { error: "keyring.side must be left, right or top" };
+  if (side !== "free" && !TEXT_KEYRING_SIDES.includes(side as TextKeyringSide)) return { error: "keyring.side must be left, right, top or free" };
   const diameter = candidate.diameter ?? DEFAULT_KEYRING_DIAMETER;
   if (typeof diameter !== "number" || !Number.isFinite(diameter) || diameter < MIN_KEYRING_DIAMETER || diameter > MAX_KEYRING_DIAMETER) {
     return { error: `keyring.diameter must be ${MIN_KEYRING_DIAMETER} to ${MAX_KEYRING_DIAMETER} mm` };
   }
-  const along = candidate.along ?? 0;
-  if (typeof along !== "number" || !Number.isFinite(along)) return { error: "keyring.along must be a number of mm" };
-  return { keyring: { side: side as TextKeyringSide, diameter, ...(along ? { along } : {}) } };
+  if (side !== "free") {
+    const along = candidate.along ?? 0;
+    if (typeof along !== "number" || !Number.isFinite(along)) return { error: "keyring.along must be a number of mm" };
+    return { keyring: { side: side as TextKeyringSide, diameter, ...(along ? { along } : {}) } };
+  }
+  const within = (entry: unknown) => typeof entry === "number" && Number.isFinite(entry) && Math.abs(entry) <= 1000;
+  if (!within(candidate.x) || !within(candidate.z)) return { error: "a free keyring needs x and z: the hole's middle in mm from the middle of the letters or the icon, -1000 to 1000" };
+  if (candidate.angle !== undefined && !within(candidate.angle)) return { error: "keyring.angle must be a number of degrees" };
+  if (candidate.length !== undefined && !(within(candidate.length) && (candidate.length as number) >= 0)) return { error: "keyring.length must be 0 to 1000 mm" };
+  return {
+    keyring: {
+      side: "left",
+      diameter,
+      at: {
+        x: candidate.x as number,
+        z: candidate.z as number,
+        ...(candidate.angle !== undefined ? { angle: candidate.angle as number } : {}),
+        ...(candidate.length !== undefined ? { length: candidate.length as number } : {}),
+      },
+    },
+  };
+}
+
+/**
+ * A key ring from layerling_layer_text or layerling_layer_icon as the tag stores it (#598): a free
+ * hole `at` a place becomes one kept to the nearest corner of the box of the letters or the icon.
+ * Left out, the ear points at the middle of the box and runs until it is half its width inside it.
+ */
+export function placedKeyring(keyring: KeyringArgument | null, box: { width: number; depth: number }): NameTagKeyring | null {
+  if (!keyring) return null;
+  const { at, ...plain } = keyring;
+  if (!at) return plain;
+  const radius = keyringEarRadius(keyring.diameter);
+  const angle = at.angle ?? (Math.hypot(at.x, at.z) > 1e-9 ? THREE.MathUtils.radToDeg(Math.atan2(-at.z, -at.x)) : 0);
+  // How far the hole's middle lies outside the box, straight across: the ear reaches that far in and half its width more.
+  const outside = Math.hypot(Math.max(0, Math.abs(at.x) - box.width / 2), Math.max(0, Math.abs(at.z) - box.depth / 2));
+  const length = at.length ?? outside + radius;
+  return { side: "left", diameter: keyring.diameter, free: freeKeyringAt({ x: at.x, z: at.z }, box, angle, length) };
 }
 
 /** layerling_layer_text's `layers` (#215): a corner other than round, bevel or miter is refused; null when they are fine. */
@@ -162,6 +206,12 @@ const growStroke = (grow: number, join: SketchStrokeJoin = "round"): SketchStrok
 function layerKeyrings(letters: WorkplaneShape, layers: readonly TextLayer[], keyring: NameTagKeyring | null): (TextKeyring | undefined)[] {
   if (!keyring || !layers.length) return layers.map(() => undefined);
   const { side, diameter } = keyring;
+  // A free hole (#598) stands where it was put, the same for every layer: the ear on the bottom one,
+  // the hole through all - a layer it does not reach keeps its outline.
+  if (keyring.free) {
+    const free = keyring.free;
+    return layers.map((_, index) => (index === layers.length - 1 ? { side, diameter, offset: 0, ear: true, free } : { side, diameter, offset: 0, free }));
+  }
   const half = side === "top" ? (letters.depth ?? 0) / 2 : (letters.width ?? 0) / 2;
   const bottomLayer = layers[layers.length - 1];
   const bottomExtent = textFillExtent({ textStroke: growStroke(bottomLayer.grow, bottomLayer.join) });
@@ -226,11 +276,11 @@ export function textLayerShapes(source: WorkplaneShape, layers: readonly TextLay
     };
     if (layerKeyring?.ear) {
       // The ear widens the box on its side; the box moves by half of that, so the letters stay put.
-      const reach = textKeyringReach(shape);
+      const reach = textKeyringReaches(shape);
       shape = {
         ...shape,
-        width: round(letters.width + 2 * extent + (layerKeyring.side === "top" ? 0 : reach)),
-        depth: round(letters.depth + 2 * extent + (layerKeyring.side === "top" ? reach : 0)),
+        width: round(letters.width + 2 * extent + reach.left + reach.right),
+        depth: round(letters.depth + 2 * extent + reach.top + reach.bottom),
       };
       const middle = turned(shape, textLetterOffset(shape));
       shape = { ...shape, x: round(letters.x - middle.x), z: round(letters.z - middle.z), elevation: round(elevation - middle.y) };
@@ -273,7 +323,7 @@ export function textLayersOf(shapes: WorkplaneShape[]): TextLayerStack | null {
   const bottom = topDown[topDown.length - 1];
   // The key ring hole (#215) is the bottom layer's, where the ear is.
   const ring = textKeyringOf(bottom);
-  const keyring = ring ? { side: ring.side, diameter: ring.diameter, ...(ring.along ? { along: ring.along } : {}) } : null;
+  const keyring = ring ? { side: ring.side, diameter: ring.diameter, ...(ring.along ? { along: ring.along } : {}), ...(ring.free ? { free: ring.free } : {}) } : null;
   return { source: { ...source, elevation: bottom.elevation ?? 0 }, layers, ids: topDown.map((shape) => shape.id), keyring };
 }
 

@@ -29,7 +29,7 @@ import { GRIDFINITY_CLEARANCE, GRIDFINITY_GRID, GRIDFINITY_HEIGHT_UNIT, MAX_GRID
 import { DEFAULT_THREAD_PROFILE, defaultThreadHeadHeight, normalizeThreadHeadHeight, threadNaturalFootprint, threadSettings } from "@/lib/threadGeometry";
 import { curvedTextPatch, MAX_TEXT_SPACING, MIN_TEXT_SPACING } from "@/lib/textGeometry";
 import { normalizeTextEdge } from "@/lib/textEdge";
-import { DEFAULT_TEXT_LAYERS, layerTextKeyringArgument, layerTextLayersError, nameTagOffsets, normalizeTextLayers, type NameTagKeyring } from "@/lib/textLayers";
+import { DEFAULT_TEXT_LAYERS, layerTextKeyringArgument, placedKeyring, layerTextLayersError, nameTagOffsets, normalizeTextLayers, type NameTagKeyring } from "@/lib/textLayers";
 import { NAME_TAG_LAYERS, NAME_TAG_LETTER_SIZE, textShrinkPatch, textSpacingPatch } from "@/lib/nameTag";
 import { DEFAULT_ICON_TAG_WIDTH, ICON_TAG_LAYERS, MAX_ICON_TAG_WIDTH, MIN_ICON_TAG_WIDTH, normalizeIconTagCount } from "@/lib/iconTag";
 import type { IconLayerPatch, IconTagControls, TextLayerPatch } from "@/components/workplane/ShapeInspector";
@@ -328,7 +328,7 @@ import { debugShapeSummary, mcpPivotRequest, compactShapeSummary, mcpShapeSummar
 import { sweepPathFromParams, sweepSectionFromParams, sweepSketchProfile } from "@/lib/sweepSketch";
 import { emptySketchProfile, cadShapeFromSketchProfile, cadShapeFromSketchSweep, revolveBuildProfile, shapeFromRevolvedSketchProfile, shapeFromCadMesh, sketchBodyAsOperation, sketchBodyOperation, sketchProfileLeftOfAxis, sketchReferenceShapeOnWorkplane, defaultMcpSketchProfile } from "@/lib/editorSketchCad";
 import { drawingLabelsInLanguage } from "@/lib/drawingLabels";
-import { offersTextLayers, textLayerStack, layeredTextShape, nameTagSource, nameTagsFor, offersIconLayers, iconLayerStack, iconTagArea, layeredIconShape, iconTagCopies, svgIconArea, iconTagFromSvg, keyringTabShape, keyringTabTag } from "@/lib/editorTextTags";
+import { offersTextLayers, textLayerStack, layeredTextShape, nameTagSource, nameTagsFor, offersIconLayers, iconLayerStack, iconTagArea, layeredIconShape, iconTagCopies, svgIconArea, iconTagFromSvg, keyringTabShape, keyringTabTag, keyringTabAt, keyringTabPlace, textFreeKeyring, textFreeKeyringPlace, iconFreeKeyring, iconFreeKeyringPlace } from "@/lib/editorTextTags";
 import { DEFAULT_KEYRING_DIAMETER } from "@/lib/textGeometry";
 
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
@@ -643,6 +643,12 @@ function writeSharedClipboard(shapes: WorkplaneShape[], copiedAt: number) {
 }
 
 /** A key ring hole (#215) is placed from the plate's real outline: the 2D kernel loads first. */
+/** The box of an icon's outline, from which a free key ring hole is placed (#598). */
+function iconBox(area: SketchProfile) {
+  const bounds = sketchOutlineBounds(area);
+  return bounds ? { width: bounds.maxX - bounds.minX, depth: bounds.maxZ - bounds.minZ } : { width: 0, depth: 0 };
+}
+
 async function keyringRuntimeReady(keyring: NameTagKeyring | null) {
   if (keyring && !loadedManifoldRuntime()) await getManifoldRuntime().catch(() => null);
 }
@@ -9287,20 +9293,49 @@ export function LayerlingEditor({
     commitShapes([...shapesRef.current.filter((shape) => !selected.has(shape.id)), bundle], bundle.id, t("status.bundledMany", { count: selectedShapes.length }));
   }, [refuseLockedSelection, commitShapes, selectedIds, selectedShapes]);
 
-  /** A key ring tab of its own (#598) held together with the nearest tag in one click, as Ctrl+B would. */
-  const bundleKeyringTab = useCallback(() => {
+  /**
+   * A key ring tab of its own (#598) fixed to the nearest tag in one click, where it was put: the
+   * tag is built again with its hole there - the ear on the bottom layer, the hole through every
+   * layer - and the tab is gone. "Free" brings it out again.
+   */
+  const fixKeyringTab = useCallback(async () => {
     if (selectedShapes.length !== 1 || !selectedShape?.keyringTab) return;
     if (refuseLockedSelection()) return;
-    const tag = keyringTabTag(selectedShape, shapesRef.current);
+    const tab = selectedShape;
+    const tag = keyringTabTag(tab, shapesRef.current);
     if (!tag) {
       setNotice(t("status.keyringTabNoTag"));
       return;
     }
-    const group = groupedShape([tag, selectedShape]);
-    if (!group) return;
-    const parts = new Set([tag.id, selectedShape.id]);
-    const bundle = canonicalizeShape({ ...group, name: tag.name, groupOperation: "bundle" });
-    commitShapes([...shapesRef.current.filter((shape) => !parts.has(shape.id)), bundle], bundle.id, t("status.keyringTabBundled"));
+    const place = keyringTabPlace(tab);
+    if (!place) return;
+    const commit = (next: WorkplaneShape) => {
+      if (!shapesRef.current.some((shape) => shape.id === tag.id) || !shapesRef.current.some((shape) => shape.id === tab.id)) return;
+      commitShapes(
+        shapesRef.current.filter((shape) => shape.id !== tab.id).map((shape) => (shape.id === tag.id ? next : shape)),
+        [next.id],
+        t("status.keyringTabFixed"),
+      );
+    };
+    try {
+      if (tag.layeredText) {
+        const stack = textLayerStack(tag);
+        if (!stack) return;
+        const keyring = { side: stack.keyring?.side ?? "left", diameter: place.diameter, free: textFreeKeyring(stack.source, place) } as const;
+        await keyringRuntimeReady(keyring);
+        commit(layeredTextShape(nameTagSource(stack.source, {}), stack.layers, stack.ids, tag.id, tag, stack.source.text, keyring));
+        return;
+      }
+      const stack = iconLayerStack(tag);
+      if (!stack) return;
+      setNotice(t("status.buildingSketch"), true);
+      const area = await iconTagArea(stack.source, stack.width, stack.width);
+      const free = iconFreeKeyring(area, stack.place, place);
+      if (!free) return;
+      commit(await layeredIconShape(area, stack.layers, stack.place, stack.ids, tag.id, tag, { side: stack.keyring?.side ?? "left", diameter: place.diameter, free }));
+    } catch (error) {
+      setNotice(error instanceof Error ? localizedError(error.message) : t("status.sketchCannotExtrude"), true);
+    }
   }, [refuseLockedSelection, commitShapes, selectedShape, selectedShapes.length]);
 
   /** Ends the preview of an intersection: the operands show as they are again. */
@@ -10149,7 +10184,12 @@ export function LayerlingEditor({
     const next = layeredTextShape(source, layers, wasText ? [] : stack.ids, selectedShape.id, selectedShape, stack.source.text, keyring);
     if (patch.keyringTab) {
       const bottom = layers[layers.length - 1];
-      const tab = keyringTabShape(next, { color: bottom.color, height: bottom.height, elevation: stack.source.elevation ?? 0 }, stack.keyring?.diameter ?? DEFAULT_KEYRING_DIAMETER, t("nameTag.keyringTab"));
+      const floor = { color: bottom.color, height: bottom.height, elevation: stack.source.elevation ?? 0 };
+      // A hole fixed freely before comes out as a tab again, where it was; otherwise one starts beside the tag.
+      const free = stack.keyring?.free;
+      const tab = free && stack.keyring
+        ? keyringTabAt(textFreeKeyringPlace(stack.source, { ...stack.keyring, free }), floor, t("nameTag.keyringTab"))
+        : keyringTabShape(next, floor, stack.keyring?.diameter ?? DEFAULT_KEYRING_DIAMETER, t("nameTag.keyringTab"));
       commitShapes([...shapesRef.current.map((shape) => (shape.id === selectedShape.id ? next : shape)), tab], [tab.id], t("status.keyringTabMade"));
       return;
     }
@@ -10211,14 +10251,21 @@ export function LayerlingEditor({
         const area = await iconTagArea(stack.source, stack.width, wanted.patch.width ?? stack.width);
         // The key ring hole stays as it is unless the patch sets or takes it off (null); "Free" (#598) takes it off too.
         const keyring = wanted.patch.keyringTab ? null : wanted.patch.keyring === undefined ? stack.keyring : wanted.patch.keyring;
-        return layeredIconShape(area, layers, stack.place, wasBody ? [] : stack.ids, current.id, wasBody ? { ...current, name: stack.name } : current, keyring);
+        const next = await layeredIconShape(area, layers, stack.place, wasBody ? [] : stack.ids, current.id, wasBody ? { ...current, name: stack.name } : current, keyring);
+        return { next, area };
       })()
-        .then((next) => {
+        .then(({ next, area }) => {
           if (iconLayerRequestRef.current !== request || !shapesRef.current.some((shape) => shape.id === next.id)) return;
           if (wanted.patch.keyringTab) {
-            // A key ring tab of its own beside the tag, in the bottom layer's colour and height (#598).
+            // A key ring tab of its own beside the tag, in the bottom layer's colour and height (#598);
+            // a hole fixed freely before comes out as a tab again, where it was.
             const bottom = layers[layers.length - 1];
-            const tab = keyringTabShape(next, { color: bottom.color, height: bottom.height, elevation: stack.place.elevation }, stack.keyring?.diameter ?? DEFAULT_KEYRING_DIAMETER, t("nameTag.keyringTab"));
+            const floor = { color: bottom.color, height: bottom.height, elevation: stack.place.elevation };
+            const free = stack.keyring?.free;
+            const back = free && stack.keyring ? iconFreeKeyringPlace(area, stack.place, { ...stack.keyring, free }) : null;
+            const tab = back
+              ? keyringTabAt(back, floor, t("nameTag.keyringTab"))
+              : keyringTabShape(next, floor, stack.keyring?.diameter ?? DEFAULT_KEYRING_DIAMETER, t("nameTag.keyringTab"));
             commitShapes([...shapesRef.current.map((shape) => (shape.id === next.id ? next : shape)), tab], [tab.id], t("status.keyringTabMade"));
             return;
           }
@@ -11280,7 +11327,8 @@ export function LayerlingEditor({
         // The key ring hole (#215): left out it stays as the stack has it.
         const keyringArgument = layerTextKeyringArgument(params.keyring);
         if (keyringArgument && "error" in keyringArgument) throw new Error(keyringArgument.error);
-        const keyring = keyringArgument ? keyringArgument.keyring : stack.keyring;
+        // A free hole (#598) is placed from the middle of the letters.
+        const keyring = keyringArgument ? placedKeyring(keyringArgument.keyring, { width: shapeWidth(source), depth: shapeDepth(source) }) : stack.keyring;
         await keyringRuntimeReady(keyring);
         const names = Array.isArray(params.names) ? mcpStringArray(params.names).map((name) => name.trim()).filter(Boolean).slice(0, 100) : [];
         if (names.length) {
@@ -11388,7 +11436,7 @@ export function LayerlingEditor({
         if (svg) {
           const label = typeof params.name === "string" && params.name.trim() ? params.name.trim().slice(0, 60) : "Icon tag";
           const { area, name } = await svgIconArea(`${label}.svg`, svg, width ?? DEFAULT_ICON_TAG_WIDTH);
-          tag = await layeredIconShape(area, layers ?? ICON_TAG_LAYERS, { x: 0, z: 0, elevation: 0, rotation: 0, rotationX: 0, rotationZ: 0 }, [], createLocalId("icon-tag"), { locked: false, hidden: false, name }, keyringArgument ? keyringArgument.keyring : null);
+          tag = await layeredIconShape(area, layers ?? ICON_TAG_LAYERS, { x: 0, z: 0, elevation: 0, rotation: 0, rotationX: 0, rotationZ: 0 }, [], createLocalId("icon-tag"), { locked: false, hidden: false, name }, keyringArgument ? placedKeyring(keyringArgument.keyring, iconBox(area)) : null);
           status = t("status.iconTagAdded", { name });
         } else {
           const target = currentShapes().find((shape) => shape.id === id);
@@ -11400,7 +11448,7 @@ export function LayerlingEditor({
           const wasBody = !target.layeredIcon;
           const area = await iconTagArea(stack.source, stack.width, width ?? stack.width);
           const built = layers ?? (wasBody ? [...ICON_TAG_LAYERS] : stack.layers);
-          tag = await layeredIconShape(area, built, stack.place, wasBody ? [] : stack.ids, target.id, wasBody ? { ...target, name: stack.name } : target, keyringArgument ? keyringArgument.keyring : stack.keyring);
+          tag = await layeredIconShape(area, built, stack.place, wasBody ? [] : stack.ids, target.id, wasBody ? { ...target, name: stack.name } : target, keyringArgument ? placedKeyring(keyringArgument.keyring, iconBox(area)) : stack.keyring);
           status = t(wasBody ? "status.iconLayered" : "status.iconLayersUpdated", { count: built.length });
         }
         const tags = count > 1 ? iconTagCopies(tag, count, { width: plate.width, depth: plate.depth }) : [tag];
@@ -14657,7 +14705,7 @@ export function LayerlingEditor({
           onWrapAroundCylinder={selectedShapes.length === 1 && offersCylinderWrap(selectedShape) ? wrapSelectionAroundCylinder : undefined}
           onLayerText={selectedShapes.length === 1 && offersTextLayers(selectedShape) ? layerSelectedText : undefined}
           onTextTags={selectedShapes.length === 1 && offersTextLayers(selectedShape) ? makeTextTags : undefined}
-          onBundleKeyringTab={selectedShapes.length === 1 && selectedShape?.keyringTab && !historyViewState ? bundleKeyringTab : undefined}
+          onFixKeyringTab={selectedShapes.length === 1 && selectedShape?.keyringTab && !historyViewState ? () => void fixKeyringTab() : undefined}
           textLayerStack={selectedNameTag}
           iconTag={historyViewState ? null : iconTagControls}
           qrCode={historyViewState ? null : qrCodeControls}
