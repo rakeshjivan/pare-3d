@@ -3583,4 +3583,10 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "shell.pickHint": "Click a face of the part to open or close it. Drag a face inward to set the wall thickness. Enter hollows.",
   "array.dragHintRow": "Or drag a copy to space them out or bring them closer; + and − while dragging change the count. Enter creates.",
   "array.dragHintCircle": "Or drag a copy round to set how far the circle goes; + and − while dragging change the count. Enter creates.",
+  "workspace.strongHoles": "Luknje prikaži bolj izrazito",
+  "workspace.strongHolesHint": "Nariše luknje temneje in manj prosojno, s temno črto okoli, da izstopajo med prosojnimi telesi.",
+  "status.shelledClosed": "Izdolbeno s stenami {size} mm, zaprto z vseh strani: votlina je znotraj in se vidi le v prerezu",
+  "sketch.modeBadgeExtrude": "Skica za izvlek",
+  "sketch.operationHint": "Kaj postane ta skica: izvlek, vrtenje ali vlečenje po poti",
+  "status.sketchOperationChanged": "Zdaj: {operation}. Dokončaj skico, da se zgradi telo",
 };

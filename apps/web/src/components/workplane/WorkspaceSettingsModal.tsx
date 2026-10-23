@@ -845,6 +845,12 @@ export function WorkspaceSettingsModal({
                     disabled={!workspace.edgeLines || workspace.fastMode}
                     onChange={(nextEdgeColor) => patchWorkspace({ edgeColor: nextEdgeColor })}
                   />
+                  <WorkspaceToggle
+                    label={t("workspace.strongHoles")}
+                    description={t("workspace.strongHolesHint")}
+                    checked={workspace.strongHoles}
+                    onChange={(strongHoles) => patchWorkspace({ strongHoles })}
+                  />
                   <ColorSettingControl
                     label={t("workspace.sketchBackground")}
                     color={sketchBackground}

@@ -56,6 +56,7 @@ export const DEFAULT_WORKPLANE_WORKSPACE: WorkplaneWorkspaceSettings = {
   gridLinesGrow: true,
   edgeLines: false,
   edgeColor: DEFAULT_EDGE_LINE_COLOR,
+  strongHoles: false,
   showShadows: true,
   cameraInertia: true,
   // Fork: Fast mode on by default - the smoothest view on any computer; Settings turns it off.
@@ -680,6 +681,7 @@ export function normalizeWorkspaceSettings(value: unknown, fallback: WorkplaneWo
     gridLinesGrow: booleanOrDefault(candidate.gridLinesGrow, fallback.gridLinesGrow),
     edgeLines: booleanOrDefault(candidate.edgeLines, fallback.edgeLines),
     edgeColor: colorOrDefault(candidate.edgeColor, fallback.edgeColor),
+    strongHoles: booleanOrDefault(candidate.strongHoles, fallback.strongHoles),
     showShadows: booleanOrDefault(candidate.showShadows, fallback.showShadows),
     cameraInertia: booleanOrDefault(candidate.cameraInertia, fallback.cameraInertia),
     fastMode: booleanOrDefault(candidate.fastMode, fallback.fastMode),

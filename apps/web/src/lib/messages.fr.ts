@@ -3581,4 +3581,10 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "array.dragHintRow": "Ou tirez une copie pour écarter ou rapprocher les copies ; + et − pendant le glissement changent le nombre. Entrée crée.",
   "array.dragHintCircle": "Ou tirez une copie autour pour régler l'étendue du cercle ; + et − pendant le glissement changent le nombre. Entrée crée.",
   "status.shelledSealed": "Évidé avec des parois de {size} mm, fermé de tous côtés - la cavité est à l'intérieur, la pièce paraît donc pleine. Ouvrez un côté pour la voir.",
+  "workspace.strongHoles": "Afficher les trous plus nettement",
+  "workspace.strongHolesHint": "Dessine les trous plus sombres et moins transparents, avec une ligne sombre autour, pour qu'ils ressortent parmi les corps transparents.",
+  "status.shelledClosed": "Creux avec des parois {size} mm, fermé de tous côtés : la cavité est à l'intérieur et n'apparaît que dans la vue en coupe",
+  "sketch.modeBadgeExtrude": "Esquisse extrudée",
+  "sketch.operationHint": "Ce que devient cette esquisse : extrudée, en révolution ou suivant un chemin",
+  "status.sketchOperationChanged": "Maintenant : {operation}. Termine l'esquisse pour construire le corps",
 };

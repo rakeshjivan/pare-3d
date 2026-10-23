@@ -3079,4 +3079,10 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "notice.importedDesignName": "読み込んだデザイン（{count}ファイル）",
   "notice.importing": "{total}件中{index}件目を読み込み中：{name}",
   "notice.importProjectFailed": "読み込んだファイルからデザインを作れませんでした",
+  "workspace.strongHoles": "穴をはっきり表示",
+  "workspace.strongHolesHint": "穴を濃く、透けにくく描き、周りに濃い線を付けます。透明なボディの中でも穴が目立ちます。",
+  "status.shelledClosed": "{size} mmの壁で中空にしました。全面が閉じているため、空洞は内部にあり断面表示でのみ見えます",
+  "sketch.modeBadgeExtrude": "押し出しスケッチ",
+  "sketch.operationHint": "このスケッチから作るもの：押し出し、回転、スイープ",
+  "status.sketchOperationChanged": "現在：{operation}。スケッチを完了するとボディが作られます",
 };

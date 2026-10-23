@@ -334,6 +334,8 @@ export type WorkplaneWorkspaceSettings = {
   edgeLines: boolean;
   /** Colour of those edge lines. */
   edgeColor: string;
+  /** Holes drawn darker and denser, with a line round them, so they stand out among see-through bodies (#662). */
+  strongHoles: boolean;
   showShadows: boolean;
   /** The camera keeps turning for a moment after you let go, and slows down. */
   cameraInertia: boolean;

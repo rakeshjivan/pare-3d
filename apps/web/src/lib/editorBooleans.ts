@@ -74,8 +74,12 @@ function paddedCutterShape(shape: WorkplaneShape): WorkplaneShape {
   // Its width and depth stay as typed but for a thousandth of a millimetre: padding them by 0.05 cut a
   // 7.9 mm hole at 8.0 (#254), none at all left a hole that touches a wall along a line cutting a slab
   // out of it. A thousandth keeps the size and breaks that touch.
-  const width = shapeWidth(shape) + CUTTER_LATERAL_PADDING * 2;
-  const depth = shapeDepth(shape) + CUTTER_LATERAL_PADDING * 2;
+  // It is a scale round the middle, which only widens a simple shape all round. An imported, sketched or grouped
+  // cutter is scaled as a whole, so both walls of a strip far from its middle move the same way: a copy set to hole
+  // then left a thin wall of the part standing (#607). Those keep their width and depth exactly.
+  const lateral = widensEvenlyWhenScaled(shape) ? CUTTER_LATERAL_PADDING : 0;
+  const width = shapeWidth(shape) + lateral * 2;
+  const depth = shapeDepth(shape) + lateral * 2;
   return {
     ...shape,
     width,
@@ -83,8 +87,13 @@ function paddedCutterShape(shape: WorkplaneShape): WorkplaneShape {
     height,
     size: Math.max(width, depth),
     elevation: (shape.elevation ?? 0) - CUTTER_PADDING,
-    baseRadius: shape.baseRadius ? shape.baseRadius + CUTTER_LATERAL_PADDING : shape.baseRadius,
+    baseRadius: shape.baseRadius ? shape.baseRadius + lateral : shape.baseRadius,
   };
+}
+
+/** A shape of its own outline - not an imported mesh, a sketch body, a text or a group of parts. */
+function widensEvenlyWhenScaled(shape: WorkplaneShape) {
+  return !shape.importedMesh && !shape.sketchProfile && !shape.groupedShapes?.length && shape.kind !== "text";
 }
 
 function brushFromShape(shape: WorkplaneShape, cutter = false) {

@@ -16,7 +16,7 @@ Choose {{ui:shape.thread}} in the shape library. Under {{ui:inspector.threadRole
 
 ![A screw with a cylinder head. On the right: kind and head shape, further down size, pitch and profile.](shot:thread-screw)
 
-You pick the size under {{ui:prop.threadSize}} from a list: metric from M2 to M12, the inch sizes UNC and UNF from No. 4 to 1 inch, and the pipe threads G1/16 to G4. If you choose {{ui:thread.customSize}}, you set {{ui:prop.diameter}} and {{ui:prop.pitch}} yourself. For an inch size or a G size the field asks for {{ui:prop.threadsPerInch}} instead of the pitch in millimetres.
+You pick the size under {{ui:prop.threadSize}} from a list: metric from M2 to M24, the inch sizes UNC and UNF from No. 4 to 1 inch, and the pipe threads G1/16 to G4. If you choose {{ui:thread.customSize}}, you set {{ui:prop.diameter}} and {{ui:prop.pitch}} yourself. For an inch size or a G size the field asks for {{ui:prop.threadsPerInch}} instead of the pitch in millimetres.
 
 The list groups the sizes by series, and a line under the field names the series of the size you picked, with examples you know from everyday life:
 

@@ -3132,4 +3132,10 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "edge.bottomEdges": "Alt kenarlar",
   "edge.bottomEdgesHint": "Sadece gövdenin en altındaki kenarları seçer, örneğin parçanın tablaya oturan tabanındaki kenarlar",
   "edge.noBottomEdges": "Bu keskinlik eşiğinde altta işlenebilecek bir kenar yok. Eşiği düşürmeyi deneyebilirsin.",
+  "workspace.strongHoles": "Delikleri daha belirgin göster",
+  "workspace.strongHolesHint": "Delikleri daha koyu ve daha az saydam, çevresinde koyu bir çizgiyle çizer; böylece saydam gövdeler arasında öne çıkarlar.",
+  "status.shelledClosed": "{size} mm duvarlarla içi boşaltıldı, her taraf kapalı: boşluk içeride ve yalnızca kesit görünümünde görünür",
+  "sketch.modeBadgeExtrude": "Ekstrüzyon eskizi",
+  "sketch.operationHint": "Bu eskizin ne olacağı: ekstrüzyon, döndürme veya yol boyunca süpürme",
+  "status.sketchOperationChanged": "Şimdi: {operation}. Gövdeyi oluşturmak için eskizi bitir",
 };

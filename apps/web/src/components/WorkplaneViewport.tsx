@@ -332,6 +332,17 @@ function setEdgeLineStyle(enabled: boolean, color: string) {
   edgeLineStyle = { enabled, color };
   return changed;
 }
+
+/** "Show holes more clearly" (#662): darker, denser holes with a line round them, handed over like the edge lines. */
+let strongHoles = false;
+const STRONG_HOLE_COLOR = "#5b6670";
+const STRONG_HOLE_EDGE_COLOR = "#1f262c";
+
+function setStrongHoles(enabled: boolean) {
+  const changed = strongHoles !== enabled;
+  strongHoles = enabled;
+  return changed;
+}
 const NORMAL_IMPORTED_SELECTION_EDGE_ANGLE = 60;
 const MODIFIER_EDGE_PICK_RADIUS_PX = 14;
 // "Only visible edges": an edge lies on the body's own faces, so its line is
@@ -1214,7 +1225,7 @@ function shapeMaterialSignature(shape: WorkplaneShape): string {
   return JSON.stringify({
     edgeLines: edgeLineStyle.enabled ? edgeLineStyle.color : "",
     color: shape.color,
-    hole: Boolean(shape.hole),
+    hole: shape.hole ? (strongHoles ? "strong" : true) : false,
     transparent: Boolean(shape.transparent),
     multicolor: shape.groupedShapes?.length ? groupShowsPartColors(shape) : undefined,
     imagePlate: shapeResourceId(shape.imagePlate),
@@ -4601,7 +4612,8 @@ export function WorkplaneViewport({
     setMeasureUnit(workspace);
     if (threeRef.current) threeRef.current.palette = appThemePalette(themePreference);
     // Edge lines on all bodies: shapes already built have to take the setting up.
-    if (setEdgeLineStyle(effectiveViewSettings(workspace).edgeLines, workspace.edgeColor)) {
+    const holesChanged = setStrongHoles(workspace.strongHoles);
+    if (setEdgeLineStyle(effectiveViewSettings(workspace).edgeLines, workspace.edgeColor) || holesChanged) {
       rebuildShapes(threeRef.current, shapesRef.current, shapeOutlineIds(), modifierActiveRef.current, placementWorkplaneRef.current);
     }
     rebuildWorkplane(threeRef.current, workspace, resolvedTheme, workplaneHidden ? horizontalPlacementWorkplane() : placementWorkplane, projectName);
@@ -7308,6 +7320,9 @@ export function WorkplaneViewport({
       // A second finger belongs to the camera.
       if (touchPointersRef.current.size !== 1) return;
       longPressFiredRef.current = pointerId;
+      // The press also began moving the body it landed on. The finger lifts on the menu, so that move never
+      // ends here: drop it now, or the next tap ends it and puts the body back where it was (#619).
+      cancelGestureForCameraRef.current();
       const shapeId = pickShape(x, y, "touch");
       if (shapeId && !selectedIdsRef.current.includes(shapeId)) onSelectShape(shapeId);
       onShapeContextMenu({ shapeId, clientX: x, clientY: y });
@@ -8641,6 +8656,8 @@ export function WorkplaneViewport({
     if (state) state.needsRender = true;
     onInteractionActiveChange?.(false);
   }, [clearMoveDimensions, onInteractionActiveChange, setMarqueeFromState]);
+  const cancelGestureForCameraRef = useRef(cancelGestureForCamera);
+  cancelGestureForCameraRef.current = cancelGestureForCamera;
 
   /**
    * Esc while the mouse button is held (#440): a move drag only previews, so its preview goes back; a handle drag
@@ -8804,6 +8821,12 @@ export function WorkplaneViewport({
       if (!drag) {
         return;
       }
+      // A move begun by another finger that never came back up here is no move of this one: letting it end
+      // would write its start places over whatever happened since, such as a body set down on a face (#619).
+      if (drag.pointerId !== event.pointerId) {
+        cancelGestureForCamera();
+        return;
+      }
 
       if (event.currentTarget.hasPointerCapture(drag.pointerId)) {
         event.currentTarget.releasePointerCapture(drag.pointerId);
@@ -8872,7 +8895,7 @@ export function WorkplaneViewport({
       }
       onInteractionActiveChange?.(false);
     },
-    [clearMoveDimensions, onDuplicateShapesMoved, onInteractionActiveChange, onSelectShape, onUpdateShape, rememberResizeAnchor, setMarqueeFromState, shapesInMarquee, suppressCornerEditAfterDrag, suppressLiftEditAfterDrag, onShapeContextMenu, pickShape],
+    [cancelGestureForCamera, clearMoveDimensions, onDuplicateShapesMoved, onInteractionActiveChange, onSelectShape, onUpdateShape, rememberResizeAnchor, setMarqueeFromState, shapesInMarquee, suppressCornerEditAfterDrag, suppressLiftEditAfterDrag, onShapeContextMenu, pickShape],
   );
 
   const handleDrop = useCallback(
@@ -13754,14 +13777,19 @@ function groupChildAppearance(group: WorkplaneShape, child: WorkplaneShape): Wor
 // visible from every side.
 const TRANSPARENT_SOLID_OPACITY = 0.4;
 
+function holeOpacity(shape: WorkplaneShape) {
+  if (strongHoles) return shape.importedMesh ? 0.6 : 0.72;
+  return shape.importedMesh ? 0.34 : 0.52;
+}
+
 function sharedShapeMaterial(shape: WorkplaneShape, vertexColors = false) {
   const seeThrough = !shape.hole && Boolean(shape.transparent);
-  const color = shape.hole ? "#b7c0c9" : vertexColors ? "#ffffff" : shape.color;
+  const color = shape.hole ? (strongHoles ? STRONG_HOLE_COLOR : "#b7c0c9") : vertexColors ? "#ffffff" : shape.color;
   const key = JSON.stringify({
     color,
     vertexColors,
     transparent: Boolean(shape.hole) || seeThrough,
-    opacity: shape.hole ? (shape.importedMesh ? 0.34 : 0.52) : seeThrough ? TRANSPARENT_SOLID_OPACITY : 1,
+    opacity: shape.hole ? holeOpacity(shape) : seeThrough ? TRANSPARENT_SOLID_OPACITY : 1,
     roughness: shape.hole ? 0.88 : 0.57,
     depthWrite: !seeThrough,
     side: "double",
@@ -13776,7 +13804,7 @@ function sharedShapeMaterial(shape: WorkplaneShape, vertexColors = false) {
     color,
     vertexColors,
     transparent: Boolean(shape.hole) || seeThrough,
-    opacity: shape.hole ? (shape.importedMesh ? 0.34 : 0.52) : seeThrough ? TRANSPARENT_SOLID_OPACITY : 1,
+    opacity: shape.hole ? holeOpacity(shape) : seeThrough ? TRANSPARENT_SOLID_OPACITY : 1,
     roughness: shape.hole ? 0.88 : 0.57,
     metalness: 0.02,
     depthWrite: !seeThrough,
@@ -14523,14 +14551,15 @@ function addShapeEdgeDecorations(group: THREE.Group, mesh: THREE.Mesh, prepared:
   const importedTriangleCount = shape.importedMesh?.triangleCount ?? 0;
   const skipHeavyImportedEdges = Boolean(shape.importedMesh) && importedTriangleCount > IMPORTED_SELECTED_EDGE_TRIANGLE_LIMIT;
   // The setting draws a line on every body, in the colour chosen.
-  const allEdgeLines = edgeLineStyle.enabled && importedTriangleCount <= ALL_EDGE_LINES_IMPORTED_TRIANGLE_LIMIT;
+  // "Show holes more clearly" (#662) gives every hole that line too, darker.
+  const allEdgeLines = (edgeLineStyle.enabled || (strongHoles && Boolean(shape.hole))) && importedTriangleCount <= ALL_EDGE_LINES_IMPORTED_TRIANGLE_LIMIT;
   if ((group.userData.showEdges || complexEdges || allEdgeLines) && (!skipHeavyImportedEdges || (allEdgeLines && !group.userData.showEdges))) {
     const selectedOutline = Boolean(group.userData.showEdges);
     const selectedRoundedBox = selectedOutline && shape.kind === "box" && Boolean(shape.radius && shape.radius > 0);
-    const edgeColor = selectedOutline ? "#00aeea" : shape.hole ? "#697989" : allEdgeLines ? edgeLineStyle.color : complexEdges ? "#141b21" : darkenHex(shape.color, 0.34);
+    const edgeColor = selectedOutline ? "#00aeea" : shape.hole ? (strongHoles ? STRONG_HOLE_EDGE_COLOR : "#697989") : allEdgeLines ? edgeLineStyle.color : complexEdges ? "#141b21" : darkenHex(shape.color, 0.34);
     // Edge lines on every body are a help to tell dark parts apart, not a drawing: half strength
     // keeps them readable without the hard black frame they had.
-    const edgeOpacity = selectedRoundedBox ? 0 : selectedOutline ? 0.98 : shape.hole ? 0.44 : allEdgeLines ? 0.5 : complexEdges ? 0.38 : shape.kind === "text" ? 0.86 : 0.2;
+    const edgeOpacity = selectedRoundedBox ? 0 : selectedOutline ? 0.98 : shape.hole ? (strongHoles ? 0.85 : 0.44) : allEdgeLines ? 0.5 : complexEdges ? 0.38 : shape.kind === "text" ? 0.86 : 0.2;
     if (selectedOutline && shape.importedMesh && shape.cadDisplayEdgesVersion === 2 && Boolean(shape.cadDisplayEdges?.length)) {
       addCadDisplayEdges(group, shape, edgeColor, edgeOpacity);
     } else {

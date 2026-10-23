@@ -3177,4 +3177,10 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "notice.folderDeleted": "Cartella {name} eliminata; il suo contenuto è stato spostato al livello superiore.",
   "notice.movedToFolder": "{name} spostato nella cartella {folder}.",
   "notice.movedToRoot": "{name} spostato al livello superiore.",
+  "workspace.strongHoles": "Mostra i fori più chiaramente",
+  "workspace.strongHolesHint": "Disegna i fori più scuri e meno trasparenti, con una linea scura intorno, così risaltano tra i corpi trasparenti.",
+  "status.shelledClosed": "Corpo svuotato con pareti di {size} mm, chiuso su tutti i lati: la cavità è all'interno e si vede solo nella vista in sezione",
+  "sketch.modeBadgeExtrude": "Schizzo da estrudere",
+  "sketch.operationHint": "Cosa diventa questo schizzo: estruso, rivoluzione o lungo un percorso",
+  "status.sketchOperationChanged": "Ora: {operation}. Termina lo schizzo per costruire il corpo",
 };

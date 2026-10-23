@@ -1,1 +1,52 @@
-[]
+[
+  {
+    "title": {
+      "de": "Aus einer Skizze eine Drehung machen",
+      "en": "Turn a sketch into a revolve"
+    },
+    "body": {
+      "de": "Das Schild oben in der Skizze ist jetzt eine Auswahl: Stell eine Skizze dort auf „Rotationsskizze“ um, auch die eines vorhandenen Körpers. So wird ein importiertes SVG zur Vase, ohne es nachzuzeichnen.",
+      "en": "The badge at the top of a sketch is now a choice: switch a sketch to \"Revolve sketch\" there, also the sketch of an existing body. An imported SVG becomes a vase this way, without tracing it."
+    }
+  },
+  {
+    "title": {
+      "de": "Eine Kopie als Loch hebt das Teil auf",
+      "en": "A copy set to hole cancels the part"
+    },
+    "body": {
+      "de": "Machst du eine Kopie eines importierten Teils zum Loch und gruppierst beide, verschwindet das Teil jetzt ganz. Bisher blieben bei großen SVGs dünne Wandstreifen stehen.",
+      "en": "Make a copy of an imported part a hole and group the two, and the part is now gone entirely. On large SVGs thin strips of wall used to stay standing."
+    }
+  },
+  {
+    "title": {
+      "de": "Auf eine Fläche setzen klappt auf dem Tablet",
+      "en": "Set down on a face works on a tablet"
+    },
+    "body": {
+      "de": "Nach einem langen Druck auf einen Körper blieb er beim Absetzen manchmal stehen, obwohl die Meldung kam, und erst Rückgängig zeigte ihn am Ziel. Jetzt landet er gleich auf der angetippten Fläche.",
+      "en": "After a long press on a body it sometimes stayed where it was when set down, although the message came, and only Undo showed it at its place. Now it lands on the face you tap straight away."
+    }
+  },
+  {
+    "title": {
+      "de": "Metrische Gewinde bis M24",
+      "en": "Metric threads up to M24"
+    },
+    "body": {
+      "de": "Die Größenliste des Gewindes geht jetzt über M12 hinaus: M14, M16, M18, M20, M22 und M24, jeweils mit Regelsteigung und genormten Kopf- und Muttermaßen.",
+      "en": "The size list of the thread now goes past M12: M14, M16, M18, M20, M22 and M24, each with its standard pitch and standard head and nut sizes."
+    }
+  },
+  {
+    "title": {
+      "de": "Löcher deutlicher zeigen",
+      "en": "Show holes more clearly"
+    },
+    "body": {
+      "de": "Unter Einstellungen, Darstellung lassen sich Löcher jetzt dunkler, weniger durchsichtig und mit einer Linie drumherum zeigen. So findest du ein Loch auch zwischen vielen durchsichtigen Körpern.",
+      "en": "Under Settings, Appearance, holes can now be shown darker, less see-through and with a line round them. That way you find a hole even among many see-through bodies."
+    }
+  }
+]

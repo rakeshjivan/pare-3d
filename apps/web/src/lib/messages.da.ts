@@ -3154,4 +3154,10 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "storageNotice.body": "Pare 3D tager intet ansvar for design der opbevares i browseren. En browser kan fejle, eller en browseropdatering kan give problemer. Gem derfor dine design ind imellem: \"Backup af alle\" samler alle design i én fil, og et åbent design kan gemmes som fil med Eksport (LYL).",
   "storageNotice.title": "Dine design ligger i denne browser – tag backup",
   "workspace.customSnapGridParts": "Også halv og kvart",
+  "workspace.strongHoles": "Vis huller tydeligere",
+  "workspace.strongHolesHint": "Tegner huller mørkere og mindre gennemsigtige, med en mørk linje rundt om, så de skiller sig ud mellem gennemsigtige former.",
+  "status.shelledClosed": "Udhulet med {size} mm vægge, lukket hele vejen rundt: hulrummet ligger indeni og ses kun i snitvisningen",
+  "sketch.modeBadgeExtrude": "Ekstruderingsskitse",
+  "sketch.operationHint": "Hvad skitsen bliver til: ekstruderet, drejet eller trukket langs en sti",
+  "status.sketchOperationChanged": "Nu: {operation}. Afslut skitsen for at bygge legemet",
 };

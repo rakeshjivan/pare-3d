@@ -51,6 +51,8 @@ export type SketchMeasurement = { start: SketchPoint; end: SketchPoint } | null;
 type SketchWorkspaceProps = {
   profile: SketchProfile;
   operation?: SketchOperation;
+  /** What the sketch becomes changed from the badge at the top (#655). */
+  onOperationChange?: (operation: SketchOperation) => void;
   revolvePreviewPositions?: number[] | null;
   referenceShapes: WorkplaneShape[];
   /** Where a workplane inside a body cuts it: the outline of the cut per body (id), as an SVG path of loops. */
@@ -540,6 +542,7 @@ function footprintOfPositions(
 export function SketchWorkspace({
   profile,
   operation = "extrude",
+  onOperationChange,
   revolvePreviewPositions = null,
   referenceShapes,
   referenceSlices,
@@ -1982,7 +1985,21 @@ export function SketchWorkspace({
           ))}
         </div>
       ) : null}
-      <div className="sketch-mode-badge">{operation === "revolve" ? t("sketch.modeBadgeRevolve") : operation === "sweep" ? t("sketch.modeBadgeSweep") : t("sketch.modeBadge")}</div>
+      {onOperationChange ? (
+        <label className="sketch-mode-badge switchable" title={t("sketch.operationHint")}>
+          <select
+            aria-label={t("sketch.operationHint")}
+            value={operation}
+            onChange={(event) => onOperationChange(event.target.value as SketchOperation)}
+          >
+            <option value="extrude">{t("sketch.modeBadgeExtrude")}</option>
+            <option value="revolve">{t("sketch.modeBadgeRevolve")}</option>
+            <option value="sweep">{t("sketch.modeBadgeSweep")}</option>
+          </select>
+        </label>
+      ) : (
+        <div className="sketch-mode-badge">{operation === "revolve" ? t("sketch.modeBadgeRevolve") : operation === "sweep" ? t("sketch.modeBadgeSweep") : t("sketch.modeBadge")}</div>
+      )}
       {operation === "revolve" ? <SketchRevolvePreview positions={revolvePreviewPositions} /> : null}
       <div className="camera-controls sketch-camera-controls" aria-label={t("sketch.viewControls")} data-help-section="cameraBar">
         <button aria-label={t("sketch.resetView")} aria-keyshortcuts="Home" title={t("camera.shortcut", { label: t("sketch.resetView"), keys: "Home" })} onClick={resetView}><Home size={28} /></button>

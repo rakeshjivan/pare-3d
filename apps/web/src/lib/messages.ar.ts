@@ -3186,4 +3186,10 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "notice.movedToRoot": "نُقل {name} إلى المستوى الأعلى.",
   "notice.importing": "جارٍ استيراد {index} من {total}: {name}",
   "notice.importProjectFailed": "تعذر إنشاء تصميم للملفات المستوردة",
+  "workspace.strongHoles": "إظهار الثقوب بوضوح أكبر",
+  "workspace.strongHolesHint": "يرسم الثقوب أغمق وأقل شفافية، مع خط داكن حولها، لتبرز بين الأجسام الشفافة.",
+  "status.shelledClosed": "تم التفريغ بجدران {size} مم، مغلق من كل الجهات: التجويف في الداخل ولا يظهر إلا في عرض المقطع",
+  "sketch.modeBadgeExtrude": "رسم بثق",
+  "sketch.operationHint": "ما يصبح عليه هذا الرسم: بثق أو دوران أو سحب على مسار",
+  "status.sketchOperationChanged": "الآن: {operation}. أنهِ الرسم لبناء الجسم",
 };

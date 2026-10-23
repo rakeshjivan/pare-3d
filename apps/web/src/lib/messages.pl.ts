@@ -3166,4 +3166,10 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "notice.importedDesignName": "Zaimportowany projekt (pliki: {count})",
   "notice.importing": "Importowanie {index} z {total}: {name}",
   "notice.importProjectFailed": "Nie udało się utworzyć projektu dla zaimportowanych plików",
+  "workspace.strongHoles": "Wyraźniej pokazuj otwory",
+  "workspace.strongHolesHint": "Rysuje otwory ciemniej i mniej przezroczyście, z ciemną linią dookoła, żeby wyróżniały się wśród przezroczystych brył.",
+  "status.shelledClosed": "Wydrążono ze ściankami {size} mm, zamknięte ze wszystkich stron: wnęka jest w środku i widać ją tylko w widoku przekroju",
+  "sketch.modeBadgeExtrude": "Szkic do wyciągnięcia",
+  "sketch.operationHint": "Czym stanie się ten szkic: wyciągnięciem, obrotem lub przeciągnięciem po ścieżce",
+  "status.sketchOperationChanged": "Teraz: {operation}. Zakończ szkic, aby zbudować bryłę",
 };

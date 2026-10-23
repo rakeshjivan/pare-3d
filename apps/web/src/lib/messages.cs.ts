@@ -3604,4 +3604,10 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "shell.pickHint": "Click a face of the part to open or close it. Drag a face inward to set the wall thickness. Enter hollows.",
   "array.dragHintRow": "Or drag a copy to space them out or bring them closer; + and − while dragging change the count. Enter creates.",
   "array.dragHintCircle": "Or drag a copy round to set how far the circle goes; + and − while dragging change the count. Enter creates.",
+  "workspace.strongHoles": "Zobrazit díry výrazněji",
+  "workspace.strongHolesHint": "Vykreslí díry tmavší a méně průhledné, s tmavou čarou kolem, aby vynikly mezi průhlednými tělesy.",
+  "status.shelledClosed": "Vytvořena dutina se stěnami {size} mm, uzavřená ze všech stran: dutina je uvnitř a je vidět jen v řezu",
+  "sketch.modeBadgeExtrude": "Náčrt pro vysunutí",
+  "sketch.operationHint": "Čím se tento náčrt stane: vysunutím, rotací nebo tažením po dráze",
+  "status.sketchOperationChanged": "Nyní: {operation}. Dokonči náčrt a těleso se postaví",
 };

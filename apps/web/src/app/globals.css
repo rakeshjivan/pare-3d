@@ -5964,6 +5964,33 @@ html[data-theme="dark"] .visibility-hidden-badge {
   pointer-events: none;
 }
 
+/* The badge picks what the sketch becomes (#655). */
+.sketch-mode-badge.switchable {
+  padding: 0;
+  pointer-events: auto;
+}
+
+.sketch-mode-badge.switchable select {
+  padding: 4px 24px 4px 10px;
+  color: inherit;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23ffffff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+
+.sketch-mode-badge.switchable select:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+}
+
+.sketch-mode-badge.switchable option {
+  color: #1f2a24;
+  background: #ffffff;
+}
+
 .sketch-revolve-preview {
   position: absolute;
   top: 18px;

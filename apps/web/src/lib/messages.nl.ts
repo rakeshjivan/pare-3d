@@ -3605,4 +3605,10 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "array.dragHintRow": "Of sleep een kopie om ze verder uit elkaar of dichterbij te zetten; + en − tijdens het slepen veranderen het aantal. Enter maakt het.",
   "array.dragHintCircle": "Of sleep een kopie rond om in te stellen hoe ver de cirkel gaat; + en − tijdens het slepen veranderen het aantal. Enter maakt het.",
   "status.shelledSealed": "Uitgehold met wanden van {size} mm, rondom gesloten - de holte zit binnenin, dus het lijkt massief. Open een zijde om hem te zien.",
+  "workspace.strongHoles": "Gaten duidelijker tonen",
+  "workspace.strongHolesHint": "Tekent gaten donkerder en minder doorzichtig, met een donkere lijn eromheen, zodat ze opvallen tussen doorzichtige lichamen.",
+  "status.shelledClosed": "Uitgehold met wanden van {size} mm, rondom dicht: de holte zit binnenin en is alleen in de doorsnedeweergave te zien",
+  "sketch.modeBadgeExtrude": "Extrusieschets",
+  "sketch.operationHint": "Wat deze schets wordt: geëxtrudeerd, gedraaid of langs een pad",
+  "status.sketchOperationChanged": "Nu: {operation}. Rond de schets af om het lichaam te bouwen",
 };

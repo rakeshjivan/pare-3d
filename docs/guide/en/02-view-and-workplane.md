@@ -121,6 +121,8 @@ The sketch view has its own colours: {{ui:workspace.sketchBackground}} for the w
 
 ![Three dark bodies with edge lines switched on: the outlines keep them apart.](shot:edge-lines)
 
+{{ui:workspace.strongHoles}} draws holes in a darker grey, less see-through and with a dark line round them. It helps when a hole is hard to find among see-through bodies. Unlike the edge lines it stays on in fast mode.
+
 ### Appearance: light and shadows
 
 {{ui:workspace.showShadows}} switches the cast shadows on and off. Two sliders set how the bodies are lit. {{ui:workspace.shadowStrength}} says how dark the cast shadows are, and {{ui:workspace.shadeContrast}} moves light from the even ambient light to the main light: towards "punchy" the shaded sides get darker and the shadows show more, towards "soft" everything gets flatter. At the top end the contrast gets very strong, so shaded sides and shadows turn really dark. {{ui:workspace.shadowSoftness}} makes the edges of the shadows soft instead of crisp. {{ui:workspace.lightAzimuth}} turns the main light round the plate (0° from the front, 90° from the right), and {{ui:workspace.lightElevation}} lifts it; at 90° it stands straight above the plate as in Tinkercad, and the shadows fall right under the bodies. {{ui:workspace.lightReset}} puts everything back.

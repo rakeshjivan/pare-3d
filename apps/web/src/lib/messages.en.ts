@@ -3606,6 +3606,12 @@ export const MESSAGES_EN = {
   "array.dragHintRow": "Or drag a copy to space them out or bring them closer; + and − while dragging change the count. Enter creates.",
   "array.dragHintCircle": "Or drag a copy round to set how far the circle goes; + and − while dragging change the count. Enter creates.",
   "status.shelledSealed": "Hollowed with {size} mm walls, sealed all round - the cavity is inside, so it looks solid. Open a side to see it.",
+  "workspace.strongHoles": "Show holes more clearly",
+  "workspace.strongHolesHint": "Draws holes darker and less see-through, with a dark line round them, so they stand out among see-through bodies.",
+  "status.shelledClosed": "Hollowed with {size} mm walls, closed all round: the cavity is inside and shows only in the section view",
+  "sketch.modeBadgeExtrude": "Extrude sketch",
+  "sketch.operationHint": "What this sketch becomes: extruded, revolved or swept",
+  "status.sketchOperationChanged": "Now: {operation}. Finish the sketch to build the body",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

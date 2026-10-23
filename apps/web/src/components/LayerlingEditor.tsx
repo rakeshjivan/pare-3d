@@ -323,7 +323,7 @@ import { escapeWasHandled } from "@/lib/escapeHandled";
 import { booleanAutomationScene } from "@/lib/editorAutomation";
 import { debugShapeSummary, mcpPivotRequest, compactShapeSummary, mcpShapeSummary, mcpSketchFillProfile, mcpTextFont } from "@/lib/editorMcpSummary";
 import { sweepPathFromParams, sweepSectionFromParams, sweepSketchProfile } from "@/lib/sweepSketch";
-import { emptySketchProfile, cadShapeFromSketchProfile, cadShapeFromSketchSweep, revolveBuildProfile, shapeFromRevolvedSketchProfile, shapeFromCadMesh, sketchReferenceShapeOnWorkplane, defaultMcpSketchProfile } from "@/lib/editorSketchCad";
+import { emptySketchProfile, cadShapeFromSketchProfile, cadShapeFromSketchSweep, revolveBuildProfile, shapeFromRevolvedSketchProfile, shapeFromCadMesh, sketchBodyAsOperation, sketchBodyOperation, sketchProfileLeftOfAxis, sketchReferenceShapeOnWorkplane, defaultMcpSketchProfile } from "@/lib/editorSketchCad";
 import { drawingLabelsInLanguage } from "@/lib/drawingLabels";
 import { offersTextLayers, textLayerStack, layeredTextShape, nameTagSource, nameTagsFor, offersIconLayers, iconLayerStack, iconTagArea, layeredIconShape, iconTagCopies, svgIconArea, iconTagFromSvg } from "@/lib/editorTextTags";
 
@@ -4829,6 +4829,11 @@ export function LayerlingEditor({
 
   /** Where the edited body's middle is in the sketch, when the sketch of an existing body was opened (#291). */
   const sketchEditAnchorRef = useRef<SketchAnchor | null>(null);
+  /**
+   * The edited body's own kind and workplane, once its sketch was switched to another kind of body (#655):
+   * finishing then makes a new body of that kind in the old one's place, and switching back edits it as before.
+   */
+  const sketchOperationSwitchRef = useRef<{ operation: SketchOperation; workplane: PlacementWorkplane } | null>(null);
 
   const beginSketch = useCallback((
     operation: SketchOperation,
@@ -4844,6 +4849,7 @@ export function LayerlingEditor({
     setToolbarMode("sketch");
     setSketchActive(true);
     setSketchOperation(operation);
+    sketchOperationSwitchRef.current = null;
     setSketchRevolveSettings(normalizeSketchRevolveSettings(revolveSettings));
     setSketchRevolvePreview(null);
     setSketchTool(profile?.segments.length ? "select" : "line");
@@ -4871,7 +4877,7 @@ export function LayerlingEditor({
       setNotice(t("status.selectSketchShape"));
       return;
     }
-    const operation = selectedShape.sketchOperation ?? (selectedShape.sketchRevolve ? "revolve" : "extrude");
+    const operation = sketchBodyOperation(selectedShape);
     let editWorkplane: PlacementWorkplane | undefined;
     sketchEditAnchorRef.current = null;
     if (operation === "extrude" || operation === "sweep") {
@@ -4918,6 +4924,7 @@ export function LayerlingEditor({
   const cancelSketch = useCallback(() => {
     setSketchActive(false);
     sketchEditAnchorRef.current = null;
+    sketchOperationSwitchRef.current = null;
     setSketchActivePointId(null);
     setSketchSelection(null);
     setSketchMeasureStart(null);
@@ -4929,6 +4936,33 @@ export function LayerlingEditor({
     setToolbarMode("geometry");
     setNotice(t("status.sketchCancelled"));
   }, []);
+
+  /**
+   * What the open sketch becomes - extruded, revolved or swept - changed while drawing (#655). The sketch
+   * of an existing body then makes a new body of that kind in its place, drawn on the plate: a revolve
+   * is drawn from the front. Switching back to the body's own kind edits it as before.
+   */
+  const switchSketchOperation = useCallback((next: SketchOperation) => {
+    if (next === sketchOperation) return;
+    if (editingSketchShapeId) {
+      const switched = sketchOperationSwitchRef.current ?? { operation: sketchOperation, workplane: activeSketchWorkplane };
+      if (next === switched.operation) {
+        setActiveSketchWorkplane(switched.workplane);
+        sketchOperationSwitchRef.current = null;
+      } else {
+        sketchOperationSwitchRef.current = switched;
+        setActiveSketchWorkplane(horizontalPlacementWorkplane());
+      }
+    }
+    setSketchOperation(next);
+    setSketchRevolvePreview(null);
+    // An outline reaching across the axis - an imported SVG is centred on itself - moves left onto it; Ctrl+Z takes it back.
+    if (next === "revolve") {
+      const leftOfAxis = sketchProfileLeftOfAxis(sketchProfile);
+      if (leftOfAxis !== sketchProfile) commitSketchProfile(leftOfAxis);
+    }
+    setNotice(t("status.sketchOperationChanged", { operation: t(next === "revolve" ? "sketch.modeBadgeRevolve" : next === "sweep" ? "sketch.modeBadgeSweep" : "sketch.modeBadgeExtrude") }));
+  }, [activeSketchWorkplane, commitSketchProfile, editingSketchShapeId, sketchOperation, sketchProfile]);
 
   const sketchUndo = useCallback(() => {
     const currentHistory = sketchHistoryRef.current;
@@ -5587,12 +5621,18 @@ export function LayerlingEditor({
   }, [sketchActive, sketchOperation, sketchProfile]);
 
   const finishSketch = useCallback(async () => {
-    const existing = editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null;
+    const edited = editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null;
+    // Switched to another kind of body (#655): a new body of that kind takes the edited one's place.
+    const switchedBody = edited && sketchOperationSwitchRef.current ? edited : null;
+    const existing = switchedBody ? null : edited;
     const height = existing?.height ?? 10;
     let resolved: WorkplaneShape | null;
     let sweptAsExtrusion = false;
     try {
-      if (sketchOperation === "revolve") {
+      if (switchedBody) {
+        setNotice(t("status.buildingSketch"), true);
+        resolved = await sketchBodyAsOperation(switchedBody, sketchProfile, sketchOperation, sketchRevolveSettings);
+      } else if (sketchOperation === "revolve") {
         setNotice(t("status.buildingSketch"), true);
         const revolved = await shapeFromRevolvedSketchProfile(sketchProfile, sketchRevolveSettings, existing);
         resolved = placeSketchShape(revolved, activeSketchWorkplane, existing);
@@ -5650,11 +5690,11 @@ export function LayerlingEditor({
       setNotice(t("status.closeProfile"), true);
       return;
     }
-    const nextShapes = existing ? shapes.map((shape) => (shape.id === existing.id ? resolved : shape)) : [...shapes, resolved];
+    const nextShapes = edited ? shapes.map((shape) => (shape.id === edited.id ? resolved : shape)) : [...shapes, resolved];
     commitShapes(
       nextShapes,
       resolved.id,
-      existing
+      edited
         ? t(sketchOperation === "revolve" ? "status.revolveUpdated" : sketchOperation === "sweep" ? "status.sweepUpdated" : "status.sketchUpdated")
         : sweptAsExtrusion
           ? t("status.sweepWithoutPath")
@@ -5669,6 +5709,7 @@ export function LayerlingEditor({
     setSketchRevolvePreview(null);
     setEditingSketchShapeId(null);
     sketchEditAnchorRef.current = null;
+    sketchOperationSwitchRef.current = null;
     setToolbarMode("geometry");
   }, [activeSketchWorkplane, commitShapes, editingSketchShapeId, shapes, sketchOperation, sketchProfile, sketchRevolveSettings]);
 
@@ -10838,6 +10879,20 @@ export function LayerlingEditor({
           updated = await rebuildSketchBodyFill(target.id, fillProfile);
           commitShapes(currentShapes().map((shape) => shape.id === target.id ? updated : shape), target.id, t("status.sketchUpdated"));
         }
+        // Another kind of body from the same sketch (#655), as the sketch's badge makes it.
+        const operationRequest = params.sketchOperation;
+        if (operationRequest !== undefined) {
+          if (operationRequest !== "extrude" && operationRequest !== "revolve" && operationRequest !== "sweep") throw new Error("sketchOperation must be extrude, revolve or sweep");
+          if (!updated.sketchProfile) throw new Error(t("status.selectSketchShape"));
+          if (sketchBodyOperation(updated) !== operationRequest) {
+            const stretch = sketchBodyOperation(updated) === "extrude" ? sketchBodyStretch(updated) : null;
+            const profile = stretch ? stretchedSketchProfile(updated.sketchProfile, stretch.x, stretch.z) : updated.sketchProfile;
+            const rebuilt = await sketchBodyAsOperation(updated, profile, operationRequest);
+            if (!rebuilt) throw new Error(t("status.closeProfile"));
+            updated = rebuilt;
+            commitShapes(currentShapes().map((shape) => shape.id === target.id ? rebuilt : shape), target.id, t("status.sketchUpdated"));
+          }
+        }
         return { object: mcpShapeSummary(updated) };
       }
 
@@ -14385,6 +14440,7 @@ export function LayerlingEditor({
           <SketchWorkspace
             profile={sketchProfile}
             operation={sketchOperation}
+            onOperationChange={switchSketchOperation}
             revolvePreviewPositions={sketchRevolvePreview?.positions ?? null}
             referenceShapes={sketchReferenceShapes.filter((shape) => shape.id !== editingSketchShapeId)}
             referenceSlices={sketchReferenceSlices}

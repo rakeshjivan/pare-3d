@@ -3592,4 +3592,10 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "shell.pickHint": "Click a face of the part to open or close it. Drag a face inward to set the wall thickness. Enter hollows.",
   "array.dragHintRow": "Or drag a copy to space them out or bring them closer; + and − while dragging change the count. Enter creates.",
   "array.dragHintCircle": "Or drag a copy round to set how far the circle goes; + and − while dragging change the count. Enter creates.",
+  "workspace.strongHoles": "Показывать отверстия заметнее",
+  "workspace.strongHolesHint": "Рисует отверстия темнее и менее прозрачными, с тёмной линией вокруг, чтобы они выделялись среди прозрачных тел.",
+  "status.shelledClosed": "Создана оболочка со стенками {size} мм, закрытая со всех сторон: полость внутри и видна только в режиме сечения",
+  "sketch.modeBadgeExtrude": "Эскиз выдавливания",
+  "sketch.operationHint": "Чем станет этот эскиз: выдавливанием, вращением или протяжкой по траектории",
+  "status.sketchOperationChanged": "Теперь: {operation}. Заверши эскиз, чтобы построить тело",
 };

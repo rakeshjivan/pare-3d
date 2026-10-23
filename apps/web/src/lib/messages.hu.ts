@@ -3098,4 +3098,10 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "notice.importedDesignName": "Importált terv ({count} fájl)",
   "notice.importing": "Importálás ({index}/{total}): {name}",
   "notice.importProjectFailed": "Nem sikerült tervet létrehozni az importált fájlokhoz",
+  "workspace.strongHoles": "Lyukak jobban látható megjelenítése",
+  "workspace.strongHolesHint": "A lyukakat sötétebben és kevésbé átlátszóan rajzolja, sötét körvonallal, hogy kitűnjenek az átlátszó testek közül.",
+  "status.shelledClosed": "Kiüregelve, falvastagság: {size} mm, minden oldalon zárt: az üreg belül van, csak a metszetnézetben látszik",
+  "sketch.modeBadgeExtrude": "Kihúzás vázlat",
+  "sketch.operationHint": "Mi lesz ebből a vázlatból: kihúzás, forgatás vagy pálya menti húzás",
+  "status.sketchOperationChanged": "Most: {operation}. Fejezd be a vázlatot a test felépítéséhez",
 };
