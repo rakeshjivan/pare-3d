@@ -11134,7 +11134,8 @@ html[data-theme="dark"] .shape-inspector .name-tag-start .name-tag-start-button:
   grid-template-columns: 145px 1fr;
   align-items: center;
   gap: 8px;
-  min-height: 20px;
+  /* No min-height: the settings body is a grid of a fixed height, which gives an auto row only its minimum, so a
+     label that wraps to two lines ran over the next row. */
   font-size: 14px;
   font-weight: 700;
 }

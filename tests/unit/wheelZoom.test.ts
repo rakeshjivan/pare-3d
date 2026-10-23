@@ -25,10 +25,14 @@ describe("wheelZoomDelta (#331)", () => {
     expect(wheelZoomDelta(pixels(2.5, true), 16)).toBe(2.5 * PINCH_WHEEL_FACTOR);
   });
 
-  it("leaves a mouse notch with Ctrl held and a wheel counted in lines or pages alone", () => {
+  it("leaves a mouse notch with Ctrl held alone", () => {
     expect(wheelZoomDelta(pixels(-100, true), 500)).toBe(-100);
-    expect(wheelZoomDelta({ deltaY: -3, deltaMode: 1, ctrlKey: false }, 500)).toBe(-3);
-    expect(wheelZoomDelta({ deltaY: -1, deltaMode: 2, ctrlKey: false }, 500)).toBe(-1);
+  });
+
+  it("counts a wheel in lines or pages in pixels: three lines or one page are a notch (Edge, one screen at a time, 22.10.2026)", () => {
+    expect(wheelZoomDelta({ deltaY: -3, deltaMode: 1, ctrlKey: false }, 500)).toBeCloseTo(-WHEEL_NOTCH_DELTA);
+    expect(wheelZoomDelta({ deltaY: -1, deltaMode: 2, ctrlKey: false }, 500)).toBe(-WHEEL_NOTCH_DELTA);
+    expect(wheelZoomDelta({ deltaY: 1, deltaMode: 2, ctrlKey: true }, 500)).toBe(WHEEL_NOTCH_DELTA);
   });
 
   it("does not turn a step of zero into a notch, and takes the first step ever as one that stands alone", () => {

@@ -16,6 +16,14 @@ export const WHEEL_NOTCH_DELTA = 100;
  */
 export const PINCH_WHEEL_FACTOR = 10;
 
+/**
+ * A wheel counted in lines or pages sends 3 lines or 1 page for a notch, not pixels: Firefox, and Windows with
+ * "scroll one screen at a time" (Edge, 22.10.2026: deltaY 1 in page mode, so a notch zoomed a hundredth of its
+ * size, whatever the zoom speed). OrbitControls reads the number as pixels, so it is turned into them here.
+ */
+export const WHEEL_LINE_DELTA = WHEEL_NOTCH_DELTA / 3;
+export const WHEEL_PAGE_DELTA = WHEEL_NOTCH_DELTA;
+
 /** A step this long after the one before it stands alone: a notch, not a stream of a trackpad. */
 export const WHEEL_ALONE_GAP_MS = 80;
 
@@ -34,7 +42,9 @@ export function pinchWheelDelta(ratio: number, zoomSpeed: number): number | null
 
 export function wheelZoomDelta(event: { deltaY: number; deltaMode: number; ctrlKey: boolean }, msSinceLastWheel: number): number {
   if (event.ctrlKey && event.deltaMode === 0 && Math.abs(event.deltaY) < WHEEL_NOTCH_DELTA) return event.deltaY * PINCH_WHEEL_FACTOR;
-  if (event.ctrlKey || event.deltaMode !== 0) return event.deltaY;
+  if (event.deltaMode === 1) return event.deltaY * WHEEL_LINE_DELTA;
+  if (event.deltaMode === 2) return event.deltaY * WHEEL_PAGE_DELTA;
+  if (event.ctrlKey) return event.deltaY;
   const size = Math.abs(event.deltaY);
   if (size === 0 || size >= WHEEL_NOTCH_DELTA) return event.deltaY;
   if (!(msSinceLastWheel >= WHEEL_ALONE_GAP_MS)) return event.deltaY;
