@@ -3649,6 +3649,11 @@ export const MESSAGES_EN = {
   "workspace.simpleModeOff": "Hold to switch off simple mode",
   "workspace.shapeColors": "Shapes in colour",
   "workspace.shapeColorsHint": "The pictures of the shape library show the colour a new shape starts with. Switch off for grey pictures.",
+  "sketch.sweepAnchorHint": "Which part of the section runs along the path: its middle, or its left or right edge as seen along the path",
+  "sketch.sweepAnchorCenter": "On the path: middle",
+  "sketch.sweepAnchorLeft": "On the path: left edge",
+  "sketch.sweepAnchorRight": "On the path: right edge",
+  "status.sketchSweepAnchorChanged": "{anchor}. Finish the sketch to build the body",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

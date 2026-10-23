@@ -3635,4 +3635,9 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "workspace.simpleModeOff": "Удерживайте, чтобы выключить простой режим",
   "workspace.shapeColors": "Цветные фигуры",
   "workspace.shapeColorsHint": "Картинки в библиотеке фигур показывают цвет, с которым появится новая фигура. Выключите, чтобы картинки были серыми.",
+  "sketch.sweepAnchorHint": "Какая часть профиля идёт по траектории: его середина или его левый либо правый край, если смотреть вдоль траектории",
+  "sketch.sweepAnchorCenter": "На траектории: середина",
+  "sketch.sweepAnchorLeft": "На траектории: левый край",
+  "sketch.sweepAnchorRight": "На траектории: правый край",
+  "status.sketchSweepAnchorChanged": "{anchor}. Заверши эскиз, чтобы построить тело",
 };

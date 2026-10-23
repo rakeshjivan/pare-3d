@@ -20,6 +20,7 @@ import { edgeIsConvex } from "@/lib/cadEdgeConvexity";
 import { filletVariableEdges } from "@/lib/cadVariableFillet";
 import { draftFacesSolid, DRAFT_FACES_REFUSED } from "@/lib/cadDraft";
 import { planarMeshFaces } from "@/lib/cadPlanarMesh";
+import { cadFlatFaceMeshStraysFromOutline } from "@/lib/cadFaceOutline";
 import { buildMessage } from "@/lib/buildStamp";
 import { CAD_MODIFIER_KERNEL_RESTART_MESSAGE, CAD_MODIFIER_RUNTIME_BASE, cadModifierCappedDeflection, cadModifierTessellationDeflection, cadModifierTopologyEdgeIsSelectable, cadTransformRequiresGeneralTransform, isCadModifierKernelExhausted, isCadModifierWasmMemoryFault } from "@/lib/cadModifierRuntime";
 
@@ -969,6 +970,11 @@ async function bearbeiteAnfrage(request: CadModifierWorkerRequest, halter: { cad
     }
     result = componentResults.length === 1 ? componentResults[0] : activeCad.makeCompound(componentResults);
     if (!cadShapeIsValid(activeCad, result)) throw new Error(request.kind === "draft" ? DRAFT_FACES_REFUSED : request.kind === "deleteFace" ? DELETE_FACES_UNCHANGED_MESSAGE : "The chosen size creates invalid or overlapping edge geometry");
+    // A fillet round a part of the outline thinner than the size can leave a "valid" body whose flat face is meshed over
+    // a bay outside its outline, a strip nobody drew (#740): that size is refused like one that crosses adjacent faces.
+    if ((request.kind === "fillet" || request.kind === "chamfer") && cadFlatFaceMeshStraysFromOutline(activeCad, result)) {
+      throw new Error("The chosen size creates invalid or overlapping edge geometry");
+    }
     const baseLoose = cadModifierTessellationDeflection(request.quality, request.amount, request.minDeflection);
     const baseCapped = cadModifierCappedDeflection(request.quality, baseLoose);
     const loose = request.kind === "chamfillet"

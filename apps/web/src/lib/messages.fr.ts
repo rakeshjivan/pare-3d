@@ -3624,4 +3624,9 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "workspace.simpleModeOff": "Maintenir pour désactiver le mode simple",
   "workspace.shapeColors": "Formes en couleur",
   "workspace.shapeColorsHint": "Les images de la bibliothèque de formes montrent la couleur d'une nouvelle forme. Désactivez pour des images grises.",
+  "sketch.sweepAnchorHint": "Quelle partie du profil suit le chemin : son milieu, ou son bord gauche ou droit, vu le long du chemin",
+  "sketch.sweepAnchorCenter": "Sur le chemin : milieu",
+  "sketch.sweepAnchorLeft": "Sur le chemin : bord gauche",
+  "sketch.sweepAnchorRight": "Sur le chemin : bord droit",
+  "status.sketchSweepAnchorChanged": "{anchor}. Termine l'esquisse pour construire le corps",
 };

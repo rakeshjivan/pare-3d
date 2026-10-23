@@ -3648,4 +3648,9 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "workspace.simpleModeOff": "Ingedrukt houden om de eenvoudige modus uit te zetten",
   "workspace.shapeColors": "Vormen in kleur",
   "workspace.shapeColorsHint": "De plaatjes van de vormenbibliotheek tonen de kleur waarmee een nieuwe vorm begint. Zet uit voor grijze plaatjes.",
+  "sketch.sweepAnchorHint": "Welk deel van het profiel op het pad ligt: het midden, of de linker- of rechterrand gezien in de richting van het pad",
+  "sketch.sweepAnchorCenter": "Op het pad: midden",
+  "sketch.sweepAnchorLeft": "Op het pad: linkerrand",
+  "sketch.sweepAnchorRight": "Op het pad: rechterrand",
+  "status.sketchSweepAnchorChanged": "{anchor}. Rond de schets af om het lichaam te bouwen",
 };

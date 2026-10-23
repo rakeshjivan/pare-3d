@@ -523,7 +523,7 @@ export const tools = [
   },
   {
     name: "layerling_sweep_sketch",
-    description: "Pull a cross-section along a path as one exact body, like the editor's Sweep sketch (#400): a cable channel that turns a corner, a conduit, a guard round a belt, a ring round a hexagon. The path is a list of points in the sketch plane, [x, z] in mm on the workplane (z runs towards the front), joined by straight lines; closed joins the last point to the first and makes a ring. The section is a rectangle (width across the path, height up) or a circle (width is the diameter), solid or hollow with a wall thickness. It is drawn at the first point and seen looking along the path, so it starts there. The body stands on the plane with the lowest point of the section, a corner of the path is a mitre, and the result is an exact body: fillet, chamfer and the STEP export work on it. Returns the new object.",
+    description: "Pull a cross-section along a path as one exact body, like the editor's Sweep sketch (#400): a cable channel that turns a corner, a conduit, a guard round a belt, a ring round a hexagon. The path is a list of points in the sketch plane, [x, z] in mm on the workplane (z runs towards the front), joined by straight lines; closed joins the last point to the first and makes a ring. The section is a rectangle (width across the path, height up) or a circle (width is the diameter), solid or hollow with a wall thickness. It is drawn at the first point and seen looking along the path, so it starts there. `anchor` (left, center or right, default center) says which part of the section runs along the path: its middle, or its left or right edge as seen looking along the path, so a rail can sit on one side of the line (#732). The body stands on the plane with the lowest point of the section, a corner of the path is a mitre, and the result is an exact body: fillet, chamfer and the STEP export work on it. Returns the new object.",
     inputSchema: {
       ...editorTargetSchema,
       required: ["path", "section"],
@@ -531,6 +531,7 @@ export const tools = [
         ...editorTargetSchema.properties,
         path: { type: "array", items: { anyOf: [{ type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 }, { type: "object", properties: { x: { type: "number" }, z: { type: "number" } } }] }, minItems: 2, description: "The points of the path, [x, z] or { x, z }, in mm." },
         closed: { type: "boolean", description: "Join the last point to the first: a ring." },
+        anchor: { type: "string", enum: ["left", "center", "right"], description: "Which part of the section runs along the path: its middle (default), or its left or right edge as seen looking along the path (#732)." },
         section: {
           type: "object",
           description: "The cross-section.",

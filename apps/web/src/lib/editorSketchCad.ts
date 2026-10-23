@@ -384,6 +384,10 @@ export function shapeFromCadMesh(
     taperBottomDepth: undefined,
     taperTopScale: undefined,
     taperBottomScale: undefined,
+    // Twist and lean are in the mesh as well, so they go the way the taper does.
+    extrudeTwist: undefined,
+    extrudeTopOffsetX: undefined,
+    extrudeTopOffsetZ: undefined,
     importedMesh: {
       positions: flattenedPositions,
       normals: flattenedNormals.length === flattenedPositions.length ? flattenedNormals : undefined,

@@ -127,7 +127,7 @@ A revolved body is an exact body, like an extruded one: it takes chamfers and fi
 
 You draw two things on the same sheet:
 
-- **The cross-section** as a closed outline, as usual. Draw it as you would see it looking along the path from its start: across the path is the sketch's left and right, up is up on the finished body. A hollow section, a channel or a tube, is an outline with another one inside it. The section is centred on the path, and the body stands on the sketch plane with the lowest point of the section.
+- **The cross-section** as a closed outline, as usual. Draw it as you would see it looking along the path from its start: across the path is the sketch's left and right, up is up on the finished body. A hollow section, a channel or a tube, is an outline with another one inside it. By default the section is centred on the path. The menu next to the mode badge at the top lets you put its left or right edge on the path instead ({{ui:sketch.sweepAnchorLeft}}, {{ui:sketch.sweepAnchorRight}}, seen looking along the path), so a rail can sit on one side of the line or follow the edge of a part. The body stands on the sketch plane with the lowest point of the section.
 
 - **The path** as a {{ui:sketch.construction}}: switch it on and draw lines or curves, one chain, open or closed (a closed chain gives a ring). The path lies flat in the sketch plane.
 

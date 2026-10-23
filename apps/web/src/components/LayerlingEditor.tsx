@@ -1377,6 +1377,10 @@ function bakeShapeTransformIntoMesh(shape: WorkplaneShape): WorkplaneShape {
     taperBottomDepth: undefined,
     taperTopScale: undefined,
     taperBottomScale: undefined,
+    // Twist and lean are in the mesh as well, so they go the way the taper does.
+    extrudeTwist: undefined,
+    extrudeTopOffsetX: undefined,
+    extrudeTopOffsetZ: undefined,
     importedMesh: {
       positions,
       baseWidth: rawWidth,

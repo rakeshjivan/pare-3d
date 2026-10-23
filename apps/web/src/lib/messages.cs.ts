@@ -3647,4 +3647,9 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "workspace.simpleModeOff": "Podržte pro vypnutí jednoduchého režimu",
   "workspace.shapeColors": "Tvary v barvě",
   "workspace.shapeColorsHint": "Obrázky v knihovně tvarů ukazují barvu, kterou nový tvar dostane. Vypněte pro šedé obrázky.",
+  "sketch.sweepAnchorHint": "Která část profilu leží na dráze: jeho střed, nebo levý či pravý okraj při pohledu po dráze",
+  "sketch.sweepAnchorCenter": "Na dráze: střed",
+  "sketch.sweepAnchorLeft": "Na dráze: levý okraj",
+  "sketch.sweepAnchorRight": "Na dráze: pravý okraj",
+  "status.sketchSweepAnchorChanged": "{anchor}. Dokonči náčrt a těleso se postaví",
 };

@@ -3648,4 +3648,9 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "workspace.simpleModeOff": "Halten, um den einfachen Modus auszuschalten",
   "workspace.shapeColors": "Formen in Farbe",
   "workspace.shapeColorsHint": "Die Bilder der Formenbibliothek zeigen die Farbe, in der eine neue Form beginnt. Ausschalten für graue Bilder.",
+  "sketch.sweepAnchorHint": "Welcher Teil des Profils auf dem Pfad liegt: seine Mitte oder seine linke oder rechte Kante, in Pfadrichtung gesehen",
+  "sketch.sweepAnchorCenter": "Auf dem Pfad: Mitte",
+  "sketch.sweepAnchorLeft": "Auf dem Pfad: linke Kante",
+  "sketch.sweepAnchorRight": "Auf dem Pfad: rechte Kante",
+  "status.sketchSweepAnchorChanged": "{anchor}. Schließe die Skizze ab, um den Körper zu bauen",
 };

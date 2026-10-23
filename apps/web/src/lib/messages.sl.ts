@@ -3626,4 +3626,9 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "workspace.simpleModeOff": "Pridržite za izklop preprostega načina",
   "workspace.shapeColors": "Oblike v barvi",
   "workspace.shapeColorsHint": "Slike v knjižnici oblik kažejo barvo, v kateri se nova oblika začne. Izklopite za sive slike.",
+  "sketch.sweepAnchorHint": "Kateri del profila poteka po poti: njegova sredina ali njegov levi ali desni rob, gledano vzdolž poti",
+  "sketch.sweepAnchorCenter": "Na poti: sredina",
+  "sketch.sweepAnchorLeft": "Na poti: levi rob",
+  "sketch.sweepAnchorRight": "Na poti: desni rob",
+  "status.sketchSweepAnchorChanged": "{anchor}. Dokončaj skico, da se zgradi telo",
 };
