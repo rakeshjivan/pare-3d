@@ -3191,4 +3191,12 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "nameTag.keyringAlong": "Posizione lungo il lato",
   "nameTag.keyringAlongHint": "Sposta la linguetta in alto o in basso lungo il suo lato, per esempio verso una lettera che sporge di più. 0 è il centro.",
   "nameTag.keyringAlongHintTop": "Sposta la linguetta a sinistra o a destra lungo il lato superiore. 0 è il centro.",
+  "shell.side.closed": "Chiuso (cavità interna)",
+  "shortcuts.historyViewPage": "Nella vista cronologia: dieci stati prima o dopo",
+  "shortcuts.historyViewEnds": "Nella vista cronologia: stato più vecchio o quello attuale",
+  "shortcuts.wheel": "Rotella del mouse",
+  "export.svg.noteFootprint": "Esporta solo i contorni con cui gli oggetti poggiano sul piano di lavoro, come linee in millimetri, per il taglio laser e le dime.",
+  "export.svg.view": "Vista",
+  "export.svg.viewSilhouette": "Silhouette dall'alto",
+  "export.svg.viewFootprint": "Impronta sul piano di lavoro",
 };

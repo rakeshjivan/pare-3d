@@ -3437,6 +3437,11 @@ html[data-theme="dark"] .edge-modifier-quick-actions button.active {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.shell-closed-option {
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 6px;
+}
+
 .shell-openings-summary {
   display: block;
   margin-top: 6px;

@@ -3146,4 +3146,12 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "nameTag.keyringAlong": "Kenar boyunca konum",
   "nameTag.keyringAlongHint": "Tırnağı kenarı boyunca yukarı veya aşağı kaydırır, örneğin daha dışarı taşan bir harfe. 0 ortadır.",
   "nameTag.keyringAlongHintTop": "Tırnağı üst kenar boyunca sola veya sağa kaydırır. 0 ortadır.",
+  "shell.side.closed": "Kapalı (içi boş)",
+  "shortcuts.historyViewPage": "Geçmiş görünümünde: on durum önce veya sonra",
+  "shortcuts.historyViewEnds": "Geçmiş görünümünde: en eski veya geçerli durum",
+  "shortcuts.wheel": "Fare tekerleği",
+  "export.svg.noteFootprint": "Yalnızca nesnelerin çalışma düzlemine oturduğu dış hatları milimetre cinsinden çizgiler olarak dışa aktarır; lazer kesim ve şablonlar için.",
+  "export.svg.view": "Görünüm",
+  "export.svg.viewSilhouette": "Üstten siluet",
+  "export.svg.viewFootprint": "Çalışma düzlemindeki taban izi",
 };

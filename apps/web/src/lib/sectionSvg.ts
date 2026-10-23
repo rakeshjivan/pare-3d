@@ -271,3 +271,17 @@ export function sectionSvgDocument(bodies: readonly SectionBody[], axis: Section
   ].join("\n");
   return { svg, loopCount, openCount, bodyCount: drawn.length, width, height };
 }
+
+/**
+ * Where the SVG export cuts for the footprint on the workplane (#692): a hair above the lowest point of
+ * the bodies, so a flat bottom is cut through rather than along. Null when there is nothing to cut.
+ */
+export const FOOTPRINT_CUT_HEIGHT = 0.01;
+
+export function footprintCutOffset(meshes: readonly SectionMesh[]): number | null {
+  let lowest = Number.POSITIVE_INFINITY;
+  meshes.forEach((mesh) => mesh.vertices.forEach((vertex) => {
+    if (vertex[1] < lowest) lowest = vertex[1];
+  }));
+  return Number.isFinite(lowest) ? lowest + FOOTPRINT_CUT_HEIGHT : null;
+}

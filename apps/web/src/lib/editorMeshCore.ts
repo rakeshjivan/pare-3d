@@ -52,7 +52,7 @@ export const CUTTER_LATERAL_PADDING = 0.001;
 
 export const POINT_TOLERANCE = 0.0001;
 
-export const CUTTER_RESIDUAL_INSET = CUTTER_PADDING * 0.4;
+export const CUTTER_RESIDUAL_INSET = 0.02;
 
 export const MIN_SHAPE_DIMENSION = 0.01;
 

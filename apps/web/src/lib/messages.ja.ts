@@ -3093,4 +3093,12 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "nameTag.keyringAlong": "辺に沿った位置",
   "nameTag.keyringAlongHint": "タブを辺に沿って上下に動かします。たとえば外側に張り出した文字の位置へ。0 が中央です。",
   "nameTag.keyringAlongHintTop": "タブを上辺に沿って左右に動かします。0 が中央です。",
+  "shell.side.closed": "閉じる (内部が空洞)",
+  "shortcuts.historyViewPage": "履歴ビューで:10 段階前または後の状態",
+  "shortcuts.historyViewEnds": "履歴ビューで:最も古い状態または現在の状態",
+  "shortcuts.wheel": "マウスホイール",
+  "export.svg.noteFootprint": "オブジェクトが作業面に接している輪郭だけを、ミリ単位の線として書き出します。レーザー加工や型紙に使えます。",
+  "export.svg.view": "表示",
+  "export.svg.viewSilhouette": "上から見たシルエット",
+  "export.svg.viewFootprint": "作業面への接地面",
 };

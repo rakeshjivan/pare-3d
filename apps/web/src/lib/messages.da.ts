@@ -3168,4 +3168,12 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "nameTag.keyringAlong": "Placering langs siden",
   "nameTag.keyringAlongHint": "Flytter fligen op eller ned langs sin side, for eksempel hen til et bogstav, der rækker længere ud. 0 er midten.",
   "nameTag.keyringAlongHintTop": "Flytter fligen til venstre eller højre langs toppen. 0 er midten.",
+  "shell.side.closed": "Lukket (hulrum indeni)",
+  "shortcuts.historyViewPage": "I historikvisningen: ti tilstande tidligere eller senere",
+  "shortcuts.historyViewEnds": "I historikvisningen: ældste eller nuværende tilstand",
+  "shortcuts.wheel": "Musehjul",
+  "export.svg.noteFootprint": "Eksporterer kun de omrids, objekterne står med på arbejdsfladen, som linjer i millimeter, til laserskæring og skabeloner.",
+  "export.svg.view": "Visning",
+  "export.svg.viewSilhouette": "Silhuet ovenfra",
+  "export.svg.viewFootprint": "Fodaftryk på arbejdsfladen",
 };

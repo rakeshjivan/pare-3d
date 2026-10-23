@@ -74,7 +74,7 @@ export const shapeSettingSchema = {
   extrudeTwist: { type: "number", description: "On every shape except gear, thread, spring, gridfinity, hinge, pyramid, bentTube, teardrop, counterbore, countersink and ruler: rotates the top face relative to the base, in degrees, for a twisted extrusion." },
   extrudeTopOffsetX: { type: "number", description: "On every shape except gear, thread, spring, gridfinity, hinge, pyramid, bentTube, teardrop, counterbore, countersink and ruler: shifts the top face along the shape's own X axis, in mm, for a leaning extrusion." },
   extrudeTopOffsetZ: { type: "number", description: "On every shape except gear, thread, spring, gridfinity, hinge, pyramid, bentTube, teardrop, counterbore, countersink and ruler: shifts the top face along the shape's own Z axis, in mm, for a leaning extrusion." },
-  teeth: { type: "number", description: "Gear only." },
+  teeth: { type: "number", description: "Gear only: how many teeth, 6 to 150." },
   gearProfile: { type: "string", enum: ["involute", "round", "simple"], description: "Gear only: involute teeth that mesh (new gears), round teeth made of arcs (like Tinkercad's Useful gear: forgiving on small printed gears, a smooth grip on knobs), or the plain straight teeth older designs have. An involute gear's width and depth are its outside diameter, module x (teeth + 2): for module 1.5 and 20 teeth give width and depth 33. Round teeth stand lower, so a round gear's outside diameter is module x (teeth + 1.2): module 1.5 and 20 teeth give 31.8. Two gears with the same module and tooth shape mesh at a centre distance of module x (teeth1 + teeth2) / 2; gearBacklash applies to both, gearPressureAngle only to involute teeth." },
   gearPressureAngle: { type: "number", description: "Involute gear only: pressure angle in degrees, 14.5 to 30 (default 20)." },
   gearBacklash: { type: "number", description: "Involute gear only: play of a meshing pair in mm, half taken off each gear (default 0.2, 0 for an exact gear)." },
@@ -858,7 +858,7 @@ export const tools = [
   },
   {
     name: "layerling_apply_edge_treatment",
-    description: "Apply chamfer, chamfillet or fillet to specific edge ids returned by layerling_list_edges, to \"all\" sharp edges, to the \"top\" edges (every edge along the body's highest level, such as the rim of a cookie cutter), to the \"bottom\" edges (every edge along its lowest level, such as the foot of a part), or to the \"vertical\" edges (every edge that stands straight up, such as the corners of a box), as the editor's Top edges, Bottom edges and Vertical edges buttons pick them. A chamfillet is the printable foot: a chamfer at the plate (chamferAngle 15 to 75, default 45) that blends tangentially into a fillet toward the wall, so the foot needs no support and ends soft; amount is the height it takes up, and it is mostly used with \"bottom\".",
+    description: "Apply chamfer, chamfillet or fillet to specific edge ids returned by layerling_list_edges, to \"all\" sharp edges, to the \"top\" edges (every edge along the body's highest level, such as the rim of a cookie cutter), to the \"bottom\" edges (every edge along its lowest level, such as the foot of a part), or to the \"vertical\" edges (every edge that stands straight up, such as the corners of a box), as the editor's Top edges, Bottom edges and Vertical edges buttons pick them. A chamfillet is the printable foot: a chamfer at the plate (chamferAngle 15 to 75, default 45) that blends tangentially into a fillet toward the wall, so the foot needs no support and ends soft; amount is the height it takes up, and it is mostly used with \"bottom\". A fillet with endAmount has a variable radius: it runs from amount at one end of the edge to endAmount at the other, on exactly one edge id; if the large end comes out where the small one should be, apply it again with the two values swapped.",
     inputSchema: {
       ...editorTargetSchema,
       required: ["id", "kind", "edgeIds", "amount"],
@@ -874,6 +874,7 @@ export const tools = [
         },
         allEdges: { type: "boolean" },
         amount: { type: "number" },
+        endAmount: { type: "number", description: "Fillet of one edge only: the radius at the edge's other end, for a radius that changes along it (#687)." },
         chamferAngle: { type: "number" },
         sharpAngle: { type: "number" },
         quality: { type: "string", enum: ["draft", "standard", "fine"] },
@@ -1211,12 +1212,13 @@ export const tools = [
   },
   {
     name: "layerling_export_mesh",
-    description: "Make the file the editor's export window writes as STL, 3MF or OBJ, from the same bodies: visible solids only, loose holes already taken off, overlapping bodies merged into one (STL) or separated by colour (3MF and OBJ, where a group in Multicolor keeps its part colours), and the tiny loose pieces a cut leaves behind left out. ids limits it to those objects (holes still cut). The answer lists the file name, its size in bytes, the number of bodies and triangles, how many bodies were merged or failed to merge, and how many loose pieces were left out. With path the file is written to that place on this computer and the answer carries no content; without it the file comes back as base64. Neither the editor's dialogs nor a download is involved.",
+    description: "Make the file the editor's export window writes as STL, 3MF, OBJ or SVG, from the same bodies: visible solids only, loose holes already taken off, overlapping bodies merged into one (STL) or separated by colour (3MF and OBJ, where a group in Multicolor keeps its part colours), and the tiny loose pieces a cut leaves behind left out. ids limits it to those objects (holes still cut). The answer lists the file name, its size in bytes, the number of bodies and triangles, how many bodies were merged or failed to merge, and how many loose pieces were left out. With path the file is written to that place on this computer and the answer carries no content; without it the file comes back as base64. SVG is the top view in millimetres: view silhouette (default) is everything seen from above as filled outlines, view footprint only the outlines where the objects stand on the workplane, as lines (the answer then counts outlines). Neither the editor's dialogs nor a download is involved.",
     inputSchema: {
       ...editorTargetSchema,
       properties: {
         ...editorTargetSchema.properties,
-        format: { type: "string", enum: ["stl", "3mf", "obj"], description: "The file format. Defaults to stl." },
+        format: { type: "string", enum: ["stl", "3mf", "obj", "svg"], description: "The file format. Defaults to stl." },
+        view: { type: "string", enum: ["silhouette", "footprint"], description: "For svg only: silhouette from above (default) or the footprint on the workplane." },
         ids: { type: "array", items: { type: "string" }, description: "Objects to export. Defaults to the whole design." },
         path: { type: "string", description: "Where to write the file, e.g. C:/print/part.stl. Directories are made as needed. Omit it to get the file as base64." },
       },

@@ -43,6 +43,8 @@ import {
   gearToothProfile,
   gearTypeIsModular,
   gearUsesModule,
+  MAX_GEAR_TEETH,
+  MIN_GEAR_TEETH,
   normalizeGearRim,
   rackMinDepth,
   rackModule,
@@ -1914,8 +1916,8 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
         id: "teeth",
       label: t("prop.teeth"),
         value: teeth,
-        min: 6,
-        max: 64,
+        min: MIN_GEAR_TEETH,
+        max: MAX_GEAR_TEETH,
         step: 1,
         onChange: (value) => {
           const nextTeeth = Math.round(value);
@@ -2355,7 +2357,7 @@ export function ShapeInspector({
   onWrapAroundCylinder,
   onLayerText,
   onTextTags,
-  onBundleKeyringTab,
+  onFixKeyringTab,
   textLayerStack: nameTagStack,
   iconTag,
   qrCode,
@@ -2387,7 +2389,7 @@ export function ShapeInspector({
   /** One tag like this text or stack per name, laid out in rows (#215). */
   onTextTags?: (names: string[], gap: number) => void;
   /** Holds a key ring tab of its own together with the nearest tag in one click (#598). */
-  onBundleKeyringTab?: () => void;
+  onFixKeyringTab?: () => void;
   /** The selected name tag's words, font and layers, read from its layers as they stand (#215). */
   textLayerStack?: NameTagStack | null;
   /** The icon tag card's wiring, for a sketch body or an icon tag; null for anything else. */
@@ -2696,7 +2698,7 @@ export function ShapeInspector({
           onInteractionActiveChange={onInteractionActiveChange}
         />
       ) : null}
-      {shape.keyringTab && onBundleKeyringTab ? <KeyringTabBundleButton disabled={locked} onBundle={onBundleKeyringTab} /> : null}
+      {shape.keyringTab && onFixKeyringTab ? <KeyringTabFixButton disabled={locked} onFix={onFixKeyringTab} /> : null}
       {qrCode ? <QrCodeCard key={`qr-code-${shape.id}`} shapeId={shape.id} controls={qrCode} disabled={locked} /> : null}
       {iconTag?.isTag ? (
         <IconTagCard key={`icon-tag-${shape.id}`} shapeId={shape.id} controls={iconTag} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
@@ -3138,14 +3140,14 @@ export type TextLayerPatch = { text?: string; font?: string; letterSize?: number
  * A key ring tab of its own (#598): once it is in place, one click holds it together with the
  * nearest tag, as Ctrl+B would, so nobody needs to know the bundle to keep the two together.
  */
-function KeyringTabBundleButton({ disabled, onBundle }: { disabled: boolean; onBundle: () => void }) {
+function KeyringTabFixButton({ disabled, onFix }: { disabled: boolean; onFix: () => void }) {
   return (
     <div className="name-tag-start">
-      <button className="inspector-action-button name-tag-start-button" type="button" disabled={disabled} onClick={onBundle}>
+      <button className="inspector-action-button name-tag-start-button" type="button" disabled={disabled} onClick={onFix}>
         <Link2 size={17} strokeWidth={2.5} />
-        <span>{t("nameTag.keyringTabBundle")}</span>
+        <span>{t("nameTag.keyringTabFix")}</span>
       </button>
-      <p className="name-tag-hint">{t("nameTag.keyringTabBundleHint")}</p>
+      <p className="name-tag-hint">{t("nameTag.keyringTabFixHint")}</p>
     </div>
   );
 }

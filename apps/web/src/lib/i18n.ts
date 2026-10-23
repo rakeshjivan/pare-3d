@@ -179,6 +179,16 @@ export function detectLanguage(): Language {
   return DEFAULT_LANGUAGE;
 }
 
+/**
+ * Runs in the page head before anything is drawn and gives <html lang> the language detectLanguage will pick, so
+ * a browser translator reads the page in its real language from the start. Read as English, a German page was
+ * translated into German and "Hell" became "Hölle" (forum); a language layerling does not speak stays "en", and
+ * the translator may turn it into that language (#681).
+ */
+export const LANGUAGE_BOOT_SCRIPT = `try{var m=${JSON.stringify(
+  Object.fromEntries(LANGUAGES.map((language) => [language, LANGUAGE_INFO[language].htmlLang])),
+)},l=null;try{var s=localStorage.getItem(${JSON.stringify(LANGUAGE_STORAGE_KEY)});if(m[s])l=s}catch(e){}if(!l){var t=navigator.languages||[navigator.language];for(var i=0;i<t.length&&!l;i++){var p=String(t[i]||"").trim().toLowerCase().split("-"),r=p.slice(0,2).join("-");l=m[r]?r:m[p[0]]?p[0]:null}}document.documentElement.lang=m[l||${JSON.stringify(DEFAULT_LANGUAGE)}]}catch(e){}`;
+
 export function translate(
   language: Language,
   key: MessageKey,

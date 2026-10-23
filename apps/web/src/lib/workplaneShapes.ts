@@ -302,7 +302,7 @@ export function meshYawDegrees(shape: WorkplaneShape) {
 }
 
 function edgeTreatmentPreserveZone(shape: WorkplaneShape): number {
-  const own = Math.max(...(shape.edgeTreatments ?? []).map((feature) => feature.amount), 0);
+  const own = Math.max(...(shape.edgeTreatments ?? []).map((feature) => Math.max(feature.amount, feature.endAmount ?? 0)), 0);
   const child = Math.max(...(shape.groupedShapes ?? []).map(edgeTreatmentPreserveZone), 0);
   return Math.max(own, child);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { designsToRecover, isInlineThumbnail, orphanedProjectIds, projectListForLocalStorage, withStoredThumbnails, writeProjectList } from "@/lib/designListStorage";
+import { designsToRecover, hiddenCopiesOf, isInlineThumbnail, orphanedProjectIds, projectListForLocalStorage, withStoredThumbnails, writeProjectList } from "@/lib/designListStorage";
 
 const picture = "data:image/png;base64,AAAA";
 
@@ -54,5 +54,16 @@ describe("the list of designs in localStorage (#656)", () => {
   it("finds the designs whose card was lost", () => {
     expect(orphanedProjectIds(["a", "b"], ["a", "c", "b", "d", "c"])).toEqual(["c", "d"]);
     expect(orphanedProjectIds([], [])).toEqual([]);
+  });
+
+  it("finds the copies a restore left behind of a design that is deleted", () => {
+    const candidates = [
+      { id: "old", name: "Tankpas", createdAt: 4, revision: 3 },
+      { id: "older", name: "Tankpas", createdAt: 4, revision: 1 },
+      { id: "renamed", name: "Tankpas 2", createdAt: 4, revision: 2 },
+      { id: "later", name: "Tankpas", createdAt: 5, revision: 2 },
+    ];
+    expect(hiddenCopiesOf({ name: "Tankpas", createdAt: 4 }, candidates)).toEqual(["old", "older"]);
+    expect(hiddenCopiesOf({ name: "Box", createdAt: 4 }, candidates)).toEqual([]);
   });
 });

@@ -63,10 +63,10 @@ A note records what the geometry does not say: "This screw is 0.3 mm too tight",
 - {{ui:note.detach}} releases an attached note from the body.
 - {{ui:editor.tool.group}} takes an attached note into the group; {{ui:editor.tool.ungroup}} hands it to the visible part under it, a group inside included. While a group is open with {{ui:group.edit}}, its notes move with the part under them and go back to the group with {{ui:group.done}}; cancelling puts them back as they were.
 - If its body is deleted, or no visible body is under it any more, the note stays where it stood, on the workplane.
-- Dragging moves the note, a click opens it for editing.
+- Dragging the pin moves the note. A click on the pin folds the card away, only the small number stays; another click opens it again. A click into the text edits it.
 - While you write, [[Enter]] keeps the text and [[Esc]] puts it back to how it was before you started; [[Shift]]+[[Enter]] starts a new line.
 
-Notes are saved in the design, appear in no export and can be shown or hidden with {{ui:visibility.notes}}.
+Notes are saved in the design, appear in no export and can be shown or hidden with {{ui:visibility.notes}} (in {{ui:editor.visibilityOptions}}, the arrow beside the eye icon).
 
 ## Reference points
 

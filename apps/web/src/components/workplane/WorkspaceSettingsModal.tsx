@@ -14,7 +14,7 @@ import { setToolbarSize, TOOLBAR_SIZE_OPTIONS, type ToolbarSize } from "@/lib/to
 import { useToolbarSize } from "@/lib/useToolbarSize";
 import { useViewCubePosition } from "@/lib/useViewCubePosition";
 import { setViewCubePosition, VIEW_CUBE_POSITION_OPTIONS, type ViewCubePosition } from "@/lib/viewCubePosition";
-import { gearCenterHoleLimits, gearToothPitch, gearTypeHasHelix } from "@/lib/gearGeometry";
+import { gearCenterHoleLimits, gearToothPitch, gearTypeHasHelix, MAX_GEAR_TEETH, MIN_GEAR_TEETH } from "@/lib/gearGeometry";
 import { automaticSideCount } from "@/lib/roundSideCount";
 import { torusTessellation } from "@/lib/torusTessellation";
 import { printerPresetById } from "@/lib/printBed";
@@ -308,7 +308,7 @@ function specialFieldsForShape(
     const fields: ShapeSpecialField[] = [
       { type: "select", key: "gearType", label: t("inspector.gearType"), defaultValue: defaults.gearType ?? "spur", options: GEAR_TYPE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) })) },
       { type: "select", key: "gearProfile", label: t("prop.gearProfile"), defaultValue: defaults.gearProfile ?? "involute", options: GEAR_PROFILE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) })) },
-      { type: "number", key: "teeth", label: t("prop.teeth"), defaultValue: defaults.teeth ?? 12, min: 6, max: 64, step: 1 },
+      { type: "number", key: "teeth", label: t("prop.teeth"), defaultValue: defaults.teeth ?? 12, min: MIN_GEAR_TEETH, max: MAX_GEAR_TEETH, step: 1 },
       ...(gearProfile === "involute" || gearProfile === "round" ? [
         ...(gearProfile === "involute" ? [
           { type: "number", key: "gearPressureAngle", label: t("prop.gearPressureAngle"), defaultValue: defaults.gearPressureAngle ?? 20, min: 14.5, max: 30, step: 0.5, unit: "°" },

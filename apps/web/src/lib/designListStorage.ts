@@ -65,6 +65,18 @@ export function designsToRecover<T extends RecoveryCandidate>(listed: ReadonlyAr
   return [...newest.values()];
 }
 
+/**
+ * Set once the lost designs have been looked for in this browser. The list cannot be lost that way since 1.95.0, so
+ * one look is enough; looking at every start brought back the old copy a restore had left behind each time the
+ * restored one was deleted (#656).
+ */
+export const LOST_DESIGNS_RECOVERED_KEY = "layerling.lostDesignsRecovered";
+
+/** The hidden copies of a design that is being deleted: same name and creation time, as designsToRecover counts them. */
+export function hiddenCopiesOf(design: { name: string; createdAt: number }, candidates: ReadonlyArray<RecoveryCandidate>): string[] {
+  return candidates.filter((candidate) => candidate.name === design.name && candidate.createdAt === design.createdAt).map((candidate) => candidate.id);
+}
+
 /** The designs whose shapes are still in IndexedDB although no card points to them any more. */
 export function orphanedProjectIds(listedIds: Iterable<string>, storedIds: Iterable<string>): string[] {
   const listed = new Set(listedIds);

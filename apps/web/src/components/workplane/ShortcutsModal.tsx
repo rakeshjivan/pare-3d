@@ -50,7 +50,9 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { combos: ["Ctrl+Z"], label: "shortcuts.undo" },
       { combos: ["Ctrl+Shift+Z", "Ctrl+Y"], label: "shortcuts.redo" },
-      { combos: ["← / →"], label: "shortcuts.historyView" },
+      { combos: ["← / →", "Wheel"], label: "shortcuts.historyView" },
+      { combos: ["PgUp / PgDn"], label: "shortcuts.historyViewPage" },
+      { combos: ["Home / End"], label: "shortcuts.historyViewEnds" },
       { combos: ["Esc"], label: "shortcuts.historyViewClose" },
     ],
   },
@@ -195,7 +197,7 @@ function ShortcutKeys({ combos }: { combos: string[] }) {
             {comboKeys(combo).map((key, keyIndex) => (
               <Fragment key={key}>
                 {keyIndex > 0 ? <span className="shortcuts-plus" aria-hidden="true">+</span> : null}
-                <kbd>{key === "Click" ? t("shortcuts.click") : key === "RightClick" ? t("shortcuts.rightClick") : key === "Drag" ? t("shortcuts.drag") : key}</kbd>
+                <kbd>{key === "Click" ? t("shortcuts.click") : key === "RightClick" ? t("shortcuts.rightClick") : key === "Drag" ? t("shortcuts.drag") : key === "Wheel" ? t("shortcuts.wheel") : key}</kbd>
               </Fragment>
             ))}
           </span>

@@ -3200,4 +3200,12 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "nameTag.keyringAlong": "الموضع على طول الجانب",
   "nameTag.keyringAlongHint": "يحرّك اللسان إلى الأعلى أو الأسفل على طول جانبه، مثلًا نحو حرف يمتد أبعد. 0 هو المنتصف.",
   "nameTag.keyringAlongHintTop": "يحرّك اللسان إلى اليسار أو اليمين على طول الأعلى. 0 هو المنتصف.",
+  "shell.side.closed": "مغلق (تجويف داخلي)",
+  "shortcuts.historyViewPage": "في عرض السجل: عشر حالات أقدم أو أحدث",
+  "shortcuts.historyViewEnds": "في عرض السجل: أقدم حالة أو الحالة الحالية",
+  "shortcuts.wheel": "عجلة الفأرة",
+  "export.svg.noteFootprint": "يصدّر فقط الحدود التي تقف بها الأجسام على مستوى العمل، كخطوط بالمليمتر، للقطع بالليزر والقوالب.",
+  "export.svg.view": "العرض",
+  "export.svg.viewSilhouette": "الظل من الأعلى",
+  "export.svg.viewFootprint": "مساحة الارتكاز على مستوى العمل",
 };

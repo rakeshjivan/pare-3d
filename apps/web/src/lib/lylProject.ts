@@ -1460,7 +1460,7 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
   }
   if (kind === "gear") {
     const teeth = finiteNumber(definition.teeth, `${label}.teeth`);
-    if (!Number.isInteger(teeth) || teeth < 6 || teeth > 64) throw new Error(`${label}.teeth is outside the supported range`);
+    if (!Number.isInteger(teeth) || teeth < 6 || teeth > 150) throw new Error(`${label}.teeth is outside the supported range`);
     const toothSize = finiteNumber(definition.toothSize, `${label}.toothSize`);
     if (toothSize <= 0) throw new Error(`${label}.toothSize must be positive`);
     if (definition.toothWidth !== undefined) {
@@ -2177,6 +2177,24 @@ export async function inspectLylProjectPackage(input: ArrayBuffer | Uint8Array):
     modifiedAt: Date.parse(validated.document.metadata.modifiedAt),
     formatVersion: validated.document.formatVersion,
   };
+}
+
+/**
+ * The package with another design name inside. Renaming a design on the start page changes its card only; the
+ * saved package keeps the old name until the design is changed again, so whatever hands the package on writes the
+ * card's name in first (#689). Everything else stays as it was; a package that already has the name comes back as is.
+ */
+export async function withLylProjectName(input: ArrayBuffer | Uint8Array, projectName: string): Promise<Uint8Array> {
+  const bytes = projectInputBytes(input);
+  const name = projectName.trim();
+  const prefix = strFromU8(bytes.subarray(0, Math.min(bytes.length, 64))).trimStart();
+  if (!name || prefix.startsWith("{")) return bytes;
+  const { files, validated } = await readPackagedLyl(bytes);
+  if (validated.document.metadata.projectName === name) return bytes;
+  const raw = JSON.parse(strFromU8(files["project.json"])) as { metadata: { projectName: string } };
+  raw.metadata.projectName = name;
+  files["project.json"] = strToU8(JSON.stringify(raw));
+  return zipAsync(Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b))), 1);
 }
 
 export async function importLylProject(input: ArrayBuffer | Uint8Array, options: ImportLylOptions = {}): Promise<LylRestoredProject> {

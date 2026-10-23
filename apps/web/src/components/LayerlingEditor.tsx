@@ -316,7 +316,7 @@ import { screenAlignedNudge } from "@/lib/keyboardNudge";
 import { LAYERLING_MCP_HEARTBEAT_MS, LAYERLING_MCP_POLL_RETRY_MS, LAYERLING_MCP_ROUTE, type LayerlingMcpCommand, type LayerlingMcpSceneSummary, type LayerlingMcpViewFace } from "@/lib/layerlingMcpProtocol";
 import type { CadFaceInfo, CadModifierComponentMesh, CadModifierDeflection, CadModifierDisplayEdge, CadModifierEdge, CadModifierFaces, CadModifierGridfinityPart, CadModifierHelicalGearPart, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierProfilePart, CadModifierQuality, CadModifierSpringPart, CadModifierThreadPart, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { getSectionBounds, sectionAxisLetter, sectionMeshInFrame, sectionPlacementWorkplane, sectionPointFromFrame, sectionPointToFrame, type SectionFrame, type SectionOrientation, type SectionPlaneAxis, type SectionPlaneSettings } from "@/lib/sectionView";
-import { projectSectionPoint, SECTION_VIEW_FACE, sectionSvgDocument, sliceMeshContours } from "@/lib/sectionSvg";
+import { footprintCutOffset, projectSectionPoint, SECTION_VIEW_FACE, sectionSvgDocument, sliceMeshContours } from "@/lib/sectionSvg";
 import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ParametricSource, ProjectAsset, ShapeAsset, ShapeCustomization, ShapeKind, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, ShellEdges, ShellOpenings, ShellSide, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
 import { type Vec3, type MeshData, type Cuboid, type ShapeUpdatePatch, type ManifoldSolid, MIN_SHAPE_DIMENSION, resetManifoldRuntime, cleanModelDimension, getManifoldRuntime, meshForShape, meshReachAlong, appendMeshData, formatTriangleCount, shapeAabb, boundsForShapes, boundsForCuboids, meshAabb, boundsForPositions, quantizedPointKey } from "@/lib/editorMeshCore";
 import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, meshDataToManifoldMesh, shapeToManifoldSolid, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, exportSolidVolume, type ExportSolidVolume, PRINT_MATERIAL_STORAGE_KEY, PRINT_INFILL_STORAGE_KEY, PRINT_WALLS_STORAGE_KEY, formatEstimateNumber, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, disposeManifold, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
@@ -391,6 +391,7 @@ export type HistoryProjectRequest = {
 };
 type ExportFormat = "stl" | "3mf" | "obj" | "step" | "svg" | "png" | "lyl" | "drawing";
 type DirectExportFormat = Exclude<ExportFormat, "step" | "png" | "lyl" | "drawing">;
+type SvgExportView = "silhouette" | "footprint";
 type ViewImageOptions = { plate: boolean; transparent: boolean };
 type LylHistoryLimit = EditorHistoryExportLimit;
 /** "file" writes into the file the design is tied to (asking for one the first time), "fileAs" always asks (#251). */
@@ -1482,6 +1483,23 @@ function imagePlateDimensions(pixelWidth: number, pixelHeight: number) {
     depth: Number(depth.toFixed(2)),
     height: 1.6,
   };
+}
+
+/**
+ * The SVG of only what stands on the workplane (#692): the outlines of the section a hair above the lowest
+ * point, drawn as lines in their colours. `shapes` are the visible ones to export, loose holes among them.
+ */
+async function footprintSvg(shapes: readonly WorkplaneShape[], title: string) {
+  const { solids, meshes: cut } = await exportBodiesWithLooseHoles(shapes);
+  const { meshes, quellen } = await colorSeparatedExportMeshes(solids, cut);
+  const offset = footprintCutOffset(meshes);
+  const bodies = offset === null ? [] : meshes.map((mesh, index) => {
+    const body = solids[quellen[index]];
+    return { name: body ? displayShapeName(body) : mesh.name, color: body?.color ?? "#000000", loops: sliceMeshContours(mesh, "y", offset) };
+  });
+  const result = offset === null ? null : sectionSvgDocument(bodies, "y", offset, title);
+  if (!result) throw new Error(t("status.sectionSvgNothing"));
+  return result;
 }
 
 /** `cutMeshes` holds a body's mesh where loose holes have cut it (#203); the others are built from the shape. */
@@ -12111,9 +12129,12 @@ export function LayerlingEditor({
       if (command.action === "export_mesh") {
         // The file the export window writes as STL, 3MF or OBJ, from the same bodies: visible solids only, loose
         // holes taken off, overlapping bodies merged (STL) or separated by colour (3MF, OBJ), and the tiny loose
-        // pieces left out. ids limit it to those objects (holes still cut).
+        // pieces left out. ids limit it to those objects (holes still cut). SVG is the top view the window writes:
+        // the silhouette from above, or with view "footprint" only the outlines standing on the workplane (#692).
         const format = params.format === undefined ? "stl" : mcpString(params.format, "stl").toLowerCase();
-        if (format !== "stl" && format !== "3mf" && format !== "obj") throw new Error("format must be stl, 3mf or obj");
+        if (format !== "stl" && format !== "3mf" && format !== "obj" && format !== "svg") throw new Error("format must be stl, 3mf, obj or svg");
+        const svgView = params.view === undefined ? "silhouette" : mcpString(params.view, "silhouette").toLowerCase();
+        if (svgView !== "silhouette" && svgView !== "footprint") throw new Error("view must be silhouette or footprint");
         const ids = Array.isArray(params.ids) ? params.ids.filter((id): id is string => typeof id === "string") : [];
         const all = currentShapes();
         const chosen = ids.length ? all.filter((shape) => ids.includes(shape.id)) : all;
@@ -12123,6 +12144,22 @@ export function LayerlingEditor({
         if (!visible.some((shape) => !shape.hole && !isNonSolidShapeKind(shape.kind))) throw new Error(t(hiddenNote ? "status.exportOnlyHidden" : "status.addSolidBeforeExport"));
         const invalidSvg = visible.map(invalidSvgMeshReason).find((reason): reason is string => Boolean(reason));
         if (invalidSvg) throw new Error(t("status.svgInvalid", { reason: invalidSvg }));
+        if (format === "svg") {
+          let svg: string;
+          let outlines: number | undefined;
+          if (svgView === "footprint") {
+            const result = await footprintSvg(visible, projectName);
+            svg = result.svg;
+            outlines = result.loopCount;
+          } else {
+            const { solids, meshes: cutMeshes, cut } = await exportBodiesWithLooseHoles(visible);
+            svg = await toSvg(solids, projectName, cutMeshes.map((mesh, index) => (cut[index] ? mesh : null)));
+          }
+          const svgBytes = new TextEncoder().encode(svg);
+          let svgBinary = "";
+          for (let index = 0; index < svgBytes.length; index += 8192) svgBinary += String.fromCharCode(...svgBytes.subarray(index, index + 8192));
+          return { format, view: svgView, fileName: projectExportFileName(projectName, "svg"), bytes: svgBytes.length, ...(outlines === undefined ? {} : { outlines }), base64: btoa(svgBinary) };
+        }
         const { solids: cutSolids, meshes, cut: wasCut, holeCutsFailed } = await exportBodiesWithLooseHoles(visible);
         const joined = await (format === "stl" ? unionOverlappingExportMeshes(cutSolids, meshes, wasCut) : colorSeparatedExportMeshes(cutSolids, meshes, wasCut));
         // A group showing its parts in their own colours keeps them in 3MF and OBJ (#153).
@@ -12610,8 +12647,8 @@ export function LayerlingEditor({
     return { shapes: hasSelection ? selectedShapes : shapes, selection: hasSelection };
   }, [hasSelection, selectedShapes, shapes]);
 
-  /** `chooseFile` asks for a new STL even when the design already has one (Save as). */
-  const exportDesign = useCallback(async (format: DirectExportFormat, exportName: string, chooseFile = false, toBambu = false) => {
+  /** `chooseFile` asks for a new STL even when the design already has one (Save as). `svgView` picks what an SVG shows (#692). */
+  const exportDesign = useCallback(async (format: DirectExportFormat, exportName: string, chooseFile = false, toBambu = false, svgView: SvgExportView = "silhouette") => {
     const source = exportSource();
     const selectionScoped = source.selection;
     // Ausgeblendetes bleibt draussen, wie bei vergleichbaren Programmen: ein beiseitegelegtes
@@ -12639,6 +12676,15 @@ export function LayerlingEditor({
     const failNotice = (label: string, error: unknown) => {
       setNotice(error instanceof Error ? localizedError(error.message) : t("status.exportFailed", { label }));
     };
+    if (format === "svg" && svgView === "footprint") {
+      // Only what stands on the workplane: the section a hair above the lowest point (#692).
+      setNotice(t("status.buildingSvg"), true);
+      void footprintSvg(sourceShapes, exportName.trim() || projectName)
+        .then((result) => downloadTextFile(projectExportFileName(exportName, "svg"), result.svg, "image/svg+xml;charset=utf-8"))
+        .then(() => finishNotice("SVG"))
+        .catch((error: unknown) => failNotice("SVG", error));
+      return;
+    }
     if (format === "svg") {
       setNotice(t("status.buildingSvg"), true);
       const endExportBusy = beginBusy("export");
@@ -15296,7 +15342,7 @@ export function LayerlingEditor({
           estimateShapes={exportTargetShapes}
           onEstimatePrint={exportSolidVolume}
           onClose={() => setTopPanel(null)}
-          onExport={(format, exportName, chooseFile) => void exportDesign(format, exportName, chooseFile)}
+          onExport={(format, exportName, chooseFile, svgView) => void exportDesign(format, exportName, chooseFile, false, svgView)}
           stlFileName={topPanel === "export" ? linkedStlFile(projectId ?? "")?.name ?? null : null}
           onExportLyl={exportLylDesign}
           onExportStep={exportStepDesign}
@@ -17115,7 +17161,7 @@ function TopActionPanel({
   estimateShapes: readonly WorkplaneShape[];
   onEstimatePrint: (shapes: readonly WorkplaneShape[]) => Promise<ExportSolidVolume>;
   onClose: () => void;
-  onExport: (format: DirectExportFormat, exportName: string, chooseFile?: boolean) => void;
+  onExport: (format: DirectExportFormat, exportName: string, chooseFile?: boolean, svgView?: SvgExportView) => void;
   /** The STL file this design exports into, once one was chosen (Chrome and Edge). */
   stlFileName?: string | null;
   onExportLyl: (exportName: string, historyLimit: LylHistoryLimit, target?: LylExportTarget) => void;
@@ -17138,6 +17184,7 @@ function TopActionPanel({
   const [svgWidthText, setSvgWidthText] = useState(() => { const width = readImportSvgWidth(); return width ? String(width) : ""; });
   const [exportFormat, setExportFormat] = useState<ExportFormat>("stl");
   const [drawingFormat, setDrawingFormat] = useState<"svg" | "pdf">("pdf");
+  const [svgView, setSvgView] = useState<SvgExportView>("silhouette");
   const [exportName, setExportName] = useState(projectName);
   const previousProjectNameRef = useRef(projectName);
   // Starts at the history setting from the workspace settings, so a project
@@ -17264,7 +17311,7 @@ function TopActionPanel({
     svg: {
       label: "SVG",
       description: t("export.svg.description"),
-      note: t("export.svg.note"),
+      note: t(svgView === "footprint" ? "export.svg.noteFootprint" : "export.svg.note"),
     },
     png: {
       label: "PNG",
@@ -17285,7 +17332,7 @@ function TopActionPanel({
     else if (exportFormat === "step") onExportStep(exportName);
     else if (exportFormat === "png") onExportImage(exportName, imageOptions);
     else if (exportFormat === "lyl") onExportLyl(exportName, lylHistoryLimit, lylFileAccessSupported() ? "fileAs" : "download");
-    else onExport(exportFormat, exportName);
+    else onExport(exportFormat, exportName, false, svgView);
   };
 
   return (
@@ -17424,6 +17471,18 @@ function TopActionPanel({
                 <select aria-label={t("export.drawing.fileFormat")} value={drawingFormat} onChange={(event) => setDrawingFormat(event.target.value as "svg" | "pdf")}>
                   <option value="pdf">PDF</option>
                   <option value="svg">SVG</option>
+                </select>
+              </label>
+            </section>
+          ) : null}
+
+          {exportFormat === "svg" ? (
+            <section className="export-setting-section">
+              <label>
+                <strong>{t("export.svg.view")}</strong>{" "}
+                <select aria-label={t("export.svg.view")} value={svgView} onChange={(event) => setSvgView(event.target.value as SvgExportView)}>
+                  <option value="silhouette">{t("export.svg.viewSilhouette")}</option>
+                  <option value="footprint">{t("export.svg.viewFootprint")}</option>
                 </select>
               </label>
             </section>
