@@ -6070,7 +6070,15 @@ html[data-theme="dark"] .visibility-hidden-badge {
   display: block;
   width: 100%;
   height: 100%;
+  /* The box lets clicks through; the picture itself is turned and zoomed with the mouse. */
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
   background: radial-gradient(circle at 50% 48%, rgba(255, 239, 221, 0.98), rgba(238, 208, 176, 0.96));
+}
+
+.sketch-revolve-preview canvas:active {
+  cursor: grabbing;
 }
 
 .sketch-revolve-preview-empty {
