@@ -342,5 +342,43 @@
       "de": "Mit „Proportionen beibehalten“ änderte die Eingabe der Höhe eines Textes auch Breite und Tiefe, also die Schriftgröße. Die Höhe eines Textes ist nur die Dicke der Buchstaben und bleibt jetzt außen vor.",
       "en": "With \"Keep proportions\" on, typing a text's height also changed its width and depth, and with them the letter size. A text's height is only the thickness of its letters and is now left out."
     }
+  },
+  {
+    "title": {
+      "de": "Die Drehkörper-Vorschau lässt sich mit der Maus drehen",
+      "en": "The revolve preview turns with the mouse",
+      "ar": "معاينة الجسم الدوّار تدور بالفأرة",
+      "cs": "Náhled rotačního tělesa se otáčí myší",
+      "da": "Forhåndsvisningen af omdrejningslegemet kan drejes med musen",
+      "fr": "L'aperçu de la révolution se tourne à la souris",
+      "hu": "A forgástest előnézete egérrel forgatható",
+      "it": "L'anteprima del solido di rotazione si gira con il mouse",
+      "ja": "回転体のプレビューをマウスで回せるように",
+      "nl": "Het voorbeeld van het draailichaam draait met de muis",
+      "pl": "Podgląd bryły obrotowej obraca się myszą",
+      "pt-br": "A pré-visualização do sólido de revolução gira com o mouse",
+      "ru": "Предпросмотр тела вращения поворачивается мышью",
+      "sl": "Predogled vrtenine se vrti z miško",
+      "tr": "Döndürme gövdesinin önizlemesi fareyle döndürülebiliyor",
+      "es": "La vista previa del sólido de revolución gira con el ratón"
+    },
+    "body": {
+      "de": "In der Skizze mit „Drehen“ ist die kleine 3D-Vorschau kein Standbild mehr: Mit der linken oder rechten Taste ziehen dreht sie, das Rad zoomt und die Radtaste verschiebt sie, so siehst du auch die Unterseite. Die eingestellte Ansicht bleibt beim Weiterzeichnen erhalten.",
+      "en": "In the sketch with Revolve, the small 3D preview is no longer a still picture: drag with the left or the right button to turn it, use the wheel to zoom and the wheel button to move it, so you can see the underside too. The view you set stays while you keep drawing.",
+      "ar": "في الرسم مع «تدوير»، لم تعد المعاينة ثلاثية الأبعاد الصغيرة صورة ثابتة: اسحب بالزر الأيسر أو الأيمن لتدويرها، وبعجلة الفأرة لتكبيرها، وبزر العجلة لتحريكها، فترى الجانب السفلي أيضًا. تبقى الزاوية التي ضبطتها أثناء متابعة الرسم.",
+      "cs": "V náčrtu s Rotací už malý 3D náhled není pevný obrázek: tažením levým nebo pravým tlačítkem ho otočíte, kolečkem zvětšíte a kolečkovým tlačítkem posunete, takže uvidíte i spodní stranu. Nastavený pohled zůstane i při dalším kreslení.",
+      "da": "I skitsen med Drej er den lille 3D-forhåndsvisning ikke længere et stillbillede: træk med venstre eller højre knap for at dreje den, brug hjulet til at zoome og hjulknappen til at flytte den, så du også kan se undersiden. Den indstillede visning bliver, mens du tegner videre.",
+      "fr": "Dans l'esquisse avec Révolution, le petit aperçu 3D n'est plus une image fixe : glissez avec le bouton gauche ou droit pour le tourner, utilisez la molette pour zoomer et le bouton de la molette pour le déplacer, pour voir aussi le dessous. La vue réglée reste pendant que vous continuez à dessiner.",
+      "hu": "A Forgatás üzemmódú vázlatban a kis 3D-előnézet már nem állókép: a bal vagy a jobb gombbal húzva elforgatható, a görgővel nagyítható, a görgőgombbal pedig mozgatható, így az alsó oldal is látszik. A beállított nézet megmarad, miközben tovább rajzolsz.",
+      "it": "Nello schizzo con Rotazione, la piccola anteprima 3D non è più un'immagine fissa: trascina con il tasto sinistro o destro per ruotarla, usa la rotellina per lo zoom e il tasto della rotellina per spostarla, così vedi anche il lato inferiore. La vista impostata resta mentre continui a disegnare.",
+      "ja": "「回転」のスケッチで、小さな3Dプレビューは静止画ではなくなりました。左または右ボタンのドラッグで回転、ホイールでズーム、ホイールボタンで移動でき、下側も見られます。設定した視点は、スケッチを描き続けても保たれます。",
+      "nl": "In de schets met Draaien is het kleine 3D-voorbeeld geen stilstaand beeld meer: sleep met de linker- of rechterknop om het te draaien, gebruik het wiel om te zoomen en de wielknop om het te verplaatsen, zodat je ook de onderkant ziet. De ingestelde weergave blijft behouden terwijl je verder tekent.",
+      "pl": "W szkicu z Obrotem mały podgląd 3D nie jest już nieruchomym obrazem: przeciągnij lewym lub prawym przyciskiem, aby go obrócić, kółkiem przybliżaj, a przyciskiem kółka przesuwaj, dzięki czemu widać też spód. Ustawiony widok zostaje, gdy rysujesz dalej.",
+      "pt-br": "No esboço com Revolução, a pequena pré-visualização 3D não é mais uma imagem parada: arraste com o botão esquerdo ou direito para girá-la, use a roda para dar zoom e o botão da roda para movê-la, assim você vê também a parte de baixo. A vista que você ajustou continua enquanto você segue desenhando.",
+      "ru": "В эскизе с вращением маленький 3D-предпросмотр больше не статичная картинка: перетаскивайте левой или правой кнопкой, чтобы повернуть, колесом — масштабировать, кнопкой колеса — сдвигать, чтобы видеть и нижнюю сторону. Выбранный вид сохраняется, пока вы продолжаете рисовать.",
+      "sl": "V skici z vrtenjem majhen 3D-predogled ni več mirujoča slika: z vlečenjem z levim ali desnim gumbom ga zasukate, s kolescem povečate, z gumbom kolesca premaknete, tako da vidite tudi spodnjo stran. Nastavljen pogled ostane, medtem ko rišete naprej.",
+      "tr": "Döndürme ile çizimde küçük 3B önizleme artık durağan bir resim değil: sol veya sağ düğmeyle sürükleyerek döndür, tekerlekle yakınlaştır, tekerlek düğmesiyle kaydır; böylece alt tarafı da görürsün. Ayarladığın görünüm çizmeye devam ederken korunur.",
+      "es": "En el boceto con Revolución, la pequeña vista previa 3D ya no es una imagen fija: arrastra con el botón izquierdo o derecho para girarla, usa la rueda para hacer zoom y el botón de la rueda para moverla, así ves también la parte inferior. La vista que ajustes se mantiene mientras sigues dibujando."
+    }
   }
 ]

@@ -6,6 +6,7 @@ import { useLanguage } from "@/lib/useLanguage";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
+import { wheelZoomDelta } from "@/lib/wheelZoom";
 
 export function SketchRevolvePreview({ positions }: { positions: number[] | null }) {
   useLanguage();
@@ -59,6 +60,21 @@ export function SketchRevolvePreview({ positions }: { positions: number[] | null
       camera.position.copy(savedView.current.position);
       controls.target.copy(savedView.current.target);
     }
+    // A wheel counted in lines or pages (Firefox, Windows with "scroll one screen at a time") zooms like any other, as in the main view.
+    let lastWheelAt = Number.NEGATIVE_INFINITY;
+    let wheelDeltaOverride: number | null = null;
+    const zoomControls = controls as unknown as { _getZoomScale: (delta: number) => number };
+    const orbitZoomScale = zoomControls._getZoomScale.bind(controls);
+    zoomControls._getZoomScale = (delta: number) => orbitZoomScale(wheelDeltaOverride ?? delta);
+    const countWheel = (event: WheelEvent) => {
+      wheelDeltaOverride = wheelZoomDelta(event, event.timeStamp - lastWheelAt);
+      lastWheelAt = event.timeStamp;
+    };
+    const endWheel = () => {
+      wheelDeltaOverride = null;
+    };
+    canvas.addEventListener("wheel", countWheel, { passive: true, capture: true });
+    canvas.addEventListener("wheel", endWheel, { passive: true });
     controls.update();
     camera.updateProjectionMatrix();
 
@@ -76,6 +92,8 @@ export function SketchRevolvePreview({ positions }: { positions: number[] | null
     observer.observe(canvas);
     return () => {
       savedView.current = { position: camera.position.clone(), target: controls.target.clone() };
+      canvas.removeEventListener("wheel", countWheel, { capture: true });
+      canvas.removeEventListener("wheel", endWheel);
       controls.dispose();
       observer.disconnect();
       geometry.dispose();
