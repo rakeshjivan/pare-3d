@@ -114,6 +114,7 @@ import { SurfaceTextPanel, type SurfaceTextSettings } from "./workplane/SurfaceT
 import { SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK, nearestSurfaceSpot, surfaceTextPositions } from "@/lib/surfaceText";
 import { anchorMotion, movePositions } from "@/lib/surfaceTextFollow";
 import { partGeometry, trianglesNear } from "@/lib/surfacePartCache";
+import { faceComponents } from "@/lib/meshComponents";
 import { movedPointIds, solveSketchConstraints } from "@/lib/sketchConstraints";
 
 /** The id of the letters shown while Text on a surface is open, before they are added. */
@@ -1946,47 +1947,7 @@ function mirroredShapesForSelection(shapes: WorkplaneShape[], selectedIds: strin
 
 
 function meshFaceComponents(mesh: MeshData, tolerance = SEPARATE_PARTS_VERTEX_TOLERANCE) {
-  if (mesh.faces.length === 0) return [];
-  // Fork (build 41): one key per point, shared by the faces that meet there - a dense mesh has a
-  // third as many points as face corners.
-  const vertexKeys = mesh.vertices.map((vertex) => quantizedPointKey(vertex, tolerance));
-  const keysByFace = mesh.faces.map((face) => face.map((vertexIndex) => vertexKeys[vertexIndex]));
-  const facesByVertex = new Map<string, number[]>();
-  keysByFace.forEach((keys, faceIndex) => {
-    keys.forEach((key) => {
-      const current = facesByVertex.get(key);
-      if (current) {
-        current.push(faceIndex);
-      } else {
-        facesByVertex.set(key, [faceIndex]);
-      }
-    });
-  });
-
-  const visited = new Uint8Array(mesh.faces.length);
-  const components: number[][] = [];
-  for (let faceIndex = 0; faceIndex < mesh.faces.length; faceIndex += 1) {
-    if (visited[faceIndex]) continue;
-    const component: number[] = [];
-    const queue = [faceIndex];
-    visited[faceIndex] = 1;
-    while (queue.length > 0) {
-      const current = queue.pop() as number;
-      component.push(current);
-      keysByFace[current].forEach((key) => {
-        const neighbors = facesByVertex.get(key);
-        if (!neighbors) return;
-        facesByVertex.delete(key);
-        neighbors.forEach((neighbor) => {
-          if (visited[neighbor]) return;
-          visited[neighbor] = 1;
-          queue.push(neighbor);
-        });
-      });
-    }
-    components.push(component);
-  }
-  return components;
+  return faceComponents(mesh.vertices, mesh.faces, tolerance);
 }
 
 function meshComponentShape(source: WorkplaneShape, mesh: MeshData, faceIndices: number[], partIndex: number, totalParts: number): WorkplaneShape | null {
@@ -2291,7 +2252,7 @@ function separablePartCount(shape: WorkplaneShape) {
   }
   const cached = importedPartCounts.get(shape.importedMesh);
   if (cached !== undefined) return cached;
-  const count = meshFaceComponents(meshForShape(shape)).length;
+  const count = meshFaceComponents(readOnlyMesh(shape)).length;
   importedPartCounts.set(shape.importedMesh, count);
   return count;
 }
@@ -2521,6 +2482,9 @@ function readMcpEditorIdentity() {
 
 /** What a locked shape still lets through updateShape: none of it changes the body. */
 const LOCKED_SHAPE_PATCH_KEYS = new Set(["locked", "hidden", "name"]);
+
+/** Fork (build 41): the least time between two pictures of the design for its card. */
+const PROJECT_THUMBNAIL_MIN_GAP_MS = 15_000;
 
 /** A preview of an intersection is not calculated for more triangles than this: it would stutter while a shape is moved (#372). */
 const INTERSECT_PREVIEW_MAX_TRIANGLES = 40000;
@@ -3653,10 +3617,26 @@ export function LayerlingEditor({
   const selectedEdgeFeatureCount = useMemo(() => selectedShape ? edgeTreatmentFeatureCount(selectedShape) : 0, [selectedShape]);
   const selectedReversibleEdgeFeatureCount = useMemo(() => selectedShape ? reversibleEdgeTreatmentCount(selectedShape) : 0, [selectedShape]);
   const selectedEdgeHistoryOptions = useMemo(() => selectedShape ? edgeTreatmentHistoryOptions(selectedShape) : [], [selectedShape]);
-  const canSeparateSelectedParts = useMemo(
-    () => selectedShapes.length === 1 && Boolean(selectedShape && selectedShape.groupOperation !== "bundle" && separablePartCount(selectedShape) > 1),
-    [selectedShape, selectedShapes.length],
-  );
+  // Fork (build 41): counted after the click has shown, not during it - on a big imported scan the
+  // count took most of a second. Separate Parts lights up a moment later if the part has pieces.
+  const [canSeparateSelectedParts, setCanSeparateSelectedParts] = useState(false);
+  useEffect(() => {
+    const shape = selectedShapes.length === 1 && selectedShape && selectedShape.groupOperation !== "bundle" ? selectedShape : null;
+    if (!shape) {
+      setCanSeparateSelectedParts(false);
+      return;
+    }
+    let cancelled = false;
+    const run = () => { if (!cancelled) setCanSeparateSelectedParts(separablePartCount(shape) > 1); };
+    const host = window as Window & typeof globalThis;
+    const idle = typeof host.requestIdleCallback === "function" ? host.requestIdleCallback(run, { timeout: 400 }) : null;
+    const timer = idle === null ? host.setTimeout(run, 30) : null;
+    return () => {
+      cancelled = true;
+      if (idle !== null) host.cancelIdleCallback(idle);
+      if (timer !== null) host.clearTimeout(timer);
+    };
+  }, [selectedShape, selectedShapes.length]);
   const toggleModifierEdge = useCallback((id: number, singleEdge = false) => {
     // Nebenwirkungen (setNotice) hier im Funktionskoerper, nicht im
     // setState-Updater - der laeuft unter React StrictMode doppelt.
@@ -3943,6 +3923,7 @@ export function LayerlingEditor({
     [notice, selectedIds, shapes],
   );
 
+  const lastThumbnailCaptureAtRef = useRef(0);
   useEffect(() => {
     const runId = projectSnapshotRunRef.current + 1;
     projectSnapshotRunRef.current = runId;
@@ -4009,13 +3990,17 @@ export function LayerlingEditor({
         }
       });
     };
+    // Fork (build 41): at most one picture every 15 seconds - taking it makes the graphics card
+    // finish its frame and read it back, a pause that grows with a big model's triangle count.
+    const sinceLast = Date.now() - lastThumbnailCaptureAtRef.current;
     const captureTimer = window.setTimeout(() => {
+      lastThumbnailCaptureAtRef.current = Date.now();
       if ("requestIdleCallback" in window) {
         idleId = window.requestIdleCallback(runCapture, { timeout: 1200 });
       } else {
         runCapture();
       }
-    }, PROJECT_THUMBNAIL_IDLE_MS);
+    }, Math.max(PROJECT_THUMBNAIL_IDLE_MS, PROJECT_THUMBNAIL_MIN_GAP_MS - sinceLast));
     return () => {
       stopped = true;
       uploadController?.abort();
@@ -14858,6 +14843,7 @@ export function LayerlingEditor({
           settings={faceTool.settings}
           workspace={workspaceSettings}
           thickness={faceTool.face?.thickness ?? 0}
+          faceSpan={faceOutlineSpan(faceTool.face)}
           empty={Boolean(faceToolPreview?.empty)}
           busy={faceTool.busy}
           onChange={changeFaceToolSettings}
@@ -17503,4 +17489,15 @@ function readOnlyMesh(shape: WorkplaneShape): MeshData {
   const mesh = meshForShape(shape);
   readOnlyMeshes.set(shape, mesh);
   return mesh;
+}
+
+/** Fork (build 41): the larger side of a picked face's outline, in mm (50 before a face is picked). */
+function faceOutlineSpan(face: { outline: { loops: ReadonlyArray<ReadonlyArray<{ u: number; v: number }>> } } | null | undefined): number {
+  if (!face) return 50;
+  let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+  for (const loop of face.outline.loops) for (const point of loop) {
+    minU = Math.min(minU, point.u); maxU = Math.max(maxU, point.u);
+    minV = Math.min(minV, point.v); maxV = Math.max(maxV, point.v);
+  }
+  return Number.isFinite(maxU) ? Math.max(maxU - minU, maxV - minV) : 50;
 }

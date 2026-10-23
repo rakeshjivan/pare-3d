@@ -148,7 +148,8 @@ Instead of dragging, click the face once and set it in the window:
 - **{{ui:faceTool.direction}}:** {{ui:faceTool.direction.out}} for material standing on the face or {{ui:faceTool.direction.in}} for a pocket cut into it. A pocket goes no deeper than the body behind the face; on a hollow body it can still reach the cavity.
 - **{{ui:faceTool.inset}}:** how far the new outline stays inside the face's edge. Going out, 0 takes the whole face, which makes a wall thicker. Openings in the face grow by the same amount.
 - **{{ui:faceTool.radius}}:** rounds every corner of the outline, the inner ones too, so a sharp tip ends in an arc. A notch narrower than twice the radius closes, and a part of the face narrower than twice the inset and the radius together is left out.
-- **{{ui:faceTool.depth}}:** how far the new part stands out of the face, or how deep the pocket goes.
+- **{{ui:faceTool.height}}** (out) or **{{ui:faceTool.depth}}** (in): how far the new part stands out of the face, or how deep the pocket goes.
+- **{{ui:faceTool.offsetX}}** and **{{ui:faceTool.offsetY}}:** slide the shape across the face to fine-tune where it sits - right and up as you look at the face from the front of it (on a face that looks up or down, up is towards the back). {{ui:faceTool.recentre}} puts it back.
 
 The drag and the window work together: drag the depth roughly, then round the corners with the radius, and the preview follows each change. {{ui:faceTool.repick}} chooses another face.
 

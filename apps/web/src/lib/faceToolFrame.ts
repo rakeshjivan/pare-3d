@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { ManifoldToplevel } from "manifold-3d";
-import { FACE_TOOL_OVERLAP, faceToolHeight, faceToolSettingsOn, faceToolWorkplane, insetFaceProfile, insetSketchProfile, type FaceToolSettings } from "@/lib/faceTool";
+import { FACE_TOOL_OVERLAP, faceToolHeight, faceToolSettingsOn, faceToolWorkplane, insetFaceProfile, insetSketchProfile, shiftedAcrossFace, type FaceToolSettings } from "@/lib/faceTool";
 import { quaternionForShape } from "@/lib/geometryRotation";
 import type { PerforableFace } from "@/lib/holePatternShapes";
 import { placementWorkplaneFromSurface, type PlacementWorkplane } from "@/lib/placementWorkplane";
@@ -82,7 +82,7 @@ export function faceToolPlan(runtime: ManifoldToplevel, source: WorkplaneShape, 
   if (capWorkplane && source.sketchProfile) {
     const outline = { ...cloneSketchProfile(source.sketchProfile), images: [] };
     if (setIn && !insetSketchProfile(runtime, outline, inset)) return null;
-    return { profile: setIn ? { ...outline, inset } : outline, workplane: capWorkplane, height };
+    return { profile: setIn ? { ...outline, inset } : outline, workplane: shiftedAcrossFace(capWorkplane, settings), height };
   }
   const profile = insetFaceProfile(runtime, face.outline, inset.distance, inset.radius);
   return profile ? { profile, workplane: faceToolWorkplane(face, settings), height } : null;

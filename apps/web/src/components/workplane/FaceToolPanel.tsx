@@ -6,7 +6,7 @@ import { Check, X } from "lucide-react";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
-import { FACE_TOOL_MAX_DEPTH, FACE_TOOL_MAX_INSET, FACE_TOOL_MAX_RADIUS, FACE_TOOL_MIN_DEPTH, type FaceToolDirection, type FaceToolSettings } from "@/lib/faceTool";
+import { FACE_TOOL_MAX_DEPTH, FACE_TOOL_MAX_INSET, FACE_TOOL_MAX_OFFSET, FACE_TOOL_MAX_RADIUS, FACE_TOOL_MIN_DEPTH, type FaceToolDirection, type FaceToolSettings } from "@/lib/faceTool";
 import type { WorkplaneWorkspaceSettings } from "@/types/layerling";
 
 const DIRECTIONS: readonly FaceToolDirection[] = ["out", "in"];
@@ -22,6 +22,7 @@ export function FaceToolPanel({
   settings,
   workspace,
   thickness,
+  faceSpan = 50,
   empty,
   busy,
   onChange,
@@ -35,6 +36,8 @@ export function FaceToolPanel({
   workspace: WorkplaneWorkspaceSettings;
   /** How thick the body is behind the picked face; a pocket runs up to it. */
   thickness: number;
+  /** Fork (build 41): how far across the picked face is, for the range of the move sliders. */
+  faceSpan?: number;
   /** The inset and the radius leave nothing of the face. */
   empty: boolean;
   busy: boolean;
@@ -47,6 +50,7 @@ export function FaceToolPanel({
   const title = t("faceTool.title");
   const ready = step === "ready";
   const status = !ready ? t("faceTool.step.pick") : empty ? t("faceTool.empty") : t("faceTool.step.ready");
+  const moveRange = Math.max(5, Math.min(FACE_TOOL_MAX_OFFSET, Math.ceil(faceSpan)));
   const maxDepth = settings.direction === "in" ? Math.max(FACE_TOOL_MIN_DEPTH, Math.floor(thickness * 10) / 10) : FACE_TOOL_MAX_DEPTH / 2;
 
   return (
@@ -107,7 +111,7 @@ export function FaceToolPanel({
         onChange={(value) => onChange({ radius: value })}
       />
       <EdgeModifierSlider
-        label={t("faceTool.depth")}
+        label={t(settings.direction === "out" ? "faceTool.height" : "faceTool.depth")}
         value={settings.depth}
         min={FACE_TOOL_MIN_DEPTH}
         max={maxDepth}
@@ -116,6 +120,30 @@ export function FaceToolPanel({
         length
         onChange={(value) => onChange({ depth: value })}
       />
+      {/* Fork (build 41): fine-tune where the pulled shape sits on the face. */}
+      <EdgeModifierSlider
+        label={t("faceTool.offsetX")}
+        value={settings.offsetX ?? 0}
+        min={-moveRange}
+        max={moveRange}
+        step={0.5}
+        workspace={workspace}
+        length
+        onChange={(value) => onChange({ offsetX: value })}
+      />
+      <EdgeModifierSlider
+        label={t("faceTool.offsetY")}
+        value={settings.offsetY ?? 0}
+        min={-moveRange}
+        max={moveRange}
+        step={0.5}
+        workspace={workspace}
+        length
+        onChange={(value) => onChange({ offsetY: value })}
+      />
+      {settings.offsetX || settings.offsetY ? (
+        <button type="button" className="parameters-add face-tool-recentre" onClick={() => onChange({ offsetX: 0, offsetY: 0 })}>{t("faceTool.recentre")}</button>
+      ) : null}
 
       <div className="edge-modifier-footer">
         <button type="button" className="secondary" onClick={ready ? onRepick : onCancel}>

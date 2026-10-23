@@ -22,6 +22,12 @@ export type FaceToolSettings = {
   radius: number;
   /** How far the new body stands out of the face, or the pocket reaches into it, in mm. */
   depth: number;
+  /**
+   * Fork (build 41): the outline moved across the face, in mm - to the right and up as the face is
+   * seen from outside it (on a face that looks up or down, "up" is towards the back).
+   */
+  offsetX?: number;
+  offsetY?: number;
 };
 
 export const DEFAULT_FACE_TOOL: FaceToolSettings = { direction: "out", inset: 0, radius: 0, depth: 2 };
@@ -29,6 +35,7 @@ export const FACE_TOOL_MAX_INSET = 50;
 export const FACE_TOOL_MAX_RADIUS = 30;
 export const FACE_TOOL_MIN_DEPTH = 0.2;
 export const FACE_TOOL_MAX_DEPTH = 100;
+export const FACE_TOOL_MAX_OFFSET = 100;
 /** How far the new body reaches into the old one, or the pocket out of the face, so the two join without a skin. */
 export const FACE_TOOL_OVERLAP = 0.2;
 
@@ -44,6 +51,9 @@ export function normalizeFaceTool(settings: Partial<FaceToolSettings>): FaceTool
     inset: clamp(number(settings.inset, DEFAULT_FACE_TOOL.inset), 0, FACE_TOOL_MAX_INSET),
     radius: clamp(number(settings.radius, DEFAULT_FACE_TOOL.radius), 0, FACE_TOOL_MAX_RADIUS),
     depth: clamp(number(settings.depth, DEFAULT_FACE_TOOL.depth), FACE_TOOL_MIN_DEPTH, FACE_TOOL_MAX_DEPTH),
+    // Only when the shape is moved across the face, so settings without a move read as before.
+    ...(number(settings.offsetX, 0) ? { offsetX: clamp(number(settings.offsetX, 0), -FACE_TOOL_MAX_OFFSET, FACE_TOOL_MAX_OFFSET) } : {}),
+    ...(number(settings.offsetY, 0) ? { offsetY: clamp(number(settings.offsetY, 0), -FACE_TOOL_MAX_OFFSET, FACE_TOOL_MAX_OFFSET) } : {}),
   };
 }
 
@@ -104,13 +114,40 @@ export function faceToolHeight(settings: Pick<FaceToolSettings, "depth">) {
  * going out starts a little inside the old one, and a pocket going in starts at its bottom and
  * reaches a little out of the face.
  */
-export function faceToolWorkplane(face: Pick<PerforableFace, "workplane">, settings: Pick<FaceToolSettings, "direction" | "depth">): PlacementWorkplane {
+export function faceToolWorkplane(face: Pick<PerforableFace, "workplane">, settings: Pick<FaceToolSettings, "direction" | "depth" | "offsetX" | "offsetY">): PlacementWorkplane {
   const { origin, normal } = face.workplane;
   const shift = settings.direction === "out" ? -FACE_TOOL_OVERLAP : -settings.depth;
-  return {
+  return shiftedAcrossFace({
     ...face.workplane,
     origin: { x: origin.x + normal.x * shift, y: origin.y + normal.y * shift, z: origin.z + normal.z * shift },
-  };
+  }, settings);
+}
+
+/**
+ * Fork (build 41): which way is right and which is up on a face, as it is seen from outside: up is
+ * the world's up laid onto the face (towards the back, -z, on a face that looks up or down).
+ */
+export function faceScreenAxes(normal: { x: number; y: number; z: number }) {
+  const length = Math.hypot(normal.x, normal.y, normal.z) || 1;
+  const n = { x: normal.x / length, y: normal.y / length, z: normal.z / length };
+  const wanted = Math.abs(n.y) > 0.95 ? { x: 0, y: 0, z: -Math.sign(n.y) } : { x: 0, y: 1, z: 0 };
+  const along = wanted.x * n.x + wanted.y * n.y + wanted.z * n.z;
+  let up = { x: wanted.x - n.x * along, y: wanted.y - n.y * along, z: wanted.z - n.z * along };
+  const upLength = Math.hypot(up.x, up.y, up.z) || 1;
+  up = { x: up.x / upLength, y: up.y / upLength, z: up.z / upLength };
+  // Looking at the face means looking along -n: right = (-n) x up.
+  const right = { x: -(n.y * up.z - n.z * up.y), y: -(n.z * up.x - n.x * up.z), z: -(n.x * up.y - n.y * up.x) };
+  return { right, up };
+}
+
+/** The workplane moved across the face by the settings' offsets (its normal and axes unchanged). */
+export function shiftedAcrossFace(workplane: PlacementWorkplane, settings: Pick<FaceToolSettings, "offsetX" | "offsetY">): PlacementWorkplane {
+  const dx = settings.offsetX ?? 0;
+  const dy = settings.offsetY ?? 0;
+  if (!dx && !dy) return workplane;
+  const { right, up } = faceScreenAxes(workplane.normal);
+  const o = workplane.origin;
+  return { ...workplane, origin: { x: o.x + right.x * dx + up.x * dy, y: o.y + right.y * dx + up.y * dy, z: o.z + right.z * dx + up.z * dy } };
 }
 
 /**

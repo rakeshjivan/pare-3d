@@ -146,6 +146,9 @@ export async function projectAssetFromBytes(
 
 export function normalizeProjectAsset(value: ProjectAsset): ProjectAsset {
   const candidate = value.bytes as Uint8Array | ArrayBuffer | number[];
+  // Fork (build 41): already normalized - the same bytes object, not a copy. A fresh copy at every
+  // change also missed the save's hash cache, so a big imported file was hashed again each save.
+  if (candidate instanceof Uint8Array && value.byteLength === candidate.byteLength) return value;
   const bytes = candidate instanceof Uint8Array
     ? new Uint8Array(candidate)
     : candidate instanceof ArrayBuffer
