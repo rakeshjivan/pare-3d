@@ -855,7 +855,7 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "shortcuts.placeWorkplaneOnSelection": "Поставить её на выделенную грань",
   "shortcuts.reverseWorkplane": "Держать при установке, чтобы обратить направление",
   "shortcuts.leaveMode": "Выйти из режима рабочей плоскости или рулетки",
-  "shortcuts.sketchEscape": "Завершить цепочку, снять выделение",
+  "shortcuts.sketchEscape": "Отложить инструмент (вернуться к «Выбрать»), затем снять выделение",
   "shortcuts.sketchDelete": "Удалить выделенный элемент",
   "shortcuts.sketchRotate": "Повернуть замкнутый эскиз на 45°",
   "shortcuts.sketchLockImage": "Заблокировать или разблокировать выбранный контур или изображение эскиза",
@@ -3610,4 +3610,8 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "shortcuts.saveView": "Сохранить вид - поворот, сдвиг и масштаб - для этого проекта",
   "camera.viewSaved": "Вид сохранён под {key} - нажмите {key}, чтобы вернуться к нему",
   "camera.savedViewEmpty": "Под {key} ещё нет сохранённого вида - Shift+{key} сохраняет текущий",
+  "status.separatedOutlines": "Разделено на тел: {count}, по одному на контур - у каждого свой эскиз",
+  "nameTag.keyringAlong": "Положение вдоль стороны",
+  "nameTag.keyringAlongHint": "Сдвигает ушко вверх или вниз вдоль его стороны, например к букве, которая выступает дальше. 0 — середина.",
+  "nameTag.keyringAlongHintTop": "Сдвигает ушко влево или вправо вдоль верхней стороны. 0 — середина.",
 };

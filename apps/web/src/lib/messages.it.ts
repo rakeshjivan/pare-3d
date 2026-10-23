@@ -821,7 +821,7 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "shortcuts.placeWorkplaneOnSelection": "Posizionalo sulla faccia selezionata",
   "shortcuts.reverseWorkplane": "Tieni premuto durante il posizionamento per invertire la direzione",
   "shortcuts.leaveMode": "Esci dalla modalità piano di lavoro o misurazione",
-  "shortcuts.sketchEscape": "Termina la sequenza e deseleziona tutto",
+  "shortcuts.sketchEscape": "Posa lo strumento (torna a Seleziona), poi deseleziona tutto",
   "shortcuts.sketchDelete": "Elimina l'elemento selezionato",
   "shortcuts.sketchRotate": "Ruota uno schizzo chiuso di 45°",
   "shortcuts.sketchLockImage": "Blocca o sblocca il contorno selezionato o l'immagine di riferimento",
@@ -3187,4 +3187,8 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "shortcuts.saveView": "Salva la vista - rotazione, spostamento e zoom - per questo progetto",
   "camera.viewSaved": "Vista salvata sotto {key} - premi {key} per tornarci",
   "camera.savedViewEmpty": "Nessuna vista salvata sotto {key} - Maiusc+{key} salva quella attuale",
+  "status.separatedOutlines": "Separato in {count} corpi, uno per contorno - ognuno mantiene il proprio schizzo",
+  "nameTag.keyringAlong": "Posizione lungo il lato",
+  "nameTag.keyringAlongHint": "Sposta la linguetta in alto o in basso lungo il suo lato, per esempio verso una lettera che sporge di più. 0 è il centro.",
+  "nameTag.keyringAlongHintTop": "Sposta la linguetta a sinistra o a destra lungo il lato superiore. 0 è il centro.",
 };

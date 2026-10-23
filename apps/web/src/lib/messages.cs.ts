@@ -933,7 +933,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "shortcuts.placeWorkplaneOnSelection": "Umístit ji na vybranou plochu",
   "shortcuts.reverseWorkplane": "Při umísťování držte pro obrácení směru",
   "shortcuts.leaveMode": "Ukončit režim pracovní roviny nebo měření",
-  "shortcuts.sketchEscape": "Ukončit posloupnost úseček a zrušit výběr",
+  "shortcuts.sketchEscape": "Odložit nástroj (zpět na Vybrat), pak zrušit výběr",
   "shortcuts.sketchDelete": "Smazat vybraný prvek",
   "shortcuts.sketchRotate": "Otočit uzavřený náčrt o 45°",
   "shortcuts.sketchLockImage": "Zamknout nebo odemknout vybraný obrys či referenční obrázek",
@@ -3622,4 +3622,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "shortcuts.saveView": "Uložit pohled - otočení, posun a přiblížení - pro tento návrh",
   "camera.viewSaved": "Pohled uložen pod {key} - stiskem {key} se k němu vrátíte",
   "camera.savedViewEmpty": "Pod {key} zatím není uložen žádný pohled - Shift+{key} uloží ten aktuální",
+  "status.separatedOutlines": "Rozděleno na {count} těles, jedno na každý obrys - každé si ponechá vlastní náčrt",
+  "nameTag.keyringAlong": "Poloha podél strany",
+  "nameTag.keyringAlongHint": "Posune poutko podél jeho strany nahoru nebo dolů, například k písmenu, které sahá dál. 0 je střed.",
+  "nameTag.keyringAlongHintTop": "Posune poutko nahoře doleva nebo doprava. 0 je střed.",
 };

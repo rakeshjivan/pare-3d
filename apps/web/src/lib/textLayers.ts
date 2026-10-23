@@ -3,7 +3,7 @@ import { loadedManifoldRuntime } from "@/lib/manifoldHandle";
 import { normalizeSketchStroke, SKETCH_STROKE_JOINS } from "@/lib/sketchStroke";
 import { normalizeTextEdge } from "@/lib/textEdge";
 import { textOutlineClearance, textOutlineReach } from "@/lib/textFill";
-import { DEFAULT_KEYRING_DIAMETER, KEYRING_HOLE_EDGE_DISTANCE, keyringEarRadius, MAX_KEYRING_DIAMETER, MIN_KEYRING_DIAMETER, TEXT_KEYRING_SIDES, textFillExtent, textKeyringOf, textKeyringReach, textLetterBox, textLetterOffset } from "@/lib/textGeometry";
+import { DEFAULT_KEYRING_DIAMETER, KEYRING_HOLE_EDGE_DISTANCE, keyringAlongLimit, keyringEarRadius, MAX_KEYRING_DIAMETER, MIN_KEYRING_DIAMETER, TEXT_KEYRING_SIDES, textFillExtent, textKeyringOf, textKeyringReach, textLetterBox, textLetterOffset } from "@/lib/textGeometry";
 import type { SketchStroke, SketchStrokeJoin, TextEdge, TextKeyring, TextKeyringSide, WorkplaneShape } from "@/types/layerling";
 
 /**
@@ -69,13 +69,30 @@ export function normalizeTextLayers(layers: unknown): TextLayer[] | null {
   return layers.map((layer, index) => normalizeTextLayer((layer && typeof layer === "object" ? layer : {}) as Partial<TextLayer>, DEFAULT_TEXT_LAYERS[Math.min(index, DEFAULT_TEXT_LAYERS.length - 1)]));
 }
 
-/** A name tag's key ring hole as the card sets it: the side and the hole's diameter. */
-export type NameTagKeyring = { side: TextKeyringSide; diameter: number };
+/**
+ * A name tag's key ring hole as the card sets it: the side, the hole's diameter and how far the tab
+ * sits off the middle of its side (#671): up on the left and right, to the right on top; 0 or left out is the middle.
+ */
+export type NameTagKeyring = { side: TextKeyringSide; diameter: number; along?: number };
+
+/** The tab's shift along its side (#671), kept within the side. */
+function clampedAlong(along: number | undefined, limit: number) {
+  return round(Math.min(limit, Math.max(-limit, along ?? 0)));
+}
+
+/** How far a name tag's tab can move along its side (#671): within the bottom layer's side. */
+export function nameTagKeyringAlongLimit(source: WorkplaneShape, layers: readonly TextLayer[], keyring: Pick<NameTagKeyring, "side" | "diameter">) {
+  const letters = textLetterBox(source);
+  const bottom = layers[layers.length - 1];
+  const extent = bottom ? textFillExtent({ textStroke: growStroke(bottom.grow, bottom.join) }) : 0;
+  return keyringAlongLimit((keyring.side === "top" ? letters.width : letters.depth) + 2 * extent, keyring.diameter);
+}
 
 /**
  * layerling_layer_text's `keyring` (#215): left out it stays as it is (undefined); false or null
- * takes it off; true puts a 4 mm hole on the left; { side, diameter } puts that one on. A side
- * other than left, right or top, or a diameter out of range, is refused, not bent into range.
+ * takes it off; true puts a 4 mm hole on the left; { side, diameter, along } puts that one on, `along`
+ * mm off the middle of its side (#671, kept within the side). A side other than left, right or top,
+ * or a diameter out of range, is refused, not bent into range.
  */
 export function layerTextKeyringArgument(value: unknown): { keyring: NameTagKeyring | null } | { error: string } | undefined {
   if (value === undefined) return undefined;
@@ -89,7 +106,9 @@ export function layerTextKeyringArgument(value: unknown): { keyring: NameTagKeyr
   if (typeof diameter !== "number" || !Number.isFinite(diameter) || diameter < MIN_KEYRING_DIAMETER || diameter > MAX_KEYRING_DIAMETER) {
     return { error: `keyring.diameter must be ${MIN_KEYRING_DIAMETER} to ${MAX_KEYRING_DIAMETER} mm` };
   }
-  return { keyring: { side: side as TextKeyringSide, diameter } };
+  const along = candidate.along ?? 0;
+  if (typeof along !== "number" || !Number.isFinite(along)) return { error: "keyring.along must be a number of mm" };
+  return { keyring: { side: side as TextKeyringSide, diameter, ...(along ? { along } : {}) } };
 }
 
 /** layerling_layer_text's `layers` (#215): a corner other than round, bevel or miter is refused; null when they are fine. */
@@ -138,12 +157,17 @@ const growStroke = (grow: number, join: SketchStrokeJoin = "round"): SketchStrok
  * tab's flat end sits where the bottom layer's outline reaches furthest in the band the tab runs
  * in (its width, across the middle of its side) - its real outline when the 2D kernel is there,
  * else its box - and the hole's edge KEYRING_HOLE_EDGE_DISTANCE beyond that. A layer above gets
- * the hole only where it reaches into it.
+ * the hole only where it reaches into it. `along` moves the band and the hole along the side (#671).
  */
 function layerKeyrings(letters: WorkplaneShape, layers: readonly TextLayer[], keyring: NameTagKeyring | null): (TextKeyring | undefined)[] {
   if (!keyring || !layers.length) return layers.map(() => undefined);
   const { side, diameter } = keyring;
   const half = side === "top" ? (letters.depth ?? 0) / 2 : (letters.width ?? 0) / 2;
+  const bottomLayer = layers[layers.length - 1];
+  const bottomExtent = textFillExtent({ textStroke: growStroke(bottomLayer.grow, bottomLayer.join) });
+  const limit = keyringAlongLimit((side === "top" ? letters.width ?? 0 : letters.depth ?? 0) + 2 * bottomExtent, diameter);
+  const along = clampedAlong(keyring.along, limit);
+  const shifted = along ? { along } : {};
   const runtime = loadedManifoldRuntime();
   // A layer as a text without a key ring, and how far its box reaches from the letters' middle.
   const layerText = (layer: TextLayer) => {
@@ -155,15 +179,15 @@ function layerKeyrings(letters: WorkplaneShape, layers: readonly TextLayer[], ke
   };
   const band = keyringEarRadius(diameter);
   const bottom = layerText(layers[layers.length - 1]);
-  const plate = (runtime ? textOutlineReach(runtime, bottom.shape, side, band) : null) ?? bottom.box;
+  const plate = (runtime ? textOutlineReach(runtime, bottom.shape, side, band, along) : null) ?? bottom.box;
   const hole = plate + KEYRING_HOLE_EDGE_DISTANCE + diameter / 2;
   const offset = round(hole - half);
   return layers.map((layer, index) => {
-    if (index === layers.length - 1) return { side, diameter, offset, ear: true };
+    if (index === layers.length - 1) return { side, diameter, offset, ...shifted, ear: true };
     // A layer reaches into the hole where a hole's edge would have to stand further out to clear it.
     const { shape, box } = layerText(layer);
-    const reach = runtime ? textOutlineClearance(runtime, shape, side, band, diameter / 2) : box + diameter / 2;
-    return reach !== null && reach > hole + 1e-6 ? { side, diameter, offset } : undefined;
+    const reach = runtime ? textOutlineClearance(runtime, shape, side, band, diameter / 2, along) : box + diameter / 2;
+    return reach !== null && reach > hole + 1e-6 ? { side, diameter, offset, ...shifted } : undefined;
   });
 }
 
@@ -249,7 +273,7 @@ export function textLayersOf(shapes: WorkplaneShape[]): TextLayerStack | null {
   const bottom = topDown[topDown.length - 1];
   // The key ring hole (#215) is the bottom layer's, where the ear is.
   const ring = textKeyringOf(bottom);
-  const keyring = ring ? { side: ring.side, diameter: ring.diameter } : null;
+  const keyring = ring ? { side: ring.side, diameter: ring.diameter, ...(ring.along ? { along: ring.along } : {}) } : null;
   return { source: { ...source, elevation: bottom.elevation ?? 0 }, layers, ids: topDown.map((shape) => shape.id), keyring };
 }
 

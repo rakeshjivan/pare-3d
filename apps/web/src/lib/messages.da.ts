@@ -841,7 +841,7 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "shortcuts.placeWorkplaneOnSelection": "Placér det på den valgte flade",
   "shortcuts.reverseWorkplane": "Hold under placering for at vende retningen",
   "shortcuts.leaveMode": "Forlad arbejdsplan- eller målebåndstilstand",
-  "shortcuts.sketchEscape": "Afslut kæden, ryd markeringen",
+  "shortcuts.sketchEscape": "Læg værktøjet fra dig (tilbage til Vælg), ryd derefter markeringen",
   "shortcuts.sketchDelete": "Slet",
   "shortcuts.sketchRotate": "Rotér",
   "shortcuts.sketchLockImage": "Lås eller lås op for det valgte omrids eller referencebilledet",
@@ -3164,4 +3164,8 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "shortcuts.saveView": "Gem visningen - drejning, panorering og zoom - for dette design",
   "camera.viewSaved": "Visning gemt under {key} - tryk på {key} for at vende tilbage til den",
   "camera.savedViewEmpty": "Ingen visning gemt under {key} endnu - Shift+{key} gemmer den aktuelle",
+  "status.separatedOutlines": "Delt i {count} legemer, ét pr. omrids - hvert beholder sin egen skitse",
+  "nameTag.keyringAlong": "Placering langs siden",
+  "nameTag.keyringAlongHint": "Flytter fligen op eller ned langs sin side, for eksempel hen til et bogstav, der rækker længere ud. 0 er midten.",
+  "nameTag.keyringAlongHintTop": "Flytter fligen til venstre eller højre langs toppen. 0 er midten.",
 };

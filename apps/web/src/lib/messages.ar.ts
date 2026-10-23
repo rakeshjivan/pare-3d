@@ -866,7 +866,7 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "shortcuts.placeWorkplaneOnSelection": "وضعه على الوجه المحدد",
   "shortcuts.reverseWorkplane": "اضغط مع الاستمرار أثناء الوضع لعكس الاتجاه",
   "shortcuts.leaveMode": "مغادرة وضع سطح العمل أو شريط القياس",
-  "shortcuts.sketchEscape": "إنهاء السلسلة، إلغاء التحديد",
+  "shortcuts.sketchEscape": "إلقاء الأداة (العودة إلى تحديد)، ثم إلغاء التحديد",
   "shortcuts.sketchDelete": "حذف العنصر المحدد",
   "shortcuts.sketchRotate": "تدوير رسم تخطيطي مغلق بـ 45 درجة",
   "shortcuts.sketchLockImage": "قفل المحيط المحدد أو الصورة المرجعية أو فتح قفلهما",
@@ -3196,4 +3196,8 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "shortcuts.saveView": "حفظ العرض - الدوران والإزاحة والتكبير - لهذا التصميم",
   "camera.viewSaved": "تم حفظ العرض تحت {key} - اضغط {key} للعودة إليه",
   "camera.savedViewEmpty": "لا يوجد عرض محفوظ تحت {key} بعد - Shift+{key} يحفظ العرض الحالي",
+  "status.separatedOutlines": "فُصل إلى {count} أجسام، جسم لكل محيط - ويحتفظ كل منها برسمه التخطيطي",
+  "nameTag.keyringAlong": "الموضع على طول الجانب",
+  "nameTag.keyringAlongHint": "يحرّك اللسان إلى الأعلى أو الأسفل على طول جانبه، مثلًا نحو حرف يمتد أبعد. 0 هو المنتصف.",
+  "nameTag.keyringAlongHintTop": "يحرّك اللسان إلى اليسار أو اليمين على طول الأعلى. 0 هو المنتصف.",
 };

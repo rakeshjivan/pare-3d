@@ -856,7 +856,7 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "shortcuts.placeWorkplaneOnSelection": "Op het geselecteerde vlak plaatsen",
   "shortcuts.reverseWorkplane": "Ingedrukt houden bij plaatsen om de richting om te keren",
   "shortcuts.leaveMode": "Werkvlak- of meetlintmodus verlaten",
-  "shortcuts.sketchEscape": "Ketting beëindigen, selectie opheffen",
+  "shortcuts.sketchEscape": "Gereedschap neerleggen (terug naar Selecteren), dan selectie opheffen",
   "shortcuts.sketchDelete": "Geselecteerd element verwijderen",
   "shortcuts.sketchRotate": "Gesloten schets 45° draaien",
   "shortcuts.sketchLockImage": "Geselecteerde omtrek of referentieafbeelding vergrendelen of ontgrendelen",
@@ -3623,4 +3623,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "shortcuts.saveView": "De weergave - draaiing, verschuiving en zoom - voor dit ontwerp opslaan",
   "camera.viewSaved": "Weergave opgeslagen onder {key} - druk op {key} om ernaar terug te gaan",
   "camera.savedViewEmpty": "Onder {key} is nog geen weergave opgeslagen - Shift+{key} slaat de huidige op",
+  "status.separatedOutlines": "Gescheiden in {count} lichamen, één per omtrek - elk houdt zijn eigen schets",
+  "nameTag.keyringAlong": "Positie langs de kant",
+  "nameTag.keyringAlongHint": "Schuift het lipje langs zijn kant omhoog of omlaag, bijvoorbeeld naar een letter die verder uitsteekt. 0 is het midden.",
+  "nameTag.keyringAlongHintTop": "Schuift het lipje aan de bovenkant naar links of rechts. 0 is het midden.",
 };

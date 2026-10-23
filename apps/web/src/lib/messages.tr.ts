@@ -830,7 +830,7 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "shortcuts.placeWorkplaneOnSelection": "Seçili yüzeye yerleştir",
   "shortcuts.reverseWorkplane": "Yönü ters çevirmek için yerleştirirken basılı tut",
   "shortcuts.leaveMode": "Çalışma düzlemi veya şerit metre modundan çık",
-  "shortcuts.sketchEscape": "Zinciri bitir, seçimi temizle",
+  "shortcuts.sketchEscape": "Aracı bırak (Seç'e dön), sonra seçimi temizle",
   "shortcuts.sketchDelete": "Seçili öğeyi sil",
   "shortcuts.sketchRotate": "Kapalı bir eskizi 45° döndür",
   "shortcuts.sketchLockImage": "Seçili dış hattı veya referans resmini kilitle ya da kilidini aç",
@@ -3142,4 +3142,8 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "shortcuts.saveView": "Görünümü - döndürme, kaydırma ve yakınlaştırma - bu tasarım için kaydet",
   "camera.viewSaved": "Görünüm {key} tuşuna kaydedildi - geri dönmek için {key} tuşuna basın",
   "camera.savedViewEmpty": "{key} tuşunda henüz kayıtlı görünüm yok - Shift+{key} geçerli görünümü kaydeder",
+  "status.separatedOutlines": "Her dış hat için bir tane olmak üzere {count} gövdeye ayrıldı - her biri kendi taslağını korur",
+  "nameTag.keyringAlong": "Kenar boyunca konum",
+  "nameTag.keyringAlongHint": "Tırnağı kenarı boyunca yukarı veya aşağı kaydırır, örneğin daha dışarı taşan bir harfe. 0 ortadır.",
+  "nameTag.keyringAlongHintTop": "Tırnağı üst kenar boyunca sola veya sağa kaydırır. 0 ortadır.",
 };

@@ -451,14 +451,18 @@ export type SketchStroke = { width: number; align: SketchStrokeAlign; join: Sket
 export type TextKeyringSide = "left" | "right" | "top";
 /**
  * A key ring hole on a text (#215): a round hole `offset` mm beyond the letters' box on `side`,
- * centred on that side. With `ear` the text also grows a round ear round the hole that joins
+ * centred on that side, or `along` mm off its middle (#671: up on the left and right, to the
+ * right on top). With `ear` the text also grows a round ear round the hole that joins
  * its outline - the bottom layer of a name tag; the layers above only get the hole where it
  * reaches them. The box grows by the ear on that side; the letters keep their size.
  */
-export type TextKeyring = { side: TextKeyringSide; diameter: number; offset: number; ear?: boolean };
+export type TextKeyring = { side: TextKeyringSide; diameter: number; offset: number; along?: number; ear?: boolean };
 
-/** A key ring hole in an extruded sketch (#391): its middle in the sketch's own mm, its size, the side it is on and whether the layer has the ear. */
-export type SketchKeyring = { side: TextKeyringSide; diameter: number; x: number; z: number; ear?: boolean };
+/**
+ * A key ring hole in an extruded sketch (#391): its middle in the sketch's own mm, its size, the side it is on and whether the layer has the ear.
+ * `along` is how far the card moved it off the middle of its side (#671), kept so the card reads it back.
+ */
+export type SketchKeyring = { side: TextKeyringSide; diameter: number; x: number; z: number; along?: number; ear?: boolean };
 /**
  * A sketch built set in from its outlines: every edge `distance` mm inward, every corner rounded to
  * `radius` mm. The face tool keeps the outline of the face it pushes out or in here and builds the

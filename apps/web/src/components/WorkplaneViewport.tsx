@@ -4,6 +4,7 @@ import { markEscapeHandled } from "@/lib/escapeHandled";
 import { ArrowDownToLine, Check, ChevronLeft, ChevronRight, Crosshair, Cuboid, Download, Eye, EyeOff, FlipHorizontal, GripVertical, Home, Layers, Minus, MousePointer2, PanelsTopLeft, Plus, Rotate3d, RotateCcw, Ruler, RulerDimensionLine, Slice, Spline, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type DragEvent, type MouseEvent as ReactMouseEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction, type WheelEvent as ReactWheelEvent } from "react";
 import { nearestObjectGap, objectSnapOffset, shiftSnapBox, type ObjectGap, type ObjectSnapGuide, type SnapBox } from "@/lib/objectSnap";
+import { dragReach } from "@/lib/dragReach";
 import { useMovablePanel, type MovablePanelOptions } from "@/lib/useMovablePanel";
 import { computeSectionPlaneVector, DEFAULT_SECTION_SETTINGS, getSectionBounds, SECTION_AXES_SHOWN, sectionAxisLetter, sectionAxisVector, sectionFineWindow, sectionFrameFromView, sectionFrameFromWorkplane, sectionPlacementWorkplane, sectionPointFromFrame, sectionPointToFrame, type SectionFrame, type SectionOrientation, type SectionPlaneAxis, type SectionPlaneSettings } from "@/lib/sectionView";
 import { projectSectionPoint, type SectionBody, type SectionLoop, type SectionPoint } from "@/lib/sectionSvg";
@@ -76,7 +77,7 @@ import { wheelBaseStep, wheelNextValue } from "@/lib/wheelValueStep";
 import { createLatestRunner, type LatestRunner } from "@/lib/latestRunner";
 import { manifoldRevision, onManifoldReady } from "@/lib/manifoldHandle";
 import { customFontRevision, onCustomFontsChanged } from "@/lib/textFonts";
-import { savedViewForKey } from "@/lib/designView";
+import { readSavedViews, SAVED_VIEW_KEYS, savedViewForKey } from "@/lib/designView";
 import { CAMERA_MAX_DISTANCE, fitCameraDepthRange, rememberCameraView, useDesignViews } from "@/components/workplane/cameraViews";
 import { DIMENSION_FORMULA_FIELDS, formulaMatchesMillimeters, formulaToRemember, withFieldFormula } from "@/lib/fieldFormulas";
 import { displayToMillimeters, formatLengthMm, lengthDisplayUnit, millimetersToDisplay, parseLengthMm, parseMeasurementInput, resolveLengthMm, setLengthUnit } from "@/lib/measurementUnits";
@@ -665,6 +666,8 @@ declare global {
     layerlingSectionView?: (patch: Partial<SectionPlaneSettings> & { center?: boolean }) => { settings: SectionPlaneSettings; bounds: { min: number; max: number; center: number } };
     /** "Hide workplane" in the camera bar for MCP: sets it when given, returns whether the plate is shown. */
     layerlingWorkplaneDisplay?: (visible?: boolean) => { visible: boolean };
+    /** The four saved views (keys 7, 8, 9, 0) for MCP: saves or shows one when asked, returns which keys hold a view. */
+    layerlingSavedViews?: (request?: { save?: number; show?: number }) => { keys: { key: string; saved: boolean }[]; shown?: boolean };
   }
 }
 
@@ -673,7 +676,10 @@ type DragState = {
   offsetX: number;
   offsetZ: number;
   planeY: number;
+  /** The workplane lifted to where the pointer took hold of the body (dragWorkplaneAtGrab). */
   workplane: PlacementWorkplane;
+  /** Height of the workplane itself, where the snap guides are drawn. */
+  guideY: number;
   startPoint: PlacementPoint;
   pointerId: number;
   primaryStartX: number;
@@ -827,9 +833,6 @@ function snapDimension(value: number, step: number, min = MIN_SHAPE_SIZE, max = 
   const effectiveMin = step > 0 ? Math.max(min, Math.min(step, max)) : min;
   return clamp(snapped, effectiveMin, max);
 }
-
-/** Wie weit ein gezogenes Teil ueber den Plattenrand hinaus darf, als Anteil der Plattengroesse je Seite. */
-const PLATE_DRAG_REACH = 1;
 
 function snapPositionValue(value: number, step: number, min: number, max: number) {
   return clamp(step > 0 ? snapValue(value, step) : value, min, max);
@@ -2242,6 +2245,24 @@ const OBJECT_SNAP_PIXELS = 8;
 function worldSnapBox(shape: WorkplaneShape): SnapBox {
   const { min, max } = projectShapeExtent(shape, WORLD_X_AXIS, WORLD_Y_AXIS, WORLD_Z_AXIS, new THREE.Vector3());
   return { minX: min.x, maxX: max.x, minZ: min.z, maxZ: max.z };
+}
+
+/**
+ * The plane a body is dragged on: the workplane, lifted along its normal to the
+ * point where the pointer took hold of the body, so that point stays under the
+ * pointer. On the workplane itself, a press high up on a tall or tilted body
+ * met the plate far behind it, and the move ran into the drag limit (#673).
+ */
+function dragWorkplaneAtGrab(state: ThreeState, clientX: number, clientY: number, shapeId: string, workplane: PlacementWorkplane): PlacementWorkplane {
+  aimPickRay(state, clientX, clientY, RENDER_LAYER_SHAPES);
+  const hit = firstShapeHit(state);
+  if (!hit || hit.object.userData.shapeId !== shapeId) return workplane;
+  const normal = new THREE.Vector3(workplane.normal.x, workplane.normal.y, workplane.normal.z);
+  const origin = new THREE.Vector3(workplane.origin.x, workplane.origin.y, workplane.origin.z);
+  const lift = normal.dot(hit.point.clone().sub(origin));
+  if (!(Math.abs(lift) > 1e-6)) return workplane;
+  origin.addScaledVector(normal, lift);
+  return { ...workplane, origin: { x: origin.x, y: origin.y, z: origin.z } };
 }
 
 function unionSnapBox(boxes: SnapBox[]): SnapBox | null {
@@ -4978,6 +4999,19 @@ export function WorkplaneViewport({
     threeRef, projectIdRef, viewCubeRef, designViewRestoredRef, orthographicView, setOrthographicView, toggleCameraProjection, syncViewCube, onNotice,
   });
 
+  // The same keys for MCP (layerling_saved_view), through the functions the keys use.
+  useEffect(() => {
+    window.layerlingSavedViews = (request = {}) => {
+      if (request.save !== undefined && !saveView(request.save)) throw new Error("The view is not ready yet");
+      const shown = request.show !== undefined ? showSavedView(request.show) : undefined;
+      const views = readSavedViews(projectIdRef.current);
+      return { keys: SAVED_VIEW_KEYS.map((key, slot) => ({ key, saved: Boolean(views[slot]) })), ...(shown !== undefined ? { shown } : {}) };
+    };
+    return () => {
+      delete window.layerlingSavedViews;
+    };
+  }, [saveView, showSavedView]);
+
   useEffect(() => {
     const state = threeRef.current;
     if (!state) {
@@ -5081,6 +5115,7 @@ export function WorkplaneViewport({
   }, [toRawPlanePoint]);
   const toPlanePoint = useCallback((clientX: number, clientY: number) => toPlanePointAtY(clientX, clientY, 0), [toPlanePointAtY]);
 
+  const dragReachCacheRef = useRef<{ shapes: readonly WorkplaneShape[]; width: number; depth: number; x: number; z: number } | null>(null);
   const toPlacementWorkplanePoint = useCallback((clientX: number, clientY: number, workplane = placementWorkplaneRef.current) => {
     const normal = new THREE.Vector3(workplane.normal.x, workplane.normal.y, workplane.normal.z);
     const origin = new THREE.Vector3(workplane.origin.x, workplane.origin.y, workplane.origin.z);
@@ -5091,12 +5126,17 @@ export function WorkplaneViewport({
     const bounds = workspaceRef.current;
     // Wie bei andere Programme darf ein Teil neben der Platte geparkt werden (Discussion #80);
     // die Grenze faengt nur den flachen Blick ab, bei dem der Strahl die Ebene weit draussen trifft.
-    const reachX = bounds.width / 2 + bounds.width * PLATE_DRAG_REACH;
-    const reachZ = bounds.depth / 2 + bounds.depth * PLATE_DRAG_REACH;
+    // Sie reicht auch um einen Entwurf, der groesser ist als die Platte (#673).
+    let cached = dragReachCacheRef.current;
+    if (!cached || cached.shapes !== shapesRef.current || cached.width !== bounds.width || cached.depth !== bounds.depth) {
+      const reach = dragReach(bounds, shapesRef.current.map(worldSnapBox));
+      cached = { shapes: shapesRef.current, width: bounds.width, depth: bounds.depth, x: reach.x, z: reach.z };
+      dragReachCacheRef.current = cached;
+    }
     return placementWorkplanePoint(
       workplane,
-      clamp(snapValue(local.x, step), -reachX, reachX),
-      clamp(snapValue(local.z, step), -reachZ, reachZ),
+      clamp(snapValue(local.x, step), -cached.x, cached.x),
+      clamp(snapValue(local.z, step), -cached.z, cached.z),
     );
   }, [toRawPlanePoint]);
 
@@ -8064,7 +8104,8 @@ export function WorkplaneViewport({
       }
       const dragPlaneY = shape ? shape.elevation ?? 0 : 0;
       const activeWorkplane = placementWorkplaneRef.current;
-      const point = toPlacementWorkplanePoint(event.clientX, event.clientY, activeWorkplane);
+      const grabWorkplane = dragWorkplaneAtGrab(state, event.clientX, event.clientY, id, activeWorkplane);
+      const point = toPlacementWorkplanePoint(event.clientX, event.clientY, grabWorkplane);
       if (!shape) {
         return;
       }
@@ -8190,7 +8231,8 @@ export function WorkplaneViewport({
         offsetX: shape.x - point.x,
         offsetZ: shape.z - point.z,
         planeY: dragPlaneY,
-        workplane: activeWorkplane,
+        workplane: grabWorkplane,
+        guideY: activeWorkplane.origin.y,
         startPoint: point,
         pointerId: event.pointerId,
         primaryStartX: shape.x,
@@ -8452,8 +8494,8 @@ export function WorkplaneViewport({
             guides = objectSnapOffset(shiftSnapBox(drag.snapMoving, deltaX, deltaZ), drag.snapTargets, 1e-4).guides;
           }
         }
-        syncObjectSnapGuides(state, guides, drag.workplane.origin.y + 0.06);
-        syncObjectGap(state, nearestObjectGap(shiftSnapBox(drag.snapMoving, deltaX, deltaZ), drag.snapTargets), drag.workplane.origin.y + 0.07);
+        syncObjectSnapGuides(state, guides, drag.guideY + 0.06);
+        syncObjectGap(state, nearestObjectGap(shiftSnapBox(drag.snapMoving, deltaX, deltaZ), drag.snapTargets), drag.guideY + 0.07);
       }
       const moveDimensionSession = moveDimensionSessionRef.current;
       if (moveDimensionSession) {

@@ -712,7 +712,7 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "shortcuts.placeWorkplaneOnSelection": "Postavi jo na izbrano ploskev",
   "shortcuts.reverseWorkplane": "Drži med postavljanjem za obrnitev smeri",
   "shortcuts.leaveMode": "Zapusti način delovne ravnine ali merilnega traku",
-  "shortcuts.sketchEscape": "Končaj verigo, počisti izbor",
+  "shortcuts.sketchEscape": "Odloži orodje (nazaj na Izberi), nato počisti izbor",
   "shortcuts.sketchDelete": "Izbriši izbrani element",
   "shortcuts.sketchRotate": "Zavrti sklenjeno skico za 45°",
   "shortcuts.sketchLockImage": "Zakleni ali odkleni izbrani obris ali referenčno sliko",
@@ -3601,4 +3601,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "shortcuts.saveView": "Shrani pogled - zasuk, premik in povečavo - za ta načrt",
   "camera.viewSaved": "Pogled shranjen pod {key} - pritisni {key}, da se vrneš nanj",
   "camera.savedViewEmpty": "Pod {key} še ni shranjenega pogleda - Shift+{key} shrani trenutnega",
+  "status.separatedOutlines": "Ločeno na {count} teles, eno za vsak obris - vsako obdrži svojo skico",
+  "nameTag.keyringAlong": "Položaj ob strani",
+  "nameTag.keyringAlongHint": "Premakne jeziček ob njegovi strani navzgor ali navzdol, na primer do črke, ki sega dlje ven. 0 je sredina.",
+  "nameTag.keyringAlongHintTop": "Premakne jeziček na vrhu levo ali desno. 0 je sredina.",
 };

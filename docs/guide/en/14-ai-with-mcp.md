@@ -71,7 +71,7 @@ The AI works with the same functions as you, through the same path as your opera
 | `layerling_ungroup_objects` | dissolves groups |
 | `layerling_boolean_cut` | cuts solids with holes |
 | `layerling_intersect_objects` | keeps only what the objects have in common (Intersection) |
-| `layerling_separate_parts` | separates a shape into its loose parts |
+| `layerling_separate_parts` | separates a shape into its loose parts, a sketch body into one body per outline |
 | `layerling_split_objects` | cuts solids or holes in two with a plane |
 | `layerling_list_edges` | lists the real CAD edges of an object |
 | `layerling_apply_edge_treatment` | chamfers or fillets chosen edges |
@@ -98,6 +98,7 @@ The AI works with the same functions as you, through the same path as your opera
 | `layerling_delete_custom_shape` | removes a custom shape; inserted bodies stay |
 | `layerling_show_workplane` | hides and shows the plate with its grid, for a picture of the underside for example (only the view) |
 | `layerling_set_section_view` | cuts the view open along a plane to look inside (only the view, nothing is cut apart) |
+| `layerling_saved_view` | saves the current view under the key 7, 8, 9 or 0 and goes back to it, like Shift+key and the key (only the view) |
 | `layerling_clear_history` | deletes every undo step for good, as the History view's "Delete history" button does; needs `confirm: true` |
 | `layerling_set_history_view` | looks back at an earlier state of the project, like the History view (the real design stays untouched; changing tools wait until it is closed) |
 | `layerling_restore_from_history` | brings objects (also parts inside groups) back from an earlier state into the design as copies, as the History view's Bring into design does - one step that undo takes back |

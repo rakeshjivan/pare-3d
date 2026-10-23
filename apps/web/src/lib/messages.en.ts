@@ -875,7 +875,7 @@ export const MESSAGES_EN = {
   "shortcuts.placeWorkplaneOnSelection": "Place it on the selected face",
   "shortcuts.reverseWorkplane": "Hold while placing to reverse the direction",
   "shortcuts.leaveMode": "Leave workplane or tape measure mode",
-  "shortcuts.sketchEscape": "End the chain, clear the selection",
+  "shortcuts.sketchEscape": "Put the tool down (back to Select), then clear the selection",
   "shortcuts.sketchDelete": "Delete the selected element",
   "shortcuts.sketchRotate": "Rotate a closed sketch by 45°",
   "shortcuts.sketchLockImage": "Lock or unlock the selected outline or the reference image",
@@ -3624,6 +3624,10 @@ export const MESSAGES_EN = {
   "shortcuts.saveView": "Save the view - turn, pan and zoom - for this design",
   "camera.viewSaved": "View saved under {key} - press {key} to come back to it",
   "camera.savedViewEmpty": "No view saved under {key} yet - Shift+{key} saves the current one",
+  "status.separatedOutlines": "Separated into {count} bodies, one per outline - each keeps its own sketch",
+  "nameTag.keyringAlong": "Position along side",
+  "nameTag.keyringAlongHint": "Moves the tab up or down along its side, for example to a letter that reaches out further. 0 is the middle.",
+  "nameTag.keyringAlongHintTop": "Moves the tab left or right along the top. 0 is the middle.",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

@@ -1300,7 +1300,8 @@ describe("gridfinity bins without compartments, unchanged by them", () => {
   });
 });
 
-describe("gridfinity dividers", () => {
+// Each case builds whole bins through Manifold; on a slow CI runner one took longer than the default 5 s (PR #657).
+describe("gridfinity dividers", { timeout: 30_000 }, () => {
   let runtime: ManifoldToplevel;
 
   beforeAll(async () => {

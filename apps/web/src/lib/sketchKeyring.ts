@@ -1,7 +1,7 @@
 import type { CrossSection, ManifoldToplevel } from "manifold-3d";
 import { orderedCadSketchPaths, silhouetteSketchProfile } from "@/lib/sketchCadProfile";
 import { sampledPath, strokedSketchProfile, type Keep } from "@/lib/sketchStroke";
-import { KEYRING_HOLE_EDGE_DISTANCE, keyringEarRadius, MAX_KEYRING_DIAMETER, MIN_KEYRING_DIAMETER, TEXT_KEYRING_SIDES } from "@/lib/textGeometry";
+import { KEYRING_HOLE_EDGE_DISTANCE, keyringAlongLimit, keyringEarRadius, MAX_KEYRING_DIAMETER, MIN_KEYRING_DIAMETER, TEXT_KEYRING_SIDES } from "@/lib/textGeometry";
 import type { SketchKeyring, SketchProfile, TextKeyringSide } from "@/types/layerling";
 
 /**
@@ -20,12 +20,14 @@ export function normalizeSketchKeyring(value: unknown): SketchKeyring | undefine
   const diameter = Number(candidate.diameter);
   const x = Number(candidate.x);
   const z = Number(candidate.z);
+  const along = Number(candidate.along ?? 0);
   if (![diameter, x, z].every(Number.isFinite) || diameter <= 0) return undefined;
   return {
     side: TEXT_KEYRING_SIDES.includes(candidate.side as TextKeyringSide) ? (candidate.side as TextKeyringSide) : "left",
     diameter: Math.min(MAX_KEYRING_DIAMETER, Math.max(MIN_KEYRING_DIAMETER, diameter)),
     x,
     z,
+    ...(Number.isFinite(along) && along !== 0 ? { along } : {}),
     ...(candidate.ear ? { ear: true } : {}),
   };
 }
@@ -37,6 +39,7 @@ export function isSketchKeyring(value: unknown): value is SketchKeyring {
   return TEXT_KEYRING_SIDES.includes(candidate.side as TextKeyringSide)
     && finite(candidate.diameter) && candidate.diameter >= MIN_KEYRING_DIAMETER && candidate.diameter <= MAX_KEYRING_DIAMETER
     && finite(candidate.x) && finite(candidate.z)
+    && (candidate.along === undefined || finite(candidate.along))
     && (candidate.ear === undefined || typeof candidate.ear === "boolean");
 }
 
@@ -58,18 +61,34 @@ export function sketchOutlineBounds(profile: SketchProfile): Bounds | null {
 /**
  * The key ring hole of an icon tag whose icon fills `area`, in the area's coordinates: its edge
  * KEYRING_HOLE_EDGE_DISTANCE beyond the bottom layer, which reaches `reach` mm beyond the icon, in the
- * middle of its side. Null when the area has no outline.
+ * middle of its side, or `along` mm off it (#671: up on the left and right, to the right on top),
+ * kept within the side of a bottom layer `bottomGrow` mm wider than the icon. Null when the area has no outline.
  */
-export function iconKeyringFor(area: SketchProfile, reach: number, side: TextKeyringSide, diameter: number, ear: boolean): SketchKeyring | null {
+export function iconKeyringFor(area: SketchProfile, reach: number, side: TextKeyringSide, diameter: number, ear: boolean, along = 0, bottomGrow = 0): SketchKeyring | null {
   const bounds = sketchOutlineBounds(area);
   if (!bounds) return null;
   const away = Math.max(0, reach) + KEYRING_HOLE_EDGE_DISTANCE + diameter / 2;
-  const middleX = (bounds.minX + bounds.maxX) / 2;
-  const middleZ = (bounds.minZ + bounds.maxZ) / 2;
+  const limit = iconKeyringAlongLimit(area, side, diameter, bottomGrow);
+  const shift = Math.round(Math.min(limit, Math.max(-limit, along)) * 1000) / 1000;
+  const middleX = (bounds.minX + bounds.maxX) / 2 + (side === "top" ? shift : 0);
+  const middleZ = (bounds.minZ + bounds.maxZ) / 2 - (side === "top" ? 0 : shift);
   const center = side === "top"
     ? { x: middleX, z: bounds.minZ - away }
     : { x: side === "right" ? bounds.maxX + away : bounds.minX - away, z: middleZ };
-  return { side, diameter, x: center.x, z: center.z, ...(ear ? { ear: true } : {}) };
+  return { side, diameter, x: center.x, z: center.z, ...(shift ? { along: shift } : {}), ...(ear ? { ear: true } : {}) };
+}
+
+/**
+ * How far an icon tag's tab can move along its side (#671): within the side of the bottom layer, `bottomGrow` mm wider than the icon.
+ * With `width` the area is read as scaled to that width, as the card knows the icon only by its outline and its width.
+ */
+export function iconKeyringAlongLimit(area: SketchProfile, side: TextKeyringSide, diameter: number, bottomGrow: number, width?: number) {
+  const bounds = sketchOutlineBounds(area);
+  if (!bounds) return 0;
+  const span = bounds.maxX - bounds.minX;
+  const scale = width !== undefined && span > 1e-9 ? width / span : 1;
+  const across = (side === "top" ? span : bounds.maxZ - bounds.minZ) * scale;
+  return keyringAlongLimit(across + 2 * Math.max(0, bottomGrow), diameter);
 }
 
 /**

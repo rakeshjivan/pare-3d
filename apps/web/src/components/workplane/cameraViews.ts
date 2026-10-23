@@ -156,21 +156,23 @@ export function useDesignViews(options: DesignViewOptions) {
   const saveView = useCallback((slot: number) => {
     const { threeRef, projectIdRef, onNotice } = optionsRef.current;
     const state = threeRef.current;
-    if (!state) return;
+    if (!state) return false;
     const views = readSavedViews(projectIdRef.current);
     views[slot] = cameraViewOf(state);
     writeSavedViews(projectIdRef.current, views);
     onNotice?.(t("camera.viewSaved", { key: SAVED_VIEW_KEYS[slot] }));
+    return true;
   }, []);
 
   /** 7, 8, 9 or 0: back to the view saved there; an empty slot says how to fill it. */
   const showSavedView = useCallback((slot: number) => {
     const { threeRef, projectIdRef, onNotice } = optionsRef.current;
     const state = threeRef.current;
-    if (!state) return;
+    if (!state) return false;
     const view = readSavedViews(projectIdRef.current)[slot];
     if (view) showView(state, view);
     else onNotice?.(t("camera.savedViewEmpty", { key: SAVED_VIEW_KEYS[slot] }));
+    return Boolean(view);
   }, [showView]);
 
   return { saveView, showSavedView };

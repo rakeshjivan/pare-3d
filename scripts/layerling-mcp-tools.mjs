@@ -675,7 +675,7 @@ export const tools = [
   },
   {
     name: "layerling_separate_parts",
-    description: "Separate one disconnected multi-part object into independent objects.",
+    description: "Separate one disconnected multi-part object into independent objects. An extruded sketch body comes apart by its outlines instead: one exact body per outer outline (with the holes inside it), overlapping outlines included, each keeping its own sketch.",
     inputSchema: {
       ...editorTargetSchema,
       properties: {
@@ -900,7 +900,7 @@ export const tools = [
   },
   {
     name: "layerling_layer_text",
-    description: "Layered text for a multicolour print (#215): one text as a stack of bodies - the letters on top, under them the same letters a little wider in another colour, at the bottom a plate wider still, usually as a silhouette without the holes in the letters. Every layer is an ordinary text with a 'Wider' fill (so each has its own colour, height and edge treatments) and the stack is a bundle flagged as layered text, whose properties panel edits words, font and layers together. Pass the id of a text (it is replaced by the stack) or of such a bundle (it is built again); layers top to bottom, each with grow (mm wider than the letters, 0 for the letters), height, color and silhouette. Left out, the layers stay as they are, or a new stack takes the classic three: white letters, a red rim 1.5 mm wider, a dark plate 3 mm wider without holes. A layer may take join (round, bevel or miter): how it goes round the corners of the letters; left out it is round, as before. keyring { side, diameter } gives the bottom layer a tab with a round end and a key ring hole on the left, right or top, cut through every layer it reaches; the tab is the hole plus a 1.75 mm wall either side wide (6.5 mm for 3 mm) and the hole's edge 2 mm beyond the bottom layer's outline, so it sticks out 6.75 mm; it follows the words and the font, true puts a 3 mm hole on the left, false takes it off, and left out it stays as it is. With names, one stack per name is made instead, laid out in rows under the first, each as its own object - a list of name tags in one go.",
+    description: "Layered text for a multicolour print (#215): one text as a stack of bodies - the letters on top, under them the same letters a little wider in another colour, at the bottom a plate wider still, usually as a silhouette without the holes in the letters. Every layer is an ordinary text with a 'Wider' fill (so each has its own colour, height and edge treatments) and the stack is a bundle flagged as layered text, whose properties panel edits words, font and layers together. Pass the id of a text (it is replaced by the stack) or of such a bundle (it is built again); layers top to bottom, each with grow (mm wider than the letters, 0 for the letters), height, color and silhouette. Left out, the layers stay as they are, or a new stack takes the classic three: white letters, a red rim 1.5 mm wider, a dark plate 3 mm wider without holes. A layer may take join (round, bevel or miter): how it goes round the corners of the letters; left out it is round, as before. keyring { side, diameter, along } gives the bottom layer a tab with a round end and a key ring hole on the left, right or top, cut through every layer it reaches, along mm off the middle of that side (up on the left and right, to the right on top); the tab is the hole plus a 1.75 mm wall either side wide (6.5 mm for 3 mm) and the hole's edge 2 mm beyond the bottom layer's outline, so it sticks out 6.75 mm; it follows the words and the font, true puts a 3 mm hole on the left, false takes it off, and left out it stays as it is. With names, one stack per name is made instead, laid out in rows under the first, each as its own object - a list of name tags in one go.",
     inputSchema: {
       ...editorTargetSchema,
       properties: {
@@ -940,6 +940,7 @@ export const tools = [
               properties: {
                 side: { type: "string", enum: ["left", "right", "top"], description: "Where the ear sits, seen from above (default left)." },
                 diameter: { type: "number", minimum: 1, maximum: 20, description: "The hole's diameter in mm (default 3); the tab grows with it." },
+                along: { type: "number", description: "How far the tab sits off the middle of its side in mm (#671): up on the left and right, to the right on top, negative the other way; 0 or left out is the middle. Kept within the side, so the tab stays as wide as it is - move it to a letter that reaches out instead of a gap beside it." },
               },
             },
             { type: "boolean" },
@@ -985,6 +986,7 @@ export const tools = [
               properties: {
                 side: { type: "string", enum: ["left", "right", "top"], description: "Where the ear sits, seen from above (default left)." },
                 diameter: { type: "number", minimum: 1, maximum: 20, description: "The hole's diameter in mm (default 3); the tab grows with it." },
+                along: { type: "number", description: "How far the tab sits off the middle of its side in mm (#671): up on the left and right, to the right on top, negative the other way; 0 or left out is the middle. Kept within the side, so the tab stays as wide as it is - move it to a letter that reaches out instead of a gap beside it." },
               },
             },
             { type: "boolean" },
@@ -1106,6 +1108,18 @@ export const tools = [
       properties: {
         ...editorTargetSchema.properties,
         visible: { type: "boolean", description: "true shows the plate, false hides it. Left out it stays as it is." },
+      },
+    },
+  },
+  {
+    name: "layerling_saved_view",
+    description: "The four views a design keeps under the keys 7, 8, 9 and 0, like Shift+key (save) and the key alone (show) in the editor. save stores the current view - angle, pan, zoom and flat or perspective - under that key; show turns the camera back to the view saved there and answers with an error if none is. Both may be given; save comes first. Call with neither to read which keys hold a view. Saved views belong to the design: they stay in the browser and travel in a .lyl file, never in the undo history. Combine with layerling_capture_image (face \"current\") for pictures from the same angle every time. Returns keys (key, saved) and, after show, shown.",
+    inputSchema: {
+      ...editorTargetSchema,
+      properties: {
+        ...editorTargetSchema.properties,
+        save: { type: "string", enum: ["7", "8", "9", "0"], description: "Save the current view under this key." },
+        show: { type: "string", enum: ["7", "8", "9", "0"], description: "Go to the view saved under this key." },
       },
     },
   },

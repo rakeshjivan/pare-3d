@@ -152,18 +152,20 @@ export function normalizeTextKeyring(value: unknown): TextKeyring | undefined {
   const candidate = value as Partial<TextKeyring>;
   const diameter = Number(candidate.diameter);
   const offset = Number(candidate.offset);
+  const along = Number(candidate.along ?? 0);
   if (!Number.isFinite(diameter) || diameter <= 0 || !Number.isFinite(offset)) return undefined;
   return {
     side: TEXT_KEYRING_SIDES.includes(candidate.side as TextKeyringSide) ? candidate.side as TextKeyringSide : "left",
     diameter: clamp(diameter, MIN_KEYRING_DIAMETER, MAX_KEYRING_DIAMETER),
     offset: clamp(offset, -MAX_KEYRING_OFFSET, MAX_KEYRING_OFFSET),
+    ...(Number.isFinite(along) && along !== 0 ? { along: clamp(along, -MAX_KEYRING_OFFSET, MAX_KEYRING_OFFSET) } : {}),
     ...(candidate.ear ? { ear: true } : {}),
   };
 }
 
 /**
  * Whether a stored key ring hole is one layerling writes (#215): a known side, a diameter within
- * range, an offset within MAX_KEYRING_OFFSET mm either way and the ear switch. A file with
+ * range, an offset and a shift along the side within MAX_KEYRING_OFFSET mm either way and the ear switch. A file with
  * anything else is refused rather than read as something else.
  */
 export function isTextKeyring(value: unknown): value is TextKeyring {
@@ -173,6 +175,7 @@ export function isTextKeyring(value: unknown): value is TextKeyring {
   return TEXT_KEYRING_SIDES.includes(candidate.side as TextKeyringSide)
     && finite(candidate.diameter) && candidate.diameter >= MIN_KEYRING_DIAMETER && candidate.diameter <= MAX_KEYRING_DIAMETER
     && finite(candidate.offset) && Math.abs(candidate.offset) <= MAX_KEYRING_OFFSET
+    && (candidate.along === undefined || (finite(candidate.along) && Math.abs(candidate.along) <= MAX_KEYRING_OFFSET))
     && (candidate.ear === undefined || typeof candidate.ear === "boolean");
 }
 
@@ -184,6 +187,14 @@ export function textKeyringOf(shape: Pick<WorkplaneShape, "textKeyring" | "textC
 /** The radius of the ear's half circle round a key ring hole of this diameter: half the tab's width, the hole and a wall either side. */
 export function keyringEarRadius(diameter: number) {
   return diameter / 2 + KEYRING_TAB_WALL;
+}
+
+/**
+ * How far a key ring tab can be moved off the middle of its side (#671), either way: its whole
+ * width stays within the side of the bottom layer, `across` mm long, so the box keeps its size.
+ */
+export function keyringAlongLimit(across: number, diameter: number) {
+  return Math.max(0, across / 2 - keyringEarRadius(diameter));
 }
 
 /**
@@ -242,12 +253,21 @@ export function textLetterOffset(shape: WorkplaneShape): { x: number; z: number 
   return { x: side === "right" ? -reach / 2 : side === "left" ? reach / 2 : 0, z: side === "top" ? reach / 2 : 0 };
 }
 
+/**
+ * Where along its side the middle of a key ring hole lies (#671), in the shape's own frame: the
+ * letters' middle moved by `along`, up on the left and right (towards -z, where the tops of the
+ * letters are), to the right on top.
+ */
+export function keyringBandCenter(middle: { x: number; z: number }, side: TextKeyringSide, along = 0) {
+  return side === "top" ? { x: middle.x + along, z: middle.z } : { x: middle.x, z: middle.z - along };
+}
+
 /** The middle of the key ring hole in the shape's own frame, or null without one. */
 export function textKeyringCenter(shape: WorkplaneShape): { x: number; z: number } | null {
   const keyring = textKeyringOf(shape);
   if (!keyring) return null;
   const letters = textLetterBox(shape);
-  const middle = textLetterOffset(shape);
+  const middle = keyringBandCenter(textLetterOffset(shape), keyring.side, keyring.along);
   if (keyring.side === "top") return { x: middle.x, z: middle.z - letters.depth / 2 - keyring.offset };
   const direction = keyring.side === "right" ? 1 : -1;
   return { x: middle.x + direction * (letters.width / 2 + keyring.offset), z: middle.z };

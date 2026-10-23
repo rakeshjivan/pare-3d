@@ -875,7 +875,7 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "shortcuts.placeWorkplaneOnSelection": "Auf die gewählte Fläche setzen",
   "shortcuts.reverseWorkplane": "Beim Setzen gedrückt halten: Richtung umkehren",
   "shortcuts.leaveMode": "Arbeitsebenen- oder Maßband-Modus verlassen",
-  "shortcuts.sketchEscape": "Linienzug beenden, Auswahl aufheben",
+  "shortcuts.sketchEscape": "Werkzeug ablegen (zurück zu Auswählen), dann Auswahl aufheben",
   "shortcuts.sketchDelete": "Gewähltes Element löschen",
   "shortcuts.sketchRotate": "Geschlossene Skizze um 45° drehen",
   "shortcuts.sketchLockImage": "Gewählten Umriss oder Vorlagenbild sperren oder entsperren",
@@ -3623,4 +3623,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "shortcuts.saveView": "Die Ansicht - Drehung, Verschiebung und Zoom - für dieses Design speichern",
   "camera.viewSaved": "Ansicht unter {key} gespeichert - {key} bringt sie zurück",
   "camera.savedViewEmpty": "Unter {key} ist noch keine Ansicht gespeichert - Shift+{key} speichert die aktuelle",
+  "status.separatedOutlines": "In {count} Körper getrennt, einer je Umriss - jeder behält seine eigene Skizze",
+  "nameTag.keyringAlong": "Lage an der Seite",
+  "nameTag.keyringAlongHint": "Schiebt die Lasche an ihrer Seite nach oben oder unten, zum Beispiel an einen Buchstaben, der weiter hinausreicht. 0 ist die Mitte.",
+  "nameTag.keyringAlongHintTop": "Schiebt die Lasche oben nach links oder rechts. 0 ist die Mitte.",
 };

@@ -15,6 +15,7 @@ import { ObjectListPanel } from "@/components/workplane/ObjectListPanel";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useWheelField } from "@/lib/useWheelField";
 import { wheelNextValue } from "@/lib/wheelValueStep";
+import { SAVED_VIEW_KEYS } from "@/lib/designView";
 import * as THREE from "three";
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import type { ComponentType, ReactNode, SVGProps } from "react";
@@ -302,7 +303,8 @@ import { silhouetteSketchProfile } from "@/lib/sketchCadProfile";
 import { svgSketchMatchesMesh } from "@/lib/svgSketch";
 import { DEFAULT_SKETCH_STROKE, normalizeSketchStroke, strokedSketchProfile } from "@/lib/sketchStroke";
 import { bottomCadModifierEdgeIds, horizontalCadModifierEdgeIds, insideCadModifierEdgeIds, outsideCadModifierEdgeIds, topCadModifierEdgeIds, verticalCadModifierEdgeIds } from "@/lib/topEdges";
-import { movedWithEditedOutline, placeSketchShape, sketchBodyAnchor, type SketchAnchor } from "@/lib/sketchPlacement";
+import { movedWithEditedOutline, placedLikeExisting, placeSketchShape, sketchBodyAnchor, type SketchAnchor } from "@/lib/sketchPlacement";
+import { separatesBySketch, sketchOutlineParts } from "@/lib/sketchOutlineParts";
 import { sketchOutlineBounds } from "@/lib/sketchKeyring";
 import { meshSlicePath, planeCutsMesh } from "@/lib/sketchSlice";
 import { projectedEdgesPath } from "@/lib/sketchEdges";
@@ -320,6 +322,7 @@ import { type Vec3, type MeshData, type Cuboid, type ShapeUpdatePatch, type Mani
 import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, meshDataToManifoldMesh, shapeToManifoldSolid, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, exportSolidVolume, type ExportSolidVolume, PRINT_MATERIAL_STORAGE_KEY, PRINT_INFILL_STORAGE_KEY, PRINT_WALLS_STORAGE_KEY, formatEstimateNumber, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, disposeManifold, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { handleViewArrowKey } from "@/lib/viewArrowKeys";
 import { escapeWasHandled } from "@/lib/escapeHandled";
+import { sketchEscapeAction } from "@/lib/sketchEscape";
 import { booleanAutomationScene } from "@/lib/editorAutomation";
 import { debugShapeSummary, mcpPivotRequest, compactShapeSummary, mcpShapeSummary, mcpSketchFillProfile, mcpTextFont } from "@/lib/editorMcpSummary";
 import { sweepPathFromParams, sweepSectionFromParams, sweepSketchProfile } from "@/lib/sweepSketch";
@@ -356,6 +359,7 @@ const HISTORY_VIEW_MCP_ACTIONS = new Set([
   "measure_section",
   "set_section_view",
   "show_workplane",
+  "saved_view",
   "export_section_svg",
   "export_drawing",
   "export_mesh",
@@ -516,6 +520,8 @@ declare global {
     layerlingSectionView?: (patch: Partial<SectionPlaneSettings> & { center?: boolean }) => { settings: SectionPlaneSettings; bounds: { min: number; max: number; center: number } };
     /** "Hide workplane" in the camera bar for MCP: sets it when given, returns whether the plate is shown. */
     layerlingWorkplaneDisplay?: (visible?: boolean) => { visible: boolean };
+    /** The four saved views (keys 7, 8, 9, 0) for MCP: saves or shows one when asked, returns which keys hold a view. */
+    layerlingSavedViews?: (request?: { save?: number; show?: number }) => { keys: { key: string; saved: boolean }[]; shown?: boolean };
   }
 }
 
@@ -2267,6 +2273,29 @@ function separateShapeParts(shape: WorkplaneShape) {
   return separateMeshParts(shape);
 }
 
+/**
+ * An extruded sketch body taken apart by its outlines (#669): every outer outline is built again on
+ * its own, as when the sketch is edited down to it, so each part stays where it was, keeps the body's
+ * height, turn and colour, and has a sketch of its own to edit. The first part keeps the body's id.
+ */
+async function separateSketchBodyParts(shape: WorkplaneShape) {
+  const profiles = shape.sketchProfile ? sketchOutlineParts(shape.sketchProfile) : [];
+  if (profiles.length < 2) return [];
+  const quaternion = quaternionForShape(shape);
+  const xAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(quaternion);
+  const zAxis = new THREE.Vector3(0, 0, 1).applyQuaternion(quaternion);
+  const axes = { x: [xAxis.x, xAxis.y, xAxis.z] as const, z: [zAxis.x, zAxis.y, zAxis.z] as const };
+  const anchor = sketchBodyAnchor(shape);
+  const parts: WorkplaneShape[] = [];
+  for (const [index, profile] of profiles.entries()) {
+    const extrusion = await cadShapeFromSketchProfile(profile, shape.height, shape);
+    const placed = placedLikeExisting(extrusion, shape);
+    const part = movedWithEditedOutline(placed, shape, anchor, { x: extrusion.x, z: extrusion.z }, axes);
+    parts.push(index === 0 ? part : canonicalizeShape({ ...part, id: createLocalId("sketch-extrusion") }));
+  }
+  return parts;
+}
+
 
 function mcpNumber(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -3580,7 +3609,7 @@ export function LayerlingEditor({
       return;
     }
     let cancelled = false;
-    const run = () => { if (!cancelled) setCanSeparateSelectedParts(separablePartCount(shape) > 1); };
+    const run = () => { if (!cancelled) setCanSeparateSelectedParts(separatesBySketch(shape) || separablePartCount(shape) > 1); };
     const host = window as Window & typeof globalThis;
     const idle = typeof host.requestIdleCallback === "function" ? host.requestIdleCallback(run, { timeout: 400 }) : null;
     const timer = idle === null ? host.setTimeout(run, 30) : null;
@@ -10330,6 +10359,24 @@ export function LayerlingEditor({
       setNotice(t("status.objectLocked"));
       return;
     }
+    if (separatesBySketch(selectedShape)) {
+      // One body per outline, each with its own sketch (#669); the build takes a moment.
+      const target = selectedShape;
+      setNotice(t("status.buildingSketch"), true);
+      void separateSketchBodyParts(target).then(
+        (parts) => {
+          const current = shapesRef.current;
+          if (parts.length <= 1 || !current.some((shape) => shape.id === target.id)) return;
+          commitShapes(
+            [...current.filter((shape) => shape.id !== target.id), ...parts],
+            parts.map((shape) => shape.id),
+            t("status.separatedOutlines", { count: parts.length }),
+          );
+        },
+        (error) => setNotice(error instanceof Error ? localizedError(error.message) : t("status.sketchCannotExtrude")),
+      );
+      return;
+    }
     const parts = separateShapeParts(selectedShape);
     if (parts.length <= 1) {
       setNotice(t("status.onlyOnePart"));
@@ -11485,7 +11532,8 @@ export function LayerlingEditor({
         const target = findShape(params.id) ?? (selectedIdsRef.current.length === 1 ? findShape(selectedIdsRef.current[0]) : null);
         if (!target) throw new Error("Select one object to separate");
         if (target.locked) throw new Error("Unlock the object before separating parts");
-        const parts = separateShapeParts(target);
+        // A sketch body comes apart by its outlines, one exact body with its own sketch each (#669).
+        const parts = separatesBySketch(target) ? await separateSketchBodyParts(target) : separateShapeParts(target);
         if (parts.length <= 1) throw new Error("The selected object has only one connected part");
         commitShapes([...currentShapes().filter((shape) => shape.id !== target.id), ...parts], parts.map((shape) => shape.id), t("status.mcpSeparated", { count: parts.length }));
         return { objects: parts.map(mcpShapeSummary) };
@@ -11888,6 +11936,21 @@ export function LayerlingEditor({
           ...(typeof params.showPlane === "boolean" ? { showPlane: params.showPlane } : {}),
           ...(params.center === true ? { center: true } : {}),
         });
+        return result;
+      }
+
+      if (command.action === "saved_view") {
+        if (!window.layerlingSavedViews) throw new Error("Saved views are not available in this editor");
+        const slotOf = (value: unknown) => {
+          const key = String(value);
+          const slot = SAVED_VIEW_KEYS.indexOf(key as (typeof SAVED_VIEW_KEYS)[number]);
+          if (slot < 0) throw new Error("key must be 7, 8, 9 or 0");
+          return slot;
+        };
+        const save = params.save === undefined ? undefined : slotOf(params.save);
+        const show = params.show === undefined ? undefined : slotOf(params.show);
+        const result = window.layerlingSavedViews({ ...(save !== undefined ? { save } : {}), ...(show !== undefined ? { show } : {}) });
+        if (show !== undefined && !result.shown) throw new Error(`No view is saved under ${SAVED_VIEW_KEYS[show]}; save one first with save: "${SAVED_VIEW_KEYS[show]}"`);
         return result;
       }
 
@@ -13620,10 +13683,17 @@ export function LayerlingEditor({
 
       if (sketchActive && toolbarMode === "sketch") {
         if (event.key === "Escape") {
+          // A crop, a calibration or the mirror panel that closes with this key is all it does.
+          if (escapeWasHandled(event)) return;
           event.preventDefault();
-          setSketchActivePointId(null);
-          setSketchSelection(null);
-          setNotice(t("status.sketchChainCleared"));
+          // As in 3D: first the tool goes down, then the selection (#664).
+          if (sketchEscapeAction(sketchTool) === "selectTool") {
+            setActiveSketchTool("select");
+          } else {
+            setSketchActivePointId(null);
+            setSketchSelection(null);
+            setNotice(t("status.sketchSelectionCleared"));
+          }
         } else if (event.key === "Delete" || event.key === "Backspace") {
           event.preventDefault();
           if (sketchSelection) deleteSelectedSketchEntity();
@@ -13984,6 +14054,8 @@ export function LayerlingEditor({
     sketchRedo,
     sketchMeasurement,
     sketchSelection,
+    sketchTool,
+    setActiveSketchTool,
     sketchUndo,
     splitSession,
     setSelectionHoleMode,

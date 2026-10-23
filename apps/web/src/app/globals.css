@@ -9074,6 +9074,9 @@ html[data-theme="dark"] .rotation-angle-badge {
   background: rgba(248, 246, 244, 0.96);
   border-left: 1px solid #e9e2d6;
   box-shadow: -2px 0 10px rgba(86, 62, 36, 0.08);
+  /* The toolbar size (Small, Medium, Large) scales the panel as it does the shape library (mail, 21.10.2026);
+     useMovablePanel reads this zoom when the panel is moved. */
+  zoom: var(--toolbar-scale);
 }
 
 .shape-inspector.minimized {

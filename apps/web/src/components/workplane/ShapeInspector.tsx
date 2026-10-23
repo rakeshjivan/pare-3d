@@ -169,7 +169,8 @@ import { MAX_TEXT_EDGE, MIN_TEXT_EDGE, normalizeTextEdge } from "@/lib/textEdge"
 import { wheelBaseStep, wheelNextValue, wheelTurn } from "@/lib/wheelValueStep";
 import { textHasFill } from "@/lib/textFill";
 import { TEXT_FILL_CHOICES, textFillChoice, textLineSettingsInView, textStrokeForChoice, textStrokeWider, type TextFillChoice } from "@/lib/textFillChoice";
-import { MAX_TEXT_LAYERS, MAX_TEXT_LAYER_GROW, MIN_TEXT_LAYER_HEIGHT, namesFromList, type NameTagKeyring, type TextLayer } from "@/lib/textLayers";
+import { MAX_TEXT_LAYERS, MAX_TEXT_LAYER_GROW, MIN_TEXT_LAYER_HEIGHT, nameTagKeyringAlongLimit, namesFromList, type NameTagKeyring, type TextLayer } from "@/lib/textLayers";
+import { iconKeyringAlongLimit } from "@/lib/sketchKeyring";
 import { DEFAULT_KEYRING_DIAMETER, MAX_TEXT_SPACING, MIN_KEYRING_DIAMETER, MIN_TEXT_SPACING, TEXT_KEYRING_SIDES } from "@/lib/textGeometry";
 import { addTextLayer, MIN_LETTER_SIZE, MIN_NAME_TAG_LAYERS, NAME_TAG_GAP, NAME_TAG_LAYERS, NAME_TAG_LETTER_SIZE, removeTextLayer, textLetterSize, textLetterSizePatch, textSpacingPatch, type NameTagStack } from "@/lib/nameTag";
 import { FONT_MANAGER_OPTION, requestFontManager } from "@/lib/fontManagerEvents";
@@ -406,7 +407,7 @@ const RELATIVE_SIZE_PROPERTY_IDS = new Set(["width", "height", "length", "diamet
 const ROTATION_PROPERTY_IDS = new Set(["rotateX", "rotateY", "rotateZ"]);
 
 function propertyUsesLengthUnit(key: string) {
-  return ["textLineWidth", "textEdgeSize", "letterSize", "iconWidth", "keyringDiameter", "positionX", "positionY", "positionZ", "pivotX", "pivotY", "pivotZ", "radius", "length", "width", "height", "bevel", "topRadius", "baseRadius", "thickness", "outerDiameter", "innerDiameter", "textRadius", "extrudeTopOffsetX", "extrudeTopOffsetZ", "toothSize", "toothWidth", "gearBacklash", "centerHole", "slotSmallEnd", "slotCentreDistance", "sketchLineWidth", "topLength", "topWidth", "bottomLength", "bottomWidth", "diameter", "pitch", "clearance", "axialClearance", "boltClearance", "threadDepth", "threadCoreDiameter", "threadLength", "headHeight", "chamfer", "chamferBottom", "headChamfer", "wire", "starOuterSize", "starInnerSize", "starOuterFillet", "starInnerFillet", "heartTipFillet", "crescentThickness", "crescentTipFillet", "honeycombCellSize", "honeycombWallThickness", "honeycombFrameWidth", "cornerFillet", "topBottomFillet", "bentTubeSize", "bentTubeWall", "bentTubeSegmentLength", "bentTubeBendRadius", "dovetailNeckWidth", "dovetailClearance", "hingePinDiameter", "hingeLeafThickness", "hingeClearance", "screwHoleShaft", "screwHoleHeadDepth", "knurlDepth", "knurlChamfer", "loftBottomWidth", "loftBottomDepth", "loftTopWidth", "loftTopDepth", "loftBottomCorner", "loftTopCorner", "loftOffsetX", "loftOffsetZ", "loftWall", "gridfinityLabelBackLength", "gridfinityLabelBackOffset", "gridfinityLabelBackWidth", "gridfinityLabelCornerSize", "gridfinityLabelFrontLength", "gridfinityLabelFrontOffset", "gridfinityLabelFrontWidth", "gridfinityLabelLeftLength", "gridfinityLabelLeftOffset", "gridfinityLabelLeftWidth", "gridfinityLabelRightLength", "gridfinityLabelRightOffset", "gridfinityLabelRightWidth", "gridfinityScoopRadius", "gridfinityFloorHeight", "gridfinityDividerThickness", "gridfinityDividerPositionX", "gridfinityDividerPositionZ", "gridfinityCompartmentLabelWidth"].includes(key);
+  return ["textLineWidth", "textEdgeSize", "letterSize", "iconWidth", "keyringDiameter", "keyringAlong", "positionX", "positionY", "positionZ", "pivotX", "pivotY", "pivotZ", "radius", "length", "width", "height", "bevel", "topRadius", "baseRadius", "thickness", "outerDiameter", "innerDiameter", "textRadius", "extrudeTopOffsetX", "extrudeTopOffsetZ", "toothSize", "toothWidth", "gearBacklash", "centerHole", "slotSmallEnd", "slotCentreDistance", "sketchLineWidth", "topLength", "topWidth", "bottomLength", "bottomWidth", "diameter", "pitch", "clearance", "axialClearance", "boltClearance", "threadDepth", "threadCoreDiameter", "threadLength", "headHeight", "chamfer", "chamferBottom", "headChamfer", "wire", "starOuterSize", "starInnerSize", "starOuterFillet", "starInnerFillet", "heartTipFillet", "crescentThickness", "crescentTipFillet", "honeycombCellSize", "honeycombWallThickness", "honeycombFrameWidth", "cornerFillet", "topBottomFillet", "bentTubeSize", "bentTubeWall", "bentTubeSegmentLength", "bentTubeBendRadius", "dovetailNeckWidth", "dovetailClearance", "hingePinDiameter", "hingeLeafThickness", "hingeClearance", "screwHoleShaft", "screwHoleHeadDepth", "knurlDepth", "knurlChamfer", "loftBottomWidth", "loftBottomDepth", "loftTopWidth", "loftTopDepth", "loftBottomCorner", "loftTopCorner", "loftOffsetX", "loftOffsetZ", "loftWall", "gridfinityLabelBackLength", "gridfinityLabelBackOffset", "gridfinityLabelBackWidth", "gridfinityLabelCornerSize", "gridfinityLabelFrontLength", "gridfinityLabelFrontOffset", "gridfinityLabelFrontWidth", "gridfinityLabelLeftLength", "gridfinityLabelLeftOffset", "gridfinityLabelLeftWidth", "gridfinityLabelRightLength", "gridfinityLabelRightOffset", "gridfinityLabelRightWidth", "gridfinityScoopRadius", "gridfinityFloorHeight", "gridfinityDividerThickness", "gridfinityDividerPositionX", "gridfinityDividerPositionZ", "gridfinityCompartmentLabelWidth"].includes(key);
 }
 
 /**
@@ -3463,7 +3464,7 @@ function NameTagCard({
               <div className="name-tag-sides" role="radiogroup" aria-label={t("nameTag.keyringSide")}>
                 <span>{t("nameTag.keyringSide")}</span>
                 {TEXT_KEYRING_SIDES.map((side) => (
-                  <button key={side} type="button" role="radio" aria-checked={keyring.side === side} className={keyring.side === side ? "active" : ""} disabled={disabled} onClick={() => onLayerText({ keyring: { ...keyring, side } })}>
+                  <button key={side} type="button" role="radio" aria-checked={keyring.side === side} className={keyring.side === side ? "active" : ""} disabled={disabled} onClick={() => onLayerText({ keyring: { side, diameter: keyring.diameter } })}>
                     {t(`nameTag.side.${side}`)}
                   </button>
                 ))}
@@ -3471,6 +3472,7 @@ function NameTagCard({
                   {t("nameTag.side.free")}
                 </button>
               </div>
+              <KeyringAlongProperty keyring={keyring} limit={nameTagKeyringAlongLimit(source, layers, keyring)} workspace={workspace} disabled={disabled} onChange={(next) => onLayerText({ keyring: next })} onInteractionActiveChange={onInteractionActiveChange} />
             </>
           ) : null}
           <NameListFields disabled={disabled} onTextTags={onTextTags} onInteractionActiveChange={onInteractionActiveChange} />
@@ -3592,6 +3594,43 @@ function MakeIconLayersButton({ disabled, onLayer }: { disabled: boolean; onLaye
  * The icon tag card, open and first: the icon's width, the layers as the name tag has them, and
  * how many tags of it - typed in, or as many as fit on the plate - laid out on the plate's middle.
  */
+/**
+ * Where along its side the key ring tab sits (#671), in mm off the middle: up on the left and
+ * right, to the right on top. The slider stays within the side, so the tab never leaves it.
+ */
+function KeyringAlongProperty({ keyring, limit, workspace, disabled, onChange, onInteractionActiveChange }: {
+  keyring: NameTagKeyring;
+  limit: number;
+  workspace: WorkplaneWorkspaceSettings;
+  disabled: boolean;
+  onChange: (keyring: NameTagKeyring) => void;
+  onInteractionActiveChange?: (active: boolean) => void;
+}) {
+  const reach = Math.max(0, Math.floor(limit * 10) / 10);
+  const value = Math.min(reach, Math.max(-reach, keyring.along ?? 0));
+  const change = (along: number) => {
+    const { along: _along, ...rest } = keyring;
+    const shift = Math.round(Math.min(reach, Math.max(-reach, along)) * 1000) / 1000;
+    onChange(shift ? { ...rest, along: shift } : rest);
+  };
+  return (
+    <RangeProperty
+      id="keyringAlong"
+      label={t("nameTag.keyringAlong")}
+      hint={t(keyring.side === "top" ? "nameTag.keyringAlongHintTop" : "nameTag.keyringAlongHint")}
+      value={value}
+      min={-reach}
+      max={reach}
+      step={0.1}
+      workspace={workspace}
+      disabled={disabled || reach <= 0}
+      onChange={change}
+      onReset={value !== 0 ? () => change(0) : undefined}
+      onInteractionActiveChange={onInteractionActiveChange}
+    />
+  );
+}
+
 function IconTagCard({ shapeId, controls, workspace, disabled, onInteractionActiveChange }: {
   shapeId: string;
   controls: IconTagControls;
@@ -3668,7 +3707,7 @@ function IconTagCard({ shapeId, controls, workspace, disabled, onInteractionActi
               <div className="name-tag-sides" role="radiogroup" aria-label={t("nameTag.keyringSide")}>
                 <span>{t("nameTag.keyringSide")}</span>
                 {TEXT_KEYRING_SIDES.map((side) => (
-                  <button key={side} type="button" role="radio" aria-checked={stack.keyring!.side === side} className={stack.keyring!.side === side ? "active" : ""} disabled={disabled} onClick={() => onLayer({ keyring: { ...stack.keyring!, side } })}>
+                  <button key={side} type="button" role="radio" aria-checked={stack.keyring!.side === side} className={stack.keyring!.side === side ? "active" : ""} disabled={disabled} onClick={() => onLayer({ keyring: { side, diameter: stack.keyring!.diameter } })}>
                     {t(`nameTag.side.${side}`)}
                   </button>
                 ))}
@@ -3676,6 +3715,14 @@ function IconTagCard({ shapeId, controls, workspace, disabled, onInteractionActi
                   {t("nameTag.side.free")}
                 </button>
               </div>
+              <KeyringAlongProperty
+                keyring={stack.keyring}
+                limit={iconKeyringAlongLimit(stack.source, stack.keyring.side, stack.keyring.diameter, stack.layers[stack.layers.length - 1]?.grow ?? 0, stack.width)}
+                workspace={workspace}
+                disabled={disabled}
+                onChange={(next) => onLayer({ keyring: next })}
+                onInteractionActiveChange={onInteractionActiveChange}
+              />
             </>
           ) : null}
           <ShapePropertyRows properties={properties.slice(1)} workspace={workspace} disabled={disabled} onInteractionActiveChange={onInteractionActiveChange} />

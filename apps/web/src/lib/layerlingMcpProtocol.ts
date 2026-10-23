@@ -137,6 +137,7 @@ export type LayerlingMcpCommandName =
   | "restore_from_history"
   | "clear_history"
   | "show_workplane"
+  | "saved_view"
   | "export_section_svg"
   | "export_drawing"
   | "export_mesh"

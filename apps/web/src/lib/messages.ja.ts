@@ -848,7 +848,7 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "shortcuts.placeWorkplaneOnSelection": "選択した面に置く",
   "shortcuts.reverseWorkplane": "置くときに押したまま: 向きを反転",
   "shortcuts.leaveMode": "作業平面またはメジャーモードを終了",
-  "shortcuts.sketchEscape": "線の連なりを終了、選択を解除",
+  "shortcuts.sketchEscape": "ツールを置く(選択に戻る)、次に選択を解除",
   "shortcuts.sketchDelete": "選択した要素を削除",
   "shortcuts.sketchRotate": "閉じたスケッチを45°回転",
   "shortcuts.sketchLockImage": "選択した輪郭または参照画像をロックまたはロック解除",
@@ -3089,4 +3089,8 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "shortcuts.saveView": "このデザインのビュー(回転・パン・ズーム)を保存",
   "camera.viewSaved": "ビューを {key} に保存しました - {key} で戻れます",
   "camera.savedViewEmpty": "{key} にはまだビューが保存されていません - Shift+{key} で現在のビューを保存します",
+  "status.separatedOutlines": "輪郭ごとに {count} 個のボディに分けました - それぞれ自分のスケッチを持ちます",
+  "nameTag.keyringAlong": "辺に沿った位置",
+  "nameTag.keyringAlongHint": "タブを辺に沿って上下に動かします。たとえば外側に張り出した文字の位置へ。0 が中央です。",
+  "nameTag.keyringAlongHintTop": "タブを上辺に沿って左右に動かします。0 が中央です。",
 };

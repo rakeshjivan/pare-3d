@@ -821,7 +821,7 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "shortcuts.placeWorkplaneOnSelection": "Elhelyezés a kijelölt lapon",
   "shortcuts.reverseWorkplane": "Elhelyezés közben nyomva tartva megfordítja az irányt",
   "shortcuts.leaveMode": "Kilépés a munkasík vagy a mérőszalag módból",
-  "shortcuts.sketchEscape": "A lánc befejezése, a kijelölés megszüntetése",
+  "shortcuts.sketchEscape": "Az eszköz letétele (vissza a Kijelöléshez), majd a kijelölés megszüntetése",
   "shortcuts.sketchDelete": "A kijelölt elem törlése",
   "shortcuts.sketchRotate": "Zárt vázlat forgatása 45°-kal",
   "shortcuts.sketchLockImage": "A kijelölt körvonal vagy a mintakép zárolása vagy feloldása",
@@ -3116,4 +3116,8 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "shortcuts.saveView": "A nézet - forgatás, eltolás és nagyítás - mentése ehhez a tervhez",
   "camera.viewSaved": "Nézet mentve ide: {key} - a {key} lenyomásával visszatérhetsz hozzá",
   "camera.savedViewEmpty": "A(z) {key} alatt még nincs mentett nézet - a Shift+{key} menti az aktuálisat",
+  "status.separatedOutlines": "{count} testre bontva, körvonalanként egyre - mindegyik megtartja a saját vázlatát",
+  "nameTag.keyringAlong": "Helyzet az oldal mentén",
+  "nameTag.keyringAlongHint": "Feljebb vagy lejjebb tolja a fület az oldala mentén, például egy messzebb kinyúló betűhöz. A 0 a közép.",
+  "nameTag.keyringAlongHintTop": "Balra vagy jobbra tolja a fület a felső oldalon. A 0 a közép.",
 };

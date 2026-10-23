@@ -849,7 +849,7 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "shortcuts.placeWorkplaneOnSelection": "Umieść ją na zaznaczonej ścianie",
   "shortcuts.reverseWorkplane": "Przytrzymaj podczas umieszczania, aby odwrócić kierunek",
   "shortcuts.leaveMode": "Wyjdź z trybu płaszczyzny roboczej lub narzędzia Zmierz",
-  "shortcuts.sketchEscape": "Zakończ łańcuch, wyczyść zaznaczenie",
+  "shortcuts.sketchEscape": "Odłóż narzędzie (powrót do Zaznacz), potem wyczyść zaznaczenie",
   "shortcuts.sketchDelete": "Usuń zaznaczony element",
   "shortcuts.sketchRotate": "Obróć zamknięty szkic o 45°",
   "shortcuts.sketchLockImage": "Zablokuj lub odblokuj zaznaczony obrys albo obraz odniesienia",
@@ -3176,4 +3176,8 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "shortcuts.saveView": "Zapisz widok - obrót, przesunięcie i przybliżenie - dla tego projektu",
   "camera.viewSaved": "Widok zapisany pod {key} - naciśnij {key}, aby do niego wrócić",
   "camera.savedViewEmpty": "Pod {key} nie zapisano jeszcze widoku - Shift+{key} zapisuje bieżący",
+  "status.separatedOutlines": "Rozdzielono na {count} brył, po jednej na kontur - każda zachowuje własny szkic",
+  "nameTag.keyringAlong": "Położenie wzdłuż boku",
+  "nameTag.keyringAlongHint": "Przesuwa uszko w górę lub w dół wzdłuż jego boku, na przykład do litery, która wystaje dalej. 0 to środek.",
+  "nameTag.keyringAlongHintTop": "Przesuwa uszko w lewo lub w prawo wzdłuż górnego boku. 0 to środek.",
 };
