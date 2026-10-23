@@ -175,6 +175,28 @@ function turned(shape: WorkplaneShape, offset: { x: number; z: number }) {
   return new THREE.Vector3(offset.x, 0, offset.z).applyEuler(euler);
 }
 
+/** Which way a shape's own up points: the stack grows that way, on a side face too (#696). */
+function upOf(shape: WorkplaneShape) {
+  return new THREE.Vector3(0, 1, 0).applyEuler(new THREE.Euler(
+    THREE.MathUtils.degToRad(shape.rotationX ?? 0),
+    THREE.MathUtils.degToRad(shape.rotation ?? 0),
+    THREE.MathUtils.degToRad(shape.rotationZ ?? 0),
+    "XYZ",
+  ));
+}
+
+/** The middle of a shape's underside: it turns about its middle, so on a side face that is not (x, elevation, z). */
+function footOf(shape: WorkplaneShape) {
+  const middle = new THREE.Vector3(shape.x, (shape.elevation ?? 0) + shape.height / 2, shape.z);
+  return middle.addScaledVector(upOf(shape), -shape.height / 2);
+}
+
+/** Where a shape of `height` and `shape`'s turn stands with its underside's middle on `foot`. */
+function placedOnFoot(shape: WorkplaneShape, foot: THREE.Vector3, height: number) {
+  const middle = foot.clone().addScaledVector(upOf(shape), height / 2);
+  return { x: round(middle.x), z: round(middle.z), elevation: round(middle.y - height / 2) };
+}
+
 /** The letters as a text without any fill: what every layer is built from. */
 export function textLayerSource(text: WorkplaneShape): WorkplaneShape {
   const letters = textLetterBox(text);
@@ -248,16 +270,19 @@ function layerKeyrings(letters: WorkplaneShape, layers: readonly TextLayer[], ke
  */
 export function textLayerShapes(source: WorkplaneShape, layers: readonly TextLayer[], ids: (string | undefined)[] = [], keyring: NameTagKeyring | null = null): WorkplaneShape[] {
   const letters = textLayerSource(source);
-  const base = letters.elevation ?? 0;
+  // The stack grows along the letters' own up, so a tag on a side face stands out of it (#696).
+  const foot = footOf(letters);
+  const up = upOf(letters);
   // Curved text has no key ring hole.
   const keyrings = layerKeyrings(letters, layers, letters.textCurved ? null : keyring);
   const bottomUp = [...layers].reverse();
-  let elevation = base;
+  let below = 0;
   const shapes = bottomUp.map((layer, fromBottom) => {
     const index = layers.length - 1 - fromBottom;
     const stroke = growStroke(layer.grow, layer.join);
     const extent = textFillExtent({ textStroke: stroke });
     const layerKeyring = keyrings[index];
+    const place = placedOnFoot(letters, foot.clone().addScaledVector(up, below), layer.height);
     let shape: WorkplaneShape = {
       ...letters,
       id: ids[index] ?? `${letters.id}-layer-${index + 1}`,
@@ -265,7 +290,7 @@ export function textLayerShapes(source: WorkplaneShape, layers: readonly TextLay
       color: layer.color,
       hole: false,
       height: layer.height,
-      elevation: round(elevation),
+      ...place,
       width: round(letters.width + 2 * extent),
       depth: round(letters.depth + 2 * extent),
       size: 0,
@@ -283,10 +308,10 @@ export function textLayerShapes(source: WorkplaneShape, layers: readonly TextLay
         depth: round(letters.depth + 2 * extent + reach.top + reach.bottom),
       };
       const middle = turned(shape, textLetterOffset(shape));
-      shape = { ...shape, x: round(letters.x - middle.x), z: round(letters.z - middle.z), elevation: round(elevation - middle.y) };
+      shape = { ...shape, x: round(place.x - middle.x), z: round(place.z - middle.z), elevation: round(place.elevation - middle.y) };
     }
     shape.size = Math.max(shape.width ?? 0, shape.depth ?? 0);
-    elevation += layer.height;
+    below += layer.height;
     return shape;
   });
   return shapes.reverse();
@@ -304,7 +329,10 @@ export function textLayersOf(shapes: WorkplaneShape[]): TextLayerStack | null {
   if (!shapes.length || shapes.some((shape) => shape.kind !== "text")) return null;
   const words = new Set(shapes.map((shape) => `${shape.text ?? "TEXT"}\u0000${shape.font ?? "Multilanguage"}\u0000${Boolean(shape.textCurved)}`));
   if (words.size !== 1) return null;
-  const topDown = [...shapes].sort((a, b) => (b.elevation ?? 0) - (a.elevation ?? 0));
+  // Ordered along the stack's own up, which is not the world's on a side face (#696).
+  const up = upOf(shapes[0]);
+  const level = (shape: WorkplaneShape) => footOf(shape).dot(up);
+  const topDown = [...shapes].sort((a, b) => level(b) - level(a));
   const layers = topDown.map((shape) => {
     const stroke = normalizeSketchStroke(shape.textStroke);
     return normalizeTextLayer({
@@ -324,7 +352,9 @@ export function textLayersOf(shapes: WorkplaneShape[]): TextLayerStack | null {
   // The key ring hole (#215) is the bottom layer's, where the ear is.
   const ring = textKeyringOf(bottom);
   const keyring = ring ? { side: ring.side, diameter: ring.diameter, ...(ring.along ? { along: ring.along } : {}), ...(ring.free ? { free: ring.free } : {}) } : null;
-  return { source: { ...source, elevation: bottom.elevation ?? 0 }, layers, ids: topDown.map((shape) => shape.id), keyring };
+  // The letters where the top layer has them, slid down its up onto the bottom layer's underside.
+  const foot = footOf(source).addScaledVector(up, level(bottom) - footOf(source).dot(up));
+  return { source: { ...source, ...placedOnFoot(source, foot, source.height) }, layers, ids: topDown.map((shape) => shape.id), keyring };
 }
 
 /** A name tag per line: empty lines dropped, at most `limit` names. */

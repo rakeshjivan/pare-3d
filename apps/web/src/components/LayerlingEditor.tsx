@@ -240,6 +240,7 @@ import { useCustomShapes } from "@/lib/useCustomShapes";
 import { packBackup } from "@/lib/projectBackup";
 import { MyShapesSection } from "@/components/workplane/MyShapesSection";
 import { addLineIntersectionPoints, onlyMovesPoints, splitSketchSegment } from "@/lib/sketchPointRefinement";
+import { joinOpenEnds } from "@/lib/sketchPointJoin";
 import { mirrorSketchSelection, SKETCH_MIRROR_HORIZONTAL, SKETCH_MIRROR_VERTICAL, sketchMirrorAxisThroughSegment } from "@/lib/sketchMirror";
 import { copySketchSelection, freeSketchPasteOffset, pasteSketchClipboard, type SketchClipboard } from "@/lib/sketchClipboard";
 import { sketchSelectedPointIds, sketchSelectionCount, toggleSketchSelection } from "@/lib/sketchSelection";
@@ -5455,7 +5456,8 @@ export function LayerlingEditor({
         handleOut: point.handleOut ? { x: point.handleOut.x + deltaX, z: point.handleOut.z + deltaZ } : undefined,
       } : point),
     };
-    commitSketchProfile(next, t("status.sketchPointMoved"));
+    // An open end dropped on another open end becomes one point with it, so a gap closes (#698).
+    commitSketchProfile(joinOpenEnds(next, id) ?? next, t("status.sketchPointMoved"));
   }, [commitSketchProfile, sketchProfile]);
 
   const transformSketchPoints = useCallback((points: SketchPoint[], message = "Sketch geometry transformed", keyRunKey?: string) => {

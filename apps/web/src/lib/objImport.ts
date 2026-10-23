@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { placeColoredParts } from "@/lib/coloredImport";
+import { reportedMeshExtent } from "@/lib/importedMeshBase";
 import { createLocalId } from "@/lib/localIds";
 import { zUpToLayerling } from "@/lib/meshCoordinates";
 import type { WorkplaneShape } from "@/types/layerling";
@@ -150,9 +151,9 @@ function importedObjShapeFromTriangles(
   const normals = rawNormals?.length === rawPositions.length
     ? [...rawNormals]
     : generatedFaceNormals(rawPositions);
-  const width = Math.max(1, sizeX);
-  const height = Math.max(1, sizeY);
-  const depth = Math.max(1, sizeZ);
+  const width = reportedMeshExtent(sizeX);
+  const height = reportedMeshExtent(sizeY);
+  const depth = reportedMeshExtent(sizeZ);
 
   return {
     id: createLocalId("uploaded-mesh"),

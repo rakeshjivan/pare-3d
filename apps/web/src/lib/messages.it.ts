@@ -3199,4 +3199,5 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "export.svg.view": "Vista",
   "export.svg.viewSilhouette": "Silhouette dall'alto",
   "export.svg.viewFootprint": "Impronta sul piano di lavoro",
+  "prop.hingeAngle": "Angolo di apertura",
 };

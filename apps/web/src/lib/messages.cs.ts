@@ -3641,4 +3641,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "status.keyringTabFixed": "Ouško na kroužek je teď součástí jmenovky tam, kam jste ho umístili.",
   "nameTag.keyringTabFix": "Připevnit ke jmenovce",
   "nameTag.keyringTabFixHint": "Udělá z ouška část nejbližší jmenovky tam, kde právě je: otvor prochází každou vrstvou a ouško zůstane na jmenovce, když se změní slova nebo velikost. „Volně“ ho zase vyjme.",
+  "prop.hingeAngle": "Úhel otevření",
+  "workspace.simpleMode": "Jednoduchý režim",
+  "workspace.simpleModeHint": "Pro děti a začátečníky: méně nástrojů, krátký seznam tvarů, větší tlačítka a úvodní stránka bez odkazů mimo layerling.",
+  "workspace.simpleModeOff": "Podržte pro vypnutí jednoduchého režimu",
 };

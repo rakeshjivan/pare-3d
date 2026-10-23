@@ -228,7 +228,7 @@ import {
   gridfinityShapePatch,
   normalizeGridfinityType,
 } from "@/lib/gridfinityGeometry";
-import { MAX_HINGE_CLEARANCE, MAX_HINGE_KNUCKLES, MIN_HINGE_CLEARANCE, MIN_HINGE_KNUCKLES, hingePlan, minimumHingeDepth, normalizeHingeClearance, normalizeHingeKnuckles, normalizeHingeLeafThickness, normalizeHingePinDiameter } from "@/lib/hingeGeometry";
+import { MAX_HINGE_ANGLE, MAX_HINGE_CLEARANCE, MAX_HINGE_KNUCKLES, MIN_HINGE_CLEARANCE, MIN_HINGE_KNUCKLES, hingePlan, minimumHingeDepth, normalizeHingeAngle, normalizeHingeClearance, normalizeHingeKnuckles, normalizeHingeLeafThickness, normalizeHingePinDiameter } from "@/lib/hingeGeometry";
 import { useLanguage } from "@/lib/useLanguage";
 import { useMovablePanel, type MovablePanelOptions } from "@/lib/useMovablePanel";
 import { SelectionSizeCard } from "@/components/workplane/SelectionSizeCard";
@@ -835,7 +835,7 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
         value: cornerFillet,
         min: 0,
         max: maxCornerFillet,
-        step: 0.1,
+        step: 0.05,
         onChange: (value) => onUpdate({ cornerFillet: normalizeCornerFillet(value, Math.min(width, depth) / 2) }),
       },
       {
@@ -844,7 +844,7 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
         value: topBottomFillet,
         min: 0,
         max: maxTopBottomFillet,
-        step: 0.1,
+        step: 0.05,
         onChange: (value) => onUpdate({ topBottomFillet: normalizeTopBottomFillet(value, shape.height / 2) }),
       },
       {
@@ -1103,6 +1103,7 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
         step: 0.1,
         onChange: (value) => onUpdate({ hingeLeafThickness: normalizeHingeLeafThickness(value, shape.height, plan.pinRadius * 2, plan.clearance) }),
       },
+      { id: "hingeAngle", label: t("prop.hingeAngle"), value: plan.angle, min: 0, max: MAX_HINGE_ANGLE, step: 1, onChange: (value) => onUpdate({ hingeAngle: normalizeHingeAngle(value) }) },
       { type: "toggle", id: "hingePinless", label: t("prop.hingePinless"), value: plan.pinless, onChange: (value) => onUpdate({ hingePinless: value }) },
       {
         id: "hingeClearance",

@@ -3176,4 +3176,5 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "export.svg.view": "Visning",
   "export.svg.viewSilhouette": "Silhuet ovenfra",
   "export.svg.viewFootprint": "Fodaftryk på arbejdsfladen",
+  "prop.hingeAngle": "Åbningsvinkel",
 };

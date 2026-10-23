@@ -3101,4 +3101,5 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "export.svg.view": "表示",
   "export.svg.viewSilhouette": "上から見たシルエット",
   "export.svg.viewFootprint": "作業面への接地面",
+  "prop.hingeAngle": "開き角度",
 };

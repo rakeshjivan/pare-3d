@@ -425,8 +425,8 @@ function specialFieldsForShape(
   }
   if (kind === "roundedBox") {
     return [
-      { type: "number", key: "cornerFillet", label: t("prop.cornerFillet"), defaultValue: defaults.cornerFillet ?? DEFAULT_ROUNDED_BOX_CORNER_FILLET, min: 0, max: Math.max(1, Math.min(dimensions.width, dimensions.depth) / 2), step: 0.1, unit: "mm" },
-      { type: "number", key: "topBottomFillet", label: t("prop.topBottomFillet"), defaultValue: defaults.topBottomFillet ?? DEFAULT_ROUNDED_BOX_TOP_BOTTOM_FILLET, min: 0, max: Math.max(1, dimensions.height / 2), step: 0.1, unit: "mm" },
+      { type: "number", key: "cornerFillet", label: t("prop.cornerFillet"), defaultValue: defaults.cornerFillet ?? DEFAULT_ROUNDED_BOX_CORNER_FILLET, min: 0, max: Math.max(1, Math.min(dimensions.width, dimensions.depth) / 2), step: 0.05, unit: "mm" },
+      { type: "number", key: "topBottomFillet", label: t("prop.topBottomFillet"), defaultValue: defaults.topBottomFillet ?? DEFAULT_ROUNDED_BOX_TOP_BOTTOM_FILLET, min: 0, max: Math.max(1, dimensions.height / 2), step: 0.05, unit: "mm" },
       { type: "number", key: "roundedBoxQuality", label: t("prop.quality"), defaultValue: defaults.roundedBoxQuality ?? DEFAULT_ROUNDED_BOX_QUALITY, min: MIN_ROUNDED_BOX_QUALITY, max: MAX_ROUNDED_BOX_QUALITY, step: 1 },
     ];
   }

@@ -164,7 +164,7 @@ export const MESSAGES_EN = {
   "welcome.moreSplitTitle": "Split",
   "welcome.moreSplitBody": "cut a body or a hole in two with a plane you move and tilt for an angled cut - handy for parts too big for the print bed.",
   "welcome.moreSketchTitle": "Sketches",
-  "welcome.moreSketchBody": "draw outlines, lay a true arc through three points, curve any straight side (a double click on the body opens its sketch again), type a line's length and angle while drawing (\"50<30\") or snap it in 15° steps, type lines to an exact length and corners to an exact angle, fillet or chamfer corners, mirror a selection across an axis or a line, draw construction lines that points snap to, and extrude them or revolve them around an axis - or build just the line with a width, as a frame or a stripe.",
+  "welcome.moreSketchBody": "draw outlines, lay a true arc through three points, curve any straight side (a double click on the body opens its sketch again), type a line's length and angle while drawing (\"50<30\") or snap it in 15° steps, type lines to an exact length and corners to an exact angle, fillet or chamfer corners, mirror a selection across an axis or a line, draw construction lines that points snap to, close a gap by dragging one open end onto the other, and extrude them or revolve them around an axis - or build just the line with a width, as a frame or a stripe.",
   "welcome.moreLibraryTitle": "Shape library",
   "welcome.moreLibraryBody": "threads (metric, UNC/UNF and G pipe threads), bolts and nuts, gears, ring gears and racks with involute or round teeth that mesh, springs, bent pipes, lofts from one outline to another, twisted or tilted too, capsules with one smaller end, text (with the spacing between the letters set, including curved along an arc, in fonts of your own, Arabic and Hebrew right to left too, as an outline, a silhouette or in layers as a name tag for a multicolour print, with a key ring hole and rounded letter edges if you like; an SVG icon as a layered icon tag too), QR codes from a text or a web address (alone, raised on a plate or engraved), print-in-place hinges, Gridfinity bins (with compartments if you like) and baseplates, knurled grips (straight, crossed or round), dovetail joints, teardrop holes for horizontal bores, counterbores, countersinks and double countersinks for screw heads and more - all adjustable afterwards. Bodies you need again and again are kept as custom shapes - in the browser or on your own server - and go into any design with one click.",
   "welcome.morePatternTitle": "Patterns",
@@ -3643,6 +3643,10 @@ export const MESSAGES_EN = {
   "status.keyringTabFixed": "The key ring tab is part of the tag now, where you put it.",
   "nameTag.keyringTabFix": "Fix to the tag",
   "nameTag.keyringTabFixHint": "Makes the tab part of the nearest tag, where it is now: the hole goes through every layer and the ear stays with the tag when the words or the size change. \"Free\" brings it out again.",
+  "prop.hingeAngle": "Opening angle",
+  "workspace.simpleMode": "Simple mode",
+  "workspace.simpleModeHint": "For children and beginners: fewer tools, a short list of shapes, larger buttons, and a start page without links out of layerling.",
+  "workspace.simpleModeOff": "Hold to switch off simple mode",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

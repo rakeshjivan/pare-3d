@@ -477,6 +477,7 @@ function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {
         hingeLeafThickness: shape.hingeLeafThickness,
         hingeClearance: shape.hingeClearance,
         hingePinless: shape.hingePinless,
+        hingeAngle: shape.hingeAngle,
         sides: shape.sides,
       });
       break;

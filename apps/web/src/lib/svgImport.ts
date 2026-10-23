@@ -76,6 +76,16 @@ export function normalizeSvgDocumentType(source: string) {
   return source.replace(SVG_DOCUMENT_TYPE_PATTERN, "");
 }
 
+/**
+ * The text of an SVG file. Most are UTF-8, but CorelDRAW and some Windows tools save UTF-16 with a
+ * byte order mark, which read as UTF-8 comes out as text with null characters between the letters (#317).
+ */
+export function decodeSvgBytes(bytes: Uint8Array) {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+  return new TextDecoder().decode(bytes);
+}
+
 export function validateSvgSourcePreflight(source: string) {
   if (!source.trim()) throw new Error("SVG file is empty");
   if (sourceByteLength(source) > MAX_SVG_BYTES) {

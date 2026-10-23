@@ -3208,4 +3208,5 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "export.svg.view": "العرض",
   "export.svg.viewSilhouette": "الظل من الأعلى",
   "export.svg.viewFootprint": "مساحة الارتكاز على مستوى العمل",
+  "prop.hingeAngle": "زاوية الفتح",
 };

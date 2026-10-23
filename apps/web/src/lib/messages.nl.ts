@@ -3642,4 +3642,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "status.keyringTabFixed": "De lip voor de sleutelring hoort nu bij het bordje, waar je hem neerlegde.",
   "nameTag.keyringTabFix": "Vastzetten aan het bordje",
   "nameTag.keyringTabFixHint": "Maakt de lip deel van het dichtstbijzijnde bordje, waar hij nu ligt: het gat gaat door elke laag en de lip blijft aan het bordje als de woorden of de grootte veranderen. \"Vrij\" haalt hem er weer uit.",
+  "prop.hingeAngle": "Openingshoek",
+  "workspace.simpleMode": "Eenvoudige modus",
+  "workspace.simpleModeHint": "Voor kinderen en beginners: minder gereedschap, een korte lijst met vormen, grotere knoppen en een startpagina zonder links buiten layerling.",
+  "workspace.simpleModeOff": "Ingedrukt houden om de eenvoudige modus uit te zetten",
 };

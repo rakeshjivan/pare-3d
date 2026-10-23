@@ -9,6 +9,7 @@ import { SketchRevolvePreview } from "@/components/SketchRevolvePreview";
 import { ToolbarConstructionLineIcon } from "@/components/toolbarIcons";
 import { constructionCrossings } from "@/lib/sketchConstruction";
 import { outlineSideMiddles, sketchSnapPoints } from "@/lib/sketchSnapPoints";
+import { openEndPoints } from "@/lib/sketchPointJoin";
 import { canApplySketchCornerTreatment } from "@/lib/sketchFilletChamfer";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -1231,7 +1232,7 @@ export function SketchWorkspace({
       let nearestDistance = reach;
       // A dragged point leaves out the middle of its own lines, which would move away under it.
       const targets = pointerAction?.kind === "move-point"
-        ? [...referenceSnapPoints, ...crossingSnapPoints, ...sketchSnapPoints(displayProfile, pointerAction.pointId)]
+        ? [...referenceSnapPoints, ...crossingSnapPoints, ...sketchSnapPoints(displayProfile, pointerAction.pointId), ...openEndPoints(displayProfile, pointerAction.pointId)]
         : snapTargets;
       targets.forEach((candidate) => {
         const distance = Math.hypot(candidate.x - local.x, candidate.z - local.z);

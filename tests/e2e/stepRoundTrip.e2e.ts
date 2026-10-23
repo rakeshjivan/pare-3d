@@ -73,8 +73,8 @@ describe("STEP export round-trip (real OCCT kernel)", () => {
       (sum, [a, b, c]) => sum + (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6,
       0,
     );
-    for (const rotation of [0, 90]) {
-      const hinge = shape({ kind: "hinge", name: "Hinge", width: 40, depth: 40, height: 8, size: 40, rotation, x: 12, z: -7, elevation: 3 });
+    for (const [rotation, hingeAngle, mirrorY] of [[0, 0, false], [90, 0, false], [0, 60, false], [90, 135, false], [30, 90, true]] as const) {
+      const hinge = shape({ kind: "hinge", name: "Hinge", width: 40, depth: 40, height: 8, size: 40, rotation, x: 12, z: -7, elevation: 3, hingeAngle, mirrorY });
       const { blob, exportedCount, skipped } = await exportShapesToStep([hinge]);
       expect(skipped).toEqual([]);
       expect(exportedCount).toBe(1);

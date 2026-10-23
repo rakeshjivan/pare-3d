@@ -1,4 +1,5 @@
 import { createLocalId } from "@/lib/localIds";
+import { repairClampedMeshBase } from "@/lib/importedMeshBase";
 import { fieldFormulasEqual } from "@/lib/fieldFormulas";
 import { threadFootprintPatch } from "@/lib/threadGeometry";
 import { gridfinityCompartmentLabelsEqual, gridfinityDividerPositionsEqual, gridfinityFootprintPatch } from "@/lib/gridfinityGeometry";
@@ -435,7 +436,8 @@ export function mirroredAxisCount(shape: WorkplaneShape) {
   return [shape.mirrorX, shape.mirrorY, shape.mirrorZ].filter(Boolean).length;
 }
 
-export function canonicalizeShape(shape: WorkplaneShape): WorkplaneShape {
+export function canonicalizeShape(unrepaired: WorkplaneShape): WorkplaneShape {
+  const shape = repairClampedMeshBase(unrepaired);
   const next: WorkplaneShape = {
     ...shape,
     rotation: cleanRotationDegrees(shape.rotation ?? 0),
@@ -587,6 +589,7 @@ export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
     a.hingeLeafThickness === b.hingeLeafThickness &&
     a.hingeClearance === b.hingeClearance &&
     a.hingePinless === b.hingePinless &&
+    a.hingeAngle === b.hingeAngle &&
     a.gridfinityType === b.gridfinityType &&
     a.gridfinityLip === b.gridfinityLip &&
     a.gridfinityMagnets === b.gridfinityMagnets &&

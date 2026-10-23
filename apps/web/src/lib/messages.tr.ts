@@ -3154,4 +3154,5 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "export.svg.view": "Görünüm",
   "export.svg.viewSilhouette": "Üstten siluet",
   "export.svg.viewFootprint": "Çalışma düzlemindeki taban izi",
+  "prop.hingeAngle": "Açılma açısı",
 };

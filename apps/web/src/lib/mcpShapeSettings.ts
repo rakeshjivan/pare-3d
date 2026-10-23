@@ -34,7 +34,7 @@ export const MCP_SHAPE_SETTING_KEYS = [
   "starPoints", "starInnerSize", "starOuterFillet", "starInnerFillet", "starQuality",
   "heartTipFillet", "heartQuality",
   "crescentThickness", "crescentTipFillet", "crescentQuality",
-  "hingeKnuckles", "hingePinDiameter", "hingeLeafThickness", "hingeClearance", "hingePinless",
+  "hingeKnuckles", "hingePinDiameter", "hingeLeafThickness", "hingeClearance", "hingePinless", "hingeAngle",
   "gridfinityType", "gridfinityLip", "gridfinityMagnets", "gridfinityHalfGrid",
   "gridfinityLabelBack", "gridfinityLabelFront", "gridfinityLabelLeft", "gridfinityLabelRight", "gridfinityLabelBackWidth", "gridfinityLabelBackLength", "gridfinityLabelBackOffset", "gridfinityLabelFrontWidth", "gridfinityLabelFrontLength", "gridfinityLabelFrontOffset", "gridfinityLabelLeftWidth", "gridfinityLabelLeftLength", "gridfinityLabelLeftOffset", "gridfinityLabelRightWidth", "gridfinityLabelRightLength", "gridfinityLabelRightOffset", "gridfinityLabelCorner", "gridfinityLabelCornerSize",
   "gridfinityScoopBack", "gridfinityScoopFront", "gridfinityScoopLeft", "gridfinityScoopRight", "gridfinityScoopRadius", "gridfinityFloorHeight",

@@ -3618,4 +3618,8 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "status.keyringTabFixed": "La languette porte-clés fait maintenant partie de l'étiquette, là où vous l'avez placée.",
   "nameTag.keyringTabFix": "Fixer à l'étiquette",
   "nameTag.keyringTabFixHint": "Intègre la languette à l'étiquette la plus proche, là où elle se trouve : le trou traverse chaque couche et la languette reste sur l'étiquette quand les mots ou la taille changent. « Libre » la ressort.",
+  "prop.hingeAngle": "Angle d'ouverture",
+  "workspace.simpleMode": "Mode simple",
+  "workspace.simpleModeHint": "Pour les enfants et les débutants : moins d'outils, une courte liste de formes, de plus grands boutons et une page d'accueil sans liens vers l'extérieur de layerling.",
+  "workspace.simpleModeOff": "Maintenir pour désactiver le mode simple",
 };

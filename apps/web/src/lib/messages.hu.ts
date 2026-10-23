@@ -3135,4 +3135,8 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "status.keyringTabFixed": "A kulcstartófül most már a címke része, ott, ahová tetted.",
   "nameTag.keyringTabFix": "Rögzítés a címkéhez",
   "nameTag.keyringTabFixHint": "A fület ott, ahol most van, a legközelebbi címke részévé teszi: a lyuk minden rétegen átmegy, és a fül a címkén marad, ha a szöveg vagy a méret változik. A „Szabad” újra kiveszi.",
+  "prop.hingeAngle": "Nyitási szög",
+  "workspace.simpleMode": "Egyszerű mód",
+  "workspace.simpleModeHint": "Gyerekeknek és kezdőknek: kevesebb eszköz, rövid alakzatlista, nagyobb gombok és a layerlingből kivezető hivatkozások nélküli kezdőoldal.",
+  "workspace.simpleModeOff": "Tartsa nyomva az egyszerű mód kikapcsolásához",
 };

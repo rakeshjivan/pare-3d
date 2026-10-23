@@ -3620,4 +3620,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "status.keyringTabFixed": "Jeziček za obesek je zdaj del napisa, tam kamor si ga postavil.",
   "nameTag.keyringTabFix": "Pritrdi na napis",
   "nameTag.keyringTabFixHint": "Jeziček postane del najbližjega napisa, tam kjer je zdaj: luknja gre skozi vse plasti in jeziček ostane na napisu, ko se besede ali velikost spremenijo. »Prosto« ga spet vzame ven.",
+  "prop.hingeAngle": "Kot odpiranja",
+  "workspace.simpleMode": "Preprosti način",
+  "workspace.simpleModeHint": "Za otroke in začetnike: manj orodij, kratek seznam oblik, večji gumbi in začetna stran brez povezav ven iz layerlinga.",
+  "workspace.simpleModeOff": "Pridržite za izklop preprostega načina",
 };

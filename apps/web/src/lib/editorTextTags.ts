@@ -131,23 +131,28 @@ export async function iconTagArea(source: SketchProfile, currentWidth: number, w
  */
 export async function layeredIconShape(area: SketchProfile, layers: readonly TextLayer[], place: IconTagPlace, ids: (string | undefined)[], keepId: string, keep: Pick<WorkplaneShape, "locked" | "hidden" | "name">, keyring: NameTagKeyring | null = null): Promise<WorkplaneShape> {
   const name = keep.name || "Icon tag";
-  const elevations = iconLayerElevations(layers, place.elevation);
+  // The place is the middle of the underside; the layers stack along the tag's own up, out of a side face too (#696).
+  const turn = quaternionForShape(place);
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(turn);
+  const below = iconLayerElevations(layers, 0);
   const holes = iconLayerKeyrings(area, layers, keyring);
   const parts = await Promise.all(layers.map(async (layer, index) => {
     const built = await cadShapeFromSketchProfile(iconLayerProfile(area, layer, holes[index]), layer.height);
     // A body stands by the middle of its extent: the layer with the ear is moved back so that the icon stays where it was.
     const hole = holes[index];
     const earOffset = hole?.ear ? iconEarOffset(area, layer.grow, hole) : { x: 0, z: 0 };
-    const shift = new THREE.Vector3(earOffset.x, 0, earOffset.z).applyQuaternion(quaternionForShape(place));
+    const middle = new THREE.Vector3(earOffset.x, 0, earOffset.z).applyQuaternion(turn)
+      .add(new THREE.Vector3(place.x, place.elevation, place.z))
+      .addScaledVector(up, below[index] + layer.height / 2);
     return canonicalizeShape({
       ...built,
       id: ids[index] ?? createLocalId("icon-layer"),
       name: layers.length > 1 ? `${name} ${index + 1}` : name,
       color: layer.color,
       hole: false,
-      x: place.x + shift.x,
-      z: place.z + shift.z,
-      elevation: elevations[index] + shift.y,
+      x: middle.x,
+      z: middle.z,
+      elevation: Math.round((middle.y - layer.height / 2) * 1000) / 1000,
       rotation: place.rotation,
       rotationX: place.rotationX,
       rotationZ: place.rotationZ,
