@@ -4,11 +4,16 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
-    build: 41,
+    build: 42,
     items: [
       "Push/pull face: the Depth slider is called Height when pulling out, and two new sliders - Move left or right, Move up or down - slide the pulled shape across the face for fine tuning (Back to the middle resets them).",
-      "Detailed parts are much quicker to work with: selecting a sphere at the highest step count, typing a new size or undoing no longer freezes the window for a second or two, and Split opens faster.",
       "Big imported models (scans of hundreds of thousands of triangles) no longer freeze the window for seconds after a move or an undo, and selecting them is quicker; saving no longer re-reads the whole file each time.",
+    ],
+  },
+  {
+    build: 41,
+    items: [
+      "Detailed parts are much quicker to work with: selecting a sphere at the highest step count, typing a new size or undoing no longer freezes the window for a second or two, and Split opens faster.",
     ],
   },
   {
