@@ -3636,4 +3636,6 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "workspace.stlAsDownloadHint": "Chrome et Edge écrivent un STL à chaque fois dans le même fichier. Activez ceci pour obtenir un téléchargement ordinaire : le navigateur numérote alors les fichiers, nom (1).stl, nom (2).stl.",
   "workspace.useMyDefault": "Utiliser mon réglage par défaut",
   "workspace.useMyDefaultHint": "Applique à ce design les couleurs, la grille et les autres réglages enregistrés avec « Par défaut ». La taille du plateau, l’imprimante et les unités restent.",
+  "prop.loftSegments": "Segments par cercle",
+  "loft.segmentsHint": "Avec combien de segments droits un cercle entier ou un arrondi est dessiné, dans la vue et dans STL, OBJ et 3MF. Plus de segments donnent un rendu plus rond et des fichiers plus gros.",
 };

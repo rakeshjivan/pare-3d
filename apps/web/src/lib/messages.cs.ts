@@ -3659,4 +3659,6 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "workspace.stlAsDownloadHint": "Chrome a Edge zapisují STL pokaždé do stejného souboru. Zapněte to, aby se místo toho stáhl běžný soubor: prohlížeč pak soubory očísluje, název (1).stl, název (2).stl.",
   "workspace.useMyDefault": "Použít moji výchozí",
   "workspace.useMyDefaultHint": "Použije na tento návrh barvy, mřížku a další nastavení uložená přes „Nastavit jako výchozí“. Velikost desky, tiskárna a jednotky zůstanou.",
+  "prop.loftSegments": "Segmenty na kruh",
+  "loft.segmentsHint": "Z kolika rovných úseků se kreslí celý kruh nebo zaoblení, v pohledu i v STL, OBJ a 3MF. Více úseků vypadá kulatěji a dělá větší soubory.",
 };

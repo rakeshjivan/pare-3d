@@ -3638,4 +3638,6 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "workspace.stlAsDownloadHint": "Chrome in Edge STL vsakič zapišeta v isto datoteko. Vklopite to za navaden prenos: brskalnik nato datoteke oštevilči, ime (1).stl, ime (2).stl.",
   "workspace.useMyDefault": "Uporabi mojo privzeto",
   "workspace.useMyDefaultHint": "Na ta osnutek uporabi barve, mrežo in druge nastavitve, shranjene z „Nastavi kot privzeto“. Velikost plošče, tiskalnik in enote ostanejo.",
+  "prop.loftSegments": "Odsekov na krog",
+  "loft.segmentsHint": "Iz koliko ravnih odsekov je narisan cel krog ali zaobljenje, v pogledu in v STL, OBJ in 3MF. Več odsekov izgleda bolj okroglo in naredi večje datoteke.",
 };

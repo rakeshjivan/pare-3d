@@ -3660,4 +3660,6 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "workspace.stlAsDownloadHint": "Chrome en Edge schrijven een STL elke keer naar hetzelfde bestand. Zet dit aan voor een gewone download: de browser nummert de bestanden dan, naam (1).stl, naam (2).stl.",
   "workspace.useMyDefault": "Mijn standaard gebruiken",
   "workspace.useMyDefaultHint": "Zet de kleuren, het raster en de andere instellingen die je met „Als standaard instellen” hebt bewaard op dit ontwerp. De grootte van het bed, de printer en de eenheden blijven.",
+  "prop.loftSegments": "Segmenten per cirkel",
+  "loft.segmentsHint": "Uit hoeveel rechte stukjes een hele cirkel of afronding wordt getekend, in het beeld en in STL, OBJ en 3MF. Meer stukjes ziet er ronder uit en maakt grotere bestanden.",
 };

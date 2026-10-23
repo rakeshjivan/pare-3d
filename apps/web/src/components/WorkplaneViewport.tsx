@@ -54,7 +54,7 @@ import {
 } from "@/lib/viewCubeDrag";
 import { cameraTurn, cameraTurnOffset, prefersReducedMotion } from "@/lib/viewCubeTransition";
 import { createGearGeometry } from "@/lib/gearGeometry";
-import { createStarGeometry } from "@/lib/starGeometry";
+import { createStarGeometry, starSettingsForSize } from "@/lib/starGeometry";
 import { createHeartGeometry } from "@/lib/heartGeometry";
 import { createCrescentGeometry } from "@/lib/crescentGeometry";
 import { createSlotGeometry } from "@/lib/slotGeometry";
@@ -2664,6 +2664,9 @@ function resizedShapePatchFromFrame(shape: WorkplaneShape, center: THREE.Vector3
   };
   if (shape.kind === "cone") {
     patch.baseRadius = width / 2;
+  }
+  if (shape.kind === "star") {
+    Object.assign(patch, starSettingsForSize({ ...shape, width: shapeWidth(shape), depth: shapeDepth(shape) }, width, depth));
   }
   return patch;
 }
@@ -6366,6 +6369,9 @@ export function WorkplaneViewport({
           : { width: nextValue, size: resizedShapeSize(nextValue, shapeDepth(shape)) };
         if (shape.kind === "cone") {
           patch.baseRadius = nextValue / 2;
+        }
+        if (shape.kind === "star") {
+          Object.assign(patch, starSettingsForSize({ ...shape, width: shapeWidth(shape), depth: shapeDepth(shape) }, nextValue, nextValue));
         }
         return patchWithResizeAnchor(shape, patch, axis, anchor);
       }

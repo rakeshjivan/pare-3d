@@ -12,6 +12,7 @@ import { groupedContentScale, groupedPartSizeScale, scaleGroupedVertices } from 
 import { dropSplitSlivers, unionSplitManifoldComponents } from "@/lib/manifoldSplit";
 import { checkManualConnectors, connectCutHalves, crowdedConnectors, dowelPinSize, placeCutConnectors, planeFrame, planePointToWorld, worldPointToPlane, type CutConnectorOptions } from "@/lib/cutConnectors";
 import { splitAxisLabel, splitPlaneIntersectsPoints, splitShapeFromWorldPositions, type ModelSplitPlane } from "@/lib/modelSplit";
+import { starSettingsForSize } from "@/lib/starGeometry";
 import { canonicalizeShape, cleanRotationDegrees, isNonSolidShapeKind, meshYawDegrees, mirrorSign, normalizeDegrees, resizedImportedCoordinates, resizedShapeSize, shapeDepth, shapeHasShapeDeform, shapeWidth, withHoleMode } from "@/lib/workplaneShapes";
 import { closedMeshVolume } from "@/lib/cadProfileExtrusion";
 import { meshSurfaceAreas } from "@/lib/printEstimate";
@@ -2238,6 +2239,7 @@ export function restoreGroupedChildren(group: WorkplaneShape): WorkplaneShape[] 
       size: resizedShapeSize(width, depth),
       // A cone is shaped by its own radii, not by its width: they stretch with it (#756).
       ...(child.kind === "cone" ? coneRadiiForWidth(child, width) : {}),
+      ...(child.kind === "star" ? starSettingsForSize({ ...child, width: shapeWidth(child), depth: shapeDepth(child) }, width, depth) : {}),
       rotation: childRotation.rotation,
       rotationX: childRotation.rotationX,
       rotationZ: childRotation.rotationZ,

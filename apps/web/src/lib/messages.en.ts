@@ -3661,6 +3661,8 @@ export const MESSAGES_EN = {
   "workspace.stlAsDownloadHint": "Chrome and Edge write an STL into the same file each time. Switch this on to get a plain download instead: the browser then numbers the files, name (1).stl, name (2).stl.",
   "workspace.useMyDefault": "Use my default",
   "workspace.useMyDefaultHint": "Puts the colours, grid and other settings you saved with “Make default” on this design. The size of the plate, the printer and the units stay.",
+  "prop.loftSegments": "Segments per circle",
+  "loft.segmentsHint": "How many straight pieces a full circle or rounded corner is drawn with, in the view and in STL, OBJ and 3MF. More pieces look rounder and make larger files.",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

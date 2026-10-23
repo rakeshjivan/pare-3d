@@ -3660,4 +3660,6 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "workspace.stlAsDownloadHint": "Chrome und Edge schreiben eine STL jedes Mal in dieselbe Datei. Mit diesem Schalter kommt stattdessen ein normaler Download: Der Browser nummeriert dann die Dateien, name (1).stl, name (2).stl.",
   "workspace.useMyDefault": "Meine Vorgabe verwenden",
   "workspace.useMyDefaultHint": "Legt die Farben, das Raster und die übrigen Einstellungen, die du mit „Als Vorgabe sichern“ gespeichert hast, auf diesen Entwurf. Größe der Platte, Drucker und Einheiten bleiben.",
+  "prop.loftSegments": "Segmente je Kreis",
+  "loft.segmentsHint": "Aus wie vielen geraden Stücken ein ganzer Kreis oder eine Rundung gezeichnet wird, in der Ansicht und in STL, OBJ und 3MF. Mehr Stücke wirken runder und machen größere Dateien.",
 };
