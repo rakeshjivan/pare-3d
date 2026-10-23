@@ -971,6 +971,8 @@ export type WorkplaneShape = {
      */
     laidCenter?: { x: number; y: number; z: number };
     laidSize?: number;
+    /** Fork (build 38): the middle of the part it sits on, when it was laid - moved together, it is only shifted. */
+    targetCenter?: { x: number; y: number; z: number };
   };
   importedMesh?: {
     positions: number[];

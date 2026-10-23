@@ -456,6 +456,12 @@ type WorkplaneViewportProps = {
   /** Fork (build 35): a double-click on text laid on a surface opens it for editing. */
   onEditSurfaceText?: () => void;
   /**
+   * Fork (build 38): dragging a text laid on a surface slides it over the surfaces under the
+   * pointer instead of across the plate. "move" carries the surface under the pointer (null off
+   * every part); "end" the last one, where it is to be laid; "cancel" for Escape or no drag at all.
+   */
+  onSurfaceTextDrag?: (shapeId: string, pick: LayFlatPick | null, phase: "move" | "end" | "cancel") => void;
+  /**
    * Fork (build 23): push/pull by dragging. Pressing on a face of this body grabs it; dragging pulls it
    * out (positive) or pushes it in (negative) along its normal, snapped to the grid (Shift: finely).
    * Typing a number sets the depth; Enter takes it, Esc gives up. A press without a drag is a pick.
@@ -3387,6 +3393,9 @@ function MovableSectionPanel({ children }: { children: (handleProps: ReturnType<
   );
 }
 
+/** Fork (build 38): the stand-in showing where a dragged surface text will land. */
+export const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
+
 export function WorkplaneViewport({
   shapes,
   selectedIds,
@@ -3467,6 +3476,7 @@ export function WorkplaneViewport({
   mateFacePick = null,
   onMateFacePick,
   onEditSurfaceText,
+  onSurfaceTextDrag,
   facePull = null,
   arrayHandle = null,
   onArrayHandleDrag,
@@ -3743,6 +3753,8 @@ export function WorkplaneViewport({
   layFlatPickModeRef.current = layFlatPickMode;
   const mateFacePickRef = useRef(mateFacePick);
   mateFacePickRef.current = mateFacePick;
+  const onSurfaceTextDragRef = useRef(onSurfaceTextDrag);
+  onSurfaceTextDragRef.current = onSurfaceTextDrag;
   const cadFacePickRef = useRef(cadFacePick);
   cadFacePickRef.current = cadFacePick;
   const cadFaceHoverRef = useRef<number | null>(null);
@@ -8140,6 +8152,64 @@ export function WorkplaneViewport({
       const dragIds = alreadySelected && selectedIdsSnapshot.length > 1 ? selectedIdsSnapshot : [id];
       // One locked shape holds the whole selection still, as the handles and the arrow keys do.
       if (dragIds.some((dragId) => shapesRef.current.find((entry) => entry.id === dragId)?.locked)) {
+        return;
+      }
+      if (dragIds.length === 1 && shape.surfaceText && onSurfaceTextDragRef.current && !event.altKey && !toggleOnClick) {
+        // Fork (build 38): a text laid on a surface slides over the surface under the pointer, as if
+        // drawn to it - curved or flat, this part or another - and is laid there when let go.
+        const element = event.currentTarget;
+        const view = element.ownerDocument.defaultView ?? window;
+        const pointerId = event.pointerId;
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const skip = new Set([id, SURFACE_TEXT_DRAG_GHOST_ID]);
+        capturePointer(element, pointerId);
+        let moved = false;
+        let last: LayFlatPick | null = null;
+        let frame = 0;
+        const stop = () => {
+          view.cancelAnimationFrame(frame);
+          view.removeEventListener("pointermove", move, true);
+          view.removeEventListener("pointerup", up, true);
+          view.removeEventListener("pointercancel", cancel, true);
+          view.removeEventListener("keydown", key, true);
+        };
+        const move = (moveEvent: PointerEvent) => {
+          if (moveEvent.pointerId !== pointerId) return;
+          if (!moved && Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < 4) return;
+          moved = true;
+          view.cancelAnimationFrame(frame);
+          const { clientX, clientY } = moveEvent;
+          frame = view.requestAnimationFrame(() => {
+            const current = threeRef.current;
+            if (!current) return;
+            last = pickLayFlatFace(current, clientX, clientY, skip);
+            onSurfaceTextDragRef.current?.(id, last, "move");
+          });
+        };
+        const up = (upEvent: PointerEvent) => {
+          if (upEvent.pointerId !== pointerId) return;
+          stop();
+          if (moved) {
+            const current = threeRef.current;
+            if (current) last = pickLayFlatFace(current, upEvent.clientX, upEvent.clientY, skip);
+          }
+          onSurfaceTextDragRef.current?.(id, moved ? last : null, moved ? "end" : "cancel");
+        };
+        const cancel = () => {
+          stop();
+          onSurfaceTextDragRef.current?.(id, null, "cancel");
+        };
+        const key = (keyEvent: KeyboardEvent) => {
+          if (keyEvent.key !== "Escape") return;
+          keyEvent.preventDefault();
+          keyEvent.stopPropagation();
+          cancel();
+        };
+        view.addEventListener("pointermove", move, true);
+        view.addEventListener("pointerup", up, true);
+        view.addEventListener("pointercancel", cancel, true);
+        view.addEventListener("keydown", key, true);
         return;
       }
       capturePointer(event.currentTarget, event.pointerId);

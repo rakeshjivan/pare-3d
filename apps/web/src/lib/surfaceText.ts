@@ -453,3 +453,62 @@ export async function surfaceTextPositions(letters: ArrayLike<number>, target: A
   }
   return { positions: out, offSurface: points ? missing / points : 0 };
 }
+
+/** The point of a triangle nearest to p (Ericson, Real-Time Collision Detection 5.1.5). */
+function closestOnTriangle(p: Vec, a: Vec, b: Vec, c: Vec): Vec {
+  const ab = sub(b, a), ac = sub(c, a), ap = sub(p, a);
+  const d1 = dot(ab, ap), d2 = dot(ac, ap);
+  if (d1 <= 0 && d2 <= 0) return a;
+  const bp = sub(p, b), d3 = dot(ab, bp), d4 = dot(ac, bp);
+  if (d3 >= 0 && d4 <= d3) return b;
+  const vc = d1 * d4 - d3 * d2;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) return { x: a.x + ab.x * (d1 / (d1 - d3)), y: a.y + ab.y * (d1 / (d1 - d3)), z: a.z + ab.z * (d1 / (d1 - d3)) };
+  const cp = sub(p, c), d5 = dot(ab, cp), d6 = dot(ac, cp);
+  if (d6 >= 0 && d5 <= d6) return c;
+  const vb = d5 * d2 - d1 * d6;
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) {
+    const w = d2 / (d2 - d6);
+    return { x: a.x + ac.x * w, y: a.y + ac.y * w, z: a.z + ac.z * w };
+  }
+  const va = d3 * d6 - d5 * d4;
+  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+    const w = (d4 - d3) / (d4 - d3 + (d5 - d6));
+    return { x: b.x + (c.x - b.x) * w, y: b.y + (c.y - b.y) * w, z: b.z + (c.z - b.z) * w };
+  }
+  const denom = 1 / (va + vb + vc);
+  const v = vb * denom, w = vc * denom;
+  return { x: a.x + ab.x * v + ac.x * w, y: a.y + ab.y * v + ac.y * w, z: a.z + ab.z * v + ac.z * w };
+}
+
+/**
+ * Fork (build 38): the spot on a part's surface nearest to p, with the surface's outward direction
+ * there - where text moved with the ordinary tools is laid again. The direction is the average of
+ * the faces around the spot (within a small radius), so a faceted curve gives a smooth answer.
+ */
+export function nearestSurfaceSpot(triangles: ArrayLike<number>, p: Vec): { point: Vec; normal: Vec; distance: number } | null {
+  let best: Vec | null = null;
+  let bestDistance = Infinity;
+  const count = Math.floor(triangles.length / 9);
+  const vertex = (t: number, k: number): Vec => ({ x: triangles[t * 9 + k * 3], y: triangles[t * 9 + k * 3 + 1], z: triangles[t * 9 + k * 3 + 2] });
+  for (let t = 0; t < count; t += 1) {
+    const q = closestOnTriangle(p, vertex(t, 0), vertex(t, 1), vertex(t, 2));
+    const d = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z);
+    if (d < bestDistance) {
+      bestDistance = d;
+      best = q;
+    }
+  }
+  if (!best) return null;
+  // The faces touching a small ball round the spot, weighted by area.
+  const near = Math.max(0.05, bestDistance * 1e-3) + 0.5;
+  let normal: Vec = { x: 0, y: 0, z: 0 };
+  for (let t = 0; t < count; t += 1) {
+    const a = vertex(t, 0), b = vertex(t, 1), c = vertex(t, 2);
+    const q = closestOnTriangle(best, a, b, c);
+    if (Math.hypot(q.x - best.x, q.y - best.y, q.z - best.z) > near) continue;
+    const n = cross(sub(b, a), sub(c, a));
+    normal = { x: normal.x + n.x, y: normal.y + n.y, z: normal.z + n.z };
+  }
+  if (Math.hypot(normal.x, normal.y, normal.z) < 1e-12) return null;
+  return { point: best, normal: norm(normal), distance: bestDistance };
+}

@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 38,
+    items: [
+      "Placed text sticks to surfaces like a magnet: drag it and it slides over the part under the pointer - curved or flat, round a sphere or onto another part - and is laid there when you let go. No double-click needed.",
+      "Move or resize the part and its text goes with it. Text nudged with the arrow keys or the Position fields is laid again on the part where it ends up.",
+    ],
+  },
+  {
     build: 37,
     items: [
       "Thank you for testing Pare 3D! Please try everything - and when something breaks or could be better, use Report a problem / suggest (bottom left, in the Help menu, or the button that appears when a tool shows an error). It goes straight to the person who makes Pare 3D.",

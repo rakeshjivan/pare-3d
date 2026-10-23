@@ -111,11 +111,13 @@ import { EdgeModifierPanel, type EdgeChamferStyle } from "./workplane/EdgeModifi
 import { FitCheckPanel } from "./workplane/FitCheckPanel";
 import { MeshRoundPanel } from "./workplane/MeshRoundPanel";
 import { SurfaceTextPanel, type SurfaceTextSettings } from "./workplane/SurfaceTextPanel";
-import { SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK, surfaceTextPositions } from "@/lib/surfaceText";
+import { SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK, nearestSurfaceSpot, surfaceTextPositions } from "@/lib/surfaceText";
 import { movedPointIds, solveSketchConstraints } from "@/lib/sketchConstraints";
 
 /** The id of the letters shown while Text on a surface is open, before they are added. */
 const SURFACE_TEXT_PREVIEW_ID = "surface-text-preview";
+/** Fork (build 38): matches the viewport's id for the stand-in of a dragged surface text. */
+const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
 import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
 import { checkFitInBackground, roundMeshInBackground } from "@/lib/meshJobs";
@@ -2973,6 +2975,8 @@ export function LayerlingEditor({
   const interactionHistoryChangedRef = useRef(false);
   const interactionHistoryTimerRef = useRef<number | null>(null);
   const [projectInteractionActive, setProjectInteractionActive] = useState(false);
+  /** Fork (build 38): where a placed text being dragged will land - shown on the surface as it moves. */
+  const [dragTextGhost, setDragTextGhost] = useState<{ id: string; ghost: WorkplaneShape } | null>(null);
   const [toolbarMode, setToolbarMode] = useState<ToolbarMode>("geometry");
   const [sketchActive, setSketchActive] = useState(false);
   const [activeSketchWorkplane, setActiveSketchWorkplane] = useState<PlacementWorkplane>(
@@ -3831,13 +3835,17 @@ export function LayerlingEditor({
       const editing = surfaceTextTool.editingId;
       result = [...(editing ? result.filter((shape) => shape.id !== editing) : result), surfaceTextTool.preview];
     }
+    if (dragTextGhost) {
+      // Fork (build 38): the dragged text shows only where it will land, on the surface under the pointer.
+      result = [...result.filter((shape) => shape.id !== dragTextGhost.id), dragTextGhost.ghost];
+    }
     if (fitCheck && fitOverlay.length) {
       // The overlapping parts see-through, so the red overlap inside them shows.
       const overlapping = new Set((fitReport?.findings ?? []).filter((finding) => finding.kind === "overlap").flatMap((finding) => [finding.a, finding.b]));
       result = [...result.map((shape) => (overlapping.has(shape.id) ? { ...shape, transparent: true } : shape)), ...fitOverlay];
     }
     return result;
-  }, [baseViewportShapes, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape, surfaceTextTool?.editingId, surfaceTextTool?.preview]);
+  }, [baseViewportShapes, dragTextGhost, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape, surfaceTextTool?.editingId, surfaceTextTool?.preview]);
   // A revolve sketch on the base plate is a side view: the bodies are shown from the front, as the profile is drawn (#525).
   // Opened again to edit a body that stands upright, it is the same side view: that body stands at its height, not on the plate's workplane.
   const editedRevolveShape = sketchActive && sketchOperation === "revolve" && editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) : undefined;
@@ -9349,6 +9357,28 @@ export function LayerlingEditor({
 
 
 
+  /** Lays the letters on the target at the placement - the text tool's preview and the re-lay after a move both use it. */
+  const laySurfaceText = async (settings: SurfaceTextSettings, placement: { origin: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } }, target: WorkplaneShape): Promise<{ positions: number[]; offSurface: number }> => {
+    const thickness = settings.mode === "engraved" ? settings.depth + SURFACE_TEXT_OVERSHOOT : settings.depth;
+    const textAsset = libraryShapeAssets.find((asset) => asset.id === "text")!;
+    const flat = canonicalizeShape({
+      ...makeShapeFromAsset(textAsset, { x: 0, z: 0, elevation: 0 }, { text: settings.text.trim(), width: Math.max(settings.letterHeight, settings.text.length * settings.letterHeight * 1.3), depth: settings.letterHeight, height: thickness }),
+      text: settings.text.trim(),
+      font: settings.font,
+    } as WorkplaneShape);
+    const normalLength = Math.hypot(placement.normal.x, placement.normal.y, placement.normal.z) || 1;
+    if (settings.shape === "surface" && settings.curve === 0 && settings.rotation === 0 && uprightCylinderDiameter(target) && Math.abs(placement.normal.y) < 0.35 * normalLength) {
+      // The side of an upright cylinder or tube: wrapped exactly round it, however far the text runs.
+      const wrapped = textWrappedOnCylinder({ ...flat, height: settings.depth }, target, placement.origin, settings.mode === "engraved" ? settings.depth : 0);
+      if (typeof wrapped === "string") throw new Error(t(wrapped === "tooWide" ? "faceText.tooWide" : "faceText.wrapFailed"));
+      const wrappedMesh = meshForShape(wrapped);
+      return { positions: wrappedMesh.faces.flatMap((face) => face.flatMap((index) => wrappedMesh.vertices[index])), offSurface: 0 };
+    } else {
+      const mesh = meshForShape(flat);
+      const letters = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
+      return await surfaceTextPositions(letters, worldTriangles(target), { origin: placement.origin, normal: placement.normal, rotation: settings.rotation }, { depth: settings.depth, mode: settings.mode, letterHeight: settings.letterHeight, shape: settings.shape, curve: settings.curve });
+    }
+  };
   const surfaceTextRunRef = useRef(0);
   const lastSurfaceTextSettingsRef = useRef<SurfaceTextSettings>({ text: "TEXT", font: "Multilanguage", letterHeight: 8, depth: 1, mode: "raised", rotation: 0, shape: "surface", curve: 0 });
   const toggleSurfaceText = useCallback(() => {
@@ -9406,26 +9436,7 @@ export function LayerlingEditor({
       }
       setSurfaceTextTool((current) => current ? { ...current, busy: true } : current);
       try {
-        const thickness = settings.mode === "engraved" ? settings.depth + SURFACE_TEXT_OVERSHOOT : settings.depth;
-        const textAsset = libraryShapeAssets.find((asset) => asset.id === "text")!;
-        const flat = canonicalizeShape({
-          ...makeShapeFromAsset(textAsset, { x: 0, z: 0, elevation: 0 }, { text: settings.text.trim(), width: Math.max(settings.letterHeight, settings.text.length * settings.letterHeight * 1.3), depth: settings.letterHeight, height: thickness }),
-          text: settings.text.trim(),
-          font: settings.font,
-        } as WorkplaneShape);
-        let result: { positions: number[]; offSurface: number };
-        const normalLength = Math.hypot(placement.normal.x, placement.normal.y, placement.normal.z) || 1;
-        if (settings.shape === "surface" && settings.curve === 0 && settings.rotation === 0 && uprightCylinderDiameter(target) && Math.abs(placement.normal.y) < 0.35 * normalLength) {
-          // The side of an upright cylinder or tube: wrapped exactly round it, however far the text runs.
-          const wrapped = textWrappedOnCylinder({ ...flat, height: settings.depth }, target, placement.origin, settings.mode === "engraved" ? settings.depth : 0);
-          if (typeof wrapped === "string") throw new Error(t(wrapped === "tooWide" ? "faceText.tooWide" : "faceText.wrapFailed"));
-          const wrappedMesh = meshForShape(wrapped);
-          result = { positions: wrappedMesh.faces.flatMap((face) => face.flatMap((index) => wrappedMesh.vertices[index])), offSurface: 0 };
-        } else {
-          const mesh = meshForShape(flat);
-          const letters = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
-          result = await surfaceTextPositions(letters, worldTriangles(target), { origin: placement.origin, normal: placement.normal, rotation: settings.rotation }, { depth: settings.depth, mode: settings.mode, letterHeight: settings.letterHeight, shape: settings.shape, curve: settings.curve });
-        }
+        const result = await laySurfaceText(settings, placement, target);
         if (surfaceTextRunRef.current !== run) return;
         const name = settings.text.trim();
         const preview = {
@@ -9453,6 +9464,7 @@ export function LayerlingEditor({
       ...tool.placement,
       laidCenter: { x: (previewBox.minX + previewBox.maxX) / 2, y: (previewBox.minY + previewBox.maxY) / 2, z: (previewBox.minZ + previewBox.maxZ) / 2 },
       laidSize: Math.max(previewBox.maxX - previewBox.minX, previewBox.maxY - previewBox.minY, previewBox.maxZ - previewBox.minZ),
+      targetCenter: boxCenter(shapesRef.current.find((shape) => shape.id === tool.placement?.targetId)),
     };
     lastSurfaceTextSettingsRef.current = tool.settings;
     const base = shapesRef.current.find((shape) => shape.id === tool.editingId);
@@ -9470,6 +9482,190 @@ export function LayerlingEditor({
     commitShapes(next, made.id, t(tool.settings.mode === "engraved" ? "surfaceText.doneEngraved" : "surfaceText.doneRaised", { name: target ? displayShapeName(target) : "" }));
     setSurfaceTextTool(null);
   }, [commitShapes, surfaceTextTool]);
+
+  /**
+   * Fork (build 38): a placed text after it was moved - laid again on its part at the nearest spot,
+   * only shifted when its part moved with it, or left where it is when pulled well away.
+   */
+  const relaidSurfaceText = async (shape: WorkplaneShape, base: WorkplaneShape[]): Promise<{ shape: WorkplaneShape; laid: boolean } | null> => {
+    const near = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < 0.05;
+    const record = shape.surfaceText;
+    if (!record?.laidCenter) return null;
+    const target = base.find((candidate) => candidate.id === record.targetId);
+    const center = boxCenter(shape)!;
+    const delta = { x: center.x - record.laidCenter.x, y: center.y - record.laidCenter.y, z: center.z - record.laidCenter.z };
+    const shifted = { x: record.origin.x + delta.x, y: record.origin.y + delta.y, z: record.origin.z + delta.z };
+    const targetCenter = boxCenter(target);
+    const stay = (): { shape: WorkplaneShape; laid: boolean } => ({ shape: { ...shape, surfaceText: { ...record, origin: shifted, laidCenter: center, targetCenter: targetCenter ?? record.targetCenter } }, laid: false });
+    if (!target || !targetCenter) return stay();
+    const zero = { x: 0, y: 0, z: 0 };
+    const targetDelta = record.targetCenter ? { x: targetCenter.x - record.targetCenter.x, y: targetCenter.y - record.targetCenter.y, z: targetCenter.z - record.targetCenter.z } : zero;
+    const textMoved = !near(delta, zero);
+    const targetMoved = !near(targetDelta, zero);
+    // Moved together with its part: the record follows the text.
+    if (textMoved && targetMoved && near(targetDelta, delta)) return stay();
+    if (!textMoved && !targetMoved) return null;
+    if (!textMoved) {
+      // Its part moved, turned or changed size on its own: the text goes with it, laid again at the
+      // same spot on the part.
+      const aim = { x: record.origin.x + targetDelta.x, y: record.origin.y + targetDelta.y, z: record.origin.z + targetDelta.z };
+      const spot = nearestSurfaceSpot(worldTriangles(target), aim);
+      if (!spot) return stay();
+      try {
+        return { shape: await surfaceTextLaidAt(shape, target, spot), laid: false };
+      } catch {
+        return stay();
+      }
+    }
+    const spot = nearestSurfaceSpot(worldTriangles(target), center);
+    // Pulled off the part: it stays where it was put, and is laid again when brought back.
+    if (!spot || spot.distance > Math.max(record.laidSize ?? 0, record.letterHeight * 2)) return stay();
+    try {
+      return { shape: await surfaceTextLaidAt(shape, target, spot), laid: true };
+    } catch {
+      // It could not be laid there (off an edge, say): it stays where it was put.
+      return stay();
+    }
+  };
+  /** A placed text laid again on `target` at `spot`, with its settings and its size as it is now. */
+  const surfaceTextLaidAt = async (shape: WorkplaneShape, target: WorkplaneShape, spot: { point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } }): Promise<WorkplaneShape> => {
+    const record = shape.surfaceText!;
+    const box = meshAabb(shape);
+    const size = Math.max(box.maxX - box.minX, box.maxY - box.minY, box.maxZ - box.minZ);
+    const letterHeight = record.laidSize && Math.abs(size / record.laidSize - 1) > 0.01 ? Math.round(record.letterHeight * (size / record.laidSize) * 10) / 10 : record.letterHeight;
+    const settings: SurfaceTextSettings = { text: record.text, font: record.font, letterHeight, depth: record.depth, mode: record.mode, rotation: record.rotation, shape: record.shape ?? "surface", curve: record.curve ?? 0 };
+    const result = await laySurfaceText(settings, { origin: spot.point, normal: spot.normal }, target);
+    const made = canonicalizeShape({
+      ...shapeWithWorldPositions(meshShapeFromPositions(shape.name, shape.color, result.positions), result.positions),
+      id: shape.id,
+      name: shape.name,
+      color: shape.color,
+      hole: shape.hole,
+      hidden: shape.hidden,
+    } as WorkplaneShape);
+    const laidBox = meshAabb(made);
+    made.surfaceText = {
+      ...record,
+      letterHeight,
+      targetId: target.id,
+      origin: spot.point,
+      normal: spot.normal,
+      laidCenter: { x: (laidBox.minX + laidBox.maxX) / 2, y: (laidBox.minY + laidBox.maxY) / 2, z: (laidBox.minZ + laidBox.maxZ) / 2 },
+      laidSize: Math.max(laidBox.maxX - laidBox.minX, laidBox.maxY - laidBox.minY, laidBox.maxZ - laidBox.minZ),
+      targetCenter: boxCenter(target),
+    };
+    return made;
+  };
+
+  // While a placed text is dragged over the surfaces, where it will land is laid there as it goes -
+  // as often as the laying keeps up, never queueing behind a slow part.
+  const surfaceDragRef = useRef<{ id: string; pick: LayFlatPick | null; busy: boolean; pending: boolean; run: number }>({ id: "", pick: null, busy: false, pending: false, run: 0 });
+  const surfaceDragTarget = (pick: LayFlatPick | null) => {
+    if (!pick) return undefined;
+    const target = shapesRef.current.find((shape) => shape.id === pick.shapeId);
+    // Another text is no surface to lay on.
+    return target && !target.surfaceText && !target.previewOnly ? target : undefined;
+  };
+  const layDragGhost = async () => {
+    const drag = surfaceDragRef.current;
+    if (drag.busy) {
+      drag.pending = true;
+      return;
+    }
+    const shape = shapesRef.current.find((candidate) => candidate.id === drag.id);
+    const target = surfaceDragTarget(drag.pick);
+    if (!shape || !target || !drag.pick) {
+      setDragTextGhost(null);
+      return;
+    }
+    const run = drag.run;
+    drag.busy = true;
+    try {
+      const laid = await surfaceTextLaidAt(shape, target, drag.pick);
+      if (surfaceDragRef.current.run === run && surfaceDragRef.current.id === shape.id) {
+        setDragTextGhost({ id: shape.id, ghost: { ...laid, id: SURFACE_TEXT_DRAG_GHOST_ID, locked: true, previewOnly: true, surfaceText: undefined } as WorkplaneShape });
+      }
+    } catch {
+      // Off an edge, say: the ghost stays where it last could be laid.
+    } finally {
+      drag.busy = false;
+      if (drag.pending && surfaceDragRef.current.run === run) {
+        drag.pending = false;
+        void layDragGhost();
+      }
+    }
+  };
+  const onSurfaceTextDrag = useCallback((shapeId: string, pick: LayFlatPick | null, phase: "move" | "end" | "cancel") => {
+    const drag = surfaceDragRef.current;
+    if (phase === "move") {
+      if (drag.id !== shapeId) surfaceDragRef.current = { id: shapeId, pick, busy: false, pending: false, run: drag.run + 1 };
+      else drag.pick = pick;
+      void layDragGhost();
+      return;
+    }
+    surfaceDragRef.current = { id: "", pick: null, busy: false, pending: false, run: drag.run + 1 };
+    setDragTextGhost(null);
+    if (phase !== "end") return;
+    const shape = shapesRef.current.find((candidate) => candidate.id === shapeId);
+    const target = surfaceDragTarget(pick);
+    if (!shape || !pick) return;
+    if (!target) {
+      setNotice(t("surfaceText.dragMissed"));
+      return;
+    }
+    void surfaceTextLaidAt(shape, target, pick).then((laid) => {
+      const current = shapesRef.current.find((candidate) => candidate.id === shapeId);
+      if (!current || projectShapesFingerprint([current]) !== projectShapesFingerprint([shape])) return;
+      commitShapes(shapesRef.current.map((candidate) => (candidate.id === shapeId ? laid : candidate)), shapeId, t("surfaceText.moved", { name: displayShapeName(target) }));
+    }).catch((error) => noticeError(error));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commitShapes]);
+
+  // Fork (build 38): text moved with the ordinary tools is laid again on the part where it now
+  // is, as in Bambu Studio - no double-click needed. Moved together with its part, it is only
+  // shifted; pulled well away from the part, it stays where it was put. The new lay joins the
+  // move's undo step.
+  const surfaceRelayRunRef = useRef(0);
+  useEffect(() => {
+    if (surfaceTextTool || projectInteractionActive) return;
+    const near = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < 0.05;
+    const moved = shapes.filter((shape) => {
+      const record = shape.surfaceText;
+      if (!record?.laidCenter || shape.locked || shape.previewOnly) return false;
+      if (!near(boxCenter(shape)!, record.laidCenter)) return true;
+      // Its part moved without it: it follows.
+      const targetCenter = record.targetCenter ? boxCenter(shapes.find((candidate) => candidate.id === record.targetId)) : undefined;
+      return Boolean(targetCenter && record.targetCenter && !near(targetCenter, record.targetCenter));
+    });
+    if (!moved.length) return;
+    const run = surfaceRelayRunRef.current + 1;
+    surfaceRelayRunRef.current = run;
+    const base = shapes;
+    const timer = window.setTimeout(async () => {
+      const replaced = new Map<string, WorkplaneShape>();
+      let laid = 0;
+      for (const shape of moved) {
+        const planned = await relaidSurfaceText(shape, base);
+        if (surfaceRelayRunRef.current !== run) return;
+        if (!planned) continue;
+        replaced.set(shape.id, planned.shape);
+        if (planned.laid) laid += 1;
+      }
+      if (surfaceRelayRunRef.current !== run || shapesRef.current !== base || !replaced.size) return;
+      const next = base.map((shape) => replaced.get(shape.id) ?? shape).map(canonicalizeShape);
+      // Part of the move just made: it replaces that step rather than adding one.
+      const history = historyRef.current;
+      const index = historyIndexRef.current;
+      const newest = index === history.length - 1 ? history[index] : undefined;
+      const replaceCurrent = Boolean(newest && newest.fingerprint === editorHistoryEntry(base, selectedIdsRef.current, notesRef.current, placementWorkplaneRef.current).fingerprint);
+      shapesRef.current = next;
+      setShapes(next);
+      if (appendHistorySnapshot(next, selectedIdsRef.current, notesRef.current, placementWorkplaneRef.current, replaceCurrent)) syncProjectShapes(next);
+      if (laid) setNotice(t("surfaceText.relaid"), true);
+    }, 200);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shapes, surfaceTextTool, projectInteractionActive]);
 
   useEffect(() => {
     if (!surfaceTextTool) return;
@@ -14315,6 +14511,7 @@ export function LayerlingEditor({
           layFlatPickMode={layFlatPickMode}
           onLayFlatPick={layFlatOnFace}
           onEditSurfaceText={toggleSurfaceText}
+          onSurfaceTextDrag={onSurfaceTextDrag}
           mateFacePick={surfaceTextTool
             ? { shapeIds: [...shapes.filter((shape) => !shape.hidden && shape.id !== surfaceTextTool.editingId && !isNonSolidShapeKind(shape.kind)).map((shape) => shape.id), SURFACE_TEXT_PREVIEW_ID], marker: "point" as const, dragId: SURFACE_TEXT_PREVIEW_ID }
             : mateTool && mateTool.step !== "ready"
@@ -17211,4 +17408,11 @@ function TopActionPanel({
       ) : null}
     </div>
   );
+}
+
+/** Fork (build 38): the middle of a part's box in the world, or undefined with no part. */
+function boxCenter(shape: WorkplaneShape | undefined): { x: number; y: number; z: number } | undefined {
+  if (!shape) return undefined;
+  const box = meshAabb(shape);
+  return { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2, z: (box.minZ + box.maxZ) / 2 };
 }
