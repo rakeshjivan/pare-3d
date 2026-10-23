@@ -14,7 +14,7 @@ import { canApplySketchCornerTreatment } from "@/lib/sketchFilletChamfer";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import { useMovablePanel, type MovablePanelOptions } from "@/lib/useMovablePanel";
-import { parseMeasurementInput, resolveMeasurementInput } from "@/lib/measurementUnits";
+import { currentLengthUnitLabel, formatLengthMm, lengthDisplayUnit, parseLengthMm, parseMeasurementInput, resolveLengthMm, setLengthUnit } from "@/lib/measurementUnits";
 import { applySegmentDimension, SEGMENT_DIMENSION_CENTER } from "@/lib/sketchDimensions";
 import { applyCornerAngle, sketchCornerAt, type CornerTurn, type SketchCorner } from "@/lib/sketchAngles";
 import { isSegmentCurved } from "@/lib/sketchSegmentCurve";
@@ -236,9 +236,18 @@ const IMAGE_SETTINGS_PANEL: MovablePanelOptions = {
   dockedAt: (area, panel) => ({ left: area.width - panel.width, top: 0 }),
 };
 
+// Lengths read and type in the workspace unit (#757); the sketch itself stays in millimetres.
 function formatDimension(value: number, accuracy: 1 | 2 | 3) {
+  return formatLengthMm(value, accuracy);
+}
+
+function formatPlainNumber(value: number, accuracy: 1 | 2 | 3) {
   const threshold = 0.5 * 10 ** -accuracy;
   return (Math.abs(value) < threshold ? 0 : value).toFixed(accuracy);
+}
+
+function defaultCornerText() {
+  return formatLengthMm(2, 2);
 }
 
 function dimensionPillSize(label: string, screenUnit: number, extra = 24) {
@@ -603,6 +612,8 @@ export function SketchWorkspace({
 }: SketchWorkspaceProps) {
   useLanguage();
   const workspace = useMemo(() => normalizeWorkspaceSettings(initialWorkspace, DEFAULT_WORKPLANE_WORKSPACE), [initialWorkspace]);
+  setLengthUnit(workspace);
+  const unitLabel = lengthDisplayUnit(workspace).label;
   const [snap, setSnap] = useState<GridSize>(() => normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID));
   // One grid for the sketch and the 3D view: what the editor holds wins, and a pick here goes back to it.
   useEffect(() => {
@@ -860,7 +871,7 @@ export function SketchWorkspace({
     setLocalCornerDialog(dialog);
     onCornerDialogChange?.(dialog);
   }, [onCornerDialogChange]);
-  const [cornerValue, setCornerValue] = useState("2");
+  const [cornerValue, setCornerValue] = useState(defaultCornerText);
   // Build 35: right-click a line or a point for the usual edits.
   type SketchMenuItem = { label: string; icon?: React.ReactNode; danger?: boolean; disabled?: boolean; divider?: boolean; run: () => void };
   const [sketchMenu, setSketchMenu] = useState<{ x: number; y: number; items: SketchMenuItem[] } | null>(null);
@@ -948,7 +959,7 @@ export function SketchWorkspace({
       // After the selection has settled - picking a point closes an open corner box.
       window.setTimeout(() => {
         setCornerDialog(dialog);
-        setCornerValue("2");
+        setCornerValue(defaultCornerText());
       }, 60);
     };
     const items: SketchMenuItem[] = [
@@ -1008,7 +1019,7 @@ export function SketchWorkspace({
 
   useEffect(() => {
     setCornerDialog(null);
-    setCornerValue("2");
+    setCornerValue(defaultCornerText());
   }, [selectedPoint?.id, setCornerDialog]);
 
   // One corner, or several selected ones that get the same radius or distance at once (#269).
@@ -1023,7 +1034,7 @@ export function SketchWorkspace({
   const manyLines = selected?.kind === "multiple" && selectedLines.length > 0 && Boolean(onCurveSegments && onStraightenSegments);
   const handleApplyCorner = () => {
     if (selectedCornerIds.length === 0 || !activeCornerDialog) return;
-    const val = parseMeasurementInput(cornerValue);
+    const val = parseLengthMm(cornerValue);
     if (!Number.isFinite(val) || val <= 0) return;
     if (activeCornerDialog === "fillet") {
       onApplyFillet?.(selectedCornerIds, val);
@@ -1052,7 +1063,7 @@ export function SketchWorkspace({
         }}
         autoFocus
       />
-      <span className="sketch-corner-unit">mm</span>
+      <span className="sketch-corner-unit">{unitLabel}</span>
       <button
         type="button"
         className="sketch-corner-submit"
@@ -1097,7 +1108,7 @@ export function SketchWorkspace({
   const commitDimensionEdit = useCallback((symmetric = false) => {
     if (!editingDimension || dimensionEditDoneRef.current) return;
     dimensionEditDoneRef.current = true;
-    const length = parseMeasurementInput(editingDimension.value);
+    const length = parseLengthMm(editingDimension.value);
     const segment = profile.segments.find((entry) => entry.id === editingDimension.segmentId);
     if (segment && Number.isFinite(length) && length > 0.001) {
       const anchor = symmetric
@@ -1124,7 +1135,7 @@ export function SketchWorkspace({
       const bounds = boundsForSketchPoints(startPoints);
       if (bounds) {
         const current = editingBoxSize.axis === "x" ? bounds.width : bounds.depth;
-        const size = resolveMeasurementInput(editingBoxSize.value, current);
+        const size = resolveLengthMm(editingBoxSize.value, current);
         if (Number.isFinite(size) && size > 0) {
           onTransformPoints(resizeSketchPointsToSize(startPoints, bounds, editingBoxSize.axis, size, keepProportionsRef.current), t("sketch.shapeResized"));
         }
@@ -1736,7 +1747,7 @@ export function SketchWorkspace({
   const pointerAngle = activePoint && hover ? sketchLineAngle(activePoint, hover) : 0;
   const typedLineTarget = (() => {
     if (!typedLine || !activePoint) return null;
-    const length = parseMeasurementInput(typedLine.length);
+    const length = parseLengthMm(typedLine.length);
     if (!Number.isFinite(length) || length <= 0.001) return null;
     const typedAngle = typedLine.angle.trim() ? parseMeasurementInput(typedLine.angle) : pointerAngle;
     return Number.isFinite(typedAngle) ? sketchPolarPoint(activePoint, length, typedAngle) : null;
@@ -2874,7 +2885,7 @@ export function SketchWorkspace({
                   onKeyDown={fieldKeys}
                   onBlur={leave}
                 />
-                <span>mm</span>
+                <span>{unitLabel}</span>
               </label>
               <label>
                 <span>{t("sketch.typedAngle")}</span>
@@ -3044,7 +3055,7 @@ export function SketchWorkspace({
                     title={t("sketch.filletCorner")}
                     onClick={() => {
                       setCornerDialog("fillet");
-                      setCornerValue("2");
+                      setCornerValue(defaultCornerText());
                     }}
                   >
                     <Spline />
@@ -3055,7 +3066,7 @@ export function SketchWorkspace({
                     title={t("sketch.chamferCorner")}
                     onClick={() => {
                       setCornerDialog("chamfer");
-                      setCornerValue("2");
+                      setCornerValue(defaultCornerText());
                     }}
                   >
                     <Slash />
@@ -3082,7 +3093,7 @@ export function SketchWorkspace({
                 title={t("sketch.filletCorners", { count: selectedCornerIds.length })}
                 onClick={() => {
                   setCornerDialog("fillet");
-                  setCornerValue("2");
+                  setCornerValue(defaultCornerText());
                 }}
               >
                 <Spline />
@@ -3093,7 +3104,7 @@ export function SketchWorkspace({
                 title={t("sketch.chamferCorners", { count: selectedCornerIds.length })}
                 onClick={() => {
                   setCornerDialog("chamfer");
-                  setCornerValue("2");
+                  setCornerValue(defaultCornerText());
                 }}
               >
                 <Slash />
@@ -3260,7 +3271,7 @@ function SketchImageInspector({
   const [calibrateDraft, setCalibrateDraft] = useState("");
   useEffect(() => setCalibrateDraft(measured > 0 ? formatDimension(measured, accuracy) : ""), [accuracy, measured]);
   const applyCalibration = () => {
-    const length = parseMeasurementInput(calibrateDraft);
+    const length = parseLengthMm(calibrateDraft);
     if (Number.isFinite(length) && length > 0) onCalibrate({ type: "apply", length });
   };
   const aspect = image.width / Math.max(0.5, image.depth);
@@ -3360,7 +3371,7 @@ function SketchImageInspector({
                   onChange={(event) => setCalibrateDraft(event.currentTarget.value)}
                   onKeyDown={(event) => { if (event.key === "Enter") applyCalibration(); if (event.key === "Escape") onCalibrate({ type: "cancel" }); }}
                 />
-                <span>mm</span>
+                <span>{currentLengthUnitLabel()}</span>
               </div>
               <button className="sketch-image-aspect-toggle active" type="button" onClick={applyCalibration}>
                 <Check size={17} />
@@ -3497,10 +3508,12 @@ function SketchImageRange({
   onChange: (value: number) => void;
 }) {
   const safeValue = clamp(Number.isFinite(value) ? value : min, min, max);
-  const [draft, setDraft] = useState(formatDimension(safeValue, accuracy));
-  useEffect(() => setDraft(formatDimension(safeValue, accuracy)), [accuracy, safeValue]);
+  const isLength = suffix === "mm";
+  const formatValue = isLength ? formatDimension : formatPlainNumber;
+  const [draft, setDraft] = useState(formatValue(safeValue, accuracy));
+  useEffect(() => setDraft(formatValue(safeValue, accuracy)), [accuracy, safeValue, formatValue]);
   const commit = () => {
-    const parsed = parseMeasurementInput(draft);
+    const parsed = isLength ? parseLengthMm(draft) : parseMeasurementInput(draft);
     onChange(clamp(Number.isFinite(parsed) ? parsed : safeValue, min, max));
   };
   const position = ((safeValue - min) / Math.max(0.001, max - min)) * 100;
@@ -3519,7 +3532,7 @@ function SketchImageRange({
           onBlur={commit}
           onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
         />
-        <span>{suffix}</span>
+        <span>{isLength ? currentLengthUnitLabel() : suffix}</span>
       </div>
       <input type="range" min={min} max={max} step={accuracy === 1 ? 0.1 : 0.01} value={safeValue} disabled={disabled} onChange={(event) => onChange(Number(event.currentTarget.value))} />
     </label>
@@ -3543,7 +3556,7 @@ function SketchImagePositionField({
   const [draft, setDraft] = useState(formatted);
   useEffect(() => setDraft(formatted), [formatted]);
   const commit = () => {
-    const parsed = parseMeasurementInput(draft);
+    const parsed = parseLengthMm(draft);
     const next = Number.isFinite(parsed) ? parsed : value;
     onChange(next);
     setDraft(formatDimension(next, accuracy));
