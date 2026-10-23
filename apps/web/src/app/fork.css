@@ -165,7 +165,7 @@
   gap: 3px !important;
 }
 .shape-menu-dropdown.shape-menu-docked .shape-menu-item img { width: 46px !important; height: 46px !important; flex: 0 0 auto; }
-.shape-menu-dropdown.shape-menu-docked .shape-menu-item span {
+.shape-menu-dropdown.shape-menu-docked .shape-menu-item span:not(.shape-menu-thumb) {
   display: block !important;
   width: 100% !important;
   max-width: none !important;
@@ -1583,3 +1583,13 @@ html[data-theme="dark"] .feedback-field input, html[data-theme="dark"] .feedback
 .parameters-row button:hover { opacity: 1; color: #c4352d; background: color-mix(in srgb, #c4352d 8%, transparent); }
 .parameters-add { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 6px 12px; font: 600 12.5px var(--font-ui); color: var(--primary, #1662b3); background: none; border: 1px dashed color-mix(in srgb, var(--primary, #1662b3) 50%, transparent); border-radius: 8px; cursor: pointer; }
 html[data-theme="dark"] .parameters-row input { background: #1a1f26; }
+
+/* Build 45: the colour layer over a library icon sits exactly on the 46px icon in the docked library. */
+.shape-menu-dropdown.shape-menu-docked .shape-menu-item .shape-menu-thumb {
+  display: block !important;
+  width: 46px !important;
+  height: 46px !important;
+  flex: 0 0 auto;
+  margin-inline: auto;
+  line-height: 0;
+}

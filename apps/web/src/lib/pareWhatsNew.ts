@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 45,
+    items: [
+      "The best of layerling 1.100 to 1.103, picked for Pare 3D: the view cube turns the view smoothly instead of jumping, the shape library shows each shape in the colour it will be added in, and the sketch reads and types in your unit (inches too).",
+      "Push/pull face: As a body of its own (not grouped) leaves the new part beside the body, ready to resize, move or use as a hole.",
+      "Scale by percent works from the keyboard (Ctrl+K, the number, Enter), and the export window works out the material estimate only when you click Calculate, so it opens at once.",
+      "Fixes: a cone keeps its radius after ungrouping a resized group, a star keeps its shape when scaled, a text's height no longer changes its letters with Keep proportions on, STEP export includes groups, a turned hollow body and a bent tube keep their stretch, the mouse wheel zooms properly in Firefox and Edge, a fillet no longer leaves a strip over a bay of an imported part or shifts a tapered and leaned body, and OBJ files are written much faster.",
+    ],
+  },
+  {
     build: 44,
     items: [
       "Brought across from layerling 1.96 to 1.99, on top of everything Pare 3D adds: Shift+7, 8, 9 or 0 saves the view, and 7, 8, 9 or 0 brings it back.",
