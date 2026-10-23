@@ -13,6 +13,7 @@
  */
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
 import { weldTriangles } from "@/lib/meshRepair";
+import { foldMesh, triangleAt, walkOnSurface, type FoldMesh } from "@/lib/surfaceFold";
 
 export type Vec = { x: number; y: number; z: number };
 
@@ -216,6 +217,8 @@ export type SurfaceTextOptions = {
    * middle highest (a rainbow), at -100 the other way (a smile). 0 is straight.
    */
   curve?: number;
+  /** Fork (build 40): a quicker, coarser lay for the preview while the text is dragged. */
+  draft?: boolean;
 };
 
 /** (u, v) of the letters bent into an arc spanning `curve`% of half a circle; `length` is the text's length along u. */
@@ -317,7 +320,8 @@ export async function surfaceTextPositions(letters: ArrayLike<number>, target: A
   // The letters cut into small pieces, so they can bend with the surface.
   const runtime = await getManifoldRuntime();
   const welded = weldTriangles(letters);
-  const pieceLength = Math.max(0.15, Math.min(0.8, options.letterHeight / 14));
+  // While dragging (draft) the pieces are about twice as long - a quarter as many, as quick to lay.
+  const pieceLength = options.draft ? Math.max(0.3, Math.min(1.6, options.letterHeight / 7)) : Math.max(0.15, Math.min(0.8, options.letterHeight / 14));
   let refined: number[] = [];
   const made: Array<{ delete(): void }> = [];
   try {
@@ -435,7 +439,29 @@ export async function surfaceTextPositions(letters: ArrayLike<number>, target: A
   const halfU = Math.max(Math.abs(minU), Math.abs(maxU)) + 1;
   const halfV = Math.max(Math.abs(minV), Math.abs(maxV)) + 1;
   const field = surfaceHeightField(target, placement.origin, frame, { u: halfU, v: halfV }, pieceLength);
-  const heights = new Map<string, { w: number; on: boolean }>();
+  // Fork (build 40): past an edge the letters fold over onto the next face, as a sticker would.
+  let fold: FoldMesh | null | undefined;
+  const startsOn = field.at(0, 0).on;
+  const folded = (u: number, v: number): { point: Vec; normal: Vec } | null => {
+    if (!startsOn) return null;
+    if (fold === undefined) fold = foldMesh(target);
+    if (!fold) return null;
+    // The last point on the way out from the spot where the letters still sat on the surface.
+    let lo = 0, hi = 1;
+    for (let n = 0; n < 16; n += 1) {
+      const mid = (lo + hi) / 2;
+      if (field.at(u * mid, v * mid).on) lo = mid;
+      else hi = mid;
+    }
+    const bu = u * lo, bv = v * lo;
+    const edge = field.at(bu, bv);
+    const at = { x: placement.origin.x + frame.u.x * bu + frame.v.x * bv + frame.w.x * edge.w, y: placement.origin.y + frame.u.y * bu + frame.v.y * bv + frame.w.y * edge.w, z: placement.origin.z + frame.u.z * bu + frame.v.z * bv + frame.w.z * edge.w };
+    const under = triangleAt(fold, at, frame.w);
+    if (!under) return null;
+    const heading = { x: frame.u.x * u + frame.v.x * v, y: frame.u.y * u + frame.v.y * v, z: frame.u.z * u + frame.v.z * v };
+    return walkOnSurface(fold, under.triangle, under.point, heading, (1 - lo) * Math.hypot(u, v));
+  };
+  const heights = new Map<string, { w: number; on: boolean; fold?: { point: Vec; normal: Vec } | null }>();
   let missing = 0;
   let points = 0;
   for (let i = 0, k = 0; i + 2 < refined.length; i += 3, k += 2) {
@@ -445,11 +471,20 @@ export async function surfaceTextPositions(letters: ArrayLike<number>, target: A
     let surface = heights.get(key);
     if (surface === undefined) {
       surface = field.at(u, v);
+      if (!surface.on) surface = { ...surface, fold: folded(u, v) };
       heights.set(key, surface);
       points += 1;
-      if (!surface.on) missing += 1;
+      if (!surface.on && !surface.fold) missing += 1;
     }
-    put(i, u, v, surface.w + along((refined[i + 1] - minY) / thickness));
+    const lift = along((refined[i + 1] - minY) / thickness);
+    if (surface.fold) {
+      const { point, normal } = surface.fold;
+      out[i] = point.x + normal.x * lift;
+      out[i + 1] = point.y + normal.y * lift;
+      out[i + 2] = point.z + normal.z * lift;
+    } else {
+      put(i, u, v, surface.w + lift);
+    }
   }
   return { positions: out, offSurface: points ? missing / points : 0 };
 }

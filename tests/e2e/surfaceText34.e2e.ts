@@ -49,24 +49,49 @@ describe("text on any surface (build 34)", () => {
     const engraved = m.Manifold.difference(ball, hole);
     expect(engraved.status()).toBe("NoError");
     expect(engraved.volume()).toBeLessThan(ball.volume() - 30);
-    // Long text on a small ball runs off it.
+    // Build 40: long text on a small ball no longer runs off it - past the part that faces the
+    // spot it carries on round the ball, every point still hugging it.
     const long = soup(m.Manifold.cube([80, 1, 6], true).translate([0, 0.5, 0]));
-    const off = await surfaceTextPositions(long, soup(ball), { origin: { x: 0, y: 0, z: 20 }, normal: { x: 0, y: 0, z: 1 } }, { depth: 1, mode: "raised", letterHeight: 6 });
+    const round = await surfaceTextPositions(long, soup(ball), { origin: { x: 0, y: 0, z: 20 }, normal: { x: 0, y: 0, z: 1 } }, { depth: 1, mode: "raised", letterHeight: 6 });
+    expect(round.offSurface).toBe(0);
+    let minR = Infinity, maxR = -Infinity;
+    for (let i = 0; i < round.positions.length; i += 3) {
+      const r = Math.hypot(round.positions[i], round.positions[i + 1], round.positions[i + 2]);
+      minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+    }
+    expect(minR).toBeGreaterThan(20 - SURFACE_TEXT_SINK - 0.3);
+    expect(maxR).toBeLessThan(21 + 0.3);
+    // Text running off an open edge still says so: a lone square sheet, text far wider than it.
+    const sheet = [-5, 0, -5, 5, 0, 5, 5, 0, -5, -5, 0, -5, -5, 0, 5, 5, 0, 5];
+    const off = await surfaceTextPositions(long, sheet, { origin: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 } }, { depth: 1, mode: "raised", letterHeight: 6 });
     expect(off.offSurface).toBeGreaterThan(0.2);
   });
 
-  it("keeps letters that run past an edge at the edge's height - they never drop onto a lower step (build 35)", async () => {
+  it("folds letters that run past an edge down onto the next face, never dropping onto a lower step (build 40)", async () => {
     const m = await getManifoldRuntime();
-    // A 20 mm wide block on a wide base 10 mm lower; text 40 mm wide clicked on the block's top.
+    // A 20 mm wide block on a wide base 10 mm lower; text 36 mm wide clicked on the block's top.
     const block = m.Manifold.union(m.Manifold.cube([20, 20, 20]).translate([-10, 0, -10]), m.Manifold.cube([80, 10, 40]).translate([-40, 0, -20]));
-    const letters = soup(m.Manifold.cube([40, 1, 6], true).translate([0, 0.5, 0]));
+    const letters = soup(m.Manifold.cube([36, 1, 6], true).translate([0, 0.5, 0]));
     const result = await surfaceTextPositions(letters, soup(block), { origin: { x: 0, y: 20, z: 0 }, normal: { x: 0, y: 1, z: 0 } }, { depth: 1, mode: "raised", letterHeight: 6 });
-    expect(result.offSurface).toBeGreaterThan(0.3);
-    let minY = Infinity;
-    for (let i = 1; i < result.positions.length; i += 3) minY = Math.min(minY, result.positions[i]);
-    expect(minY).toBeGreaterThan(20 - SURFACE_TEXT_SINK - 0.05);
+    expect(result.offSurface).toBe(0);
+    let minY = Infinity, folded = 0;
+    for (let i = 0; i < result.positions.length; i += 3) {
+      const [x, y] = [result.positions[i], result.positions[i + 1]];
+      minY = Math.min(minY, y);
+      // Every point past the top's edge lies on the block's side, from just inside it to the depth out.
+      if (Math.abs(x) > 10 + 1.05) throw new Error(`a letter stands off the side at x ${x}`);
+      if (y < 20 - SURFACE_TEXT_SINK - 0.05) {
+        folded += 1;
+        expect(Math.abs(x)).toBeGreaterThan(10 - SURFACE_TEXT_SINK - 0.05);
+      }
+    }
+    expect(folded).toBeGreaterThan(0);
+    // 8 mm of each end folds down the side: it stops above the base, 10 mm down.
+    expect(minY).toBeGreaterThan(10);
+    expect(minY).toBeLessThan(13);
     const text = await solid(result.positions);
     expect(text.decompose()).toHaveLength(1);
+    expect(m.Manifold.union(block, text).decompose()).toHaveLength(1);
   });
 
   it("wraps a long line of text right round a cylinder, every point the right distance from its axis (build 35)", async () => {

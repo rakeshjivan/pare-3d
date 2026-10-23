@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 40,
+    items: [
+      "Text that runs past an edge now folds over onto the next face, like a sticker pressed round a corner, instead of sticking out into the air - handy for a short label near the corner of a box.",
+      "Dragging text over a detailed part is far smoother: on a sphere at the highest step count each update is about 25 times quicker. The letters are laid a little coarser while you drag and at full detail when you let go.",
+    ],
+  },
+  {
     build: 39,
     items: [
       "Turn a part and the text on it turns with it, exactly - round, tipped over or both. Hollow, fillet or resize the part and the text is laid again on the same spot.",

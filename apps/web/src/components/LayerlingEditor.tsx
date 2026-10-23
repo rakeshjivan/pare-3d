@@ -112,7 +112,8 @@ import { FitCheckPanel } from "./workplane/FitCheckPanel";
 import { MeshRoundPanel } from "./workplane/MeshRoundPanel";
 import { SurfaceTextPanel, type SurfaceTextSettings } from "./workplane/SurfaceTextPanel";
 import { SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK, nearestSurfaceSpot, surfaceTextPositions } from "@/lib/surfaceText";
-import { anchorMotion, movePositions, surfaceAnchors } from "@/lib/surfaceTextFollow";
+import { anchorMotion, movePositions } from "@/lib/surfaceTextFollow";
+import { partGeometry, trianglesNear } from "@/lib/surfacePartCache";
 import { movedPointIds, solveSketchConstraints } from "@/lib/sketchConstraints";
 
 /** The id of the letters shown while Text on a surface is open, before they are added. */
@@ -9359,7 +9360,7 @@ export function LayerlingEditor({
 
 
   /** Lays the letters on the target at the placement - the text tool's preview and the re-lay after a move both use it. */
-  const laySurfaceText = async (settings: SurfaceTextSettings, placement: { origin: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } }, target: WorkplaneShape): Promise<{ positions: number[]; offSurface: number }> => {
+  const laySurfaceText = async (settings: SurfaceTextSettings, placement: { origin: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } }, target: WorkplaneShape, draft = false): Promise<{ positions: number[]; offSurface: number }> => {
     const thickness = settings.mode === "engraved" ? settings.depth + SURFACE_TEXT_OVERSHOOT : settings.depth;
     const textAsset = libraryShapeAssets.find((asset) => asset.id === "text")!;
     const flat = canonicalizeShape({
@@ -9377,7 +9378,13 @@ export function LayerlingEditor({
     } else {
       const mesh = meshForShape(flat);
       const letters = mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]));
-      return await surfaceTextPositions(letters, worldTriangles(target), { origin: placement.origin, normal: placement.normal, rotation: settings.rotation }, { depth: settings.depth, mode: settings.mode, letterHeight: settings.letterHeight, shape: settings.shape, curve: settings.curve });
+      // Fork (build 40): only the part's triangles the letters can reach (all of them to wrap right
+      // round), from geometry worked out once per version of the part - a dense part stays quick.
+      const geometry = partGeom(target);
+      let reach = 0;
+      for (const vertex of mesh.vertices) reach = Math.max(reach, Math.hypot(vertex[0] - flat.x, vertex[2] - flat.z));
+      const triangles = settings.shape === "wrap" ? geometry.triangles : trianglesNear(geometry, placement.origin, reach * 1.25 + settings.letterHeight + settings.depth + 2);
+      return await surfaceTextPositions(letters, triangles, { origin: placement.origin, normal: placement.normal, rotation: settings.rotation }, { depth: settings.depth, mode: settings.mode, letterHeight: settings.letterHeight, shape: settings.shape, curve: settings.curve, draft });
     }
   };
   const surfaceTextRunRef = useRef(0);
@@ -9468,7 +9475,7 @@ export function LayerlingEditor({
       targetCenter: boxCenter(shapesRef.current.find((shape) => shape.id === tool.placement?.targetId)),
       targetAnchors: (() => {
         const target = shapesRef.current.find((shape) => shape.id === tool.placement?.targetId);
-        return target ? surfaceAnchors(meshForShape(target).vertices) : undefined;
+        return target ? partGeom(target).anchors : undefined;
       })(),
     };
     lastSurfaceTextSettingsRef.current = tool.settings;
@@ -9500,9 +9507,10 @@ export function LayerlingEditor({
     const center = boxCenter(shape)!;
     const delta = { x: center.x - record.laidCenter.x, y: center.y - record.laidCenter.y, z: center.z - record.laidCenter.z };
     const shifted = { x: record.origin.x + delta.x, y: record.origin.y + delta.y, z: record.origin.z + delta.z };
-    const targetCenter = boxCenter(target);
+    const geometry = target ? partGeom(target) : undefined;
+    const targetCenter = geometry?.center;
     const targetVertices = target ? meshForShape(target).vertices : [];
-    const anchorsNow = target ? surfaceAnchors(targetVertices) : undefined;
+    const anchorsNow = geometry?.anchors;
     const stay = (): { shape: WorkplaneShape; laid: boolean } => ({ shape: { ...shape, surfaceText: { ...record, origin: shifted, laidCenter: center, targetCenter: targetCenter ?? record.targetCenter, targetAnchors: anchorsNow ?? record.targetAnchors } }, laid: false });
     if (!target || !targetCenter) return stay();
     const zero = { x: 0, y: 0, z: 0 };
@@ -9536,7 +9544,7 @@ export function LayerlingEditor({
     if (!textMoved) {
       // Its part changed size or shape: the text is laid again at the same spot on it.
       const aim = { x: record.origin.x + targetDelta.x, y: record.origin.y + targetDelta.y, z: record.origin.z + targetDelta.z };
-      const spot = nearestSurfaceSpot(worldTriangles(target), aim);
+      const spot = nearestSurfaceSpot(trianglesNear(geometry!, aim, record.letterHeight + 5), aim) ?? nearestSurfaceSpot(geometry!.triangles, aim);
       if (!spot) return stay();
       try {
         return { shape: await surfaceTextLaidAt(shape, target, spot), laid: false };
@@ -9544,7 +9552,7 @@ export function LayerlingEditor({
         return stay();
       }
     }
-    const spot = nearestSurfaceSpot(worldTriangles(target), center);
+    const spot = nearestSurfaceSpot(trianglesNear(geometry!, center, Math.max(record.laidSize ?? 0, record.letterHeight * 2) + 1), center);
     // Pulled off the part: it stays where it was put, and is laid again when brought back.
     if (!spot || spot.distance > Math.max(record.laidSize ?? 0, record.letterHeight * 2)) return stay();
     try {
@@ -9555,13 +9563,13 @@ export function LayerlingEditor({
     }
   };
   /** A placed text laid again on `target` at `spot`, with its settings and its size as it is now. */
-  const surfaceTextLaidAt = async (shape: WorkplaneShape, target: WorkplaneShape, spot: { point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } }): Promise<WorkplaneShape> => {
+  const surfaceTextLaidAt = async (shape: WorkplaneShape, target: WorkplaneShape, spot: { point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } }, draft = false): Promise<WorkplaneShape> => {
     const record = shape.surfaceText!;
     const box = meshAabb(shape);
     const size = Math.max(box.maxX - box.minX, box.maxY - box.minY, box.maxZ - box.minZ);
     const letterHeight = record.laidSize && Math.abs(size / record.laidSize - 1) > 0.01 ? Math.round(record.letterHeight * (size / record.laidSize) * 10) / 10 : record.letterHeight;
     const settings: SurfaceTextSettings = { text: record.text, font: record.font, letterHeight, depth: record.depth, mode: record.mode, rotation: record.rotation, shape: record.shape ?? "surface", curve: record.curve ?? 0 };
-    const result = await laySurfaceText(settings, { origin: spot.point, normal: spot.normal }, target);
+    const result = await laySurfaceText(settings, { origin: spot.point, normal: spot.normal }, target, draft);
     const made = canonicalizeShape({
       ...shapeWithWorldPositions(meshShapeFromPositions(shape.name, shape.color, result.positions), result.positions),
       id: shape.id,
@@ -9579,8 +9587,8 @@ export function LayerlingEditor({
       normal: spot.normal,
       laidCenter: { x: (laidBox.minX + laidBox.maxX) / 2, y: (laidBox.minY + laidBox.maxY) / 2, z: (laidBox.minZ + laidBox.maxZ) / 2 },
       laidSize: Math.max(laidBox.maxX - laidBox.minX, laidBox.maxY - laidBox.minY, laidBox.maxZ - laidBox.minZ),
-      targetCenter: boxCenter(target),
-      targetAnchors: surfaceAnchors(meshForShape(target).vertices),
+      targetCenter: partGeom(target).center,
+      targetAnchors: partGeom(target).anchors,
     };
     return made;
   };
@@ -9609,7 +9617,8 @@ export function LayerlingEditor({
     const run = drag.run;
     drag.busy = true;
     try {
-      const laid = await surfaceTextLaidAt(shape, target, drag.pick);
+      // While dragging: coarser letter pieces, quick to lay; full detail when let go.
+      const laid = await surfaceTextLaidAt(shape, target, drag.pick, true);
       if (surfaceDragRef.current.run === run && surfaceDragRef.current.id === shape.id) {
         setDragTextGhost({ id: shape.id, ghost: { ...laid, id: SURFACE_TEXT_DRAG_GHOST_ID, locked: true, previewOnly: true, surfaceText: undefined } as WorkplaneShape });
       }
@@ -17452,4 +17461,9 @@ function boxCenter(shape: WorkplaneShape | undefined): { x: number; y: number; z
   if (!shape) return undefined;
   const box = meshAabb(shape);
   return { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2, z: (box.minZ + box.maxZ) / 2 };
+}
+
+/** Fork (build 40): a part's triangles, middle and anchors for text on its surface, worked out once per version of it. */
+function partGeom(shape: WorkplaneShape) {
+  return partGeometry(shape, () => meshForShape(shape));
 }

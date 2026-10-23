@@ -31,7 +31,7 @@ To put lettering on a part - a name on a mug, a label on a curved lid, a number 
 
 How the text meets the part:
 
-- **{{ui:surfaceText.shape.surface}}** - the letters follow the surface where you clicked. Letters that run past an edge carry on at the edge's height instead of dropping onto another part of the model.
+- **{{ui:surfaceText.shape.surface}}** - the letters follow the surface where you clicked. Letters that run past an edge fold over onto the next face, like a sticker pressed round a corner, keeping their size.
 - **{{ui:surfaceText.shape.flat}}** - the letters stand flat on the plane touching the part where you clicked.
 - **{{ui:surfaceText.shape.wrap}}** - the line of text runs right round the part, past the sides and round the back: a name round a mug, a bottle or a ring. It needs a closed part.
 
@@ -45,7 +45,7 @@ Good to know:
 
 - On the side of an upright cylinder or tube (with {{ui:surfaceText.shape.surface}}, no curve and {{ui:surfaceText.rotation}} at 0°) the text is wrapped exactly round it, however far it runs.
 - Text across a sharp edge or a deep crease bends with it, as in any slicer's text tool.
-- If part of the text runs past the edge of the surface, the window says how much; move it or make it smaller.
+- If part of the text runs off the part altogether (past an open edge), the window says how much; move it or make it smaller.
 - A font of your own travels with the design when you save it, so the text can still be edited on another computer.
 
 ## Your own fonts
