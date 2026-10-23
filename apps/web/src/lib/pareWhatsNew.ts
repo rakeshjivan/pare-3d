@@ -4,6 +4,12 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 41,
+    items: [
+      "Detailed parts are much quicker to work with: selecting a sphere at the highest step count, typing a new size or undoing no longer freezes the window for a second or two, and Split opens faster.",
+    ],
+  },
+  {
     build: 40,
     items: [
       "Text that runs past an edge now folds over onto the next face, like a sticker pressed round a corner, instead of sticking out into the air - handy for a short label near the corner of a box.",

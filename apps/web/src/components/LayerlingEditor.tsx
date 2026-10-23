@@ -1947,7 +1947,10 @@ function mirroredShapesForSelection(shapes: WorkplaneShape[], selectedIds: strin
 
 function meshFaceComponents(mesh: MeshData, tolerance = SEPARATE_PARTS_VERTEX_TOLERANCE) {
   if (mesh.faces.length === 0) return [];
-  const keysByFace = mesh.faces.map((face) => face.map((vertexIndex) => quantizedPointKey(mesh.vertices[vertexIndex], tolerance)));
+  // Fork (build 41): one key per point, shared by the faces that meet there - a dense mesh has a
+  // third as many points as face corners.
+  const vertexKeys = mesh.vertices.map((vertex) => quantizedPointKey(vertex, tolerance));
+  const keysByFace = mesh.faces.map((face) => face.map((vertexIndex) => vertexKeys[vertexIndex]));
   const facesByVertex = new Map<string, number[]>();
   keysByFace.forEach((keys, faceIndex) => {
     keys.forEach((key) => {
@@ -2262,10 +2265,30 @@ const importedPartCounts = new WeakMap<object, number>();
 const NO_MODIFIER_EDGES: CadModifierEdge[] = [];
 const NO_EDGE_IDS: number[] = [];
 
+/**
+ * Fork (build 41): the basic shapes are one piece however they are sized or turned, so Separate
+ * Parts never needs to count them - counting a 256-step sphere froze the window for a second or
+ * two at every click, size change and drag step.
+ */
+const SINGLE_BODY_KINDS = new Set(["box", "sphere", "halfSphere", "cylinder", "cone", "pyramid", "ellipse", "tube", "torus"]);
+/** Part counts of other shapes by their form - where they stand and which way they face never changes it. */
+const partCountsByForm = new Map<string, number>();
+
 function separablePartCount(shape: WorkplaneShape) {
   if (shape.locked || shape.hole) return 0;
   if (shape.groupedShapes?.length && !shape.importedMesh) return shape.groupedShapes.length;
-  if (!shape.importedMesh) return meshFaceComponents(meshForShape(shape)).length;
+  if (!shape.importedMesh) {
+    if (SINGLE_BODY_KINDS.has(shape.kind)) return 1;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, name, color, x, z, elevation, rotation, rotationX, rotationZ, locked, hidden, transparent, ...form } = shape;
+    const key = JSON.stringify(form);
+    const known = partCountsByForm.get(key);
+    if (known !== undefined) return known;
+    const count = meshFaceComponents(readOnlyMesh(shape)).length;
+    partCountsByForm.set(key, count);
+    if (partCountsByForm.size > 200) partCountsByForm.delete(partCountsByForm.keys().next().value as string);
+    return count;
+  }
   const cached = importedPartCounts.get(shape.importedMesh);
   if (cached !== undefined) return cached;
   const count = meshFaceComponents(meshForShape(shape)).length;
@@ -3481,7 +3504,7 @@ export function LayerlingEditor({
     () => splitSession ? shapes.filter((shape) => splitSession.targetIds.includes(shape.id)) : [],
     [shapes, splitTargetKey],
   );
-  const splitTargetPoints = useMemo(() => splitTargetShapes.flatMap((shape) => meshForShape(shape).vertices), [splitTargetShapes]);
+  const splitTargetPoints = useMemo(() => splitTargetShapes.flatMap((shape) => readOnlyMesh(shape).vertices), [splitTargetShapes]);
   const splitPlane = useMemo(
     () => splitSession ? modelSplitPlane(splitTargetPoints, splitSession.axis, splitSession.position, splitSession.rotation) : null,
     [splitSession?.axis, splitSession?.position, splitSession?.rotation[0], splitSession?.rotation[1], splitTargetPoints],
@@ -6634,7 +6657,7 @@ export function LayerlingEditor({
       setNotice(t("status.splitSelectSolids"));
       return;
     }
-    const targetPoints = selectedShapes.flatMap((shape) => meshForShape(shape).vertices);
+    const targetPoints = selectedShapes.flatMap((shape) => readOnlyMesh(shape).vertices);
     // The plane starts parallel to the workplane (#644) - on the base plate that is level, as it always was.
     const workplaneNormal = placementWorkplaneRef.current.normal;
     const start = splitOrientationForNormal([workplaneNormal.x, workplaneNormal.y, workplaneNormal.z]) ?? { axis: "y" as AlignAxis, rotation: NO_SPLIT_ROTATION };
@@ -9509,7 +9532,7 @@ export function LayerlingEditor({
     const shifted = { x: record.origin.x + delta.x, y: record.origin.y + delta.y, z: record.origin.z + delta.z };
     const geometry = target ? partGeom(target) : undefined;
     const targetCenter = geometry?.center;
-    const targetVertices = target ? meshForShape(target).vertices : [];
+    const targetVertices = target ? readOnlyMesh(target).vertices : [];
     const anchorsNow = geometry?.anchors;
     const stay = (): { shape: WorkplaneShape; laid: boolean } => ({ shape: { ...shape, surfaceText: { ...record, origin: shifted, laidCenter: center, targetCenter: targetCenter ?? record.targetCenter, targetAnchors: anchorsNow ?? record.targetAnchors } }, laid: false });
     if (!target || !targetCenter) return stay();
@@ -9674,7 +9697,7 @@ export function LayerlingEditor({
       const target = shapes.find((candidate) => candidate.id === record.targetId);
       if (!target) return false;
       if (record.targetAnchors) {
-        const vertices = meshForShape(target).vertices;
+        const vertices = readOnlyMesh(target).vertices;
         return record.targetAnchors.some((anchor) => {
           const v = vertices[anchor.index];
           return !v || Math.hypot(v[0] - anchor.at.x, v[1] - anchor.at.y, v[2] - anchor.at.z) > 1e-4;
@@ -17465,5 +17488,19 @@ function boxCenter(shape: WorkplaneShape | undefined): { x: number; y: number; z
 
 /** Fork (build 40): a part's triangles, middle and anchors for text on its surface, worked out once per version of it. */
 function partGeom(shape: WorkplaneShape) {
-  return partGeometry(shape, () => meshForShape(shape));
+  return partGeometry(shape, () => readOnlyMesh(shape));
+}
+
+/**
+ * Fork (build 41): a shape's mesh, built once per version of the shape (every edit makes a new
+ * shape object) - only for code that reads it and never changes it. A 256-step sphere takes most
+ * of a second to build, and several tools asked for it again at every click.
+ */
+const readOnlyMeshes = new WeakMap<WorkplaneShape, MeshData>();
+function readOnlyMesh(shape: WorkplaneShape): MeshData {
+  const known = readOnlyMeshes.get(shape);
+  if (known) return known;
+  const mesh = meshForShape(shape);
+  readOnlyMeshes.set(shape, mesh);
+  return mesh;
 }
