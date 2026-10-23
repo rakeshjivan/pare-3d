@@ -37,7 +37,7 @@ How the text meets the part:
 
 The text stays editable: **double-click it** (or right-click it and choose {{ui:surfaceText.editMenu}}) and the window opens again with everything as you left it - switch between raised and cut in, change the words, font, size, depth, shape, curve or where it sits, then {{ui:surfaceText.update}}. If you moved or resized it with the ordinary tools meanwhile, the edit starts from where and how big it is now.
 
-**Moving it:** drag placed text and it slides over whatever surface is under the pointer, as if drawn to it - round a curve, across a flat face, or onto another part - and is laid there when you let go (Esc while dragging leaves it where it was). Move or resize the part it sits on and the text goes with it. Nudged with the arrow keys or the Position fields, it is laid again on the part where it ends up; pulled well clear of the part, it stays where you put it.
+**Moving it:** drag placed text and it slides over whatever surface is under the pointer, as if drawn to it - round a curve, across a flat face, or onto another part - and is laid there when you let go (Esc while dragging leaves it where it was). Move, turn or resize the part it sits on and the text goes with it - turned exactly as the part turns. Nudged with the arrow keys or the Position fields, it is laid again on the part where it ends up; pulled well clear of the part, it stays where you put it.
 
 When it is final, select the text and the part and group them ([[Ctrl]]+[[G]]): raised text joins the part, cut-in text is cut out of it.
 

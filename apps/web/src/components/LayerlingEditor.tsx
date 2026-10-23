@@ -112,6 +112,7 @@ import { FitCheckPanel } from "./workplane/FitCheckPanel";
 import { MeshRoundPanel } from "./workplane/MeshRoundPanel";
 import { SurfaceTextPanel, type SurfaceTextSettings } from "./workplane/SurfaceTextPanel";
 import { SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK, nearestSurfaceSpot, surfaceTextPositions } from "@/lib/surfaceText";
+import { anchorMotion, movePositions, surfaceAnchors } from "@/lib/surfaceTextFollow";
 import { movedPointIds, solveSketchConstraints } from "@/lib/sketchConstraints";
 
 /** The id of the letters shown while Text on a surface is open, before they are added. */
@@ -9465,6 +9466,10 @@ export function LayerlingEditor({
       laidCenter: { x: (previewBox.minX + previewBox.maxX) / 2, y: (previewBox.minY + previewBox.maxY) / 2, z: (previewBox.minZ + previewBox.maxZ) / 2 },
       laidSize: Math.max(previewBox.maxX - previewBox.minX, previewBox.maxY - previewBox.minY, previewBox.maxZ - previewBox.minZ),
       targetCenter: boxCenter(shapesRef.current.find((shape) => shape.id === tool.placement?.targetId)),
+      targetAnchors: (() => {
+        const target = shapesRef.current.find((shape) => shape.id === tool.placement?.targetId);
+        return target ? surfaceAnchors(meshForShape(target).vertices) : undefined;
+      })(),
     };
     lastSurfaceTextSettingsRef.current = tool.settings;
     const base = shapesRef.current.find((shape) => shape.id === tool.editingId);
@@ -9496,18 +9501,40 @@ export function LayerlingEditor({
     const delta = { x: center.x - record.laidCenter.x, y: center.y - record.laidCenter.y, z: center.z - record.laidCenter.z };
     const shifted = { x: record.origin.x + delta.x, y: record.origin.y + delta.y, z: record.origin.z + delta.z };
     const targetCenter = boxCenter(target);
-    const stay = (): { shape: WorkplaneShape; laid: boolean } => ({ shape: { ...shape, surfaceText: { ...record, origin: shifted, laidCenter: center, targetCenter: targetCenter ?? record.targetCenter } }, laid: false });
+    const targetVertices = target ? meshForShape(target).vertices : [];
+    const anchorsNow = target ? surfaceAnchors(targetVertices) : undefined;
+    const stay = (): { shape: WorkplaneShape; laid: boolean } => ({ shape: { ...shape, surfaceText: { ...record, origin: shifted, laidCenter: center, targetCenter: targetCenter ?? record.targetCenter, targetAnchors: anchorsNow ?? record.targetAnchors } }, laid: false });
     if (!target || !targetCenter) return stay();
     const zero = { x: 0, y: 0, z: 0 };
-    const targetDelta = record.targetCenter ? { x: targetCenter.x - record.targetCenter.x, y: targetCenter.y - record.targetCenter.y, z: targetCenter.z - record.targetCenter.z } : zero;
     const textMoved = !near(delta, zero);
-    const targetMoved = !near(targetDelta, zero);
-    // Moved together with its part: the record follows the text.
-    if (textMoved && targetMoved && near(targetDelta, delta)) return stay();
+    // Fork (build 39): how the part moved or turned, exactly, from three of its points.
+    const motion = record.targetAnchors ? anchorMotion(record.targetAnchors, targetVertices) : undefined;
+    const targetDelta = record.targetCenter ? { x: targetCenter.x - record.targetCenter.x, y: targetCenter.y - record.targetCenter.y, z: targetCenter.z - record.targetCenter.z } : zero;
+    const targetMoved = motion ? motion === "changed" || !motion.identity : !near(targetDelta, zero);
     if (!textMoved && !targetMoved) return null;
+    if (targetMoved && motion && motion !== "changed") {
+      const carriedCenter = motion.point(record.laidCenter);
+      const carried = { ...record, origin: motion.point(record.origin), normal: motion.direction(record.normal), targetCenter, targetAnchors: anchorsNow };
+      // Moved or turned together with its part: the record follows the text.
+      if (textMoved && near(carriedCenter, center)) return { shape: { ...shape, surfaceText: { ...carried, laidCenter: center } }, laid: false };
+      if (!textMoved) {
+        // Its part moved or turned on its own: the text goes with it, exactly.
+        const positions = movePositions(worldTriangles(shape), motion);
+        const made = canonicalizeShape({
+          ...shapeWithWorldPositions(meshShapeFromPositions(shape.name, shape.color, positions), positions),
+          id: shape.id,
+          name: shape.name,
+          color: shape.color,
+          hole: shape.hole,
+          hidden: shape.hidden,
+        } as WorkplaneShape);
+        made.surfaceText = { ...carried, laidCenter: boxCenter(made)! };
+        return { shape: made, laid: false };
+      }
+    }
+    if (!motion && textMoved && targetMoved && near(targetDelta, delta)) return stay();
     if (!textMoved) {
-      // Its part moved, turned or changed size on its own: the text goes with it, laid again at the
-      // same spot on the part.
+      // Its part changed size or shape: the text is laid again at the same spot on it.
       const aim = { x: record.origin.x + targetDelta.x, y: record.origin.y + targetDelta.y, z: record.origin.z + targetDelta.z };
       const spot = nearestSurfaceSpot(worldTriangles(target), aim);
       if (!spot) return stay();
@@ -9553,6 +9580,7 @@ export function LayerlingEditor({
       laidCenter: { x: (laidBox.minX + laidBox.maxX) / 2, y: (laidBox.minY + laidBox.maxY) / 2, z: (laidBox.minZ + laidBox.maxZ) / 2 },
       laidSize: Math.max(laidBox.maxX - laidBox.minX, laidBox.maxY - laidBox.minY, laidBox.maxZ - laidBox.minZ),
       targetCenter: boxCenter(target),
+      targetAnchors: surfaceAnchors(meshForShape(target).vertices),
     };
     return made;
   };
@@ -9633,8 +9661,17 @@ export function LayerlingEditor({
       const record = shape.surfaceText;
       if (!record?.laidCenter || shape.locked || shape.previewOnly) return false;
       if (!near(boxCenter(shape)!, record.laidCenter)) return true;
-      // Its part moved without it: it follows.
-      const targetCenter = record.targetCenter ? boxCenter(shapes.find((candidate) => candidate.id === record.targetId)) : undefined;
+      // Its part moved, turned or changed without it: it follows.
+      const target = shapes.find((candidate) => candidate.id === record.targetId);
+      if (!target) return false;
+      if (record.targetAnchors) {
+        const vertices = meshForShape(target).vertices;
+        return record.targetAnchors.some((anchor) => {
+          const v = vertices[anchor.index];
+          return !v || Math.hypot(v[0] - anchor.at.x, v[1] - anchor.at.y, v[2] - anchor.at.z) > 1e-4;
+        });
+      }
+      const targetCenter = record.targetCenter ? boxCenter(target) : undefined;
       return Boolean(targetCenter && record.targetCenter && !near(targetCenter, record.targetCenter));
     });
     if (!moved.length) return;

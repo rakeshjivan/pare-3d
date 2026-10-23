@@ -4,6 +4,12 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 39,
+    items: [
+      "Turn a part and the text on it turns with it, exactly - round, tipped over or both. Hollow, fillet or resize the part and the text is laid again on the same spot.",
+    ],
+  },
+  {
     build: 38,
     items: [
       "Placed text sticks to surfaces like a magnet: drag it and it slides over the part under the pointer - curved or flat, round a sphere or onto another part - and is laid there when you let go. No double-click needed.",
