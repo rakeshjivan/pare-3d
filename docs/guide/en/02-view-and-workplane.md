@@ -46,6 +46,8 @@ The small arrow at the very top of the bar hides it if it gets in the way.
 
 A design opens the way you left it: the angle, zoom and position of the view are kept with it in this browser, so you continue where you stopped, also after going Home or closing the page. A saved file (.lyl) carries the view along, so it opens in it elsewhere too. The view is not part of the undo history.
 
+You can also keep four views of your own in each design. [[Shift]]+[[7]], [[Shift]]+[[8]], [[Shift]]+[[9]] or [[Shift]]+[[0]] saves the view exactly as it is - angle, position, zoom, and flat or perspective - under that key, and the key alone ([[7]], [[8]], [[9]] or [[0]]) brings it back. A message at the bottom confirms the save; saving again under the same key replaces the view. Like the view above, the saved views stay with the design in this browser and travel in a saved file (.lyl), and they are not part of the undo history.
+
 ## Looking inside: the section view
 
 {{ui:camera.sectionView}}, the last button in the bar (the cut tool), cuts the view open along a plane so you can check walls, cavities and parts that fit into each other. Nothing is cut for real: the design, its files and every export stay whole. Where the plane goes through a solid, the cut is filled with the colour of the body a little darker, and a hole inside it stays empty, so you can tell solid from hollow; the filled face appears a moment after the plane stops moving.

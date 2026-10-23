@@ -3138,4 +3138,8 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "sketch.modeBadgeExtrude": "Ekstrüzyon eskizi",
   "sketch.operationHint": "Bu eskizin ne olacağı: ekstrüzyon, döndürme veya yol boyunca süpürme",
   "status.sketchOperationChanged": "Şimdi: {operation}. Gövdeyi oluşturmak için eskizi bitir",
+  "shortcuts.savedViews": "O tuşa kaydedilen görünüme git",
+  "shortcuts.saveView": "Görünümü - döndürme, kaydırma ve yakınlaştırma - bu tasarım için kaydet",
+  "camera.viewSaved": "Görünüm {key} tuşuna kaydedildi - geri dönmek için {key} tuşuna basın",
+  "camera.savedViewEmpty": "{key} tuşunda henüz kayıtlı görünüm yok - Shift+{key} geçerli görünümü kaydeder",
 };

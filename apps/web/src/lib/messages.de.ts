@@ -3619,4 +3619,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "status.keyringTabMade": "Neben dem Schild liegt eine eigene Lasche für den Schlüsselring: Verschieb und dreh sie wie jede Form an ihren Platz und drück dann in ihrem Bereich „Mit dem Schild bündeln“.",
   "status.keyringTabBundled": "Die Lasche für den Schlüsselring ist mit dem Schild gebündelt.",
   "status.keyringTabNoTag": "Es gibt kein Namensschild und kein Symbolschild, mit dem die Lasche gebündelt werden kann.",
+  "shortcuts.savedViews": "Zur Ansicht, die unter der Taste gespeichert ist",
+  "shortcuts.saveView": "Die Ansicht - Drehung, Verschiebung und Zoom - für dieses Design speichern",
+  "camera.viewSaved": "Ansicht unter {key} gespeichert - {key} bringt sie zurück",
+  "camera.savedViewEmpty": "Unter {key} ist noch keine Ansicht gespeichert - Shift+{key} speichert die aktuelle",
 };

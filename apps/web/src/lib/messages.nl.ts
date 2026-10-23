@@ -3619,4 +3619,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "status.keyringTabMade": "Naast het bordje ligt een eigen lip voor de sleutelring: verplaats en draai die op zijn plek zoals elke vorm en druk dan in het paneel op \"Bundelen met het bordje\".",
   "status.keyringTabBundled": "De lip voor de sleutelring is gebundeld met het bordje.",
   "status.keyringTabNoTag": "Er is geen naambordje of icoonlabel om de lip mee te bundelen.",
+  "shortcuts.savedViews": "Naar de weergave die onder die toets is opgeslagen",
+  "shortcuts.saveView": "De weergave - draaiing, verschuiving en zoom - voor dit ontwerp opslaan",
+  "camera.viewSaved": "Weergave opgeslagen onder {key} - druk op {key} om ernaar terug te gaan",
+  "camera.savedViewEmpty": "Onder {key} is nog geen weergave opgeslagen - Shift+{key} slaat de huidige op",
 };

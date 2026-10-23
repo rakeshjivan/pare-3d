@@ -3183,4 +3183,8 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "sketch.modeBadgeExtrude": "Schizzo da estrudere",
   "sketch.operationHint": "Cosa diventa questo schizzo: estruso, rivoluzione o lungo un percorso",
   "status.sketchOperationChanged": "Ora: {operation}. Termina lo schizzo per costruire il corpo",
+  "shortcuts.savedViews": "Vai alla vista salvata sotto quel tasto",
+  "shortcuts.saveView": "Salva la vista - rotazione, spostamento e zoom - per questo progetto",
+  "camera.viewSaved": "Vista salvata sotto {key} - premi {key} per tornarci",
+  "camera.savedViewEmpty": "Nessuna vista salvata sotto {key} - Maiusc+{key} salva quella attuale",
 };

@@ -3620,6 +3620,10 @@ export const MESSAGES_EN = {
   "status.keyringTabMade": "A key ring tab of its own is beside the tag: move and turn it into place like any shape, then press \"Keep with the tag\" in its panel.",
   "status.keyringTabBundled": "The key ring tab is held together with the tag.",
   "status.keyringTabNoTag": "There is no name tag or icon tag to hold the key ring tab with.",
+  "shortcuts.savedViews": "Go to the view saved under that key",
+  "shortcuts.saveView": "Save the view - turn, pan and zoom - for this design",
+  "camera.viewSaved": "View saved under {key} - press {key} to come back to it",
+  "camera.savedViewEmpty": "No view saved under {key} yet - Shift+{key} saves the current one",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

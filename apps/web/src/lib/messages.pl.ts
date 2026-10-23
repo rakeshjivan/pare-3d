@@ -3172,4 +3172,8 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "sketch.modeBadgeExtrude": "Szkic do wyciągnięcia",
   "sketch.operationHint": "Czym stanie się ten szkic: wyciągnięciem, obrotem lub przeciągnięciem po ścieżce",
   "status.sketchOperationChanged": "Teraz: {operation}. Zakończ szkic, aby zbudować bryłę",
+  "shortcuts.savedViews": "Przejdź do widoku zapisanego pod tym klawiszem",
+  "shortcuts.saveView": "Zapisz widok - obrót, przesunięcie i przybliżenie - dla tego projektu",
+  "camera.viewSaved": "Widok zapisany pod {key} - naciśnij {key}, aby do niego wrócić",
+  "camera.savedViewEmpty": "Pod {key} nie zapisano jeszcze widoku - Shift+{key} zapisuje bieżący",
 };

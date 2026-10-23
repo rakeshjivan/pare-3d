@@ -3618,4 +3618,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "status.keyringTabMade": "Vedle jmenovky je samostatné ouško na kroužek: posuňte ho a otočte na místo jako každý tvar a pak v jeho panelu stiskněte „Spojit se jmenovkou“.",
   "status.keyringTabBundled": "Ouško na kroužek je spojené se jmenovkou.",
   "status.keyringTabNoTag": "Není tu žádná jmenovka ani štítek s ikonou, se kterými by šlo ouško spojit.",
+  "shortcuts.savedViews": "Přejít na pohled uložený pod touto klávesou",
+  "shortcuts.saveView": "Uložit pohled - otočení, posun a přiblížení - pro tento návrh",
+  "camera.viewSaved": "Pohled uložen pod {key} - stiskem {key} se k němu vrátíte",
+  "camera.savedViewEmpty": "Pod {key} zatím není uložen žádný pohled - Shift+{key} uloží ten aktuální",
 };

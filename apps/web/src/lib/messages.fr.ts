@@ -3595,4 +3595,8 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "status.keyringTabMade": "Une languette porte-clés indépendante est à côté de l'étiquette : déplacez-la et tournez-la à sa place comme toute forme, puis appuyez sur « Lier à l'étiquette » dans son panneau.",
   "status.keyringTabBundled": "La languette porte-clés est liée à l'étiquette.",
   "status.keyringTabNoTag": "Il n'y a aucune étiquette de nom ni étiquette d'icône à laquelle lier la languette.",
+  "shortcuts.savedViews": "Aller à la vue enregistrée sous cette touche",
+  "shortcuts.saveView": "Enregistrer la vue - rotation, déplacement et zoom - pour ce design",
+  "camera.viewSaved": "Vue enregistrée sous {key} - appuyez sur {key} pour y revenir",
+  "camera.savedViewEmpty": "Aucune vue enregistrée sous {key} - Maj+{key} enregistre la vue actuelle",
 };

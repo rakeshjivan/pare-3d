@@ -76,7 +76,8 @@ import { wheelBaseStep, wheelNextValue } from "@/lib/wheelValueStep";
 import { createLatestRunner, type LatestRunner } from "@/lib/latestRunner";
 import { manifoldRevision, onManifoldReady } from "@/lib/manifoldHandle";
 import { customFontRevision, onCustomFontsChanged } from "@/lib/textFonts";
-import { readDesignView, writeDesignView } from "@/lib/designView";
+import { savedViewForKey } from "@/lib/designView";
+import { CAMERA_MAX_DISTANCE, fitCameraDepthRange, rememberCameraView, useDesignViews } from "@/components/workplane/cameraViews";
 import { DIMENSION_FORMULA_FIELDS, formulaMatchesMillimeters, formulaToRemember, withFieldFormula } from "@/lib/fieldFormulas";
 import { displayToMillimeters, formatLengthMm, lengthDisplayUnit, millimetersToDisplay, parseLengthMm, parseMeasurementInput, resolveLengthMm, setLengthUnit } from "@/lib/measurementUnits";
 import { computeCornerRulerRelativeCoordinates, cornerRulerAxisModes, cornerRulerFrameForWorkplane, cornerRulerShiftVector, pointAlongRuler, rotateCornerRulerFrame, rulerDimensionMatch, rulerTicks, toggledCornerRulerAxis, toggledCornerRulerMode, type CornerRulerAxis, type RulerDimensionField } from "@/lib/rulerDimensions";
@@ -183,9 +184,8 @@ const CORNER_RULER_DEFAULT_ARM_X = 100;
 const CORNER_RULER_DEFAULT_ARM_Z = 80;
 const DEFAULT_WORKSPACE = DEFAULT_WORKPLANE_WORKSPACE;
 const CAMERA_FOV = 38;
-/** How close the camera may come to what it looks at, and how far it may back off, in mm. */
+/** How close the camera may come to what it looks at, in mm; how far it may back off is in cameraViews. */
 const CAMERA_MIN_DISTANCE = 3;
-const CAMERA_MAX_DISTANCE = 9000;
 
 /**
  * The normal view zooms towards its pivot and stops at the closest distance
@@ -241,35 +241,6 @@ function orthographicZoomRange(camera: THREE.OrthographicCamera) {
   return { min: frameHalfHeight / (CAMERA_MAX_DISTANCE * tanHalf), max: frameHalfHeight / (CAMERA_MIN_DISTANCE * tanHalf) };
 }
 
-/**
- * Near and far planes that follow the distance: up close a near plane of
- * 0.1 mm would cut into a 3 mm view, far out a fixed one would leave the
- * depth buffer too coarse and faces would flicker into each other.
- *
- * The flat view draws the same picture wherever the camera stands on its line
- * of sight, but the camera stays where the standard view (F) or the switch
- * left it, often closer than the parts in front of the pivot: tilted towards
- * the front, everything nearer than the camera was cut off. Its depth range
- * reaches behind the camera as far as in front, so nothing in the picture is.
- */
-function fitCameraDepthRange(camera: THREE.Camera, target: THREE.Vector3) {
-  if (camera instanceof THREE.OrthographicCamera) {
-    const far = camera.position.distanceTo(target) + CAMERA_MAX_DISTANCE;
-    if (camera.near === -CAMERA_MAX_DISTANCE && Math.abs(camera.far - far) <= camera.far * 0.05) return;
-    camera.near = -CAMERA_MAX_DISTANCE;
-    camera.far = far;
-    camera.updateProjectionMatrix();
-    return;
-  }
-  if (!(camera instanceof THREE.PerspectiveCamera)) return;
-  const distance = camera.position.distanceTo(target);
-  const near = clamp(distance / 2000, 0.01, 5);
-  const far = Math.max(6000, distance * 2 + 3000);
-  if (Math.abs(camera.near - near) <= camera.near * 0.05 && Math.abs(camera.far - far) <= camera.far * 0.05) return;
-  camera.near = near;
-  camera.far = far;
-  camera.updateProjectionMatrix();
-}
 const CAMERA_HOME = new THREE.Vector3(118, 96, 118);
 const CAMERA_TARGET = new THREE.Vector3(0, 0, 0);
 const MIN_SHAPE_SIZE = 0.01;
@@ -512,6 +483,8 @@ type WorkplaneViewportProps = {
   /** The design on screen, null behind the overview. The viewport outlives a design, so its tools reset when this changes. */
   projectId?: string | null;
   onWorkplaneModeChange: (active: boolean) => void;
+  /** A short message for the editor's notice line, such as a view saved under 7. */
+  onNotice?: (message: string) => void;
   modifierActive?: boolean;
   modifierPreviewActive?: boolean;
   modifierEdges?: CadModifierEdge[];
@@ -3512,6 +3485,7 @@ export function WorkplaneViewport({
   projectName = "",
   projectId = null,
   onWorkplaneModeChange,
+  onNotice,
   modifierActive = false,
   modifierPreviewActive = false,
   modifierEdges = [],
@@ -3829,7 +3803,6 @@ export function WorkplaneViewport({
   const projectIdRef = useRef(projectId);
   projectIdRef.current = projectId;
   const designViewRestoredRef = useRef(false);
-  const designViewReadyRef = useRef(false);
   const workplaneModeRef = useRef(workplaneMode);
   const splitActiveRef = useRef(splitActive);
   const splitPlaneRef = useRef(splitPlane);
@@ -4880,8 +4853,7 @@ export function WorkplaneViewport({
     window.addEventListener("resize", state.resize);
 
     return () => {
-      // The view is taken down while a sketch is open; it comes back looking where it looked (#150).
-      rememberedCameraViews.set(projectIdRef.current ?? "", cameraViewOf(state));
+      rememberCameraView(projectIdRef.current, state);
       window.cancelAnimationFrame(state.animationId);
       window.removeEventListener("resize", state.resize);
       state.disposeInteractionListeners();
@@ -5002,55 +4974,9 @@ export function WorkplaneViewport({
     setOrthographicView(state.camera instanceof THREE.OrthographicCamera);
   }, [workspaceSettingsKey]);
 
-  // Back from the sketch view: the camera looks where it looked before (#150). A design opens the
-  // way it was left, too: its view is kept in the browser and in a saved file (#220).
-  useEffect(() => {
-    const state = threeRef.current;
-    const key = projectIdRef.current ?? "";
-    const view = rememberedCameraViews.get(key) ?? readDesignView(projectIdRef.current);
-    rememberedCameraViews.delete(key);
-    if (state && view) {
-      if ((state.camera instanceof THREE.OrthographicCamera) !== view.orthographic) toggleCameraProjection(state);
-      applyCameraView(state, view);
-      syncViewCube(state, viewCubeRef.current);
-      setOrthographicView(state.camera instanceof THREE.OrthographicCamera);
-      designViewRestoredRef.current = true;
-    }
-    // Only now may the camera's own movements be written down: before, the standard view
-    // the viewport starts in would overwrite the one the design was left in.
-    designViewReadyRef.current = true;
-    if (!state) return;
-    let timer = 0;
-    const save = () => {
-      window.clearTimeout(timer);
-      writeDesignView(projectIdRef.current, cameraViewOf(state));
-    };
-    const saveSoon = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(save, 500);
-    };
-    const saveWhenHidden = () => {
-      if (document.visibilityState === "hidden") save();
-    };
-    state.controls.addEventListener("change", saveSoon);
-    window.addEventListener("pagehide", save);
-    document.addEventListener("visibilitychange", saveWhenHidden);
-    return () => {
-      state.controls.removeEventListener("change", saveSoon);
-      window.removeEventListener("pagehide", save);
-      document.removeEventListener("visibilitychange", saveWhenHidden);
-      window.clearTimeout(timer);
-      // The viewport is taken down when the design is left (or a sketch opens): its view stays.
-      save();
-    };
-  }, []);
-
-  // The projection switch moves no control, so it asks for the view to be kept itself.
-  useEffect(() => {
-    if (!designViewReadyRef.current) return;
-    const state = threeRef.current;
-    if (state) writeDesignView(projectIdRef.current, cameraViewOf(state));
-  }, [orthographicView]);
+  const { saveView, showSavedView } = useDesignViews({
+    threeRef, projectIdRef, viewCubeRef, designViewRestoredRef, orthographicView, setOrthographicView, toggleCameraProjection, syncViewCube, onNotice,
+  });
 
   useEffect(() => {
     const state = threeRef.current;
@@ -9542,6 +9468,7 @@ export function WorkplaneViewport({
       const shortcutView = !event.ctrlKey && !event.metaKey && !event.altKey
         ? viewFaceForKey(event.key, event.code, event.shiftKey)
         : undefined;
+      const savedView = !event.ctrlKey && !event.metaKey && !event.altKey ? savedViewForKey(event.key, event.code, event.shiftKey) : undefined;
       // A slider keeps the focus after it was dragged, as in the split panel,
       // but only needs its own keys - the view shortcuts still apply.
       const sliderTarget = event.target instanceof HTMLInputElement && event.target.type === "range";
@@ -9584,6 +9511,10 @@ export function WorkplaneViewport({
         // With Shift, frame the selection from the new side, as Shift+F does;
         // with nothing selected focusSelection does nothing.
         if (event.shiftKey) focusSelection();
+      } else if (savedView) {
+        event.preventDefault();
+        if (savedView.save) saveView(savedView.slot);
+        else showSavedView(savedView.slot);
       } else if (key === "w") {
         event.preventDefault();
         if (!event.shiftKey || !setPlacementWorkplaneAtSelection()) {
@@ -10850,39 +10781,6 @@ function updateOrthographicFrustum(camera: THREE.OrthographicCamera, aspect: num
   camera.top = halfHeight;
   camera.bottom = -halfHeight;
   camera.updateProjectionMatrix();
-}
-
-type CameraView = {
-  orthographic: boolean;
-  position: [number, number, number];
-  target: [number, number, number];
-  up: [number, number, number];
-  zoom: number;
-};
-
-/** Where the camera looked, per design, while the view was taken down for a sketch (#150). */
-const rememberedCameraViews = new Map<string, CameraView>();
-
-function cameraViewOf(state: ThreeState): CameraView {
-  return {
-    orthographic: state.camera instanceof THREE.OrthographicCamera,
-    position: state.camera.position.toArray() as [number, number, number],
-    target: state.controls.target.toArray() as [number, number, number],
-    up: state.camera.up.toArray() as [number, number, number],
-    zoom: state.camera.zoom,
-  };
-}
-
-function applyCameraView(state: ThreeState, view: CameraView) {
-  state.camera.up.fromArray(view.up);
-  state.camera.position.fromArray(view.position);
-  state.controls.target.fromArray(view.target);
-  state.camera.zoom = view.zoom;
-  state.camera.lookAt(state.controls.target);
-  state.camera.updateProjectionMatrix();
-  fitCameraDepthRange(state.camera, state.controls.target);
-  state.controls.update();
-  state.needsRender = true;
 }
 
 function toggleCameraProjection(state: ThreeState) {

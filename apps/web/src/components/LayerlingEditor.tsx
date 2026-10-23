@@ -228,7 +228,7 @@ import { ForkDraftIcon } from "./forkToolbarIcons";
 import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
 import { BookOpen, Import, Keyboard, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, StickyNote, Type, Upload, Variable } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
-import { NOTICE_AFTER_HOVER_MS, noticeDurationMs } from "@/lib/noticeTiming";
+import { useEditorNotice } from "@/components/workplane/useEditorNotice";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
 import { PROJECT_THUMBNAIL_IDLE_MS, projectThumbnailSceneChanged, type ProjectThumbnailSceneKey } from "@/lib/projectThumbnail";
 import { importedShapeFromObj } from "@/lib/objImport";
@@ -2821,26 +2821,12 @@ export function LayerlingEditor({
   const [scalePercentTool, setScalePercentTool] = useState<ScalePercentSettings | null>(null);
   const [scalePercentError, setScalePercentError] = useState<string | null>(null);
   const editorLanguage = useLanguage();
-  // Leer heisst Ruhe: Dann steht kein Fenster auf der Arbeitsflaeche. Ein
-  // „Bereit" braucht niemand zu lesen - dass nichts los ist, sieht man.
-  const [notice, setNoticeText] = useState("");
-  // A message may carry one button, for what the person can do about it right away (#489).
-  const [noticeAction, setNoticeAction] = useState<{ label: string; run: () => void } | null>(null);
+  const { notice, noticeAction, setNotice, holdNotice, releaseNotice, dismissNotice, reportNoticesRef } = useEditorNotice();
   const showHiddenRef = useRef<() => void>(() => undefined);
   // The design for which the hidden shapes were told once, when its shapes first arrived (#489).
   const hiddenNoticedProjectRef = useRef<string | null>(null);
   const hiddenNoticePendingRef = useRef(false);
-  const noticeTimerRef = useRef<number | null>(null);
-
-  /**
-   * Die Statuszeile in der Fusszeile. Eine Bestaetigung - „Gewinde
-   * hinzugefuegt" - hat nach ein paar Sekunden ihren Zweck erfuellt und macht
-   * wieder Platz. Alles, was etwas von einem will oder schiefgegangen ist,
-   * bleibt stehen, bis es abgeloest wird: Eine Aufforderung, die sich von
-   * selbst zurueckzieht, ist keine.
-   */
-  // Fuer den Fehlerbericht: die letzten Meldungen und Fehler dieser Sitzung.
-  const reportNoticesRef = useRef<BugReportEvent[]>([]);
+  // Fuer den Fehlerbericht: die letzten Fehler dieser Sitzung.
   const reportErrorsRef = useRef<BugReportEvent[]>([]);
   useEffect(() => {
     const remember = (text: string) => {
@@ -2854,40 +2840,6 @@ export function LayerlingEditor({
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onRejection);
     };
-  }, []);
-  const setNotice = useCallback((message: string, patient = false, action: { label: string; run: () => void } | null = null) => {
-    reportNoticesRef.current = rememberBugReportEvent(reportNoticesRef.current, message);
-    setNoticeText(message);
-    setNoticeAction(action);
-    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
-    noticeTimerRef.current = window.setTimeout(() => {
-      noticeTimerRef.current = null;
-      setNoticeText("");
-      setNoticeAction(null);
-    }, noticeDurationMs(message, patient));
-  }, []);
-  // A message stays while the pointer rests on it, and goes a few seconds after it leaves (#422).
-  const holdNotice = useCallback(() => {
-    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
-    noticeTimerRef.current = null;
-  }, []);
-  const releaseNotice = useCallback(() => {
-    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
-    noticeTimerRef.current = window.setTimeout(() => {
-      noticeTimerRef.current = null;
-      setNoticeText("");
-      setNoticeAction(null);
-    }, NOTICE_AFTER_HOVER_MS);
-  }, []);
-  const dismissNotice = useCallback(() => {
-    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
-    noticeTimerRef.current = null;
-    setNoticeText("");
-    setNoticeAction(null);
-  }, []);
-
-  useEffect(() => () => {
-    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
   }, []);
   // A failed autosave is said where the work happens, and stays a while.
   useEffect(() => {
@@ -14705,6 +14657,7 @@ export function LayerlingEditor({
           onNoteModeChange={setNoteMode}
           onWorkspaceSettingsChange={updateProjectWorkspaceSettings}
           onWorkplaneModeChange={closeViewportWorkplaneMode}
+          onNotice={setNotice}
           modifierActive={Boolean(edgeModifier)}
           modifierPreviewActive={Boolean(edgeModifier?.preview)}
           modifierEdges={modifierDisplayEdges}

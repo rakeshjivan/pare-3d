@@ -3597,4 +3597,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "nameTag.keyringTab": "Jeziček za obesek",
   "nameTag.keyringTabBundle": "Združi z napisom",
   "nameTag.keyringTabBundleHint": "Združi jeziček z najbližjim napisom v sveženj (Ctrl+B): premikata in vrtita se skupaj, barve ostanejo.",
+  "shortcuts.savedViews": "Pojdi na pogled, shranjen pod to tipko",
+  "shortcuts.saveView": "Shrani pogled - zasuk, premik in povečavo - za ta načrt",
+  "camera.viewSaved": "Pogled shranjen pod {key} - pritisni {key}, da se vrneš nanj",
+  "camera.savedViewEmpty": "Pod {key} še ni shranjenega pogleda - Shift+{key} shrani trenutnega",
 };

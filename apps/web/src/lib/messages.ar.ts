@@ -3192,4 +3192,8 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "sketch.modeBadgeExtrude": "رسم بثق",
   "sketch.operationHint": "ما يصبح عليه هذا الرسم: بثق أو دوران أو سحب على مسار",
   "status.sketchOperationChanged": "الآن: {operation}. أنهِ الرسم لبناء الجسم",
+  "shortcuts.savedViews": "الانتقال إلى العرض المحفوظ تحت هذا المفتاح",
+  "shortcuts.saveView": "حفظ العرض - الدوران والإزاحة والتكبير - لهذا التصميم",
+  "camera.viewSaved": "تم حفظ العرض تحت {key} - اضغط {key} للعودة إليه",
+  "camera.savedViewEmpty": "لا يوجد عرض محفوظ تحت {key} بعد - Shift+{key} يحفظ العرض الحالي",
 };

@@ -3085,4 +3085,8 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "sketch.modeBadgeExtrude": "押し出しスケッチ",
   "sketch.operationHint": "このスケッチから作るもの：押し出し、回転、スイープ",
   "status.sketchOperationChanged": "現在：{operation}。スケッチを完了するとボディが作られます",
+  "shortcuts.savedViews": "そのキーに保存したビューへ移動",
+  "shortcuts.saveView": "このデザインのビュー(回転・パン・ズーム)を保存",
+  "camera.viewSaved": "ビューを {key} に保存しました - {key} で戻れます",
+  "camera.savedViewEmpty": "{key} にはまだビューが保存されていません - Shift+{key} で現在のビューを保存します",
 };

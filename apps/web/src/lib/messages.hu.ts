@@ -3112,4 +3112,8 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "status.keyringTabMade": "A címke mellett egy külön kulcstartófül van: mozgasd és forgasd a helyére, mint bármelyik alakzatot, aztán a paneljén nyomd meg az „Összefogás a címkével” gombot.",
   "status.keyringTabBundled": "A kulcstartófül össze van fogva a címkével.",
   "status.keyringTabNoTag": "Nincs névcímke vagy ikoncímke, amellyel a kulcstartófület össze lehetne fogni.",
+  "shortcuts.savedViews": "Ugrás az adott billentyűre mentett nézetre",
+  "shortcuts.saveView": "A nézet - forgatás, eltolás és nagyítás - mentése ehhez a tervhez",
+  "camera.viewSaved": "Nézet mentve ide: {key} - a {key} lenyomásával visszatérhetsz hozzá",
+  "camera.savedViewEmpty": "A(z) {key} alatt még nincs mentett nézet - a Shift+{key} menti az aktuálisat",
 };

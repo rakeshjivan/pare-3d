@@ -3160,4 +3160,8 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "sketch.modeBadgeExtrude": "Ekstruderingsskitse",
   "sketch.operationHint": "Hvad skitsen bliver til: ekstruderet, drejet eller trukket langs en sti",
   "status.sketchOperationChanged": "Nu: {operation}. Afslut skitsen for at bygge legemet",
+  "shortcuts.savedViews": "Gå til visningen, der er gemt under den tast",
+  "shortcuts.saveView": "Gem visningen - drejning, panorering og zoom - for dette design",
+  "camera.viewSaved": "Visning gemt under {key} - tryk på {key} for at vende tilbage til den",
+  "camera.savedViewEmpty": "Ingen visning gemt under {key} endnu - Shift+{key} gemmer den aktuelle",
 };
