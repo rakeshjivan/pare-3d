@@ -19,6 +19,16 @@ scope.onmessage = async (event: MessageEvent<MeshJobRequest>) => {
       const positions = Float32Array.from(result.positions);
       const reply: MeshJobResponse = { id: job.id, ok: true, result: { positions, voxel: result.voxel, coarse: result.coarse } };
       scope.postMessage(reply, [positions.buffer]);
+    } else if (job.kind === "dentalPrepare") {
+      const { prepareDentalScan } = await import("@/lib/dentalModel");
+      const prepared = prepareDentalScan(job.positions);
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalPrepare", prepared };
+      scope.postMessage(reply, [prepared.positions.buffer]);
+    } else if (job.kind === "dentalModel") {
+      const { makeDentalModel } = await import("@/lib/dentalModel");
+      const model = await makeDentalModel(job.positions, job.options);
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalModel", model };
+      scope.postMessage(reply, [model.positions.buffer]);
     } else if (job.kind === "fit") {
       const { checkFit } = await import("@/lib/partTools");
       const report = await checkFit(job.shapes, job.clearance);

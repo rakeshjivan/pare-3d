@@ -124,7 +124,10 @@ const SURFACE_TEXT_PREVIEW_ID = "surface-text-preview";
 const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
 import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
-import { checkFitInBackground, roundMeshInBackground } from "@/lib/meshJobs";
+import { checkFitInBackground, makeDentalModelInBackground, prepareDentalScanInBackground, roundMeshInBackground } from "@/lib/meshJobs";
+import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
+import { looksLikeDentalScan, type DentalModelOptions, type DentalScanReport } from "@/lib/dentalModel";
+import { DentalModelPanel, dentalPreset, type DentalPurpose } from "./workplane/DentalModelPanel";
 import { ShellPanel } from "./workplane/ShellPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
 import { MateFacesPanel } from "./workplane/MateFacesPanel";
@@ -225,7 +228,7 @@ import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, tra
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
 import { BambuSendButton } from "@/components/BambuSendButton";
-import { ForkDraftIcon } from "./forkToolbarIcons";
+import { ForkDraftIcon, ForkToothIcon } from "./forkToolbarIcons";
 import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
 import { BookOpen, Import, Keyboard, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, StickyNote, Type, Upload, Variable } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
@@ -344,6 +347,7 @@ const BLEND_PREVIEW_ID = "blend-preview";
 // Fork (build 30): the mesh check and Fill a hole, from the command search.
 const MESH_CHECK_EVENT = "pare3d:mesh-check";
 const FILL_HOLE_EVENT = "pare3d:fill-hole";
+const DENTAL_MODEL_EVENT = "pare3d:dental-model";
 const libraryShapeIds: ReadonlySet<string> = new Set(libraryShapeAssets.map((shape) => shape.id));
 
 const HISTORY_VIEW_COMMANDS = new Set(["history", "export", "guide", "shortcuts"]);
@@ -2918,7 +2922,7 @@ export function LayerlingEditor({
   // Left open on an iPad, which greys out files of types it does not know (#219).
   const projectFileAccept = useFileAccept(".lyl,.skf");
   const myShapesFileAccept = useFileAccept(".zip,.lyl,.skf");
-  const importFileAccept = useFileAccept(`.stl,.obj,.mtl,.zip,.3mf,.step,.stp,.svg,image/svg+xml,${PICTURE_FILE_ACCEPT}`);
+  const importFileAccept = useFileAccept(`.stl,.ply,.obj,.mtl,.zip,.3mf,.step,.stp,.svg,image/svg+xml,${PICTURE_FILE_ACCEPT}`);
   const projectFileInputRef = useRef<HTMLInputElement | null>(null);
   const insertProjectFileInputRef = useRef<HTMLInputElement | null>(null);
   const sketchImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -3757,7 +3761,7 @@ export function LayerlingEditor({
   // The holes a hole pattern would cut, shown on the face until "Create".
   // Fork (build 25): Blend's state and its live piece (the tool itself is further down).
   // Fork (build 30): imported meshes that are not watertight, offered for repair; Fill a hole's part.
-  const [meshCheck, setMeshCheck] = useState<{ ids: string[]; message: string } | null>(null);
+  const [meshCheck, setMeshCheck] = useState<{ ids: string[]; message: string; scan?: string } | null>(null);
   const [fillHoleTool, setFillHoleTool] = useState<{ shapeId: string; busy: boolean } | null>(null);
   const [blendTool, setBlendTool] = useState<{
     ids: [string, string];
@@ -9474,6 +9478,128 @@ export function LayerlingEditor({
     if (meshRoundTool && !(selectedIds.length === 1 && selectedIds[0] === meshRoundTool.shapeId) && !meshRoundTool.busy) setMeshRoundTool(null);
   }, [meshRoundTool, selectedIds]);
 
+  // Fork (build 46): Dental model - step 1 cleans and turns the scan as the tool opens, step 2 makes the model.
+  const [dentalTool, setDentalTool] = useState<{
+    shapeId: string;
+    stage: "preparing" | "ready" | "making";
+    report: DentalScanReport | null;
+    purpose: DentalPurpose;
+    options: DentalModelOptions;
+    error: string | null;
+    /** The turned scan in Z-up millimetres, and where its centre sits on the plate. */
+    prepared: Float32Array | null;
+    offset: { x: number; z: number };
+    fingerprint: string | null;
+  } | null>(null);
+  const dentalToolRef = useRef(dentalTool);
+  dentalToolRef.current = dentalTool;
+  const toZUp = (positions: ArrayLike<number>) => {
+    const out = new Float32Array(positions.length);
+    for (let i = 0; i + 2 < positions.length; i += 3) {
+      const [x, y, z] = layerlingToZUp([positions[i], positions[i + 1], positions[i + 2]]);
+      out[i] = x; out[i + 1] = y; out[i + 2] = z;
+    }
+    return out;
+  };
+  const fromZUp = (positions: ArrayLike<number>, offset: { x: number; z: number }) => {
+    const out = new Array<number>(positions.length);
+    for (let i = 0; i + 2 < positions.length; i += 3) {
+      const [x, y, z] = zUpToLayerling([positions[i], positions[i + 1], positions[i + 2]]);
+      out[i] = x + offset.x; out[i + 1] = y; out[i + 2] = z + offset.z;
+    }
+    return out;
+  };
+  const openDentalModel = useCallback(() => {
+    if (dentalToolRef.current) {
+      if (dentalToolRef.current.stage !== "making") setDentalTool(null);
+      return;
+    }
+    if (refuseLockedSelection()) return;
+    const shape = selectedShapes.length === 1 ? selectedShapes[0] : null;
+    if (!shape || shape.hole || isNonSolidShapeKind(shape.kind) || shape.groupedShapes?.length) {
+      setNotice(t("dental.selectOne"));
+      return;
+    }
+    const positions = partGeom(shape).triangles;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i + 2 < positions.length; i += 3) {
+      minX = Math.min(minX, positions[i]); maxX = Math.max(maxX, positions[i]);
+      minZ = Math.min(minZ, positions[i + 2]); maxZ = Math.max(maxZ, positions[i + 2]);
+    }
+    const offset = { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 };
+    setDentalTool({ shapeId: shape.id, stage: "preparing", report: null, purpose: "study", options: dentalPreset("study", 10), error: null, prepared: null, offset, fingerprint: null });
+    window.setTimeout(async () => {
+      try {
+        const prepared = await prepareDentalScanInBackground(toZUp(positions));
+        const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
+        if (!current || projectShapesFingerprint([current]) !== projectShapesFingerprint([shape]) || dentalToolRef.current?.shapeId !== shape.id) {
+          setDentalTool(null);
+          return;
+        }
+        const turned = canonicalizeShape(shapeWithWorldPositions(shape, fromZUp(prepared.positions, offset)));
+        commitShapes(shapesRef.current.map((candidate) => (candidate.id === shape.id ? turned : candidate)), turned.id, t("dental.prepared", { holes: prepared.report.holesFilled, fragments: prepared.report.fragmentsRemoved + prepared.report.brokenRemoved }));
+        const fresh = shapesRef.current.find((candidate) => candidate.id === shape.id) ?? turned;
+        setDentalTool((latest) => latest && latest.shapeId === shape.id ? {
+          ...latest,
+          stage: "ready",
+          report: prepared.report,
+          options: dentalPreset(latest.purpose, prepared.report.maxKeep),
+          prepared: prepared.positions,
+          fingerprint: projectShapesFingerprint([fresh]),
+        } : latest);
+      } catch (error) {
+        setDentalTool((latest) => latest ? { ...latest, stage: "ready", report: null, error: error instanceof Error ? localizedError(error.message) : String(error) } : latest);
+      }
+    }, 30);
+  }, [commitShapes, refuseLockedSelection, selectedShapes]);
+  const applyDentalModel = useCallback(() => {
+    const tool = dentalToolRef.current;
+    const shape = tool ? shapesRef.current.find((candidate) => candidate.id === tool.shapeId) : null;
+    if (!tool || !shape || !tool.report) {
+      setDentalTool(null);
+      return;
+    }
+    setDentalTool({ ...tool, stage: "making", error: null });
+    window.setTimeout(async () => {
+      try {
+        // The turned scan as step 1 left it; moved or turned since, it is read back and turned again.
+        let prepared = tool.prepared;
+        let offset = tool.offset;
+        if (!prepared || projectShapesFingerprint([shape]) !== tool.fingerprint) {
+          const positions = partGeom(shape).triangles;
+          let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+          for (let i = 0; i + 2 < positions.length; i += 3) {
+            minX = Math.min(minX, positions[i]); maxX = Math.max(maxX, positions[i]);
+            minZ = Math.min(minZ, positions[i + 2]); maxZ = Math.max(maxZ, positions[i + 2]);
+          }
+          offset = { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 };
+          prepared = (await prepareDentalScanInBackground(toZUp(positions))).positions;
+        }
+        const model = await makeDentalModelInBackground(prepared, tool.options);
+        const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
+        if (!current || projectShapesFingerprint([current]) !== projectShapesFingerprint([shape])) {
+          setDentalTool(null);
+          setNotice(t("dental.changed"));
+          return;
+        }
+        const made = canonicalizeShape({ ...shapeWithWorldPositions(shape, fromZUp(model.positions, offset)), name: t("dental.modelName", { name: displayShapeName(shape) }) });
+        const kind = model.hollow ? t("dental.doneHollow", { wall: tool.options.wall.toFixed(1) }) : t("dental.doneSolid");
+        commitShapes(shapesRef.current.map((candidate) => (candidate.id === shape.id ? made : candidate)), made.id, t("dental.done", { height: model.height.toFixed(1), kind }));
+        setDentalTool(null);
+      } catch (error) {
+        setDentalTool((latest) => latest ? { ...latest, stage: "ready", error: error instanceof Error ? localizedError(error.message) : String(error) } : latest);
+      }
+    }, 30);
+  }, [commitShapes]);
+  useEffect(() => {
+    if (dentalTool && dentalTool.stage === "ready" && !(selectedIds.length === 1 && selectedIds[0] === dentalTool.shapeId)) setDentalTool(null);
+  }, [dentalTool, selectedIds]);
+  useEffect(() => {
+    const onOpen = () => openDentalModel();
+    window.addEventListener(DENTAL_MODEL_EVENT, onOpen);
+    return () => window.removeEventListener(DENTAL_MODEL_EVENT, onOpen);
+  }, [openDentalModel]);
+
 
 
   /** Lays the letters on the target at the placement - the text tool's preview and the re-lay after a move both use it. */
@@ -12884,6 +13010,12 @@ export function LayerlingEditor({
       }
     });
     if (unsound.length) {
+      // Fork (build 46): a raw intraoral scan is open on purpose; it is offered Dental model instead.
+      const lone = unsound.length === 1 ? unsound[0].shape : null;
+      if (lone?.importedMesh && looksLikeDentalScan(lone.importedMesh.positions)) {
+        setMeshCheck({ ids: [lone.id], scan: lone.id, message: t("meshCheck.scan", { name: displayShapeName(lone) }) });
+        return;
+      }
       setMeshCheck({
         ids: unsound.map((entry) => entry.shape.id),
         message: unsound.map((entry) => t("meshCheck.problem", { name: displayShapeName(entry.shape), openings: entry.health.openings, broken: entry.health.brokenEdges })).join(" "),
@@ -14897,7 +15029,15 @@ export function LayerlingEditor({
           <p>{meshCheck.message}</p>
           <div className="mesh-check-actions">
             <button type="button" onClick={() => setMeshCheck(null)}>{t("meshCheck.leave")}</button>
-            <button type="button" className="primary" onClick={() => void makePartsSolid(meshCheck.ids)}>{t("meshCheck.makeSolid")}</button>
+            <button type="button" className={meshCheck.scan ? "" : "primary"} onClick={() => void makePartsSolid(meshCheck.ids)}>{t("meshCheck.makeSolid")}</button>
+            {meshCheck.scan ? (
+              <button type="button" className="primary" onClick={() => {
+                const id = meshCheck.scan!;
+                setMeshCheck(null);
+                setSelectedIds([id]);
+                window.setTimeout(() => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), 60);
+              }}>{t("dental.title")}</button>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -15238,6 +15378,21 @@ export function LayerlingEditor({
           onChange={(patch) => setSurfaceTextTool((current) => current ? { ...current, settings: { ...current.settings, ...patch } } : current)}
           onApply={applySurfaceText}
           onCancel={() => setSurfaceTextTool(null)}
+        />
+      ) : null}
+      {dentalTool ? (
+        <DentalModelPanel
+          targetName={displayShapeName(shapes.find((shape) => shape.id === dentalTool.shapeId) ?? ({ name: "" } as WorkplaneShape))}
+          stage={dentalTool.stage}
+          report={dentalTool.report}
+          purpose={dentalTool.purpose}
+          options={dentalTool.options}
+          error={dentalTool.error}
+          workspace={workspaceSettings}
+          onPurposeChange={(purpose) => setDentalTool((current) => current && current.stage === "ready" && current.report ? { ...current, purpose, options: dentalPreset(purpose, current.report.maxKeep), error: null } : current)}
+          onOptionsChange={(patch) => setDentalTool((current) => current && current.stage === "ready" ? { ...current, options: { ...current.options, ...patch }, error: null } : current)}
+          onApply={applyDentalModel}
+          onCancel={() => setDentalTool((current) => (current?.stage === "making" ? current : null))}
         />
       ) : null}
       {meshRoundTool ? (
@@ -16236,6 +16391,8 @@ function SecondaryToolbar({
     { id: "simplify", label: t("editor.tool.simplify"), icon: ToolbarSimplifyIcon, action: onSimplify, enabled: canSimplify, active: simplifyActive },
     { id: "cutBelowBed", label: t("cutBelowBed.command"), icon: Scissors, action: () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT)), enabled: canSimplify },
     { id: "roundMesh", label: t("meshRound.title"), icon: Squircle, action: build33.onRound, enabled: build33.canRound || build33.roundActive, active: build33.roundActive },
+    // Fork (build 46).
+    { id: "dentalModel", label: t("dental.title"), icon: ForkToothIcon, action: () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), enabled: canSimplify },
   ];
   const arrangeTools = [
     { id: "align", label: t("editor.tool.align"), icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign, active: alignMode },
@@ -16416,6 +16573,7 @@ function SecondaryToolbar({
       plain("cut-below-bed", t("cutBelowBed.command"), manageGroup, true, () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT))),
       plain("mesh-check", t("meshCheck.command"), manageGroup, hasSelection, () => window.dispatchEvent(new Event(MESH_CHECK_EVENT))),
       plain("fill-hole", t("fillHole.command"), t("editor.group.modify"), hasSelection, () => window.dispatchEvent(new Event(FILL_HOLE_EVENT))),
+      plain("dental-model", t("dental.title"), t("editor.group.modify"), hasSelection, () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), { icon: ForkToothIcon }),
       plain("settings", t("editor.workspaceSettings"), manageGroup, true, () => window.dispatchEvent(new Event("layerling:open-workspace-settings")), { icon: ToolbarSettingsIcon }),
       plain("mode-sketch", t("palette.switchSketch"), t("palette.group.mode"), true, () => selectToolbarMode("sketch")),
       ...helpCommands,

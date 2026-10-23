@@ -256,6 +256,18 @@ export function ForkDraftIcon(props: IconProps) {
   );
 }
 
+/** Fork (build 46): Dental model - a molar standing on a base block, the base in the accent colour. */
+export function ForkToothIcon(props: IconProps) {
+  return (
+    <ForkIcon {...props}>
+      <rect x="7" y="33" width="34" height="9" rx="2" {...ACCENT} />
+      <path d="M13 9c3-3 7-2 11 0 4-2 8-3 11 0 4 4 2 11 0 15-1 3-1 6-2 9h-4l-2-7c-1-2-5-2-6 0l-2 7h-4c-1-3-1-6-2-9-2-4-4-11 0-15Z" {...SOFT} />
+      <path d="M13 9c3-3 7-2 11 0 4-2 8-3 11 0 4 4 2 11 0 15-1 3-1 6-2 9h-4l-2-7c-1-2-5-2-6 0l-2 7h-4c-1-3-1-6-2-9-2-4-4-11 0-15Z" />
+      <rect x="7" y="33" width="34" height="9" rx="2" />
+    </ForkIcon>
+  );
+}
+
 /** Fork (build 25): Blend - a wide end and a narrow end joined by a smooth flare, the flare in the accent colour. */
 export function ForkBlendIcon(props: IconProps) {
   return (
@@ -392,6 +404,7 @@ export const FORK_SHORT_LABELS_EN: Readonly<Record<string, string>> = {
   hull: "Hull",
   fitCheck: "Fit check",
   roundMesh: "Round",
+  dentalModel: "Dental",
   roundAll: "Round all",
   surfaceText: "Text",
   align: "Align",
@@ -462,6 +475,7 @@ export const FORK_TOOL_HINTS_EN: Readonly<Record<string, string>> = {
   hull: "wrap the selected parts in one smooth body - two cylinders become a rounded slot",
   fitCheck: "find parts that overlap or sit too close to print apart or move",
   roundMesh: "round every edge by one radius, also on imported meshes",
+  dentalModel: "turn a raw intraoral scan into a printable model: cleans it, trims it, adds a base and hollows it",
   roundAll: "round every edge by one radius, also where the fillet tool cannot",
   surfaceText: "click any part to put text on it - it hugs flat and curved surfaces, raised or cut in",
   align: "line parts up with each other",

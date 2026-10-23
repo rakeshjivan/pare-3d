@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 46,
+    items: [
+      "New: Dental model turns a raw intraoral scan into a printable model in two steps. Import the scan (STL, OBJ, PLY or 3MF) and click Dental model on the card that appears, or in the Mesh group. Pare 3D cleans the scan, fills its small holes and turns it teeth up; then choose Study model, Aligner / tray or Crown & bridge and click Make model.",
+      "The teeth and gum you keep are the scan itself, untouched; Pare 3D adds straight walls down to a flat base, an optional plate across the arch, and hollows study models with walls of the thickness you set, open underneath so no resin is trapped.",
+      "PLY files can be imported.",
+    ],
+  },
+  {
     build: 45,
     items: [
       "The best of layerling 1.100 to 1.103, picked for Pare 3D: the view cube turns the view smoothly instead of jumping, the shape library shows each shape in the colour it will be added in, and the sketch reads and types in your unit (inches too).",

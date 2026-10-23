@@ -77,7 +77,7 @@ export function squaredDistanceTo(target: Uint8Array, nx: number, ny: number, nz
   return out;
 }
 
-type Grid = { nx: number; ny: number; nz: number; h: number; origin: [number, number, number] };
+export type Grid = { nx: number; ny: number; nz: number; h: number; origin: [number, number, number] };
 
 /** Which voxel centres lie inside the closed triangle mesh: rays along z, counting crossings. */
 export function voxelise(positions: ArrayLike<number>, grid: Grid): Uint8Array {
@@ -161,7 +161,7 @@ export function smallestRoundingRadius(positions: ArrayLike<number>) {
 }
 
 /** Trilinear sample of a voxel field (values at voxel centres), in world coordinates. */
-function sampler(field: Float32Array, grid: Grid, outside: number) {
+export function sampler(field: Float32Array, grid: Grid, outside: number) {
   const { nx, ny, nz, h, origin } = grid;
   return (p: [number, number, number]) => {
     const gx = (p[0] - origin[0]) / h - 0.5;

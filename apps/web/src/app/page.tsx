@@ -2514,7 +2514,7 @@ export default function Home() {
   const pickDashboardImport = async () => {
     if (lylFileAccessSupported()) {
       try {
-        const picked = await pickFilesToImport([".lyl", ".skf", ".zip", ".stl", ".obj", ".mtl", ".3mf", ".step", ".stp", ".svg", ".png", ".jpg", ".jpeg"]);
+        const picked = await pickFilesToImport([".lyl", ".skf", ".zip", ".stl", ".ply", ".obj", ".mtl", ".3mf", ".step", ".stp", ".svg", ".png", ".jpg", ".jpeg"]);
         if (picked?.length) await importFilesFromDashboard(picked.map((entry) => entry.file), picked.length === 1 ? picked[0].handle : undefined);
         return;
       } catch {

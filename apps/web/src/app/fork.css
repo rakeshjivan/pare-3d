@@ -1593,3 +1593,8 @@ html[data-theme="dark"] .parameters-row input { background: #1a1f26; }
   margin-inline: auto;
   line-height: 0;
 }
+
+/* Build 46: Dental model panel. */
+.dental-model-panel .edge-modifier-label { display: block; font-size: 12px; font-weight: 600; color: var(--muted-foreground, #5b6573); margin-bottom: 6px; }
+.dental-model-panel .dental-status { display: flex; align-items: center; gap: 8px; }
+.dental-model-panel .dental-height { font-weight: 600; }

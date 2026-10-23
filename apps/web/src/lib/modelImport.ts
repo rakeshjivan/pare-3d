@@ -5,6 +5,7 @@ import { importExtensionSupported } from "@/lib/importExtensions";
 import { importedShapesFromObj } from "@/lib/objImport";
 import { attachProjectAsset, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/projectAssets";
 import { importedShapeFromStl } from "@/lib/stlImport";
+import { isPlyFile, plyAsStlFile } from "@/lib/plyImport";
 import { readKeepSvgPage } from "@/lib/importPreferences";
 import { scaleSvgText } from "@/lib/svgScale";
 import { decodeSvgBytes, importedShapeFromSvgWithReport, prepareSvgImport } from "@/lib/svgImport";
@@ -36,7 +37,7 @@ async function prepareImportFiles(files: readonly File[]) {
     }
     try {
       const entries = unzipSync(new Uint8Array(await file.arrayBuffer()), {
-        filter: (entry) => !entry.name.endsWith("/") && /\.(obj|mtl|stl|3mf|svg|step|stp)$/i.test(entry.name) && !/(^|\/)__MACOSX\//.test(entry.name),
+        filter: (entry) => !entry.name.endsWith("/") && /\.(obj|mtl|stl|ply|3mf|svg|step|stp)$/i.test(entry.name) && !/(^|\/)__MACOSX\//.test(entry.name),
       });
       const inside = Object.entries(entries).map(([name, bytes]) => new File([bytes as BlobPart], name.split("/").pop() || name));
       if (!inside.some((entry) => !/\.mtl$/i.test(entry.name))) {
@@ -100,8 +101,17 @@ export async function importModelFiles(
   }
 
   for (let index = 0; index < files.length; index += 1) {
-    const file = files[index];
+    // Fork (build 46): a PLY scan comes in as the STL of its triangles.
+    let file = files[index];
     if (options.cancelled?.()) return null;
+    if (isPlyFile(file.name)) {
+      try {
+        file = await plyAsStlFile(file);
+      } catch (error) {
+        result.failures.push({ fileName: file.name, reason: error instanceof Error ? error.message : String(error) });
+        continue;
+      }
+    }
 
     // A PNG or JPG comes in traced into an outline, as an SVG (#359).
     const isPicture = isPictureFile(file);
