@@ -4,6 +4,16 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 47,
+    items: [
+      "New: Dental Studio, with a place of its own in the toolbar (Dental). It makes printable models from raw intraoral scans - one arch, or an upper and a lower with their bite scan - full arches and quadrants alike. Import the scans from the panel, choose Study model, Ortho study models, Aligner models or Crown & bridge, and click Make model.",
+      "No tooth is ever cut off: everything down to below the gum line of the teeth is protected, and every model is checked against its scan before it is handed over.",
+      "Upper and lower are fitted onto the bite scan and can be placed in occlusion; orthodontic bases are trimmed the classic way, and a printable snap-on hinge can be added behind the molars.",
+      "Quadrant scans are recognised and kept whole, on a base of their own, instead of coming out as a few small blocks of teeth.",
+      "Imported files remember where their coordinates were, so scans of one patient keep their places from the scanner. Ctrl+Z brings the scans back after Make model.",
+    ],
+  },
+  {
     build: 46,
     items: [
       "New: Dental model turns a raw intraoral scan into a printable model in two steps. Import the scan (STL, OBJ, PLY or 3MF) and click Dental model on the card that appears, or in the Mesh group. Pare 3D cleans the scan, fills its small holes and turns it teeth up; then choose Study model, Aligner / tray or Crown & bridge and click Make model.",

@@ -1008,6 +1008,13 @@ export type WorkplaneShape = {
     baseHeight: number;
     triangleCount: number;
     sourceFormat: "stl" | "obj" | "svg" | "json" | "step" | "3mf";
+    /**
+     * Fork (build 47): where the file's own coordinates went, so scans of one patient keep the places
+     * the scanner gave them. A local position is the file point (turned from Z-up to Y-up when
+     * `sourceTurned`) less `sourceOrigin`.
+     */
+    sourceOrigin?: [number, number, number];
+    sourceTurned?: boolean;
     // IndexedDB persistence uses this only in compact stored shape records.
     // Runtime editor shapes are hydrated with the full immutable mesh resource.
     storageResourceId?: string;

@@ -475,7 +475,7 @@ export const FORK_TOOL_HINTS_EN: Readonly<Record<string, string>> = {
   hull: "wrap the selected parts in one smooth body - two cylinders become a rounded slot",
   fitCheck: "find parts that overlap or sit too close to print apart or move",
   roundMesh: "round every edge by one radius, also on imported meshes",
-  dentalModel: "turn a raw intraoral scan into a printable model: cleans it, trims it, adds a base and hollows it",
+  dentalModel: "raw intraoral scans (upper, lower and bite; full arches or quadrants) to printable models",
   roundAll: "round every edge by one radius, also where the fillet tool cannot",
   surfaceText: "click any part to put text on it - it hugs flat and curved surfaces, raised or cut in",
   align: "line parts up with each other",

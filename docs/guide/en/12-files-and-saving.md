@@ -132,22 +132,29 @@ For a part built in Pare 3D, the fillet tool gives exact, smoother results - use
 
 ## Dental models from a scan
 
-An intraoral scan comes out of the scanner as an open surface: the teeth and gum, with a ragged edge where the scan stops, often a few small holes and a loose piece of cheek or tongue. **{{ui:dental.title}}** turns it into a printable model in two steps - the work Meshmixer needs a dozen steps for. Import the scan (STL, OBJ, PLY or 3MF), select it and click **{{ui:dental.title}}** in the {{ui:editor.group.mesh}} group, or search for it with [[Ctrl]]+[[K]].
+An intraoral scan comes out of the scanner as an open surface: the teeth and gum, with a ragged edge where the scan stops, often a few small holes and a loose piece of cheek or tongue. **{{ui:dental.title}}** turns raw scans into printable models - one arch, or an upper and a lower with their bite - in one or two clicks: the work Meshmixer needs a dozen steps for. Full arches and quadrants (sextants) both work.
 
-**Step 1 happens as the panel opens.** Pare 3D welds the scan, removes broken triangles and loose pieces, fills the small holes and turns the scan teeth up, with the open edge underneath. The panel says what it found and how much of the scan can be kept: from the tallest tooth down to the highest point of the open edge, where the scan is complete all the way round. [[Ctrl]]+[[Z]] takes the turn back.
+Click **{{ui:dental.title}}** in the {{ui:editor.group.dental}} group of the toolbar, or search for it with [[Ctrl]]+[[K]]. With no scans in the design yet, click **{{ui:dental.import}}** in the panel and pick the upper, lower and bite scans (STL, OBJ, PLY or 3MF) together; they go straight into the slots. Scans already in the design are picked up when the panel opens: file names with upper, lower or bite in them say which is which; otherwise Pare 3D works it out (scanners put the upper above the lower, and a palate or the width across the canines says upper). **{{ui:dental.swap}}** swaps them if it guessed wrong.
 
-**Step 2 is one click.** Choose what the model is for and click {{ui:dental.apply}}:
+**As the panel opens** Pare 3D welds each scan, removes broken triangles and loose pieces, fills the small holes and sets each arch up teeth up, with the occlusal plane level and the midline straight. A quadrant is recognised as one and set up along its own length. With a bite scan the two arches are fitted onto it; without one they stay where the scanner put them, which is in occlusion when both came from the same scan. The panel says what it found for each scan and whether the arches are in occlusion.
+
+**Then one click.** Choose what the models are for and click {{ui:dental.apply}}:
 
 - **{{ui:dental.study}}:** hollow with 2 mm walls and open underneath, on a 4 mm base. It saves about a third of the resin; no resin is trapped and no drain holes are needed.
+- **{{ui:dental.ortho}}:** solid, on a base trimmed the orthodontic way - back square to the midline, heels and buccal sides angled, the upper's front pointed and the lower's rounded, 3 mm clear of the teeth. A pair is placed in occlusion. Quadrants get a square block instead.
 - **{{ui:dental.aligner}}:** solid, about 18 mm tall in all - models for thermoforming should be 15-20 mm tall, as taller models stretch the sheet too thin.
 - **{{ui:dental.crown}}:** solid, with a plate across the palate or tongue space. Studies of printed models find solid models with a cross-arch plate the most accurate, and hollow ones the least.
 
-Each choice only sets the values below it, which you can change: **{{ui:dental.keep}}**, the **{{ui:dental.base}}** (the model's height is shown underneath), **{{ui:dental.plate}}**, solid or hollow, and the **{{ui:dental.wall}}**.
+**{{ui:dental.more}}** holds the values each choice sets, which you can change: how much of the scan is kept ({{ui:dental.keep}}), the {{ui:dental.base}}, the base's shape (it follows the scan, a plate, or orthodontic), solid or hollow (open underneath, or closed with vent holes), the {{ui:dental.wall}}, a {{ui:dental.label}} engraved on the base, how the pair is placed ({{ui:dental.layoutPrint}}, side by side base down, or {{ui:dental.layoutOcclusion}}) and the {{ui:dental.hinge}}.
 
-- The teeth and gum you keep are the scan itself, untouched. Only the gum below the cut goes; the base is built from straight walls down to a flat floor.
-- A hollow model is hollowed on a fine grid of a fifth of the wall: the walls come out at least as thick as set (a little more in places), and the hollow opens through the floor.
-- Upper and lower arches work the same. A scan with the palate only partly scanned becomes a horseshoe; turn on the plate to join its two sides.
-- The result is one closed solid. Add a label with the text tool and export it as STL or 3MF.
+- **No tooth is ever cut off.** Pare 3D finds the teeth on each scan - everything within reach of a cusp tip and down to 10 mm below it, measured tooth by tooth, so a tilted arch or a quadrant is covered as well as a full arch - and no cut or trim goes into them. Where the scan's ragged edge folds under the teeth (a cheek flap tucked under the sulcus), what is under the teeth goes, not the teeth. Only the ragged fringe right at the scan's edge, at most 1.2 mm wide, may be trimmed beside a tooth - at the end of a quadrant, where the scan stops partway across a tooth. Every model is checked against its scan before it is handed over, and Pare 3D says so if any tooth surface could not be kept.
+- How deep the scan is kept is measured from the occlusal plane. By default Pare 3D keeps the scan down to where almost all of it ends - long tails of tissue that hang far below the gum are left out - and never more than 22 mm.
+- The teeth and gum you keep are the scan itself, untouched; the base is built from straight walls down to a flat floor. A pair stands equally tall.
+- A hollow model is hollowed on a fine grid of a fifth of the wall: the walls come out at least as thick as set (a little more in places).
+- The {{ui:dental.hinge}} adds a snap-on hinge behind the last molars of a pair in occlusion: posts and an axle on the lower, a clip on the upper. Print both, snap the clip over the axle, and the models open and close in their bite.
+- Each model is one closed solid that replaces its scan; [[Ctrl]]+[[Z]] brings the scans back and [[Ctrl]]+[[Y]] makes the models again.
+
+Import keeps note of where each file's coordinates were, so scans of one patient keep the places the scanner gave them however they are moved on the plate. Scans imported with Pare 3D before build 47 do not have that note: if they no longer face each other, each is made on its own, side by side, and the panel says so - import the files again to keep the bite.
 
 Pare 3D makes printable models; it does not check a scan for clinical accuracy. Keep patient files on your own computer - Pare 3D does all of this on your computer and sends nothing anywhere.
 

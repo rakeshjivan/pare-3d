@@ -1,0 +1,261 @@
+import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
+import { beforeAll, describe, expect, it } from "vitest";
+import { analyseDental, looksLikeDentalScan, makeDentalStudio, pinchedEdges, type DentalStudioOptions } from "@/lib/dentalModel";
+import { closeToFloor, orthoOutline } from "@/lib/dentalBase";
+import { labelSection, labelText } from "@/lib/dentalLabel";
+import { weld } from "@/lib/dentalMesh";
+import { plyToStlBytes } from "@/lib/plyImport";
+import { importedShapeFromStl } from "@/lib/stlImport";
+import { layerlingToZUp } from "@/lib/meshCoordinates";
+import { dentalPreset } from "@/components/workplane/DentalStudioPanel";
+
+/**
+ * A made-up arch, no patient's: a U-shaped sheet of "teeth" (bumps along the U, the incisors in
+ * front at -y) that falls away to a ragged edge, as an intraoral scan does. `teethDown` turns it
+ * over like an upper arch out of the scanner; a small hole and a loose fragment come with it.
+ */
+function syntheticArch(options: { teethDown?: boolean; flap?: boolean; front?: number } = {}) {
+  const nx = 120, ny = 60, sx = 60, sy = 30;
+  const front = options.front ?? 0;
+  const notch = (u: number, v: number) => Math.max(0.32 - u, u - 0.68, 0.45 - v);
+  const z = (i: number, j: number) => {
+    const u = i / nx, v = j / ny;
+    const edge = Math.min(u, 1 - u, v, 1 - v, Math.max(0, notch(u, v)));
+    const plateau = Math.min(1, edge * 8);
+    const teeth = 1.5 * Math.max(0, Math.sin(u * Math.PI * 14)) * Math.max(0, Math.sin(v * Math.PI * 2));
+    const ragged = 3 + 2 * Math.sin(i * 0.7) * Math.cos(j * 0.9);
+    return plateau * (12 + teeth) - (1 - plateau) * ragged;
+  };
+  // Front at -y: the closed end of the U is at small v.
+  const p = (i: number, j: number) => [(i / nx - 0.5) * sx, (j / ny - 0.5) * sy + front, z(i, j)];
+  const out: number[] = [];
+  const hole = (i: number, j: number) => i >= 20 && i < 22 && j >= 6 && j < 8;
+  for (let j = 0; j < ny; j += 1) for (let i = 0; i < nx; i += 1) {
+    if (notch((i + 0.5) / nx, (j + 0.5) / ny) < 0 || hole(i, j)) continue;
+    const a = p(i, j), b = p(i + 1, j), c = p(i + 1, j + 1), d = p(i, j + 1);
+    out.push(...a, ...c, ...b, ...a, ...d, ...c);
+  }
+  if (options.flap) {
+    // A cheek flap folded back under the front edge: a strip that hangs below the margin.
+    for (let i = 10; i < 110; i += 1) {
+      const x0 = (i / nx - 0.5) * sx, x1 = ((i + 1) / nx - 0.5) * sx, y0 = -sy / 2 + front;
+      const a = [x0, y0, z(i, 0)], b = [x1, y0, z(i + 1, 0)], c = [x1, y0 + 3, -6], d = [x0, y0 + 3, -6];
+      out.push(...a, ...b, ...c, ...a, ...c, ...d);
+    }
+  }
+  if (options.teethDown) {
+    for (let t = 0; t < out.length; t += 9) {
+      for (let k = 2; k < 9; k += 3) out[t + k] = -out[t + k];
+      for (let k = 0; k < 3; k += 1) { const swap = out[t + 3 + k]; out[t + 3 + k] = out[t + 6 + k]; out[t + 6 + k] = swap; }
+    }
+  }
+  out.push(80, 0, 0, 81, 0, 0, 80, 1, 0);
+  return Float32Array.from(out);
+}
+
+const base: DentalStudioOptions = { keep: null, base: 4, baseStyle: "follow", inside: "solid", wall: 2, hinge: false, layout: "print", label: "" };
+
+function closedVolume(runtime: ManifoldToplevel, positions: Float32Array) {
+  const mesh = new runtime.Mesh({ numProp: 3, vertProperties: positions, triVerts: Uint32Array.from({ length: positions.length / 3 }, (_, k) => k) });
+  mesh.merge();
+  const solid = new runtime.Manifold(mesh);
+  const result = { status: solid.status(), volume: solid.volume() };
+  solid.delete();
+  return result;
+}
+
+describe("Dental Studio (build 47)", () => {
+  let runtime: ManifoldToplevel;
+  beforeAll(async () => {
+    runtime = await manifoldModule();
+    runtime.setup();
+  });
+
+  it("recognises a raw scan and not a few triangles", () => {
+    expect(looksLikeDentalScan(syntheticArch())).toBe(true);
+    expect(looksLikeDentalScan(syntheticArch().slice(0, 900))).toBe(false);
+  });
+
+  it("cleans one arch, turns it teeth up and reports how deep the scan goes", () => {
+    const analysis = analyseDental({ arches: [{ id: "a", positions: syntheticArch({ teethDown: true }) }] });
+    expect(analysis.pair).toBeNull();
+    const arch = analysis.arches[0];
+    expect(arch.report.holesFilled).toBe(1);
+    expect(arch.report.fragmentsRemoved).toBe(1);
+    expect(arch.depth).toBeGreaterThan(12);
+    expect(arch.depth).toBeLessThan(25);
+  });
+
+  it("makes a closed solid model with all of the scan, the floor at z = 0", async () => {
+    const input = { arches: [{ id: "a", positions: syntheticArch({ teethDown: true }) }] };
+    const result = await makeDentalStudio(input, base, runtime as never);
+    const part = result.parts[0];
+    const closed = closedVolume(runtime, part.positions);
+    expect(closed.status).toBe("NoError");
+    expect(closed.volume).toBeCloseTo(part.volume, 0);
+    expect(pinchedEdges(part.positions)).toBe(0);
+    let minZ = Infinity;
+    for (let i = 2; i < part.positions.length; i += 3) minZ = Math.min(minZ, part.positions[i]);
+    expect(minZ).toBeCloseTo(0, 4);
+    expect(result.keptDepth[0]).toBeGreaterThan(analyseDental(input).arches[0].depth - 0.5);
+  });
+
+  it("wears back a folded flap instead of cutting the whole edge", () => {
+    const m = weld(syntheticArch({ flap: true }));
+    const closed = closeToFloor(m, -12);
+    expect(closed.worn).toBeGreaterThan(50);
+    expect(closed.worn).toBeLessThan(2000);
+  });
+
+  it("hollows open underneath, or closed with vents", async () => {
+    const input = { arches: [{ id: "a", positions: syntheticArch({ teethDown: true }) }] };
+    const solid = await makeDentalStudio(input, base, runtime as never);
+    const open = await makeDentalStudio(input, { ...base, inside: "open" }, runtime as never);
+    const closed = await makeDentalStudio(input, { ...base, inside: "closed" }, runtime as never);
+    expect(open.parts[0].volume).toBeLessThan(solid.parts[0].volume * 0.85);
+    expect(closed.parts[0].volume).toBeLessThan(solid.parts[0].volume * 0.95);
+    expect(closed.parts[0].volume).toBeGreaterThan(open.parts[0].volume);
+    for (const result of [open, closed]) {
+      expect(closedVolume(runtime, result.parts[0].positions).status).toBe("NoError");
+      expect(pinchedEdges(result.parts[0].positions)).toBe(0);
+    }
+    expect(closed.warnings).not.toContain("vents");
+  });
+
+  it("trims an orthodontic base and engraves its label", async () => {
+    const input = { arches: [{ id: "a", positions: syntheticArch({ teethDown: true }) }] };
+    const plain = await makeDentalStudio(input, { ...base, baseStyle: "ortho", base: 8 }, runtime as never);
+    const labelled = await makeDentalStudio(input, { ...base, baseStyle: "ortho", base: 8, label: "ab 12" }, runtime as never);
+    expect(closedVolume(runtime, labelled.parts[0].positions).status).toBe("NoError");
+    expect(labelled.warnings).not.toContain("label");
+    // Engraving takes a little away.
+    expect(labelled.parts[0].volume).toBeLessThan(plain.parts[0].volume - 1);
+    expect(labelled.parts[0].volume).toBeGreaterThan(plain.parts[0].volume - 60);
+  });
+
+  it("draws the orthodontic outlines: square back, pointed upper front, rounded lower front", () => {
+    const teeth: Array<[number, number]> = [];
+    for (let a = 0; a <= Math.PI; a += 0.05) teeth.push([25 * Math.cos(a), -20 * Math.sin(a) + 5]);
+    const upper = orthoOutline(teeth, "upper");
+    const lower = orthoOutline(teeth, "lower");
+    const back = (poly: Array<[number, number]>) => Math.max(...poly.map(([, y]) => y));
+    expect(back(upper)).toBeCloseTo(back(lower), 6);
+    // Every tooth point at least 3 mm inside both outlines' bounding boxes.
+    for (const poly of [upper, lower]) {
+      const minX = Math.min(...poly.map(([x]) => x)), maxX = Math.max(...poly.map(([x]) => x));
+      expect(minX).toBeLessThan(-25 - 2.9);
+      expect(maxX).toBeGreaterThan(25 + 2.9);
+    }
+    // The upper ends in a point on the midline; the lower is rounded with many sides.
+    expect(upper.length).toBeLessThan(lower.length);
+  });
+
+  it("puts a pair in occlusion, tells upper from lower by the overjet, and adds a printable hinge", async () => {
+    const upper = syntheticArch({ teethDown: true, front: -2 });
+    const lower = syntheticArch();
+    // Lower teeth up below the upper's, touching.
+    for (let i = 2; i < lower.length; i += 3) lower[i] -= 26.6;
+    const input = { arches: [{ id: "x", positions: lower }, { id: "y", positions: upper }] };
+    const analysis = analyseDental(input);
+    expect(analysis.pair?.inOcclusion).toBe(true);
+    expect(analysis.arches.find((a) => a.id === "y")?.role).toBe("upper");
+    const result = await makeDentalStudio(input, { ...base, hinge: true, layout: "print" }, runtime as never);
+    expect(result.parts.length).toBe(2);
+    for (const part of result.parts) {
+      expect(closedVolume(runtime, part.positions).status).toBe("NoError");
+      expect(pinchedEdges(part.positions)).toBe(0);
+    }
+    // Both stand on the plate, side by side.
+    const box = (p: Float32Array) => {
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity;
+      for (let i = 0; i < p.length; i += 3) { minX = Math.min(minX, p[i]); maxX = Math.max(maxX, p[i]); minZ = Math.min(minZ, p[i + 2]); }
+      return { minX, maxX, minZ };
+    };
+    const [a, b] = result.parts.map((part) => box(part.positions));
+    expect(a.minZ).toBeCloseTo(0, 3);
+    expect(b.minZ).toBeCloseTo(0, 3);
+    expect(Math.max(a.minX, b.minX)).toBeGreaterThan(Math.min(a.maxX, b.maxX));
+  });
+
+  it("starts each preset from the settings the evidence points to", () => {
+    expect(dentalPreset("study", 16, false)).toMatchObject({ inside: "open", baseStyle: "follow", keep: null });
+    const aligner = dentalPreset("aligner", 16, false);
+    expect(aligner.inside).toBe("solid");
+    expect(aligner.keep! + aligner.base).toBeGreaterThanOrEqual(15);
+    expect(aligner.keep! + aligner.base).toBeLessThanOrEqual(20);
+    expect(dentalPreset("crown", 16, false)).toMatchObject({ inside: "solid", baseStyle: "plate" });
+    expect(dentalPreset("ortho", 16, true)).toMatchObject({ baseStyle: "ortho", inside: "solid", layout: "occlusion", base: 8 });
+  });
+
+  it("writes labels in its own font", () => {
+    expect(labelText("Bonnie ünd 23/10")).toBe("BONNIE ND 23/10");
+    const section = labelSection(runtime as never, "U 12", 4);
+    expect(section.area()).toBeGreaterThan(5);
+    section.delete();
+  });
+
+  it("reads a PLY file's triangles as an STL", () => {
+    const ply = "ply\nformat ascii 1.0\nelement vertex 4\nproperty float x\nproperty float y\nproperty float z\nelement face 2\nproperty list uchar int vertex_indices\nend_header\n0 0 0\n1 0 0\n1 1 0\n0 1 0\n3 0 1 2\n3 0 2 3\n";
+    const stl = plyToStlBytes(new TextEncoder().encode(ply).buffer as ArrayBuffer);
+    const view = new DataView(stl.buffer);
+    expect(view.getUint32(80, true)).toBe(2);
+    expect(view.getFloat32(84 + 12 + 12, true)).toBe(1);
+  });
+
+  it("never loses tooth surface: a flap folded under the teeth goes, the teeth stay", async () => {
+    const result = await makeDentalStudio({ arches: [{ id: "a", positions: syntheticArch({ flap: true }) }] }, base, runtime as never);
+    expect(result.warnings).not.toContain("teeth");
+    // -1: the share of the teeth's surface kept; -2: how much tooth surface was found, mm².
+    expect(result.surface[0][-2]).toBeGreaterThan(300);
+    expect(result.surface[0][-1]).toBeGreaterThanOrEqual(0.999);
+    expect(result.surface[0][2]).toBeGreaterThanOrEqual(0.999);
+  });
+
+  it("keeps a short quadrant whole, teeth and all", async () => {
+    // A quadrant: a straight strip of five teeth with only a few mm of gum below them.
+    const out: number[] = [];
+    const nx = 100, ny = 24, sx = 40, sy = 11;
+    const z = (i: number, j: number) => {
+      const u = i / nx, v = j / ny;
+      const edge = Math.min(u, 1 - u, v, 1 - v);
+      const plateau = Math.min(1, edge * 6);
+      const teeth = 1.2 * Math.max(0, Math.sin(u * Math.PI * 5)) * Math.sin(v * Math.PI);
+      return plateau * (8 + teeth) - (1 - plateau) * (2 + Math.sin(i * 0.9) * Math.cos(j * 1.3));
+    };
+    const p = (i: number, j: number) => [(j / ny - 0.5) * sy, (i / nx - 0.5) * sx, z(i, j)];
+    for (let j = 0; j < ny; j += 1) for (let i = 0; i < nx; i += 1) {
+      const a = p(i, j), b = p(i + 1, j), c = p(i + 1, j + 1), d = p(i, j + 1);
+      out.push(...a, ...b, ...c, ...a, ...c, ...d);
+    }
+    const quadrant = Float32Array.from(out);
+    const analysis = analyseDental({ arches: [{ id: "q", positions: quadrant }] });
+    expect(analysis.arches[0].partial).toBe(true);
+    const result = await makeDentalStudio({ arches: [{ id: "q", positions: quadrant }] }, { ...base, inside: "open" }, runtime as never);
+    expect(result.warnings).not.toContain("teeth");
+    expect(result.surface[0][-2]).toBeGreaterThan(150);
+    expect(result.surface[0][-1]).toBeGreaterThanOrEqual(0.999);
+    expect(closedVolume(runtime, result.parts[0].positions).status).toBe("NoError");
+  });
+
+  it("remembers where an imported file's coordinates went, so scans keep the scanner's places", () => {
+    const stl = (points: number[]) => {
+      const n = points.length / 9;
+      const buf = new ArrayBuffer(84 + n * 50);
+      const view = new DataView(buf);
+      view.setUint32(80, n, true);
+      for (let t = 0; t < n; t += 1) for (let k = 0; k < 9; k += 1) view.setFloat32(84 + t * 50 + 12 + k * 4, points[t * 9 + k], true);
+      return buf;
+    };
+    // A Z-up file far from the origin: import centres it and turns it Y-up.
+    const file = [100, 50, 20, 110, 50, 20, 100, 60, 25, 104, 55, 30, 100, 50, 20, 110, 50, 20];
+    const shape = importedShapeFromStl("upper.stl", stl(file));
+    const mesh = shape.importedMesh!;
+    expect(mesh.sourceOrigin).toBeDefined();
+    expect(mesh.sourceTurned).toBe(true);
+    const [ox, oy, oz] = mesh.sourceOrigin!;
+    const back = layerlingToZUp([mesh.positions[0] + ox, mesh.positions[1] + oy, mesh.positions[2] + oz]);
+    expect(back[0]).toBeCloseTo(100, 4);
+    expect(back[1]).toBeCloseTo(50, 4);
+    expect(back[2]).toBeCloseTo(20, 4);
+  });
+});

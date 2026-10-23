@@ -4,19 +4,19 @@
  */
 import type { MeshRoundMode, MeshRoundResult } from "@/lib/meshRound";
 import type { FitReport } from "@/lib/partTools";
-import type { DentalModelOptions, DentalModelResult, PreparedDentalScan } from "@/lib/dentalModel";
+import type { DentalAnalysis, DentalStudioInput, DentalStudioOptions, DentalStudioResult } from "@/lib/dentalModel";
 import type { WorkplaneShape } from "@/types/layerling";
 
 export type MeshJobRequest =
   | { id: number; base: string; kind: "round"; positions: Float32Array; radius: number; mode: MeshRoundMode }
   | { id: number; base: string; kind: "fit"; shapes: WorkplaneShape[]; clearance: number }
-  | { id: number; base: string; kind: "dentalPrepare"; positions: Float32Array }
-  | { id: number; base: string; kind: "dentalModel"; positions: Float32Array; options: DentalModelOptions };
+  | { id: number; base: string; kind: "dentalAnalyse"; input: DentalStudioInput }
+  | { id: number; base: string; kind: "dentalStudio"; input: DentalStudioInput; options: DentalStudioOptions };
 export type MeshJobResponse =
   | { id: number; ok: true; kind?: "round"; result: { positions: Float32Array; voxel: number; coarse: boolean } }
   | { id: number; ok: true; kind: "fit"; report: FitReport }
-  | { id: number; ok: true; kind: "dentalPrepare"; prepared: PreparedDentalScan }
-  | { id: number; ok: true; kind: "dentalModel"; model: DentalModelResult }
+  | { id: number; ok: true; kind: "dentalAnalyse"; analysis: DentalAnalysis }
+  | { id: number; ok: true; kind: "dentalStudio"; result: DentalStudioResult }
   | { id: number; ok: false; error: string };
 
 let worker: Worker | null = null;
@@ -36,8 +36,8 @@ function meshWorker(): Worker | null {
       pending.delete(reply.id);
       if (!reply.ok) waiting.reject(new Error(reply.error));
       else if (reply.kind === "fit") waiting.resolve(reply.report);
-      else if (reply.kind === "dentalPrepare") waiting.resolve(reply.prepared);
-      else if (reply.kind === "dentalModel") waiting.resolve(reply.model);
+      else if (reply.kind === "dentalAnalyse") waiting.resolve(reply.analysis);
+      else if (reply.kind === "dentalStudio") waiting.resolve(reply.result);
       else waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
     };
     worker.onerror = () => {
@@ -99,32 +99,40 @@ export async function checkFitInBackground(shapes: readonly WorkplaneShape[], cl
   }
 }
 
-/** Runs a dental job in the worker when one runs, here otherwise (build 46). */
-async function dentalJob<T>(request: (id: number, base: string, data: Float32Array) => MeshJobRequest, positions: ArrayLike<number>, here: () => Promise<T>): Promise<T> {
+/** Copies of the scans, so the caller's arrays are not handed over to the worker. */
+function copiedInput(input: DentalStudioInput): DentalStudioInput {
+  return {
+    arches: input.arches.map((arch) => ({ id: arch.id, positions: Float32Array.from(arch.positions as ArrayLike<number>) })),
+    bite: input.bite ? Float32Array.from(input.bite as ArrayLike<number>) : null,
+    roles: input.roles,
+  };
+}
+
+/** Runs a Dental Studio job in the worker when one runs, here otherwise (build 47). */
+async function dentalJob<T>(request: (id: number, base: string, input: DentalStudioInput) => MeshJobRequest, input: DentalStudioInput, here: (input: DentalStudioInput) => Promise<T>): Promise<T> {
   const target = meshWorker();
-  if (!target) return here();
+  if (!target) return here(input);
   const id = nextId;
   nextId += 1;
-  const data = Float32Array.from(positions as ArrayLike<number>);
+  const data = copiedInput(input);
+  const buffers = [...data.arches.map((arch) => (arch.positions as Float32Array).buffer), ...(data.bite ? [(data.bite as Float32Array).buffer] : [])];
   try {
     return await new Promise<T>((resolve, reject) => {
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
-      target.postMessage(request(id, new URL(".", window.location.href).href, data), [data.buffer]);
+      target.postMessage(request(id, new URL(".", window.location.href).href, data), buffers);
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "worker-unavailable") return here();
+    if (error instanceof Error && error.message === "worker-unavailable") return here(input);
     throw error;
   }
 }
 
-/** Step 1 of Dental model: cleans and turns a raw scan (Z-up positions). */
-export function prepareDentalScanInBackground(positions: ArrayLike<number>): Promise<PreparedDentalScan> {
-  const copy = Float32Array.from(positions as ArrayLike<number>);
-  return dentalJob((id, base, data) => ({ id, base, kind: "dentalPrepare", positions: data }), positions, async () => (await import("@/lib/dentalModel")).prepareDentalScan(copy));
+/** Dental Studio: cleans the scans, tells upper from lower, finds the bite (Z-up positions). */
+export function analyseDentalInBackground(input: DentalStudioInput): Promise<DentalAnalysis> {
+  return dentalJob((id, base, data) => ({ id, base, kind: "dentalAnalyse", input: data }), input, async (data) => (await import("@/lib/dentalModel")).analyseDental(data));
 }
 
-/** Step 2 of Dental model: trims, adds the base and hollows a prepared scan (Z-up positions). */
-export function makeDentalModelInBackground(positions: ArrayLike<number>, options: DentalModelOptions): Promise<DentalModelResult> {
-  const copy = Float32Array.from(positions as ArrayLike<number>);
-  return dentalJob((id, base, data) => ({ id, base, kind: "dentalModel", positions: data, options }), positions, async () => (await import("@/lib/dentalModel")).makeDentalModel(copy, options));
+/** Dental Studio: makes the models (Z-up positions). */
+export function makeDentalStudioInBackground(input: DentalStudioInput, options: DentalStudioOptions): Promise<DentalStudioResult> {
+  return dentalJob((id, base, data) => ({ id, base, kind: "dentalStudio", input: data, options }), input, async (data) => (await import("@/lib/dentalModel")).makeDentalStudio(data, options));
 }

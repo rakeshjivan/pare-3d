@@ -46,6 +46,7 @@ export function importedShapeFromTriangleSoup(
   rawPositions: number[],
   rawNormals: number[] | undefined,
   sourceFormat: NonNullable<WorkplaneShape["importedMesh"]>["sourceFormat"] = "stl",
+  sourceTurned?: boolean,
 ): WorkplaneShape {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(rawPositions, 3));
@@ -108,6 +109,8 @@ export function importedShapeFromTriangleSoup(
     importedMesh: {
       positions,
       normals: normals.length ? normals : undefined,
+      sourceOrigin: [center.x, box.min.y, center.z],
+      ...(sourceTurned ? { sourceTurned: true } : {}),
       baseWidth: width,
       baseDepth: depth,
       baseHeight: height,
@@ -141,5 +144,5 @@ export function importedShapeFromStl(fileName: string, buffer: ArrayBuffer): Wor
     }
   }
 
-  return importedShapeFromTriangleSoup(fileName, rawPositions, rawNormals.length ? rawNormals : undefined);
+  return importedShapeFromTriangleSoup(fileName, rawPositions, rawNormals.length ? rawNormals : undefined, "stl", !usesLayerlingYUp);
 }

@@ -80,6 +80,9 @@ export type LylImportedMeshReferenceV1 = {
   baseHeight: number;
   triangleCount: number;
   sourceFormat: NonNullable<WorkplaneShape["importedMesh"]>["sourceFormat"];
+  /** Fork (build 47): see WorkplaneShape importedMesh. */
+  sourceOrigin?: [number, number, number];
+  sourceTurned?: boolean;
 };
 
 export type LylShapeNodeV1 = {
@@ -773,6 +776,8 @@ async function serializeShapeNode(
       baseHeight: importedMesh.baseHeight,
       triangleCount: importedMesh.triangleCount,
       sourceFormat: importedMesh.sourceFormat,
+      ...(importedMesh.sourceOrigin ? { sourceOrigin: importedMesh.sourceOrigin } : {}),
+      ...(importedMesh.sourceTurned ? { sourceTurned: true } : {}),
     };
   }
 
@@ -1961,6 +1966,8 @@ async function restoreShapeFromNode(
       baseHeight: reference.baseHeight,
       triangleCount: reference.triangleCount,
       sourceFormat: reference.sourceFormat,
+      ...(Array.isArray(reference.sourceOrigin) && reference.sourceOrigin.length === 3 && reference.sourceOrigin.every(Number.isFinite) ? { sourceOrigin: reference.sourceOrigin } : {}),
+      ...(reference.sourceTurned === true ? { sourceTurned: true } : {}),
       ...(brepRecord ? { brepStep: strFromU8(files[brepRecord.path]) } : {}),
     }));
   }

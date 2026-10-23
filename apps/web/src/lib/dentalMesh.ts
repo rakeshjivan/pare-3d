@@ -1,0 +1,644 @@
+/**
+ * Fork (build 47): mesh helpers for Dental Studio - an indexed mesh welded from a triangle soup,
+ * its open edges, cuts, fills, and the bridge to Manifold. Z-up millimetres throughout.
+ */
+import * as THREE from "three";
+import type { ManifoldToplevel } from "manifold-3d";
+import { weldedVertexIds } from "@/lib/meshComponents";
+
+export type Mesh = { v: number[]; f: number[] };
+export type Ring = Array<[number, number]>;
+export type ManifoldRuntime = ManifoldToplevel;
+export type ManifoldSolid = InstanceType<ManifoldToplevel["Manifold"]>;
+
+export function weld(positions: ArrayLike<number>, tolerance = 1e-4): Mesh {
+  const count = Math.floor(positions.length / 3);
+  const points: Float64Array[] = new Array(count);
+  const flat = Float64Array.from(positions as ArrayLike<number>);
+  for (let i = 0; i < count; i += 1) points[i] = flat.subarray(i * 3, i * 3 + 3);
+  const ids = weldedVertexIds(points, tolerance);
+  let vertexCount = 0;
+  for (let i = 0; i < count; i += 1) vertexCount = Math.max(vertexCount, ids[i] + 1);
+  const v = new Array<number>(vertexCount * 3);
+  for (let i = 0; i < count; i += 1) {
+    const id = ids[i];
+    v[id * 3] = flat[i * 3];
+    v[id * 3 + 1] = flat[i * 3 + 1];
+    v[id * 3 + 2] = flat[i * 3 + 2];
+  }
+  const f: number[] = [];
+  const seen = new Map<number, number[]>();
+  for (let t = 0; t + 2 < count; t += 3) {
+    const a = ids[t], b = ids[t + 1], c = ids[t + 2];
+    if (a === b || b === c || a === c) continue;
+    // A doubled triangle: the same three corners, looked up by its two lowest corners.
+    const lo = Math.min(a, b, c), hi = Math.max(a, b, c), mid = a + b + c - lo - hi;
+    const key = lo * 4294967296 + mid;
+    const list = seen.get(key);
+    if (list) {
+      if (list.includes(hi)) continue;
+      list.push(hi);
+    } else seen.set(key, [hi]);
+    f.push(a, b, c);
+  }
+  return { v, f };
+}
+
+export function edgeKey(a: number, b: number) {
+  return a < b ? a * 4194304 + b : b * 4194304 + a;
+}
+
+export function faceArea(m: Mesh, t: number) {
+  const a = m.f[t * 3] * 3, b = m.f[t * 3 + 1] * 3, c = m.f[t * 3 + 2] * 3;
+  const ux = m.v[b] - m.v[a], uy = m.v[b + 1] - m.v[a + 1], uz = m.v[b + 2] - m.v[a + 2];
+  const wx = m.v[c] - m.v[a], wy = m.v[c + 1] - m.v[a + 1], wz = m.v[c + 2] - m.v[a + 2];
+  const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+  return Math.sqrt(nx * nx + ny * ny + nz * nz) / 2;
+}
+
+/** Drops the triangles on an edge used by more than two triangles. */
+export function dropNonManifold(m: Mesh): number {
+  const counts = new Map<number, number>();
+  const faces = m.f.length / 3;
+  for (let t = 0; t < faces; t += 1) for (let k = 0; k < 3; k += 1) {
+    const key = edgeKey(m.f[t * 3 + k], m.f[t * 3 + ((k + 1) % 3)]);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const kept: number[] = [];
+  let dropped = 0;
+  for (let t = 0; t < faces; t += 1) {
+    let bad = false;
+    for (let k = 0; k < 3 && !bad; k += 1) bad = (counts.get(edgeKey(m.f[t * 3 + k], m.f[t * 3 + ((k + 1) % 3)])) ?? 0) > 2;
+    if (bad) dropped += 1;
+    else kept.push(m.f[t * 3], m.f[t * 3 + 1], m.f[t * 3 + 2]);
+  }
+  m.f = kept;
+  return dropped;
+}
+
+/** Keeps the pieces at least `share` of the biggest piece's area; returns how many went. */
+export function dropFragments(m: Mesh, share: number): number {
+  const faces = m.f.length / 3;
+  if (faces === 0) return 0;
+  const parent = new Int32Array(m.v.length / 3);
+  for (let i = 0; i < parent.length; i += 1) parent[i] = i;
+  const find = (start: number) => {
+    let a = start;
+    while (parent[a] !== a) {
+      parent[a] = parent[parent[a]];
+      a = parent[a];
+    }
+    return a;
+  };
+  for (let t = 0; t < faces; t += 1) {
+    const a = find(m.f[t * 3]);
+    const b = find(m.f[t * 3 + 1]);
+    if (a !== b) parent[b] = a;
+    const c = find(m.f[t * 3 + 2]);
+    const r = find(a);
+    if (c !== r) parent[c] = r;
+  }
+  const area = new Map<number, number>();
+  for (let t = 0; t < faces; t += 1) {
+    const root = find(m.f[t * 3]);
+    area.set(root, (area.get(root) ?? 0) + faceArea(m, t));
+  }
+  const biggest = Math.max(...area.values());
+  const keep = new Set([...area.entries()].filter(([, a]) => a >= biggest * share).map(([root]) => root));
+  const kept: number[] = [];
+  for (let t = 0; t < faces; t += 1) if (keep.has(find(m.f[t * 3]))) kept.push(m.f[t * 3], m.f[t * 3 + 1], m.f[t * 3 + 2]);
+  m.f = kept;
+  return area.size - keep.size;
+}
+
+/**
+ * Drops the pieces that face down on the whole (a flap folded over, its outside towards the plate),
+ * keeping the biggest piece whatever it does. Returns how many went.
+ */
+export function dropInverted(m: Mesh): number {
+  const faces = m.f.length / 3;
+  if (faces === 0) return 0;
+  const parent = new Int32Array(m.v.length / 3);
+  for (let i = 0; i < parent.length; i += 1) parent[i] = i;
+  const find = (start: number) => {
+    let a = start;
+    while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; }
+    return a;
+  };
+  for (let t = 0; t < faces; t += 1) {
+    const a = find(m.f[t * 3]);
+    for (let k = 1; k < 3; k += 1) { const b = find(m.f[t * 3 + k]); if (a !== b) parent[b] = a; }
+  }
+  const up = new Map<number, number>(), area = new Map<number, number>();
+  for (let t = 0; t < faces; t += 1) {
+    const root = find(m.f[t * 3]);
+    const a = m.f[t * 3] * 3, b = m.f[t * 3 + 1] * 3, c = m.f[t * 3 + 2] * 3;
+    const cross = (m.v[b] - m.v[a]) * (m.v[c + 1] - m.v[a + 1]) - (m.v[b + 1] - m.v[a + 1]) * (m.v[c] - m.v[a]);
+    up.set(root, (up.get(root) ?? 0) + cross);
+    area.set(root, (area.get(root) ?? 0) + faceArea(m, t));
+  }
+  let biggest = -1, most = -1;
+  area.forEach((value, root) => { if (value > most) { most = value; biggest = root; } });
+  const drop = new Set([...up.entries()].filter(([root, value]) => value < 0 && root !== biggest).map(([root]) => root));
+  if (!drop.size) return 0;
+  const kept: number[] = [];
+  for (let t = 0; t < faces; t += 1) if (!drop.has(find(m.f[t * 3]))) kept.push(m.f[t * 3], m.f[t * 3 + 1], m.f[t * 3 + 2]);
+  m.f = kept;
+  return drop.size;
+}
+
+/**
+ * The open edges as closed loops of vertex indices, each in the direction its triangles run along
+ * it (a triangle's edge a->b on the boundary gives a->b in the loop).
+ */
+export function boundaryLoops(m: Mesh): number[][] {
+  const faces = m.f.length / 3;
+  const directed = new Map<number, number>();
+  for (let t = 0; t < faces; t += 1) for (let k = 0; k < 3; k += 1) {
+    const a = m.f[t * 3 + k], b = m.f[t * 3 + ((k + 1) % 3)];
+    const key = edgeKey(a, b);
+    directed.set(key, (directed.get(key) ?? 0) + 1);
+  }
+  const next = new Map<number, number[]>();
+  for (let t = 0; t < faces; t += 1) for (let k = 0; k < 3; k += 1) {
+    const a = m.f[t * 3 + k], b = m.f[t * 3 + ((k + 1) % 3)];
+    if (directed.get(edgeKey(a, b)) !== 1) continue;
+    const list = next.get(a);
+    if (list) list.push(b);
+    else next.set(a, [b]);
+  }
+  const loops: number[][] = [];
+  for (const start of [...next.keys()]) {
+    for (;;) {
+      const outs = next.get(start);
+      if (!outs || outs.length === 0) break;
+      const loop: number[] = [start];
+      let current = outs.pop()!;
+      let guard = 0;
+      while (current !== start && guard < 10_000_000) {
+        loop.push(current);
+        const more = next.get(current);
+        if (!more || more.length === 0) break;
+        current = more.pop()!;
+        guard += 1;
+      }
+      if (current === start && loop.length >= 3) loops.push(loop);
+    }
+  }
+  return loops;
+}
+
+export function loopLength(m: Mesh, loop: number[]) {
+  let total = 0;
+  for (let i = 0; i < loop.length; i += 1) {
+    const a = loop[i] * 3, b = loop[(i + 1) % loop.length] * 3;
+    total += Math.hypot(m.v[a] - m.v[b], m.v[a + 1] - m.v[b + 1], m.v[a + 2] - m.v[b + 2]);
+  }
+  return total;
+}
+
+/** Closes a hole with a fan from its centre; the new triangles run the other way round the edge. */
+export function fillLoop(m: Mesh, loop: number[]) {
+  let cx = 0, cy = 0, cz = 0;
+  for (const i of loop) {
+    cx += m.v[i * 3];
+    cy += m.v[i * 3 + 1];
+    cz += m.v[i * 3 + 2];
+  }
+  const centre = m.v.length / 3;
+  m.v.push(cx / loop.length, cy / loop.length, cz / loop.length);
+  for (let i = 0; i < loop.length; i += 1) {
+    const a = loop[i], b = loop[(i + 1) % loop.length];
+    m.f.push(b, a, centre);
+  }
+}
+
+/** Unit normal of the best-fit plane through points (smallest eigenvector of their covariance). */
+export function planeNormal(points: number[][]): [number, number, number] {
+  const n = points.length;
+  const c = [0, 0, 0];
+  points.forEach((p) => { c[0] += p[0]; c[1] += p[1]; c[2] += p[2]; });
+  c[0] /= n; c[1] /= n; c[2] /= n;
+  const a = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  points.forEach((p) => {
+    const d = [p[0] - c[0], p[1] - c[1], p[2] - c[2]];
+    for (let i = 0; i < 3; i += 1) for (let j = 0; j < 3; j += 1) a[i][j] += d[i] * d[j];
+  });
+  // Jacobi rotations on the symmetric 3x3 matrix.
+  const vecs = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  for (let sweep = 0; sweep < 50; sweep += 1) {
+    let off = 0;
+    for (let i = 0; i < 3; i += 1) for (let j = i + 1; j < 3; j += 1) off += a[i][j] * a[i][j];
+    if (off < 1e-18) break;
+    for (let p = 0; p < 3; p += 1) for (let q = p + 1; q < 3; q += 1) {
+      if (Math.abs(a[p][q]) < 1e-30) continue;
+      const theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
+      const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+      const cs = 1 / Math.sqrt(t * t + 1), sn = t * cs;
+      for (let k = 0; k < 3; k += 1) {
+        const akp = a[k][p], akq = a[k][q];
+        a[k][p] = cs * akp - sn * akq;
+        a[k][q] = sn * akp + cs * akq;
+      }
+      for (let k = 0; k < 3; k += 1) {
+        const apk = a[p][k], aqk = a[q][k];
+        a[p][k] = cs * apk - sn * aqk;
+        a[q][k] = sn * apk + cs * aqk;
+      }
+      for (let k = 0; k < 3; k += 1) {
+        const vkp = vecs[k][p], vkq = vecs[k][q];
+        vecs[k][p] = cs * vkp - sn * vkq;
+        vecs[k][q] = sn * vkp + cs * vkq;
+      }
+    }
+  }
+  let smallest = 0;
+  for (let i = 1; i < 3; i += 1) if (a[i][i] < a[smallest][smallest]) smallest = i;
+  const normal: [number, number, number] = [vecs[0][smallest], vecs[1][smallest], vecs[2][smallest]];
+  const length = Math.hypot(...normal) || 1;
+  return [normal[0] / length, normal[1] / length, normal[2] / length];
+}
+
+export function rotateOnto(m: Mesh, from: [number, number, number], to: [number, number, number]) {
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(...from), new THREE.Vector3(...to));
+  const p = new THREE.Vector3();
+  for (let i = 0; i < m.v.length; i += 3) {
+    p.set(m.v[i], m.v[i + 1], m.v[i + 2]).applyQuaternion(q);
+    m.v[i] = p.x;
+    m.v[i + 1] = p.y;
+    m.v[i + 2] = p.z;
+  }
+}
+
+export function soup(m: Mesh): Float32Array {
+  const out = new Float32Array(m.f.length * 3);
+  for (let i = 0; i < m.f.length; i += 1) {
+    const base = m.f[i] * 3;
+    out[i * 3] = m.v[base];
+    out[i * 3 + 1] = m.v[base + 1];
+    out[i * 3 + 2] = m.v[base + 2];
+  }
+  return out;
+}
+
+/** Sum of z-normal times area: positive when the surface faces up on the whole. */
+export function upwardness(m: Mesh) {
+  let total = 0;
+  for (let t = 0; t < m.f.length; t += 3) {
+    const a = m.f[t] * 3, b = m.f[t + 1] * 3, c = m.f[t + 2] * 3;
+    const ux = m.v[b] - m.v[a], uy = m.v[b + 1] - m.v[a + 1];
+    const wx = m.v[c] - m.v[a], wy = m.v[c + 1] - m.v[a + 1];
+    total += ux * wy - uy * wx;
+  }
+  return total;
+}
+
+export function cutBelow(m: Mesh, level: number): Mesh {
+  const v = m.v.slice();
+  for (let i = 2; i < v.length; i += 3) if (Math.abs(v[i] - level) < 1e-7) v[i] = level;
+  const f: number[] = [];
+  const made = new Map<number, number>();
+  const cutPoint = (a: number, b: number) => {
+    const key = edgeKey(a, b);
+    const found = made.get(key);
+    if (found !== undefined) return found;
+    const za = v[a * 3 + 2], zb = v[b * 3 + 2];
+    const s = (level - za) / (zb - za);
+    const id = v.length / 3;
+    v.push(v[a * 3] + (v[b * 3] - v[a * 3]) * s, v[a * 3 + 1] + (v[b * 3 + 1] - v[a * 3 + 1]) * s, level);
+    made.set(key, id);
+    return id;
+  };
+  for (let t = 0; t < m.f.length; t += 3) {
+    const tri = [m.f[t], m.f[t + 1], m.f[t + 2]];
+    const above = tri.map((i) => v[i * 3 + 2] >= level);
+    const count = above.filter(Boolean).length;
+    if (count === 3) {
+      f.push(...tri);
+      continue;
+    }
+    if (count === 0) continue;
+    // Walk the triangle's edges, keeping the part above and the crossings, in order.
+    const poly: number[] = [];
+    for (let k = 0; k < 3; k += 1) {
+      const a = tri[k], b = tri[(k + 1) % 3];
+      const aa = above[k], bb = above[(k + 1) % 3];
+      if (aa) poly.push(a);
+      if (aa !== bb) {
+        const za = v[a * 3 + 2], zb = v[b * 3 + 2];
+        // A corner exactly on the plane is the crossing itself.
+        if (aa && za === level) continue;
+        if (bb && zb === level) continue;
+        poly.push(cutPoint(a, b));
+      }
+    }
+    for (let k = 1; k + 1 < poly.length; k += 1) {
+      const a = poly[0], b = poly[k], c = poly[k + 1];
+      if (a !== b && b !== c && a !== c) f.push(a, b, c);
+    }
+  }
+  return { v, f };
+}
+
+export function pointInPolygon(x: number, y: number, poly: Array<[number, number]>) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+export function signedArea(poly: Array<[number, number]>) {
+  let s = 0;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) s += (poly[j][0] - poly[i][0]) * (poly[j][1] + poly[i][1]);
+  return s / 2;
+}
+
+/**
+ * Closes a cut scan: vertical walls from every open edge straight down to z = floor, and the floor.
+ * The edges' outlines seen from above must not cross themselves or each other, and no part of the
+ * scan may lie under an edge (closeToFloor in dentalBase sees to both).
+ */
+export function closeWithBase(m: Mesh, floor: number): { mesh: Mesh; outline: Ring[] } {
+  const loops = boundaryLoops(m);
+  if (loops.length === 0) throw new Error("The cut left no open edge to build the base from");
+  const v = m.v.slice();
+  const f = m.f.slice();
+  const below = new Map<number, number>();
+  const down = (i: number) => {
+    const found = below.get(i);
+    if (found !== undefined) return found;
+    const id = v.length / 3;
+    v.push(m.v[i * 3], m.v[i * 3 + 1], floor);
+    below.set(i, id);
+    return id;
+  };
+  const rings = loops.map((loop) => loop.map((i) => [m.v[i * 3], m.v[i * 3 + 1]] as [number, number]));
+  // Walls: the scan runs a->b along its edge, the wall b->a, then down.
+  loops.forEach((loop) => {
+    for (let k = 0; k < loop.length; k += 1) {
+      const a = loop[k], b = loop[(k + 1) % loop.length];
+      const a2 = down(a), b2 = down(b);
+      f.push(b, a, a2, b, a2, b2);
+    }
+  });
+  // Floor: loops nested by containment; even depth = outline, odd = hole in the one around it.
+  const depth = rings.map((ring, i) => rings.reduce((d, other, j) => (j !== i && pointInPolygon(ring[0][0], ring[0][1], other) ? d + 1 : d), 0));
+  const areas = rings.map((ring) => Math.abs(signedArea(ring)));
+  rings.forEach((ring, i) => {
+    if (depth[i] % 2 !== 0) return;
+    const holes = rings
+      .map((_, j) => j)
+      .filter((j) => depth[j] === depth[i] + 1 && areas[j] < areas[i] && pointInPolygon(rings[j][0][0], rings[j][0][1], ring));
+    const contour = ring.map(([x, y]) => new THREE.Vector2(x, y));
+    const holeVectors = holes.map((j) => rings[j].map(([x, y]) => new THREE.Vector2(x, y)));
+    const ids = [...loops[i].map(down), ...holes.flatMap((j) => loops[j].map(down))];
+    const faces = THREE.ShapeUtils.triangulateShape(contour, holeVectors);
+    // The floor runs against its walls: the walls run along the bottom edge in the loop's direction,
+    // so the floor runs the other way. Decided once for the whole floor (slivers along a straight
+    // edge have no winding of their own).
+    let total = 0;
+    for (const [p, q, r] of faces) {
+      const a = ids[p], b = ids[q], c = ids[r];
+      total += (v[b * 3] - v[a * 3]) * (v[c * 3 + 1] - v[a * 3 + 1]) - (v[b * 3 + 1] - v[a * 3 + 1]) * (v[c * 3] - v[a * 3]);
+    }
+    const loopTurnsLeft = signedArea(ring) > 0;
+    for (const [p, q, r] of faces) {
+      if ((total > 0) === loopTurnsLeft) f.push(ids[p], ids[r], ids[q]);
+      else f.push(ids[p], ids[q], ids[r]);
+    }
+  });
+  patchOpenEdges(f);
+  return { mesh: { v, f }, outline: rings };
+}
+
+/**
+ * Where the floor's triangulation left gaps (an outline touching or crossing itself where a corner
+ * of the teeth could not be worn back), each gap is closed by a fan, so the solid is closed.
+ */
+export function patchOpenEdges(f: number[]) {
+  const uses = new Map<number, number>();
+  for (let t = 0; t < f.length; t += 3) for (let k = 0; k < 3; k += 1) {
+    const key = edgeKey(f[t + k], f[t + ((k + 1) % 3)]);
+    uses.set(key, (uses.get(key) ?? 0) + 1);
+  }
+  // The edges a patch must run along: the reverse of each edge used once.
+  const next = new Map<number, number[]>();
+  for (let t = 0; t < f.length; t += 3) for (let k = 0; k < 3; k += 1) {
+    const a = f[t + k], b = f[t + ((k + 1) % 3)];
+    if (uses.get(edgeKey(a, b)) !== 1) continue;
+    const list = next.get(b);
+    if (list) list.push(a);
+    else next.set(b, [a]);
+  }
+  for (const start of [...next.keys()]) {
+    while ((next.get(start) ?? []).length) {
+      const cycle = [start];
+      let at = next.get(start)!.pop()!;
+      let guard = 0;
+      while (at !== start && guard < 100000) {
+        cycle.push(at);
+        const list = next.get(at);
+        if (!list || !list.length) break;
+        at = list.pop()!;
+        guard += 1;
+      }
+      if (at !== start || cycle.length < 3) continue;
+      for (let k = 1; k + 1 < cycle.length; k += 1) f.push(cycle[0], cycle[k], cycle[k + 1]);
+    }
+  }
+}
+
+/** Convex hull of 2D points (monotone chain), counter-clockwise. */
+export function convexHull(points: Array<[number, number]>): Array<[number, number]> {
+  const pts = points.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o: [number, number], a: [number, number], b: [number, number]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: Array<[number, number]> = [];
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: Array<[number, number]> = [];
+  for (let i = pts.length - 1; i >= 0; i -= 1) {
+    const p = pts[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  upper.pop();
+  lower.pop();
+  return lower.concat(upper);
+}
+
+export function toManifold(runtime: ManifoldRuntime, m: Mesh): ManifoldSolid {
+  // Points made twice (a cut point and a wall point at the same place) are joined first.
+  const welded = weld(soup(m), 1e-6);
+  const solid = new runtime.Manifold(new runtime.Mesh({ numProp: 3, vertProperties: new Float32Array(welded.v), triVerts: new Uint32Array(welded.f) }));
+  if (solid.status() !== "NoError") throw new Error(`The model did not close into a solid (${solid.status()})`);
+  return solid;
+}
+
+export function solidPositions(solid: ManifoldSolid): Float32Array {
+  const mesh = solid.getMesh();
+  const n = mesh.vertProperties.length / mesh.numProp;
+  const px = new Float64Array(n * 3);
+  for (let i = 0; i < n; i += 1) for (let k = 0; k < 3; k += 1) px[i * 3 + k] = mesh.vertProperties[i * mesh.numProp + k];
+  // Where the solid touches itself (two lobes of a cavity meeting at an edge) Manifold keeps two
+  // vertices at one place. Joined again on import they would make an edge of four faces, so each
+  // copy is moved 2 microns towards its own neighbours: apart, the solid welds back cleanly.
+  const at = new Map<string, number[]>();
+  for (let i = 0; i < n; i += 1) {
+    const key = `${px[i * 3]},${px[i * 3 + 1]},${px[i * 3 + 2]}`;
+    const list = at.get(key);
+    if (list) list.push(i);
+    else at.set(key, [i]);
+  }
+  const doubled = [...at.values()].filter((list) => list.length > 1).flat();
+  if (doubled.length) {
+    const wanted = new Set(doubled);
+    const sum = new Map<number, [number, number, number, number]>();
+    for (let t = 0; t < mesh.triVerts.length; t += 3) for (let k = 0; k < 3; k += 1) {
+      const v = mesh.triVerts[t + k];
+      if (!wanted.has(v)) continue;
+      const entry = sum.get(v) ?? [0, 0, 0, 0];
+      for (let j = 1; j < 3; j += 1) {
+        const w = mesh.triVerts[t + ((k + j) % 3)];
+        entry[0] += px[w * 3]; entry[1] += px[w * 3 + 1]; entry[2] += px[w * 3 + 2]; entry[3] += 1;
+      }
+      sum.set(v, entry);
+    }
+    sum.forEach(([x, y, z, count], v) => {
+      const dx = x / count - px[v * 3], dy = y / count - px[v * 3 + 1], dz = z / count - px[v * 3 + 2];
+      const length = Math.hypot(dx, dy, dz) || 1;
+      px[v * 3] += (dx / length) * 0.002;
+      px[v * 3 + 1] += (dy / length) * 0.002;
+      px[v * 3 + 2] += (dz / length) * 0.002;
+    });
+  }
+  const out = new Float32Array(mesh.triVerts.length * 3);
+  for (let i = 0; i < mesh.triVerts.length; i += 1) {
+    const base = mesh.triVerts[i] * 3;
+    out[i * 3] = px[base];
+    out[i * 3 + 1] = px[base + 1];
+    out[i * 3 + 2] = px[base + 2];
+  }
+  return out;
+}
+
+/** The cavity of a hollow model: the solid shrunk by `wall`, carried on down through the floor. */
+export function pinchedEdges(positions: ArrayLike<number>): number {
+  const m = weld(positions, 1e-5);
+  const counts = new Map<number, number>();
+  for (let t = 0; t < m.f.length; t += 3) for (let k = 0; k < 3; k += 1) {
+    const key = edgeKey(m.f[t + k], m.f[t + ((k + 1) % 3)]);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let pinched = 0;
+  counts.forEach((count) => { if (count > 2) pinched += 1; });
+  return pinched;
+}
+
+
+/** Applies a rigid (or any affine) transform to every point of the mesh, in place. */
+export function applyMatrix(m: Mesh, matrix: THREE.Matrix4) {
+  const p = new THREE.Vector3();
+  for (let i = 0; i < m.v.length; i += 3) {
+    p.set(m.v[i], m.v[i + 1], m.v[i + 2]).applyMatrix4(matrix);
+    m.v[i] = p.x;
+    m.v[i + 1] = p.y;
+    m.v[i + 2] = p.z;
+  }
+}
+
+export function cloneMesh(m: Mesh): Mesh {
+  return { v: m.v.slice(), f: m.f.slice() };
+}
+
+/** A transformed copy of a triangle soup. */
+export function transformSoup(positions: ArrayLike<number>, matrix: THREE.Matrix4): Float32Array {
+  const out = new Float32Array(positions.length);
+  const p = new THREE.Vector3();
+  for (let i = 0; i + 2 < positions.length; i += 3) {
+    p.set(positions[i], positions[i + 1], positions[i + 2]).applyMatrix4(matrix);
+    out[i] = p.x;
+    out[i + 1] = p.y;
+    out[i + 2] = p.z;
+  }
+  return out;
+}
+
+export function soupBounds(positions: ArrayLike<number>) {
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i + 2 < positions.length; i += 3) for (let k = 0; k < 3; k += 1) {
+    min[k] = Math.min(min[k], positions[i + k]);
+    max[k] = Math.max(max[k], positions[i + k]);
+  }
+  return { min, max };
+}
+
+/** Points hashed into cubes of `cell` mm, for nearest-point questions. */
+export class PointGrid {
+  private cells = new Map<number, number[]>();
+  constructor(private points: ArrayLike<number>, private cell: number) {
+    for (let i = 0; i + 2 < points.length; i += 3) {
+      const key = this.key(Math.floor(points[i] / cell), Math.floor(points[i + 1] / cell), Math.floor(points[i + 2] / cell));
+      const list = this.cells.get(key);
+      if (list) list.push(i / 3);
+      else this.cells.set(key, [i / 3]);
+    }
+  }
+  private key(x: number, y: number, z: number) {
+    return ((x + 1024) * 2048 + (y + 1024)) * 2048 + (z + 1024);
+  }
+  /** The nearest point within one cell's reach, as [index, distance], or null. */
+  nearest(x: number, y: number, z: number): [number, number] | null {
+    const cx = Math.floor(x / this.cell), cy = Math.floor(y / this.cell), cz = Math.floor(z / this.cell);
+    let best = -1, bestD = Infinity;
+    for (let dx = -1; dx <= 1; dx += 1) for (let dy = -1; dy <= 1; dy += 1) for (let dz = -1; dz <= 1; dz += 1) {
+      const list = this.cells.get(this.key(cx + dx, cy + dy, cz + dz));
+      if (!list) continue;
+      for (const i of list) {
+        const d = (this.points[i * 3] - x) ** 2 + (this.points[i * 3 + 1] - y) ** 2 + (this.points[i * 3 + 2] - z) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      }
+    }
+    return best < 0 ? null : [best, Math.sqrt(bestD)];
+  }
+}
+
+/** Unit vector helpers. */
+export type Vec3 = [number, number, number];
+export const normalize = (v: Vec3): Vec3 => {
+  const l = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+};
+
+/**
+ * Share (by area) of the scan's surface above z = level that is still in `result` (a triangle soup):
+ * a triangle counts when all its corners are there, within 0.01 mm.
+ */
+export function surfaceKept(scan: Mesh, result: ArrayLike<number>, level: number, only?: Uint8Array): number {
+  const grid = new PointGrid(result, 0.05);
+  const found = new Int8Array(scan.v.length / 3); // 0 unknown, 1 there, -1 gone
+  const there = (i: number) => {
+    if (!found[i]) {
+      const hit = grid.nearest(scan.v[i * 3], scan.v[i * 3 + 1], scan.v[i * 3 + 2]);
+      found[i] = hit && hit[1] < 0.01 ? 1 : -1;
+    }
+    return found[i] === 1;
+  };
+  let total = 0, kept = 0;
+  for (let t = 0; t < scan.f.length / 3; t += 1) {
+    const a = scan.f[t * 3], b = scan.f[t * 3 + 1], c = scan.f[t * 3 + 2];
+    if (scan.v[a * 3 + 2] <= level || scan.v[b * 3 + 2] <= level || scan.v[c * 3 + 2] <= level) continue;
+    if (only && !(only[a] && only[b] && only[c])) continue;
+    const area = faceArea(scan, t);
+    total += area;
+    if (there(a) && there(b) && there(c)) kept += area;
+  }
+  return total > 0 ? kept / total : 1;
+}
