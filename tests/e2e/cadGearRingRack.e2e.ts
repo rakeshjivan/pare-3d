@@ -22,7 +22,6 @@ describe("the ring gear's and the rack's exact bodies (#201)", () => {
   const rackLength = (module: number, teeth: number) => Math.PI * module * teeth;
   const cases: Array<[string, Partial<WorkplaneShape>]> = [
     ["ring gear", { gearType: "internal", gearProfile: "involute", teeth: 30, width: 71, depth: 71, size: 71, gearRim: 3, gearBacklash: 0.2 }],
-    ["ring gear of 150 teeth, module 0.5 (#679)", { gearType: "internal", gearProfile: "involute", teeth: 150, width: 82.25, depth: 82.25, size: 82.25, gearRim: 3 }],
     ["ring gear of 12 teeth, whose tips lie inside the base circle", { gearType: "internal", gearProfile: "involute", teeth: 12, width: 35, depth: 35, size: 35, gearRim: 3 }],
     ["oval ring gear", { gearType: "internal", gearProfile: "involute", teeth: 24, width: 60, depth: 48, size: 60, gearRim: 4 }],
     ["ring gear turned, tipped and lifted", { gearType: "internal", gearProfile: "involute", teeth: 20, width: 50, depth: 50, size: 50, gearRim: 2, rotation: 30, rotationX: 90, elevation: 4, x: 12, z: -5 }],

@@ -4,6 +4,16 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 44,
+    items: [
+      "Brought across from layerling 1.96 to 1.99, on top of everything Pare 3D adds: Shift+7, 8, 9 or 0 saves the view, and 7, 8, 9 or 0 brings it back.",
+      "Sketches: change a sketch between extrude, revolve and sweep from the badge at the top; close a gap by dragging one open end onto the other; Separate Parts splits a sketch body by its outlines; Esc puts the drawing tool down first.",
+      "Key ring holes on name and icon tags can sit on a tab of their own (Free) and be fixed to the tag where you put it, or slide along their side.",
+      "Hollow has a Closed (cavity inside) button; holes can be shown more clearly (Settings, Appearance); the history view steps with the mouse wheel; SVG export can write just the footprint on the plate; hinges have an opening angle; gears go up to 500 teeth.",
+      "Fixes: tall parts follow the mouse when dragged, trackpad pinch zooms properly in Chrome, imported parts thinner than 1 mm keep their size, SVG files saved as UTF-16 open, deleted designs stay deleted after a backup is restored, a renamed design keeps its name in backups, and phones and tablets get a minus key for negative values.",
+    ],
+  },
+  {
     build: 43,
     items: [
       "Smoother first moments: the brief pause the first time you drag, undo or open a tool in a session (while the graphics card prepares what it draws) is gone or much shorter.",

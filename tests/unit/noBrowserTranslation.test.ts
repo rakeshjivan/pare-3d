@@ -27,7 +27,8 @@ describe("the browser's translator and the page language", () => {
     // Read as English, a German page was translated into German and "Hell" became "Hölle".
     expect(bootLanguage("de", ["de-DE"])).toBe("de");
     expect(bootLanguage(null, ["de-AT", "en"])).toBe("de");
-    expect(bootLanguage(null, ["pt-BR"])).toBe("pt-BR");
+    // Pare 3D has no Brazilian Portuguese catalogue: such a browser reads English.
+    expect(bootLanguage(null, ["pt-BR"])).toBe("en");
     expect(bootLanguage("en", ["de-DE"])).toBe("en");
     expect(bootLanguage(null, ["es-ES", "es"])).toBe("en");
     expect(bootLanguage("xx", ["es"])).toBe("en");
