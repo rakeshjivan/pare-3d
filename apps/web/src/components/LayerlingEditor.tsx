@@ -8915,9 +8915,19 @@ export function LayerlingEditor({
   const dentalCandidates = useCallback(() => shapesRef.current.filter((shape) => shape.importedMesh && !shape.groupedShapes?.length && !shape.hole && !shape.locked), []);
   // Fork (build 53): the tooth area of each scan (one flag per triangle), with the scan's fingerprint it was made for.
   const dentalAreas = useRef(new Map<string, { key: string; area: Uint8Array }>());
+  // Fork (build 56): the area belongs to the scan's triangles, not to where the scan stands - turning
+  // or moving the model keeps it; trimming the scan (new triangles) starts it again.
+  const dentalAreaKey = (shape: WorkplaneShape) => {
+    const p = shape.importedMesh?.positions;
+    if (!p?.length) return projectShapesFingerprint([shape]);
+    let hash = p.length | 0;
+    const step = Math.max(1, Math.floor(p.length / 997));
+    for (let i = 0; i < p.length; i += step) hash = (Math.imul(hash, 31) + Math.round(p[i] * 1000)) | 0;
+    return `${p.length}:${hash}`;
+  };
   const dentalAreaFor = (shape: WorkplaneShape) => {
     const known = dentalAreas.current.get(shape.id);
-    return known && known.key === projectShapesFingerprint([shape]) ? known.area : null;
+    return known && known.key === dentalAreaKey(shape) ? known.area : null;
   };
   const dentalInput = useCallback((state: Pick<DentalStudioState, "slots" | "rolesChosen">): DentalStudioInput | null => {
     const find = (id: string | null) => (id ? shapesRef.current.find((shape) => shape.id === id) ?? null : null);
@@ -9126,7 +9136,7 @@ export function LayerlingEditor({
     try {
       for (const { shape } of missing) {
         const area = await dentalAreaInBackground(Float32Array.from(toZUp(worldTriangles(shape!))));
-        dentalAreas.current.set(shape!.id, { key: projectShapesFingerprint([shape!]), area });
+        dentalAreas.current.set(shape!.id, { key: dentalAreaKey(shape!), area });
       }
     } finally {
       setDentalAreaBusy(false);
@@ -9150,7 +9160,8 @@ export function LayerlingEditor({
       for (let t = 0; t < area.length; t += 1) if (area[t]) for (let k = 0; k < 9; k += 1) parts.push(world[t * 9 + k]);
     });
     window.layerlingHighlight?.(parts.length ? Float32Array.from(parts) : null);
-  }, [dentalAreaManual, dentalAreaVersion, dentalHidden, dentalStudio?.stage, dentalStudio?.slots.upper, dentalStudio?.slots.lower]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Build 56: drawn again whenever the shapes change, so the tint turns and moves with its model.
+  }, [dentalAreaManual, dentalAreaVersion, dentalHidden, dentalStudio?.stage, dentalStudio?.slots.upper, dentalStudio?.slots.lower, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => window.layerlingHighlight?.(null), []);
   const chooseDentalAreaTool = useCallback((slot: "upper" | "lower", tool: DentalAreaTool | null) => {
     const state = dentalStudioRef.current;
