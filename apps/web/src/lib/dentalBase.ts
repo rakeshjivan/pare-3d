@@ -221,15 +221,15 @@ const edgeId = (a: number, b: number) => (a < b ? a * 4194304 + b : b * 4194304 
  * corners that are new on it are tested again: taking surface away never puts surface under a
  * corner that was clear. Throws when it does not settle.
  */
-export function closeToFloor(m: Mesh, floor: number, maxRounds = 400, teeth?: Uint8Array): ClosedArch {
+export function closeToFloor(m: Mesh, floor: number, maxRounds = 400, teeth?: Uint8Array, fringe = EDGE_FRINGE): ClosedArch {
   const faces = m.f.length / 3;
   const alive = new Uint8Array(faces).fill(1);
   // Triangles on the teeth are never worn away: what blocks a wall under them goes instead. The
   // ragged fringe right at the scan's edge (EDGE_FRINGE) may still go, even beside a tooth.
   const guarded = new Uint8Array(faces);
   if (teeth) {
-    const fromEdge = distanceFromEdge(m, EDGE_FRINGE);
-    const kept = (v: number) => teeth[v] && fromEdge[v] > EDGE_FRINGE;
+    const fromEdge = fringe > 0 ? distanceFromEdge(m, fringe) : null;
+    const kept = (v: number) => teeth[v] && (!fromEdge || fromEdge[v] > fringe);
     for (let t = 0; t < faces; t += 1) if (kept(m.f[t * 3]) || kept(m.f[t * 3 + 1]) || kept(m.f[t * 3 + 2])) guarded[t] = 1;
   }
   const accepted = new Set<number>();
@@ -348,8 +348,8 @@ export function closeToFloor(m: Mesh, floor: number, maxRounds = 400, teeth?: Ui
   const f: number[] = [];
   for (let t = 0; t < faces; t += 1) if (alive[t]) f.push(m.f[t * 3], m.f[t * 3 + 1], m.f[t * 3 + 2]);
   const compact: Mesh = { v: m.v, f };
-  dropFragments(compact, 0.05);
-  dropInverted(compact);
+  dropFragments(compact, 0.05, teeth);
+  dropInverted(compact, teeth);
   const closed = closeWithBase(splitBowties(compact), floor);
   return { mesh: closed.mesh, outline: closed.outline, worn, rounds, forced: accepted.size, forcedAt: [...accepted] };
 }
@@ -586,7 +586,7 @@ export const TOOTH_REACH = 5.5;
  * cheek flap, the palate or the floor of the mouth never do. Measured locally, so a tilted or curved
  * arch and a quadrant are covered alike.
  */
-export function toothZone(m: Mesh): Uint8Array {
+export function toothZone(m: Mesh, crown = TOOTH_CROWN, reachOut = TOOTH_REACH): Uint8Array {
   const cell = 0.5;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (let i = 0; i < m.v.length; i += 3) { minX = Math.min(minX, m.v[i]); maxX = Math.max(maxX, m.v[i]); minY = Math.min(minY, m.v[i + 1]); maxY = Math.max(maxY, m.v[i + 1]); }
@@ -629,11 +629,35 @@ export function toothZone(m: Mesh): Uint8Array {
     if (top[k] >= near[k] - 0.3 && top[k] - around[k] >= 2.5) tips[k] = top[k];
   }
   // The highest cusp tip within reach of each cell.
-  const reach = pass(tips, TOOTH_REACH, Math.max, -Infinity);
+  const reach = pass(tips, reachOut, Math.max, -Infinity);
   const zone = new Uint8Array(m.v.length / 3);
   for (let i = 0; i < zone.length; i += 1) {
     const r = reach[at(m.v[i * 3], m.v[i * 3 + 1])];
-    if (Number.isFinite(r) && m.v[i * 3 + 2] > r - TOOTH_CROWN) zone[i] = 1;
+    if (Number.isFinite(r) && m.v[i * 3 + 2] > r - crown) zone[i] = 1;
   }
   return zone;
+}
+
+/**
+ * Smooths the scan's ragged open edge, `rounds` times, leaving the teeth where they are: each edge
+ * corner moves towards its two neighbours along the edge (a gentle, shrink-free pass each round).
+ */
+export function smoothEdge(m: Mesh, rounds: number, keep?: Uint8Array) {
+  if (rounds <= 0) return;
+  const loops = boundaryLoops(m);
+  for (let round = 0; round < rounds; round += 1) {
+    for (const factor of [0.5, -0.53]) {
+      for (const loop of loops) {
+        if (loop.length < 4) continue;
+        const moved = loop.map((v, k) => {
+          const a = loop[(k + loop.length - 1) % loop.length], b = loop[(k + 1) % loop.length];
+          return [0, 1, 2].map((axis) => m.v[v * 3 + axis] + factor * ((m.v[a * 3 + axis] + m.v[b * 3 + axis]) / 2 - m.v[v * 3 + axis]));
+        });
+        loop.forEach((v, k) => {
+          if (keep?.[v]) return;
+          for (let axis = 0; axis < 3; axis += 1) m.v[v * 3 + axis] = moved[k][axis];
+        });
+      }
+    }
+  }
 }

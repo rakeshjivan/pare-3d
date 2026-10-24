@@ -661,6 +661,13 @@ declare global {
       get: () => ViewportPerfStats;
     };
     layerlingCaptureCanvas?: () => string;
+    /**
+     * Fork (build 48): world points (scene axes, flat x, y, z) to screen pixels, x and y per point,
+     * relative to the page - for tools that draw over the view, such as Dental Studio's trim line.
+     */
+    layerlingProjectPoints?: (points: ArrayLike<number>) => Float32Array;
+    /** Fork (build 48): turns the view to look along -direction (scene axes) and frames these parts. */
+    layerlingShowParts?: (ids: string[], direction: [number, number, number]) => boolean;
     layerlingCaptureCanvasAsync?: () => Promise<string>;
     layerlingCaptureView?: (face?: LayerlingMcpViewFace) => Promise<string> | string;
     layerlingCaptureImage?: (options?: { plate?: boolean; transparent?: boolean; scale?: number }) => string;
@@ -4685,6 +4692,23 @@ export function WorkplaneViewport({
       renderFrame(state);
       return state.renderer.domElement.toDataURL("image/png");
     };
+    window.layerlingProjectPoints = (points) => {
+      state.camera.updateMatrixWorld();
+      const rect = state.renderer.domElement.getBoundingClientRect();
+      const matrix = new THREE.Matrix4().multiplyMatrices(state.camera.projectionMatrix, state.camera.matrixWorldInverse);
+      const e = matrix.elements;
+      const count = Math.floor(points.length / 3);
+      const out = new Float32Array(count * 2);
+      for (let i = 0; i < count; i += 1) {
+        const x = points[i * 3], y = points[i * 3 + 1], z = points[i * 3 + 2];
+        const w = e[3] * x + e[7] * y + e[11] * z + e[15];
+        const nx = (e[0] * x + e[4] * y + e[8] * z + e[12]) / w;
+        const ny = (e[1] * x + e[5] * y + e[9] * z + e[13]) / w;
+        out[i * 2] = rect.left + ((nx + 1) / 2) * rect.width;
+        out[i * 2 + 1] = rect.top + ((1 - ny) / 2) * rect.height;
+      }
+      return out;
+    };
     window.layerlingCaptureCanvasAsync = () => {
       state.camera.updateMatrixWorld();
       renderFrame(state);
@@ -4931,6 +4955,7 @@ export function WorkplaneViewport({
       }
       delete window.layerlingOrbitView;
       delete window.layerlingPanView;
+      delete window.layerlingProjectPoints;
       threeRef.current = null;
     };
   }, []);
@@ -8953,6 +8978,22 @@ export function WorkplaneViewport({
     state.needsRender = true;
     return true;
   }, []);
+  // Fork (build 48): Dental Studio's named views - look at these parts from a direction, framed.
+  useEffect(() => {
+    window.layerlingShowParts = (ids, direction) => {
+      const state = threeRef.current;
+      if (!state) return false;
+      const along = new THREE.Vector3(...direction);
+      if (along.lengthSq() < 1e-9) return false;
+      along.normalize();
+      // Straight up or down, nudged a hair so the camera's up (y) still gives the view a direction.
+      if (Math.abs(along.y) > 0.999) along.z += along.y > 0 ? 0.002 : -0.002;
+      setCameraToViewDirection(state, along.normalize(), false);
+      syncViewCube(state, viewCubeRef.current);
+      return focusSelection(ids, 1.15);
+    };
+    return () => { delete window.layerlingShowParts; };
+  }, [focusSelection]);
 
   // Fork: a design opened from a starter example is framed whole once its parts are drawn.
   useEffect(() => {

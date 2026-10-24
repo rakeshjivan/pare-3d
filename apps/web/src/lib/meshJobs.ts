@@ -5,18 +5,21 @@
 import type { MeshRoundMode, MeshRoundResult } from "@/lib/meshRound";
 import type { FitReport } from "@/lib/partTools";
 import type { DentalAnalysis, DentalStudioInput, DentalStudioOptions, DentalStudioResult } from "@/lib/dentalModel";
+import type { DentalTrimMode, DentalTrimResult } from "@/lib/dentalTrim";
 import type { WorkplaneShape } from "@/types/layerling";
 
 export type MeshJobRequest =
   | { id: number; base: string; kind: "round"; positions: Float32Array; radius: number; mode: MeshRoundMode }
   | { id: number; base: string; kind: "fit"; shapes: WorkplaneShape[]; clearance: number }
   | { id: number; base: string; kind: "dentalAnalyse"; input: DentalStudioInput }
-  | { id: number; base: string; kind: "dentalStudio"; input: DentalStudioInput; options: DentalStudioOptions };
+  | { id: number; base: string; kind: "dentalStudio"; input: DentalStudioInput; options: DentalStudioOptions }
+  | { id: number; base: string; kind: "dentalTrim"; positions: Float32Array; inside: Uint8Array; mode: DentalTrimMode };
 export type MeshJobResponse =
   | { id: number; ok: true; kind?: "round"; result: { positions: Float32Array; voxel: number; coarse: boolean } }
   | { id: number; ok: true; kind: "fit"; report: FitReport }
   | { id: number; ok: true; kind: "dentalAnalyse"; analysis: DentalAnalysis }
   | { id: number; ok: true; kind: "dentalStudio"; result: DentalStudioResult }
+  | { id: number; ok: true; kind: "dentalTrim"; trim: DentalTrimResult }
   | { id: number; ok: false; error: string };
 
 let worker: Worker | null = null;
@@ -38,6 +41,7 @@ function meshWorker(): Worker | null {
       else if (reply.kind === "fit") waiting.resolve(reply.report);
       else if (reply.kind === "dentalAnalyse") waiting.resolve(reply.analysis);
       else if (reply.kind === "dentalStudio") waiting.resolve(reply.result);
+      else if (reply.kind === "dentalTrim") waiting.resolve(reply.trim);
       else waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
     };
     worker.onerror = () => {
@@ -135,4 +139,23 @@ export function analyseDentalInBackground(input: DentalStudioInput): Promise<Den
 /** Dental Studio: makes the models (Z-up positions). */
 export function makeDentalStudioInBackground(input: DentalStudioInput, options: DentalStudioOptions): Promise<DentalStudioResult> {
   return dentalJob((id, base, data) => ({ id, base, kind: "dentalStudio", input: data, options }), input, async (data) => (await import("@/lib/dentalModel")).makeDentalStudio(data, options));
+}
+
+/** Dental Studio (build 48): which triangles of a scan a trim keeps (Z-up soup, one inside flag per corner). */
+export async function trimDentalScanInBackground(positions: Float32Array, inside: Uint8Array, mode: DentalTrimMode): Promise<DentalTrimResult> {
+  const here = async () => (await import("@/lib/dentalTrim")).trimDentalScan(positions, inside, mode);
+  const target = meshWorker();
+  if (!target) return here();
+  const id = nextId;
+  nextId += 1;
+  const data = Float32Array.from(positions), flags = Uint8Array.from(inside);
+  try {
+    return await new Promise<DentalTrimResult>((resolve, reject) => {
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "dentalTrim", positions: data, inside: flags, mode } satisfies MeshJobRequest, [data.buffer, flags.buffer]);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "worker-unavailable") return here();
+    throw error;
+  }
 }

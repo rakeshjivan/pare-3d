@@ -16,7 +16,7 @@
 import * as THREE from "three";
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
 import { alignToBite, archFrame, canineWidth, cleanScan, frontOf, isPartialArch, marginUp, pairFrame, palateScore, type CleanArch, type CleanReport } from "@/lib/dentalArch";
-import { blockOutline, closeToFloor, distanceFromEdge, EDGE_FRINGE, hingeParts, hollowCavity, orthoOutline, outlineSide, prism, toothZone } from "@/lib/dentalBase";
+import { blockOutline, closeToFloor, distanceFromEdge, EDGE_FRINGE, hingeParts, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, TOOTH_CROWN, TOOTH_REACH, toothZone } from "@/lib/dentalBase";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
 import {
   applyMatrix, boundaryLoops, cloneMesh, convexHull, cutBelow, dropFragments, faceArea, loopLength, surfaceKept, pinchedEdges, solidPositions, toManifold, upwardness, weld,
@@ -44,8 +44,10 @@ export type DentalStudioInput = {
   roles?: Record<string, DentalRole>;
 };
 
-/** `depth`: how much of the scan is kept by default below the occlusal plane; `teeth`: the least that may be kept - 1 mm under the lowest tooth surface; `above`: how far the tallest tooth stands above the occlusal plane (mm). */
-export type DentalArchInfo = { id: string; role: DentalRole; report: CleanReport; depth: number; teeth: number; above: number; palate: number; canines: number; partial: boolean };
+/** `depth`: how much of the scan is kept by default below the occlusal plane; `teeth`: the least that may be kept - 2 mm under the lowest tooth surface; `above`: how far the tallest tooth stands above the occlusal plane (mm). */
+/** `axes`: the arch's directions in the input's axes - teeth, front and the patient's left. */
+export type DentalArchAxes = { up: [number, number, number]; front: [number, number, number]; left: [number, number, number] };
+export type DentalArchInfo = { id: string; role: DentalRole; report: CleanReport; depth: number; teeth: number; above: number; palate: number; canines: number; partial: boolean; axes: DentalArchAxes };
 export type DentalAnalysis = {
   arches: DentalArchInfo[];
   /** `apart`: the two scans do not share the scanner's coordinates, so each is set up on its own. */
@@ -66,7 +68,17 @@ export type DentalStudioOptions = {
   layout: "print" | "occlusion";
   /** Engraved on the base; U or L goes in front for a pair. Empty for none. */
   label: string;
+  /**
+   * Fork (build 48): follow the gum line - keep this much gum below the teeth, all round, and no
+   * more (palate and floor of the mouth go). Null or left out: cut straight across at `keep`.
+   */
+  gum?: number | null;
+  /** Fork (build 48): smooth the scan's ragged edge before the base goes on (never the teeth). */
+  smooth?: DentalSmooth;
 };
+
+export type DentalSmooth = "off" | "low" | "high";
+const SMOOTH_ROUNDS: Record<DentalSmooth, number> = { off: 0, low: 3, high: 10 };
 
 export type DentalPart = { id: string; role: DentalRole; positions: Float32Array; height: number; volume: number };
 /** `surface`: per part, the share of the scan's surface kept above each depth (mm below the occlusal plane). */
@@ -121,10 +133,32 @@ function depthIn(m: Mesh, frame: THREE.Matrix4): { depth: number; teeth: number;
   const zone = toothZone(turned);
   let lowest = Infinity;
   for (let i = 0; i < zone.length; i += 1) if (zone[i]) lowest = Math.min(lowest, turned.v[i * 3 + 2]);
-  const teeth = Number.isFinite(lowest) ? Math.max(1, -lowest + 1) : 1;
+  // 2 mm under the lowest tooth surface: clear of the fringe the cut's own edge may lose.
+  const teeth = Number.isFinite(lowest) ? Math.max(1, -lowest + 2) : 1;
   let above = 0;
   for (let i = 2; i < turned.v.length; i += 3) above = Math.max(above, turned.v[i]);
   return { depth: Math.max(robustDepth(m, frame), teeth), teeth, above };
+}
+
+/**
+ * An arch's directions in the input's axes. In its frame the teeth point up (+z) and the front is at
+ * -y; seen from the front the patient's left is on the right (+x) for a lower, and for an upper,
+ * turned over to stand teeth up, on the left.
+ */
+function archAxes(frame: THREE.Matrix4, role: DentalRole): DentalArchAxes {
+  const back = new THREE.Matrix3().setFromMatrix4(frame).transpose();
+  const axis = (x: number, y: number, z: number): [number, number, number] => {
+    const v = new THREE.Vector3(x, y, z).applyMatrix3(back).normalize();
+    return [v.x, v.y, v.z];
+  };
+  return { up: axis(0, 0, 1), front: axis(0, -1, 0), left: role === "upper" ? axis(-1, 0, 0) : axis(1, 0, 0) };
+}
+
+/** How deep an arch is kept below the occlusal plane: never into the teeth; following the gum, no deeper than it. */
+function keptDepthFor(arch: { depth: number; teeth: number }, options: DentalStudioOptions) {
+  const keep = options.keep === null ? arch.depth : Math.max(arch.teeth, Math.min(options.keep, arch.depth));
+  if (options.gum === null || options.gum === undefined) return keep;
+  return Math.max(arch.teeth, Math.min(keep, arch.teeth + Math.max(0.5, options.gum)));
 }
 
 function zSpan(m: Mesh, frame: THREE.Matrix4) {
@@ -164,7 +198,7 @@ function prepare(input: DentalStudioInput): Prepared {
     return {
       arches: [{ id: cleaned[0].id, role: roles[0], clean: cleaned[0].clean, frame, ...measured, palate: palates[0], canines: canines[0], partial: partials[0] }],
       analysis: {
-        arches: [{ id: cleaned[0].id, role: roles[0], report: cleaned[0].clean.report, ...measured, palate: palates[0], canines: canines[0], partial: partials[0] }],
+        arches: [{ id: cleaned[0].id, role: roles[0], report: cleaned[0].clean.report, ...measured, palate: palates[0], canines: canines[0], partial: partials[0], axes: archAxes(frame, roles[0]) }],
         pair: null,
       },
     };
@@ -215,7 +249,7 @@ function prepare(input: DentalStudioInput): Prepared {
   return {
     arches,
     analysis: {
-      arches: arches.map(({ id, role, clean, depth, teeth, above, palate, canines: width, partial }) => ({ id, role, report: clean.report, depth, teeth, above, palate, canines: width, partial })),
+      arches: arches.map(({ id, role, clean, frame, depth, teeth, above, palate, canines: width, partial }) => ({ id, role, report: clean.report, depth, teeth, above, palate, canines: width, partial, axes: archAxes(frame, role) })),
       pair: { inOcclusion: pair.inOcclusion && !apart, apart, contacts: apart ? 0 : pair.contacts, bite },
     },
   };
@@ -301,24 +335,39 @@ function buildArch(
   if (upwardness(m) < 0) for (let t = 0; t < m.f.length; t += 3) { const b = m.f[t + 1]; m.f[t + 1] = m.f[t + 2]; m.f[t + 2] = b; }
   let top = -Infinity, low = Infinity;
   for (let i = 2; i < m.v.length; i += 3) { top = Math.max(top, m.v[i]); low = Math.min(low, m.v[i]); }
-  const keep = options.keep === null ? arch.depth : Math.max(arch.teeth, Math.min(options.keep, arch.depth));
+  const keep = keptDepthFor(arch, options);
   // The cut never passes through a tooth: keep is never less than arch.teeth.
   const scanTeeth = toothZone(m);
   const level = -keep;
   const cut = level <= low + 1e-6 ? m : cutBelow(m, level);
-  dropFragments(cut, 0.05);
-  // The teeth: never cut and never worn away.
+  // The teeth: never cut and never worn away - nor dropped as a loose piece.
   const teeth = toothZone(cut);
+  // Guarded: the teeth, all but the fringe right at the scan's own edge (not edges a trim makes here).
+  const scanEdge = distanceFromEdge(cut, EDGE_FRINGE);
+  const guard = teeth.map((inZone, i) => (inZone && scanEdge[i] > EDGE_FRINGE ? 1 : 0));
+  dropFragments(cut, 0.05, teeth);
+  if (options.gum !== null && options.gum !== undefined) {
+    // Following the gum line: what lies further below the teeth than the gum asked for goes.
+    // As far out as down: the gum round the teeth, plus room for the edge's fringe.
+    const gum = Math.max(0.5, options.gum);
+    const band = toothZone(cut, TOOTH_CROWN + gum, TOOTH_REACH + gum + EDGE_FRINGE);
+    const f: number[] = [];
+    const kept = (v: number) => band[v] || teeth[v];
+    for (let t = 0; t < cut.f.length; t += 3) if (kept(cut.f[t]) || kept(cut.f[t + 1]) || kept(cut.f[t + 2])) f.push(cut.f[t], cut.f[t + 1], cut.f[t + 2]);
+    cut.f = f;
+    dropFragments(cut, 0.05, teeth);
+  }
+  smoothEdge(cut, SMOOTH_ROUNDS[options.smooth ?? "low"], teeth);
   let closed;
   try {
-    closed = closeToFloor(cut, floor, 400, teeth);
+    closed = closeToFloor(cut, floor, 400, guard, 0);
   } catch {
     // The ragged edge would not settle: cut where the edge is complete all round - never into the teeth.
     const loops = boundaryLoops(m);
     let complete = -Infinity;
     for (const loop of loops) for (const i of loop) complete = Math.max(complete, m.v[i * 3 + 2]);
     const fallback = cutBelow(m, Math.max(level, complete + 0.01));
-    dropFragments(fallback, 0.05);
+    dropFragments(fallback, 0.05, toothZone(fallback));
     try {
       closed = closeToFloor(fallback, floor, 600, toothZone(fallback));
       warnings.push("edge");
@@ -429,7 +478,7 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
   if (apart) options = { ...options, layout: "print", hinge: false };
   const runtime = given ?? (await getManifoldRuntime());
   const base = Math.max(DENTAL_MIN_BASE, Math.min(DENTAL_MAX_BASE, options.base));
-  const keeps = prep.arches.map((arch) => (options.keep === null ? arch.depth : Math.max(arch.teeth, Math.min(options.keep, arch.depth))));
+  const keeps = prep.arches.map((arch) => keptDepthFor(arch, options));
   // A pair stands equally tall: both floors as far from the occlusal plane.
   const depth = Math.max(...keeps) + base;
   const pair = prep.arches.length === 2;

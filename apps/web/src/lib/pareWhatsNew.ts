@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 48,
+    items: [
+      "Dental Studio: trim a scan by hand - choose the arch, turn the view and draw a line round what to keep (or what to remove). Teeth are never trimmed, even inside the line, and Ctrl+Z takes a trim back.",
+      "Named views for each arch: Occlusal, Front, Left, Right and Lingual, each framed on that arch.",
+      "Follow the gum line: keep a band of gum of the depth you set all round the teeth and nothing more - the palate and floor of the mouth go.",
+      "The scan's ragged edge is smoothed before the base goes on (Off, Low or High; never the teeth), and the panel reads as three steps: scans, trim, model.",
+    ],
+  },
+  {
     build: 47,
     items: [
       "New: Dental Studio, with a place of its own in the toolbar (Dental). It makes printable models from raw intraoral scans - one arch, or an upper and a lower with their bite scan - full arches and quadrants alike. Import the scans from the panel, choose Study model, Ortho study models, Aligner models or Crown & bridge, and click Make model.",

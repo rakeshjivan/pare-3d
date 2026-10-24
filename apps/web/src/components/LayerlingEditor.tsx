@@ -124,10 +124,12 @@ const SURFACE_TEXT_PREVIEW_ID = "surface-text-preview";
 const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
 import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
-import { analyseDentalInBackground, checkFitInBackground, makeDentalStudioInBackground, roundMeshInBackground } from "@/lib/meshJobs";
+import { analyseDentalInBackground, checkFitInBackground, makeDentalStudioInBackground, roundMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
+import { DentalTrimOverlay, insideTrimLine, type TrimPoint } from "./workplane/DentalTrimOverlay";
+import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
 import { looksLikeDentalScan, type DentalAnalysis, type DentalRole, type DentalStudioInput, type DentalStudioOptions } from "@/lib/dentalModel";
-import { DentalStudioPanel, dentalPreset, type DentalPreset, type DentalSlot } from "./workplane/DentalStudioPanel";
+import { DentalStudioPanel, dentalPreset, type DentalPreset, type DentalSlot, type DentalView } from "./workplane/DentalStudioPanel";
 import { ShellPanel } from "./workplane/ShellPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
 import { MateFacesPanel } from "./workplane/MateFacesPanel";
@@ -3843,8 +3845,11 @@ export function LayerlingEditor({
   const [fitBusy, setFitBusy] = useState(false);
   const [fitOverlay, setFitOverlay] = useState<WorkplaneShape[]>([]);
   const fitRunRef = useRef(0);
+  // Fork (build 48): scans Dental Studio sets aside while one is trimmed - on screen only, not in the design.
+  const [dentalHidden, setDentalHidden] = useState<string[]>([]);
   const viewportShapes = useMemo(() => {
     let result = baseViewportShapes;
+    if (dentalHidden.length) result = result.filter((shape) => !dentalHidden.includes(shape.id));
     if (intersectPreviewIds) {
       const operands = new Set(intersectPreviewIds);
       const ghosts = result.map((shape) => (operands.has(shape.id) && !shape.hole ? { ...shape, transparent: true } : shape));
@@ -3865,7 +3870,7 @@ export function LayerlingEditor({
       result = [...result.map((shape) => (overlapping.has(shape.id) ? { ...shape, transparent: true } : shape)), ...fitOverlay];
     }
     return result;
-  }, [baseViewportShapes, dragTextGhost, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape, surfaceTextTool?.editingId, surfaceTextTool?.preview]);
+  }, [baseViewportShapes, dentalHidden, dragTextGhost, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape, surfaceTextTool?.editingId, surfaceTextTool?.preview]);
   // A revolve sketch on the base plate is a side view: the bodies are shown from the front, as the profile is drawn (#525).
   // Opened again to edit a body that stands upright, it is the same side view: that body stands at its height, not on the plate's workplane.
   const editedRevolveShape = sketchActive && sketchOperation === "revolve" && editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) : undefined;
@@ -9481,7 +9486,7 @@ export function LayerlingEditor({
   // Fork (build 46, Dental Studio in build 47): raw intraoral scans to printable models.
   type DentalStudioState = {
     slots: Record<DentalSlot, string | null>;
-    stage: "analysing" | "ready" | "making";
+    stage: "analysing" | "ready" | "making" | "trimming";
     analysis: DentalAnalysis | null;
     /** Whether the person set who is upper and lower; otherwise it is worked out from the scans. */
     rolesChosen: boolean;
@@ -9496,6 +9501,7 @@ export function LayerlingEditor({
   const dentalStudioRef = useRef(dentalStudio);
   dentalStudioRef.current = dentalStudio;
   const dentalRun = useRef(0);
+  const dentalSceneDirection = useRef(new Map<string, (v: [number, number, number]) => [number, number, number]>());
   const toZUp = (positions: ArrayLike<number>) => {
     const out = new Float32Array(positions.length);
     for (let i = 0; i + 2 < positions.length; i += 3) {
@@ -9545,6 +9551,16 @@ export function LayerlingEditor({
       ySpans += maxY - minY; zSpans += maxZ - minZ;
     });
     const yUpFiles = fromFile && ySpans < zSpans;
+    // Directions found in the scans' axes, back in the scene's (for Dental Studio's views).
+    chosen.forEach((shape) => {
+      const turned = Boolean(files.get(shape.id) && shape.importedMesh?.sourceTurned);
+      dentalSceneDirection.current.set(shape.id, (v) => {
+        let d: [number, number, number] = v;
+        if (!files.get(shape.id)) return zUpToLayerling(d);
+        if (yUpFiles) d = zUpToLayerling(d);
+        return turned ? zUpToLayerling(d) : d;
+      });
+    });
     const scan = (shape: WorkplaneShape) => {
       const file = files.get(shape.id);
       if (!file) return toZUp(partGeom(shape).triangles);
@@ -9642,6 +9658,18 @@ export function LayerlingEditor({
     const { slots, rolesChosen } = guessDentalSlots(pool);
     analyseDentalStudio(freshDentalState(slots, rolesChosen));
   }, [analyseDentalStudio, dentalCandidates, selectedShapes]);
+  // A scan in a slot that changes (a trim, Undo, Redo) is looked at again.
+  const dentalSlotKey = dentalStudio ? (Object.values(dentalStudio.slots).filter(Boolean) as string[]).map((id) => { const shape = shapes.find((candidate) => candidate.id === id); return shape ? `${id}:${shape.importedMesh?.positions.length ?? 0}:${shape.x}:${shape.z}` : `${id}:gone`; }).join("|") : "";
+  const dentalSlotSeen = useRef("");
+  useEffect(() => {
+    const state = dentalStudioRef.current;
+    const before = dentalSlotSeen.current;
+    dentalSlotSeen.current = dentalSlotKey;
+    if (!state || !before || before === dentalSlotKey || state.stage !== "ready") return;
+    const slots = { ...state.slots };
+    (Object.keys(slots) as DentalSlot[]).forEach((slot) => { if (slots[slot] && !shapesRef.current.some((shape) => shape.id === slots[slot])) slots[slot] = null; });
+    analyseDentalStudio({ ...state, slots, stage: "analysing" });
+  }, [dentalSlotKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // Scans imported while the studio is open go into its empty slots.
   const dentalCandidateKey = dentalStudio ? `#,${dentalCandidates().map((shape) => shape.id).join(",")}` : "";
   const dentalSeen = useRef("");
@@ -9658,6 +9686,95 @@ export function LayerlingEditor({
     const { slots, rolesChosen } = guessDentalSlots([...slotted, ...added].slice(0, 3));
     analyseDentalStudio({ ...freshDentalState(slots, rolesChosen && state.rolesChosen), preset: state.preset, options: state.options, optionsTouched: state.optionsTouched, advanced: state.advanced });
   }, [dentalCandidateKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Fork (build 48): trimming a scan by hand - a line drawn over the view round what to keep.
+  const [dentalTrim, setDentalTrim] = useState<{ slot: "upper" | "lower"; mode: DentalTrimMode } | null>(null);
+  const [dentalTrimMode, setDentalTrimMode] = useState<DentalTrimMode>("keep");
+  const startDentalTrim = useCallback((slot: "upper" | "lower", mode: DentalTrimMode) => {
+    const state = dentalStudioRef.current;
+    if (!state || state.stage !== "ready" || !state.slots[slot]) return;
+    setDentalTrim({ slot, mode });
+    setDentalHidden((Object.values(state.slots).filter((id) => id && id !== state.slots[slot]) as string[]));
+  }, []);
+  /** Looks at one arch from a named side, framed. */
+  const showDentalView = useCallback((slot: "upper" | "lower", view: DentalView) => {
+    const state = dentalStudioRef.current;
+    const id = state?.slots[slot];
+    const info = id ? state?.analysis?.arches.find((arch) => arch.id === id) : undefined;
+    const toScene = id ? dentalSceneDirection.current.get(id) : undefined;
+    if (!id || !info || !toScene || !window.layerlingShowParts) return;
+    const { up, front, left } = info.axes;
+    const along = view === "occlusal" ? up : view === "front" ? front : view === "left" ? left : view === "right" ? left.map((value) => -value) as [number, number, number] : front.map((value) => -value) as [number, number, number];
+    window.layerlingShowParts([id], toScene(along));
+  }, []);
+  const stopDentalTrim = useCallback(() => {
+    setDentalTrim(null);
+    setDentalHidden([]);
+  }, []);
+  const applyDentalTrim = useCallback((line: TrimPoint[]) => {
+    const trim = dentalTrim;
+    const state = dentalStudioRef.current;
+    const id = trim && state ? state.slots[trim.slot] : null;
+    const shape = id ? shapesRef.current.find((candidate) => candidate.id === id) : undefined;
+    if (!trim || !state || !shape?.importedMesh || !window.layerlingProjectPoints) return;
+    const mesh = shape.importedMesh;
+    const world = worldTriangles(shape);
+    const inside = insideTrimLine(window.layerlingProjectPoints(world), line);
+    const fingerprint = projectShapesFingerprint([shape]);
+    setDentalStudio({ ...state, stage: "trimming", error: null });
+    window.setTimeout(async () => {
+      try {
+        const result = await trimDentalScanInBackground(toZUp(world), inside, trim.mode);
+        const current = shapesRef.current.find((candidate) => candidate.id === id);
+        if (!current || projectShapesFingerprint([current]) !== fingerprint) throw new Error(t("dental.changed"));
+        if (!result.removed) {
+          setNotice(t(result.protectedTriangles ? "dental.trimOnlyTeeth" : "dental.trimNothing"));
+          setDentalStudio((latest) => latest ? { ...latest, stage: "ready" } : latest);
+          return;
+        }
+        const keepTriangle = (t: number) => result.keep[t] === 1;
+        const pick = (values: number[]) => {
+          const out: number[] = [];
+          for (let t = 0; t * 9 < values.length; t += 1) if (keepTriangle(t)) for (let k = 0; k < 9; k += 1) out.push(values[t * 9 + k]);
+          return out;
+        };
+        let positions = pick(mesh.positions);
+        const normals = mesh.normals?.length === mesh.positions.length ? pick(mesh.normals) : undefined;
+        let next: WorkplaneShape = { ...shape, importedMesh: { ...mesh, positions, normals, triangleCount: positions.length / 9, assetId: undefined, storageResourceId: undefined } };
+        // Unturned and at its size, the part is centred on what is left; the file's own place goes with it.
+        const plain = !shape.rotation && !shape.rotationX && !shape.rotationZ && !shape.mirrorX && !shape.mirrorY && !shape.mirrorZ
+          && Math.abs(shape.width - mesh.baseWidth) < 1e-6 && Math.abs(shape.depth - mesh.baseDepth) < 1e-6 && Math.abs(shape.height - mesh.baseHeight) < 1e-6;
+        if (plain) {
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+          for (let i = 0; i < positions.length; i += 3) {
+            minX = Math.min(minX, positions[i]); maxX = Math.max(maxX, positions[i]);
+            minY = Math.min(minY, positions[i + 1]); maxY = Math.max(maxY, positions[i + 1]);
+            minZ = Math.min(minZ, positions[i + 2]); maxZ = Math.max(maxZ, positions[i + 2]);
+          }
+          const dx = (minX + maxX) / 2, dy = minY, dz = (minZ + maxZ) / 2;
+          positions = positions.map((value, index) => value - (index % 3 === 0 ? dx : index % 3 === 1 ? dy : dz));
+          const [ox, oy, oz] = mesh.sourceOrigin ?? [0, 0, 0];
+          const width = maxX - minX, height = maxY - minY, depth = maxZ - minZ;
+          next = {
+            ...next,
+            x: shape.x + dx,
+            z: shape.z + dz,
+            elevation: (shape.elevation ?? 0) + dy,
+            width, depth, height,
+            size: Math.max(width, depth),
+            importedMesh: { ...next.importedMesh!, positions, baseWidth: width, baseDepth: depth, baseHeight: height, ...(mesh.sourceOrigin ? { sourceOrigin: [ox + dx, oy + dy, oz + dz] as [number, number, number] } : {}) },
+          };
+        }
+        const committed = shapesRef.current.map((candidate) => (candidate.id === id ? canonicalizeShape(next) : candidate));
+        commitShapes(committed, [id!], t("dental.trimmed", { removed: result.removed.toLocaleString(), teeth: result.protectedTriangles.toLocaleString() }));
+        if (result.protectedTriangles) setNotice(t("dental.trimmedTeeth", { removed: result.removed.toLocaleString() }));
+        const latest = dentalStudioRef.current;
+        if (latest) analyseDentalStudio({ ...latest, stage: "analysing" });
+      } catch (error) {
+        setDentalStudio((latest) => latest ? { ...latest, stage: "ready", error: error instanceof Error ? localizedError(error.message) : String(error) } : latest);
+      }
+    }, 30);
+    stopDentalTrim();
+  }, [analyseDentalStudio, commitShapes, dentalTrim, stopDentalTrim]);
   const applyDentalStudio = useCallback(() => {
     const state = dentalStudioRef.current;
     if (!state || !state.analysis) return;
@@ -15496,11 +15613,19 @@ export function LayerlingEditor({
           onCancel={() => setSurfaceTextTool(null)}
         />
       ) : null}
+      {dentalStudio && dentalTrim ? (
+        <DentalTrimOverlay hint={t(dentalTrim.mode === "keep" ? "dental.trimHintKeep" : "dental.trimHintRemove")} onDone={applyDentalTrim} onCancel={stopDentalTrim} />
+      ) : null}
       {dentalStudio ? (
         <DentalStudioPanel
           parts={dentalCandidates().map((shape) => ({ id: shape.id, name: displayShapeName(shape) }))}
           slots={dentalStudio.slots}
           stage={dentalStudio.stage}
+          trimming={dentalTrim}
+          trimMode={dentalTrimMode}
+          onTrimModeChange={setDentalTrimMode}
+          onTrim={(slot) => (dentalTrim?.slot === slot ? stopDentalTrim() : startDentalTrim(slot, dentalTrimMode))}
+          onView={showDentalView}
           analysis={dentalStudio.analysis}
           preset={dentalStudio.preset}
           options={dentalStudio.options}
@@ -15534,7 +15659,7 @@ export function LayerlingEditor({
           onAdvancedChange={(advanced) => setDentalStudio((current) => current ? { ...current, advanced } : current)}
           onApply={applyDentalStudio}
           onImport={() => fileInputRef.current?.click()}
-          onCancel={() => setDentalStudio((current) => (current?.stage === "making" ? current : null))}
+          onCancel={() => { stopDentalTrim(); setDentalStudio((current) => (current?.stage === "making" || current?.stage === "trimming" ? current : null)); }}
         />
       ) : null}
       {meshRoundTool ? (

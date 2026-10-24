@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeftRight, Check, ChevronDown, LoaderCircle, Upload, X } from "lucide-react";
+import { ArrowLeftRight, Check, ChevronDown, LoaderCircle, Scissors, Upload, X } from "lucide-react";
+import { useState } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
@@ -41,11 +42,20 @@ export function dentalPreset(preset: DentalPreset, depth: number, pair: boolean,
 
 export type DentalPartChoice = { id: string; name: string };
 
+/** Fork (build 48): the sides an arch can be looked at from. */
+export type DentalView = "occlusal" | "front" | "left" | "right" | "lingual";
+const DENTAL_VIEWS: readonly DentalView[] = ["occlusal", "front", "left", "right", "lingual"];
+
 /** Fork (build 47): Dental Studio - raw intraoral scans to printable models, one arch or a pair with its bite. */
 export function DentalStudioPanel({
   parts,
   slots,
   stage,
+  trimming,
+  trimMode,
+  onTrimModeChange,
+  onTrim,
+  onView,
   analysis,
   preset,
   options,
@@ -64,7 +74,12 @@ export function DentalStudioPanel({
 }: {
   parts: DentalPartChoice[];
   slots: Record<DentalSlot, string | null>;
-  stage: "analysing" | "ready" | "making";
+  stage: "analysing" | "ready" | "making" | "trimming";
+  trimming: { slot: "upper" | "lower"; mode: "keep" | "remove" } | null;
+  trimMode: "keep" | "remove";
+  onTrimModeChange: (mode: "keep" | "remove") => void;
+  onTrim: (slot: "upper" | "lower") => void;
+  onView: (slot: "upper" | "lower", view: DentalView) => void;
   analysis: DentalAnalysis | null;
   preset: DentalPreset;
   options: DentalStudioOptions;
@@ -83,13 +98,17 @@ export function DentalStudioPanel({
 }) {
   useLanguage();
   const title = t("dental.title");
+  const [chosenArch, setArch] = useState<"upper" | "lower">("upper");
+  const arch = trimming?.slot ?? (slots[chosenArch] ? chosenArch : slots.upper ? "upper" : "lower");
   const busy = stage !== "ready";
   const pair = Boolean(slots.upper && slots.lower);
   const depth = analysis ? Math.max(...analysis.arches.map((arch) => arch.depth)) : 10;
   const maxKeep = Math.max(1, Math.floor(depth * 10) / 10);
   // Never less than keeps every tooth whole.
   const minKeep = Math.min(maxKeep, analysis ? Math.ceil(Math.max(...analysis.arches.map((arch) => arch.teeth)) * 10) / 10 : 1);
-  const keep = options.keep === null ? maxKeep : Math.max(minKeep, Math.min(options.keep, maxKeep));
+  const following = options.gum !== null && options.gum !== undefined;
+  const straight = options.keep === null ? maxKeep : Math.max(minKeep, Math.min(options.keep, maxKeep));
+  const keep = following ? Math.max(minKeep, Math.min(straight, minKeep + (options.gum ?? 3))) : straight;
   // Floor to the tallest tooth.
   const height = keep + options.base + (analysis ? Math.max(...analysis.arches.map((arch) => arch.above)) : 0);
   const ready = Boolean(analysis) && !busy && Boolean(slots.upper || slots.lower);
@@ -135,6 +154,7 @@ export function DentalStudioPanel({
           <button type="button" aria-label={t("common.cancel")} onClick={onCancel}><X size={20} /></button>
         </div>
       </div>
+      <h3 className="dental-step">{t("dental.step1")}</h3>
       <div className="dental-slots">
         {parts.length === 0 ? <p className="dental-status" role="status">{t("dental.noScans")}</p> : null}
         <button type="button" className="dental-import" disabled={stage === "making"} onClick={onImport}><Upload size={15} /> {t("dental.import")}</button>
@@ -145,6 +165,35 @@ export function DentalStudioPanel({
         {stage === "analysing" ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.analysing")}</p> : null}
         {pairLine ? <p className={`dental-status ${pairLine.warn ? "warn" : ""}`} role="status">{pairLine.text}</p> : null}
       </div>
+      <div className="dental-trim">
+        <h3 className="dental-step">{t("dental.step2")}</h3>
+        <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.trimArch")}>
+          {(["upper", "lower"] as const).map((slot) => (
+            <button key={slot} type="button" role="radio" aria-checked={arch === slot} className={arch === slot ? "active" : ""} disabled={!slots[slot] || Boolean(trimming)} onClick={() => setArch(slot)}>
+              {t(slot === "upper" ? "dental.upper" : "dental.lower")}
+            </button>
+          ))}
+        </div>
+        <div className="dental-views" role="group" aria-label={t("dental.views")}>
+          {DENTAL_VIEWS.map((view) => (
+            <button key={view} type="button" disabled={!slots[arch] || !analysis} onClick={() => onView(arch, view)}>{t(`dental.view.${view}`)}</button>
+          ))}
+        </div>
+        <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.trimTitle")}>
+          {(["keep", "remove"] as const).map((mode) => (
+            <button key={mode} type="button" role="radio" aria-checked={trimMode === mode} className={trimMode === mode ? "active" : ""} disabled={busy || Boolean(trimming)} onClick={() => onTrimModeChange(mode)}>
+              {t(mode === "keep" ? "dental.trimKeep" : "dental.trimRemove")}
+            </button>
+          ))}
+        </div>
+        <div className="dental-trim-buttons">
+          <button type="button" className={trimming ? "active" : ""} disabled={(busy && !trimming) || !slots[arch] || !analysis} onClick={() => onTrim(arch)}>
+            <Scissors size={15} /> {t(trimming ? "dental.trimStop" : "dental.trimDraw")}
+          </button>
+        </div>
+        {stage === "trimming" ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.trimming")}</p> : <p className="blend-hint">{t("dental.trimInfo")}</p>}
+      </div>
+      <h3 className="dental-step">{t("dental.step3")}</h3>
       <div className="dental-presets" role="radiogroup" aria-label={t("dental.purpose")}>
         {([
           ["study", t("dental.study"), t("dental.studyHint")],
@@ -165,12 +214,30 @@ export function DentalStudioPanel({
       {advanced ? (
         <div className="dental-advanced">
           <label className="edge-modifier-check">
-            <input type="checkbox" checked={options.keep === null} disabled={busy} onChange={(event) => onOptionsChange({ keep: event.currentTarget.checked ? null : maxKeep })} />
-            <span>{t("dental.keepAll")}</span>
+            <input type="checkbox" checked={following} disabled={busy} onChange={(event) => onOptionsChange({ gum: event.currentTarget.checked ? 3 : null })} />
+            <span>{t("dental.gumFollow")}</span>
           </label>
-          {options.keep !== null ? (
-            <EdgeModifierSlider label={t("dental.keep")} value={keep} min={minKeep} max={maxKeep} step={0.1} coarse={{ step: 0.5, max: maxKeep }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ keep: value })} />
-          ) : null}
+          {following ? (
+            <EdgeModifierSlider label={t("dental.gum")} value={options.gum ?? 3} min={0.5} max={10} step={0.1} coarse={{ step: 0.5, max: 10 }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ gum: value })} />
+          ) : (
+            <>
+              <label className="edge-modifier-check">
+                <input type="checkbox" checked={options.keep === null} disabled={busy} onChange={(event) => onOptionsChange({ keep: event.currentTarget.checked ? null : maxKeep })} />
+                <span>{t("dental.keepAll")}</span>
+              </label>
+              {options.keep !== null ? (
+                <EdgeModifierSlider label={t("dental.keep")} value={keep} min={minKeep} max={maxKeep} step={0.1} coarse={{ step: 0.5, max: maxKeep }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ keep: value })} />
+              ) : null}
+            </>
+          )}
+          <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.smooth")}>
+            <span className="edge-modifier-label">{t("dental.smooth")}</span>
+            <div className="shell-opening-options">
+              {(["off", "low", "high"] as const).map((value) => (
+                <button key={value} type="button" role="radio" aria-checked={(options.smooth ?? "low") === value} className={(options.smooth ?? "low") === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ smooth: value })}>{t(`dental.smooth.${value}`)}</button>
+              ))}
+            </div>
+          </div>
           <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.baseStyle")}>
             <span className="edge-modifier-label">{t("dental.baseStyle")}</span>
             <div className="shell-opening-options">

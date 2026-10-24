@@ -1622,3 +1622,19 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 /* Fork (build 47): Dental Studio - import button */
 .dental-studio-panel .dental-import { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; margin: 0 0 8px; padding: 5px 10px; border: 1px solid var(--border, #d4dae3); border-radius: 6px; background: transparent; color: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .dental-studio-panel .dental-import:hover:not(:disabled) { border-color: var(--primary, #1f6feb); color: var(--primary, #1f6feb); }
+/* Fork (build 48): Dental Studio trim line */
+.dental-trim-overlay { position: absolute; inset: 0; z-index: 30; cursor: crosshair; touch-action: none; }
+.dental-trim-overlay svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.dental-trim-overlay polygon { fill: rgba(31, 111, 235, 0.12); stroke: #1f6feb; stroke-width: 2; stroke-dasharray: 6 4; }
+.dental-trim-hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); margin: 0; padding: 6px 12px; border-radius: 6px; background: rgba(20, 24, 31, 0.82); color: #fff; font-size: 13px; pointer-events: none; white-space: nowrap; }
+.dental-studio-panel .dental-trim { margin: 10px 0 4px; padding: 10px 0 2px; border-top: 1px solid var(--border, #e3e7ed); }
+.dental-studio-panel .dental-trim-mode, .dental-studio-panel .dental-trim-buttons { display: flex; gap: 6px; margin-bottom: 6px; }
+.dental-studio-panel .dental-trim-mode button, .dental-studio-panel .dental-trim-buttons button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--border, #d4dae3); border-radius: 6px; background: transparent; color: inherit; font-size: 12px; cursor: pointer; }
+.dental-studio-panel .dental-trim-mode button.active, .dental-studio-panel .dental-trim-buttons button.active { border-color: var(--primary, #1f6feb); color: var(--primary, #1f6feb); background: rgba(31, 111, 235, 0.08); font-weight: 600; }
+.dental-studio-panel .dental-trim button:disabled { opacity: 0.5; cursor: default; }
+.dental-studio-panel .dental-views { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.dental-studio-panel .dental-views button { padding: 4px 8px; border: 1px solid var(--border, #d4dae3); border-radius: 999px; background: transparent; color: inherit; font-size: 11px; cursor: pointer; }
+.dental-studio-panel .dental-views button:hover:not(:disabled) { border-color: var(--primary, #1f6feb); color: var(--primary, #1f6feb); }
+.dental-studio-panel .dental-views button:disabled { opacity: 0.5; cursor: default; }
+.dental-studio-panel .dental-step { margin: 10px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: var(--foreground, #1d2430); }
+.dental-studio-panel .dental-trim .dental-step { margin-top: 0; }

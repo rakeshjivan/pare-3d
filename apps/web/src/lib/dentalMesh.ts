@@ -77,7 +77,8 @@ export function dropNonManifold(m: Mesh): number {
 }
 
 /** Keeps the pieces at least `share` of the biggest piece's area; returns how many went. */
-export function dropFragments(m: Mesh, share: number): number {
+/** Drops pieces under `share` of the biggest by area - never one holding a `spare` vertex (a tooth). */
+export function dropFragments(m: Mesh, share: number, spare?: Uint8Array): number {
   const faces = m.f.length / 3;
   if (faces === 0) return 0;
   const parent = new Int32Array(m.v.length / 3);
@@ -105,6 +106,8 @@ export function dropFragments(m: Mesh, share: number): number {
   }
   const biggest = Math.max(...area.values());
   const keep = new Set([...area.entries()].filter(([, a]) => a >= biggest * share).map(([root]) => root));
+  // A piece of tooth stays, if it is more than a speck (2 mm²): a speck cannot stand as a solid.
+  if (spare) for (let i = 0; i < m.f.length; i += 1) if (spare[m.f[i]] && (area.get(find(m.f[i])) ?? 0) >= 2) keep.add(find(m.f[i]));
   const kept: number[] = [];
   for (let t = 0; t < faces; t += 1) if (keep.has(find(m.f[t * 3]))) kept.push(m.f[t * 3], m.f[t * 3 + 1], m.f[t * 3 + 2]);
   m.f = kept;
@@ -115,7 +118,7 @@ export function dropFragments(m: Mesh, share: number): number {
  * Drops the pieces that face down on the whole (a flap folded over, its outside towards the plate),
  * keeping the biggest piece whatever it does. Returns how many went.
  */
-export function dropInverted(m: Mesh): number {
+export function dropInverted(m: Mesh, spare?: Uint8Array): number {
   const faces = m.f.length / 3;
   if (faces === 0) return 0;
   const parent = new Int32Array(m.v.length / 3);
@@ -140,6 +143,7 @@ export function dropInverted(m: Mesh): number {
   let biggest = -1, most = -1;
   area.forEach((value, root) => { if (value > most) { most = value; biggest = root; } });
   const drop = new Set([...up.entries()].filter(([root, value]) => value < 0 && root !== biggest).map(([root]) => root));
+  if (spare) for (let i = 0; i < m.f.length; i += 1) if (spare[m.f[i]]) drop.delete(find(m.f[i]));
   if (!drop.size) return 0;
   const kept: number[] = [];
   for (let t = 0; t < faces; t += 1) if (!drop.has(find(m.f[t * 3]))) kept.push(m.f[t * 3], m.f[t * 3 + 1], m.f[t * 3 + 2]);
@@ -384,14 +388,23 @@ export function closeWithBase(m: Mesh, floor: number): { mesh: Mesh; outline: Ri
       f.push(b, a, a2, b, a2, b2);
     }
   });
-  // Floor: loops nested by containment; even depth = outline, odd = hole in the one around it.
-  const depth = rings.map((ring, i) => rings.reduce((d, other, j) => (j !== i && pointInPolygon(ring[0][0], ring[0][1], other) ? d + 1 : d), 0));
-  const areas = rings.map((ring) => Math.abs(signedArea(ring)));
+  // Floor: an outline runs round the way the biggest loop does, a hole (the palate's opening) the
+  // other way and goes in the smallest outline around it. Judged by direction, not by nesting: a
+  // separate piece above the main one, seen from above, is an outline of its own, not a hole.
+  const signed = rings.map((ring) => signedArea(ring));
+  const areas = signed.map((value) => Math.abs(value));
+  const biggest = areas.indexOf(Math.max(...areas));
+  const outward = Math.sign(signed[biggest]) || 1;
+  const isOutline = signed.map((value) => Math.sign(value) === outward);
+  const holeOf = rings.map((ring, j) => {
+    if (isOutline[j]) return -1;
+    let best = -1;
+    rings.forEach((other, i) => { if (isOutline[i] && areas[i] > areas[j] && pointInPolygon(ring[0][0], ring[0][1], other) && (best < 0 || areas[i] < areas[best])) best = i; });
+    return best;
+  });
   rings.forEach((ring, i) => {
-    if (depth[i] % 2 !== 0) return;
-    const holes = rings
-      .map((_, j) => j)
-      .filter((j) => depth[j] === depth[i] + 1 && areas[j] < areas[i] && pointInPolygon(rings[j][0][0], rings[j][0][1], ring));
+    if (!isOutline[i]) return;
+    const holes = rings.map((_, j) => j).filter((j) => holeOf[j] === i);
     const contour = ring.map(([x, y]) => new THREE.Vector2(x, y));
     const holeVectors = holes.map((j) => rings[j].map(([x, y]) => new THREE.Vector2(x, y)));
     const ids = [...loops[i].map(down), ...holes.flatMap((j) => loops[j].map(down))];
@@ -474,7 +487,15 @@ export function convexHull(points: Array<[number, number]>): Array<[number, numb
 export function toManifold(runtime: ManifoldRuntime, m: Mesh): ManifoldSolid {
   // Points made twice (a cut point and a wall point at the same place) are joined first.
   const welded = weld(soup(m), 1e-6);
-  const solid = new runtime.Manifold(new runtime.Mesh({ numProp: 3, vertProperties: new Float32Array(welded.v), triVerts: new Uint32Array(welded.f) }));
+  const mesh = new runtime.Mesh({ numProp: 3, vertProperties: new Float32Array(welded.v), triVerts: new Uint32Array(welded.f) });
+  let solid: ManifoldSolid;
+  try {
+    solid = new runtime.Manifold(mesh);
+  } catch {
+    // Open edges whose ends lie at the same places (a split corner, a gap closed by a fan) are joined.
+    mesh.merge();
+    solid = new runtime.Manifold(mesh);
+  }
   if (solid.status() !== "NoError") throw new Error(`The model did not close into a solid (${solid.status()})`);
   return solid;
 }

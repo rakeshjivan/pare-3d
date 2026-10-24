@@ -6,6 +6,7 @@ import { labelSection, labelText } from "@/lib/dentalLabel";
 import { weld } from "@/lib/dentalMesh";
 import { plyToStlBytes } from "@/lib/plyImport";
 import { importedShapeFromStl } from "@/lib/stlImport";
+import { trimDentalScan } from "@/lib/dentalTrim";
 import { layerlingToZUp } from "@/lib/meshCoordinates";
 import { dentalPreset } from "@/components/workplane/DentalStudioPanel";
 
@@ -257,5 +258,33 @@ describe("Dental Studio (build 47)", () => {
     expect(back[0]).toBeCloseTo(100, 4);
     expect(back[1]).toBeCloseTo(50, 4);
     expect(back[2]).toBeCloseTo(20, 4);
+  });
+
+  it("trims by hand, but never the teeth (build 48)", () => {
+    const arch = syntheticArch({ flap: true });
+    const corners = arch.length / 3;
+    const all = new Uint8Array(corners).fill(1);
+    // Only the loose fragment that came with the scan goes.
+    expect(trimDentalScan(arch, all, "keep").removed).toBeLessThanOrEqual(1);
+    // A line round the right-hand third, to be removed: its gum goes, its teeth stay.
+    const right = new Uint8Array(corners);
+    for (let i = 0; i < corners; i += 1) right[i] = arch[i * 3] > 10 ? 1 : 0;
+    const result = trimDentalScan(arch, right, "remove");
+    expect(result.removed).toBeGreaterThan(100);
+    expect(result.protectedTriangles).toBeGreaterThan(100);
+    // What is kept still makes a model.
+    const kept: number[] = [];
+    for (let t = 0; t < result.keep.length; t += 1) if (result.keep[t]) for (let k = 0; k < 9; k += 1) kept.push(arch[t * 9 + k]);
+    expect(kept.length / 9).toBe(result.keep.length - result.removed);
+  });
+
+  it("follows the gum line, keeping the teeth whole (build 48)", async () => {
+    const input = { arches: [{ id: "a", positions: syntheticArch({ teethDown: true }) }] };
+    const straight = await makeDentalStudio(input, base, runtime as never);
+    const gum = await makeDentalStudio(input, { ...base, gum: 2, smooth: "high" }, runtime as never);
+    expect(gum.warnings).not.toContain("teeth");
+    expect(gum.surface[0][-1]).toBeGreaterThanOrEqual(0.999);
+    expect(gum.parts[0].volume).toBeLessThanOrEqual(straight.parts[0].volume);
+    expect(closedVolume(runtime, gum.parts[0].positions).status).toBe("NoError");
   });
 });
