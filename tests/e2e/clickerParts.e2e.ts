@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 (globalThis as unknown as { window: unknown }).window = { location: { href: pathToFileURL(resolve("apps/web/public") + "/").href } };
-import { CLICKER_BASE_HEIGHT, CLICKER_DEFAULT_GAP, CLICKER_SOCKET_DEPTH, clickerBasePart, clickerTopPart } from "@/lib/clickerParts";
+import { CLICKER_DEFAULT_GAP, CLICKER_GAPS, CLICKER_TOP_HEIGHT, clickerBaseDepth, clickerBasePart, clickerTopPart } from "@/lib/clickerParts";
 import { buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { meshForShape } from "@/lib/editorMeshCore";
 import { canonicalizeShape } from "@/lib/workplaneShapes";
@@ -34,48 +34,41 @@ function openEdges(positions: number[]) {
   return [...edges.values()].filter((count) => count !== 2).length;
 }
 
-describe("Clicker pieces (build 54, reworked in build 56)", () => {
+describe("Clicker cutters (build 54, reworked in build 57)", () => {
   const base = clickerBasePart("Clicker base").shapes[0];
-  const [top, stemHole] = clickerTopPart("Clicker top", "Stem hole").shapes;
+  const top = clickerTopPart("Clicker top").shapes[0];
 
-  it("are closed, of the switch's size, and keep it", () => {
-    for (const piece of [base, top, stemHole]) {
-      expect(piece.fixedSize).toBe(true);
-      expect(openEdges(piece.importedMesh!.positions)).toBe(0);
-      const resized = canonicalizeShape({ ...piece, width: 40, depth: 9, height: 20, size: 40 });
-      expect([resized.width, resized.depth, resized.height]).toEqual([piece.width, piece.depth, piece.height]);
+  it("are closed holes of the switch's size that keep it", () => {
+    for (const cutter of [top, ...CLICKER_GAPS.map((gap) => clickerBasePart("b", gap).shapes[0])]) {
+      expect(cutter.hole).toBe(true);
+      expect(cutter.fixedSize).toBe(true);
+      expect(openEdges(cutter.importedMesh!.positions)).toBe(0);
+      const resized = canonicalizeShape({ ...cutter, width: 40, depth: 9, height: 20, size: 40 });
+      expect([resized.width, resized.depth, resized.height]).toEqual([cutter.width, cutter.depth, cutter.height]);
     }
-    expect(base.hole).toBe(true);
-    expect(top.hole).toBe(false);
-    expect(stemHole.hole).toBe(true);
-    expect([base.width, base.depth, base.height]).toEqual([15.8, 15.9, CLICKER_BASE_HEIGHT]);
-    expect([top.width, top.depth, top.height]).toEqual([5.6, 5.6, CLICKER_DEFAULT_GAP]);
-    expect(clickerTopPart("t", "h", 4.5).shapes[0].height).toBe(4.5);
+    expect([base.width, base.depth, base.height]).toEqual([15.8, 15.9, clickerBaseDepth(CLICKER_DEFAULT_GAP)]);
+    expect(clickerBaseDepth(2.5)).toBe(12.8);
+    expect(clickerBasePart("b", 4.5).shapes[0].height).toBe(10.8);
+    expect([top.width, top.depth, top.height]).toEqual([13.9, 15.5, CLICKER_TOP_HEIGHT]);
   });
 
-  it("sinks the whole switch into a base, its top level with the face", async () => {
+  it("sinks the switch into a base so only the gap stands out", async () => {
     const half = block(20);
-    const cutter = canonicalizeShape({ ...base, elevation: 20 - CLICKER_BASE_HEIGHT });
+    const cutter = canonicalizeShape({ ...base, elevation: 20 - base.height });
     const result = await buildGroupedShapeFromSelection([half, cutter], 400000);
-    expect(volume(half) - volume(result.group!)).toBeCloseTo(3418.3, 0);
-    // The top housing's room: 15.8 mm square, 6.6 mm deep under the face.
+    expect(volume(half) - volume(result.group!)).toBeCloseTo(2794.2, 0);
+    // The top housing's room: 15.8 mm square, from the face down to the plate's level (6.6 mm less the gap).
     const { vertices } = meshForShape(result.group!);
-    expect(vertices.some(([x, y]) => Math.abs(Math.abs(x) - 7.9) < 0.01 && Math.abs(y - (20 - 6.6)) < 0.01)).toBe(true);
+    expect(vertices.some(([x, y]) => Math.abs(Math.abs(x) - 7.9) < 0.01 && Math.abs(y - (20 - (6.6 - CLICKER_DEFAULT_GAP))) < 0.01)).toBe(true);
   });
 
-  it("adds the stem post to a top, as long as the gap, with the cross hole reaching into the top", async () => {
+  it("cuts the kit's recess into a top and leaves the dowel with its cross hole standing", async () => {
     const half = block(10);
-    const post = canonicalizeShape({ ...top, elevation: 10 });
-    const hole = canonicalizeShape({ ...stemHole, elevation: 10 + (stemHole.elevation ?? 0) });
-    const result = await buildGroupedShapeFromSelection([half, post, hole], 400000);
+    const cutter = canonicalizeShape({ ...top, elevation: 10 - CLICKER_TOP_HEIGHT });
+    const result = await buildGroupedShapeFromSelection([half, cutter], 400000);
+    expect(volume(half) - volume(result.group!)).toBeCloseTo(468.0, 0);
     const { vertices } = meshForShape(result.group!);
-    expect(Math.max(...vertices.map((v) => v[1]))).toBeCloseTo(10 + CLICKER_DEFAULT_GAP, 3);
-    // The cross hole's floor: 3.8 mm in from the post's end, so 1.3 mm into the top itself.
-    const floor = 10 + CLICKER_DEFAULT_GAP - CLICKER_SOCKET_DEPTH;
-    expect(vertices.some(([x, y, z]) => Math.abs(Math.abs(x) - 2.17) < 0.01 && Math.abs(z) < 0.8 && Math.abs(y - floor) < 0.01)).toBe(true);
-    // Added: the post less the hole; taken: the hole's part in the top.
-    const cross = 2 * 4.34 * 1.45 - 1.45 * 1.45;
-    const disc = 0.5 * 96 * 2.8 * 2.8 * Math.sin((2 * Math.PI) / 96);
-    expect(volume(result.group!) - volume(half)).toBeCloseTo(disc * CLICKER_DEFAULT_GAP - cross * CLICKER_SOCKET_DEPTH, 0);
+    // The dowel, 5.77 mm across, its end level with the face.
+    expect(vertices.filter(([x, y, z]) => Math.abs(Math.hypot(x, z) - 5.77 / 2) < 0.05 && y > 6.9 && y < 10.01).length).toBeGreaterThan(20);
   });
 });

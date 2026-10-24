@@ -5186,7 +5186,7 @@ export function LayerlingEditor({
     }
     const cut = canonicalizeShape({ ...result.group, name: part.name });
     const next = before.filter((shape) => !placedById.has(shape.id)).map((shape) => (shape.id === part.id ? cut : shape));
-    commitShapes(next, [cut.id], [t(cutter.hole ? "clicker.cut" : "clicker.added", { cutter: cutterName, part: displayShapeName(part) }), ...notes].join(" "), undefined, insertEntry);
+    commitShapes(next, [cut.id], [t("clicker.cut", { cutter: cutterName, part: displayShapeName(part) }), ...notes].join(" "), undefined, insertEntry);
   }, [commitShapes]);
 
   /** Sets the parts picked up with C down on the face (or the workplane) that was clicked, as one step. */

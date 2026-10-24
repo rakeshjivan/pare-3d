@@ -174,14 +174,14 @@ The result is a mesh like an imported model. Undo lays the shape flat again; for
 
 ### Making a clicker
 
-The group **{{ui:readyParts.cat.clicker}}** turns any shape into a clicker built round a keyboard switch (Cherry MX style, the kind sold for mechanical keyboards: a 15 mm housing and 4 mm of travel). It has two pieces:
+The group **{{ui:readyParts.cat.clicker}}** turns any shape into a clicker built round a keyboard switch (Cherry MX style, the kind sold for mechanical keyboards: a 15 mm housing and 4 mm of travel). It has two cutters, and both are holes:
 
-- **{{ui:readyParts.clickerBase}}:** a hole - the pocket the whole switch sinks into, 15.3 mm deep. The top of the switch ends up level with the face; below, notches hold the switch's clips, the way a keyboard plate does.
-- **{{ui:readyParts.clickerTop}}:** a solid post with a cross-shaped hole that pushes onto the switch's stem. The post is as long as the gap it leaves between the halves, chosen beside it ({{ui:readyParts.clickerGap}}): 2.5 mm by default, which is enough for a clicky (blue) switch to click - it clicks at about 2.2 mm - and keeps the halves close; up to 4.5 mm lets the switch travel its full 4 mm. With a short post the cross hole reaches on into the top half.
+- **{{ui:readyParts.clickerBase}}:** the pocket the switch presses into. Notches hold its clips, the way a keyboard plate does, and the pocket is deep enough that only a little of the switch stands out of the face: that is the gap between the two halves, chosen beside it ({{ui:readyParts.clickerGap}}). 2.5 mm, the default, is enough for a clicky (blue) switch to click - it clicks at about 2.2 mm - and keeps the halves close; up to 4.5 mm gives a longer press.
+- **{{ui:readyParts.clickerTop}}:** a recess with a dowel standing in its middle, the cross hole in the dowel pushing onto the switch's stem. The dowel's end is level with the face; as you press, the recess takes the top of the switch.
 
-Split your shape into a base and a top and lay each half with its flat face up. Press {{ui:readyParts.add}} beside {{ui:readyParts.clickerBase}} and click the base's flat face: the pocket goes into the middle of that face, level with it, and is cut in at once. Choose the gap and do the same with {{ui:readyParts.clickerTop}} on the top's flat face: the post is added to its middle. Both halves are groups afterwards, so Ungroup takes the piece out again. If the face is curved, the piece is set down where you clicked and not joined; if the base is thinner than the pocket is deep (about 16 mm), the notice says so.
+Split your shape into a base and a top and lay each half with its flat face up. Choose the gap, press {{ui:readyParts.add}} beside {{ui:readyParts.clickerBase}} and click the base's flat face: the pocket goes into the middle of that face, level with it, and is cut in at once. Do the same with {{ui:readyParts.clickerTop}} on the top's flat face. Both halves are groups afterwards, so Ungroup takes the cutter out again. If the face is curved, the cutter is set down where you clicked and not cut in; if the base is thinner than the pocket is deep, the notice says so.
 
-Print both halves, press the switch into the base until its clips snap in, and push the top onto its stem. The pieces keep their size - they fit standard switches - so they have no resize handles and cannot be tapered, twisted or wrapped.
+Print both halves, press the switch into the base until its clips snap in, and push the top onto its stem. The cutters keep their size - they fit standard switches - so they have no resize handles and cannot be tapered, twisted or wrapped.
 
 ## Making from a photo or a pattern
 

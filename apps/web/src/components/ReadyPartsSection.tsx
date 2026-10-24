@@ -4,7 +4,7 @@ import { BoxPartIcon, ClickerBasePartIcon, ClickerTopPartIcon, FlexiPartIcon, Hi
 import { DEFAULT_JAR, jarParts, normalizeJar, type JarOptions } from "@/lib/readyJar";
 import { DEFAULT_FLEXI_CHAIN, flexiChainParts, normalizeFlexiChain, type FlexiChainOptions } from "@/lib/flexiJoint";
 import { useState } from "react";
-import { CLICKER_BASE_HEIGHT, CLICKER_DEFAULT_GAP, CLICKER_GAPS, clickerBasePart, clickerTopPart } from "@/lib/clickerParts";
+import { CLICKER_DEFAULT_GAP, CLICKER_GAPS, CLICKER_TOP_HEIGHT, clickerBaseDepth, clickerBasePart, clickerTopPart, type ClickerGap } from "@/lib/clickerParts";
 import { ForkLithophaneIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -46,7 +46,7 @@ export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: Read
   const [flexi, setFlexi] = useState<FlexiChainOptions>(DEFAULT_FLEXI_CHAIN);
   const [snap, setSnap] = useState<SnapFitOptions>(DEFAULT_SNAP_FIT);
   const [hinge, setHinge] = useState<LivingHingeOptions>(DEFAULT_LIVING_HINGE);
-  const [clickerGap, setClickerGap] = useState<number>(CLICKER_DEFAULT_GAP);
+  const [clickerGap, setClickerGap] = useState<ClickerGap>(CLICKER_DEFAULT_GAP);
   const clickerOnFace = { hint: t("readyParts.clickerPlaceHint"), placed: t("readyParts.clickerPlaced"), cutInto: true };
   const toggleForm = (form: "snap" | "hinge" | "jar" | "flexi") => setOpenForm(openForm === form ? null : form);
   const safeBend = snapFitSafeBend(snap);
@@ -262,34 +262,34 @@ export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: Read
           {/* Fork (build 54): the two cutters that make a clicker round a keyboard switch. */}
           <h4 className="ready-parts-category">{t("readyParts.cat.clicker")}</h4>
           <p className="ready-part-note">{t("readyParts.clickerHowTo")}</p>
-          {/* Fork (build 56): the base sinks the whole switch; the top's post sets the gap between the halves. */}
-          <div className="ready-part" data-ready-part="clicker-base">
+          {/* Fork (build 57): the base sets the gap between the halves; the top is the kit's cutter. */}
+          <div className="ready-part has-size" data-ready-part="clicker-base">
             <ClickerBasePartIcon />
             <div>
               <strong>{t("readyParts.clickerBase")}</strong>
-              <span>{t("readyParts.clickerBaseHint")}</span>
+              <span>{t("readyParts.clickerBaseHint", { gap: clickerGap.toFixed(1) })}</span>
             </div>
-            <button
-              type="button"
-              className="ready-part-add"
-              onClick={() => onInsert([clickerBasePart(t("readyParts.clickerBase"))], { sink: CLICKER_BASE_HEIGHT, onFace: clickerOnFace })}
-            >
-              {t("readyParts.add")}
-            </button>
-          </div>
-          <div className="ready-part has-size" data-ready-part="clicker-top">
-            <ClickerTopPartIcon />
-            <div>
-              <strong>{t("readyParts.clickerTop")}</strong>
-              <span>{t("readyParts.clickerTopHint", { gap: clickerGap.toFixed(1) })}</span>
-            </div>
-            <select className="ready-part-size" aria-label={t("readyParts.clickerGap")} title={t("readyParts.clickerGapHint")} value={clickerGap} onChange={(event) => setClickerGap(Number(event.currentTarget.value))}>
+            <select className="ready-part-size" aria-label={t("readyParts.clickerGap")} title={t("readyParts.clickerGapHint")} value={clickerGap} onChange={(event) => setClickerGap(Number(event.currentTarget.value) as ClickerGap)}>
               {CLICKER_GAPS.map((gap) => <option key={gap} value={gap}>{t("readyParts.clickerGapOption", { gap: gap.toFixed(1) })}</option>)}
             </select>
             <button
               type="button"
               className="ready-part-add"
-              onClick={() => onInsert([clickerTopPart(t("readyParts.clickerTop"), t("readyParts.clickerStemHole"), clickerGap)], { onFace: clickerOnFace })}
+              onClick={() => onInsert([clickerBasePart(t("readyParts.clickerBase"), clickerGap)], { sink: clickerBaseDepth(clickerGap), onFace: clickerOnFace })}
+            >
+              {t("readyParts.add")}
+            </button>
+          </div>
+          <div className="ready-part" data-ready-part="clicker-top">
+            <ClickerTopPartIcon />
+            <div>
+              <strong>{t("readyParts.clickerTop")}</strong>
+              <span>{t("readyParts.clickerTopHint")}</span>
+            </div>
+            <button
+              type="button"
+              className="ready-part-add"
+              onClick={() => onInsert([clickerTopPart(t("readyParts.clickerTop"))], { sink: CLICKER_TOP_HEIGHT, onFace: clickerOnFace })}
             >
               {t("readyParts.add")}
             </button>

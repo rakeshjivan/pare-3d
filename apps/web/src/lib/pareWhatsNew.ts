@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 57,
+    items: [
+      "Clicker top is the inset clicker kit's top cutter again: a recess with a dowel in the middle whose cross hole pushes onto the switch's stem (build 56's post standing out of the face was wrong).",
+      "The gap between the clicker's halves is now chosen on the Clicker base: the pocket sinks the switch so only that much stands out - 2.5 mm by default, enough for a blue switch to click, up to 4.5 mm.",
+    ],
+  },
+  {
     build: 56,
     items: [
       "Clicker in one click each: Add the Clicker base, click the base's flat face, and the pocket goes into the middle of the face and is cut in at once; the same for the Clicker top. No moving, centring or grouping by hand.",
