@@ -12,6 +12,7 @@ import { decodeSvgBytes, importedShapeFromSvgWithReport, prepareSvgImport } from
 import { importedShapesFrom3mf } from "@/lib/threemfImport";
 import { sketchProfileFromSvg } from "@/lib/svgSketch";
 import { importedPictureSvg, isPictureFile, svgEmbeddedPicture } from "@/lib/pictureIcon";
+import { dxfToSvg } from "@/lib/dxf";
 import type { ProjectAsset, SketchProfile, WorkplaneShape } from "@/types/layerling";
 
 /**
@@ -37,7 +38,7 @@ async function prepareImportFiles(files: readonly File[]) {
     }
     try {
       const entries = unzipSync(new Uint8Array(await file.arrayBuffer()), {
-        filter: (entry) => !entry.name.endsWith("/") && /\.(obj|mtl|stl|ply|3mf|svg|step|stp)$/i.test(entry.name) && !/(^|\/)__MACOSX\//.test(entry.name),
+        filter: (entry) => !entry.name.endsWith("/") && /\.(obj|mtl|stl|ply|3mf|svg|dxf|step|stp)$/i.test(entry.name) && !/(^|\/)__MACOSX\//.test(entry.name),
       });
       const inside = Object.entries(entries).map(([name, bytes]) => new File([bytes as BlobPart], name.split("/").pop() || name));
       if (!inside.some((entry) => !/\.mtl$/i.test(entry.name))) {
@@ -115,7 +116,9 @@ export async function importModelFiles(
 
     // A PNG or JPG comes in traced into an outline, as an SVG (#359).
     const isPicture = isPictureFile(file);
-    const sourceFormat = isPicture ? "svg" : sourceFormatForFileName(file.name) ?? (file.type === "image/svg+xml" ? "svg" : null);
+    // Fork (build 55): a DXF drawing comes in through the SVG import, as the SVG of its outlines.
+    const isDxf = /\.dxf$/i.test(file.name);
+    const sourceFormat = isPicture || isDxf ? "svg" : sourceFormatForFileName(file.name) ?? (file.type === "image/svg+xml" ? "svg" : null);
     const isStep = sourceFormat === "step";
     const isObj = sourceFormat === "obj";
     const isSvg = sourceFormat === "svg";
@@ -155,10 +158,19 @@ export async function importModelFiles(
         const { importedShapeFromStep } = await import("@/lib/stepImport");
         shape = await importedShapeFromStep(file.name, buffer);
       } else if (isSvg) {
-        let text = isPicture ? await importedPictureSvg(file) : decodeSvgBytes(bytes);
-        const embedded = isPicture ? null : svgEmbeddedPicture(text);
+        let dxfOpen = 0;
+        let text: string;
+        if (isDxf) {
+          const drawing = dxfToSvg(new TextDecoder().decode(bytes));
+          text = drawing.svg;
+          dxfOpen = drawing.open;
+        } else {
+          text = isPicture ? await importedPictureSvg(file) : decodeSvgBytes(bytes);
+        }
+        const embedded = isPicture || isDxf ? null : svgEmbeddedPicture(text);
         if (embedded) text = await importedPictureSvg(embedded);
-        const traced = isPicture || Boolean(embedded);
+        const traced = isPicture || isDxf || Boolean(embedded);
+        if (dxfOpen > 0) result.notes.push(t("status.importDxfOpen", { name: file.name, count: dxfOpen }));
         if (traced) {
           bytes = new TextEncoder().encode(text);
           assetName = `${file.name.replace(/\.[^.]+$/, "")}.svg`;

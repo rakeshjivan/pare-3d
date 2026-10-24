@@ -7,6 +7,7 @@ import type { FitReport } from "@/lib/partTools";
 import type { DentalAnalysis, DentalStudioInput, DentalStudioOptions, DentalStudioResult } from "@/lib/dentalModel";
 import type { DentalTrimMode, DentalTrimResult } from "@/lib/dentalTrim";
 import type { WorkplaneShape } from "@/types/layerling";
+import type { SurfaceTextureOptions, SurfaceTextureResult } from "@/lib/surfaceTexture";
 
 export type MeshJobRequest =
   | { id: number; base: string; kind: "round"; positions: Float32Array; radius: number; mode: MeshRoundMode }
@@ -14,7 +15,8 @@ export type MeshJobRequest =
   | { id: number; base: string; kind: "dentalAnalyse"; input: DentalStudioInput }
   | { id: number; base: string; kind: "dentalStudio"; input: DentalStudioInput; options: DentalStudioOptions }
   | { id: number; base: string; kind: "dentalTrim"; positions: Float32Array; side: Float32Array; mode: DentalTrimMode; local: Float32Array }
-  | { id: number; base: string; kind: "dentalArea"; positions: Float32Array };
+  | { id: number; base: string; kind: "dentalArea"; positions: Float32Array }
+  | { id: number; base: string; kind: "texture"; positions: Float32Array; options: SurfaceTextureOptions };
 export type MeshJobResponse =
   | { id: number; ok: true; kind?: "round"; result: { positions: Float32Array; voxel: number; coarse: boolean } }
   | { id: number; ok: true; kind: "fit"; report: FitReport }
@@ -22,6 +24,7 @@ export type MeshJobResponse =
   | { id: number; ok: true; kind: "dentalStudio"; result: DentalStudioResult }
   | { id: number; ok: true; kind: "dentalTrim"; trim: DentalTrimResult }
   | { id: number; ok: true; kind: "dentalArea"; area: Uint8Array }
+  | { id: number; ok: true; kind: "texture"; texture: SurfaceTextureResult }
   | { id: number; ok: false; error: string };
 
 let worker: Worker | null = null;
@@ -45,6 +48,7 @@ function meshWorker(): Worker | null {
       else if (reply.kind === "dentalStudio") waiting.resolve(reply.result);
       else if (reply.kind === "dentalTrim") waiting.resolve(reply.trim);
       else if (reply.kind === "dentalArea") waiting.resolve(reply.area);
+      else if (reply.kind === "texture") waiting.resolve(reply.texture);
       else waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
     };
     worker.onerror = () => {
@@ -83,6 +87,26 @@ export async function roundMeshInBackground(positions: ArrayLike<number>, radius
     });
   } catch (error) {
     if (error instanceof Error && error.message === "worker-unavailable") return roundHere(positions, radius, mode);
+    throw error;
+  }
+}
+
+/** Fork (build 55): a surface texture on a part (world positions), in the worker when one runs. */
+export async function textureMeshInBackground(positions: ArrayLike<number>, options: SurfaceTextureOptions): Promise<SurfaceTextureResult> {
+  const here = async () => (await import("@/lib/surfaceTexture")).textureMeshPositions(positions, options);
+  const target = meshWorker();
+  if (!target) return here();
+  const id = nextId;
+  nextId += 1;
+  const data = Float32Array.from(positions as ArrayLike<number>);
+  try {
+    return await new Promise<SurfaceTextureResult>((resolve, reject) => {
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      const request: MeshJobRequest = { id, base: new URL(".", window.location.href).href, kind: "texture", positions: data, options };
+      target.postMessage(request, [data.buffer]);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "worker-unavailable") return here();
     throw error;
   }
 }

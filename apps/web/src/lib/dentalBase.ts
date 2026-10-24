@@ -569,24 +569,27 @@ const axleAlongX = (runtime: ManifoldRuntime, radius: number, x0: number, x1: nu
 /**
  * A snap-on hinge in the pair's frame (occlusal plane z = 0, back +y): a bar along the back of each
  * base, two posts carrying an axle on the lower, and a clip on the upper that snaps over the axle
- * between them. The axle lies 6 mm behind `back`, in the occlusal plane.
+ * between them. The axle lies 6 mm behind `back` - behind the last molars - in the occlusal plane.
  */
 export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number, xMax: number, floorUpper: number, floorLower: number) {
   const r = HINGE_AXLE_RADIUS, bore = r + HINGE_CLEARANCE;
   const ay = back + 6;
-  const half = Math.max(14, Math.min(-xMin, xMax));
+  // Build 55: centred on what stands at the back - the last molars of both sides on a full arch,
+  // the last molars of the one side on a quadrant - rather than on the midline, where a quadrant has nothing.
+  const cx = Number.isFinite(xMin) && Number.isFinite(xMax) ? (xMin + xMax) / 2 : 0;
+  const half = Math.max(14, Number.isFinite(xMin) && Number.isFinite(xMax) ? (xMax - xMin) / 2 : 14);
   const made: ManifoldSolid[] = [];
   const keep = <T extends ManifoldSolid>(solid: T) => { made.push(solid); return solid; };
-  const lowerBar = keep(box(runtime, -half, half, back - 4, back + 10, floorLower, floorLower + 4));
-  const postL = keep(box(runtime, -13, -5.5, back + 2, back + 10, floorLower, r + 2.5));
-  const postR = keep(box(runtime, 5.5, 13, back + 2, back + 10, floorLower, r + 2.5));
-  const axle = keep(axleAlongX(runtime, r, -13, 13, ay, 0));
+  const lowerBar = keep(box(runtime, cx - half, cx + half, back - 4, back + 10, floorLower, floorLower + 4));
+  const postL = keep(box(runtime, cx - 13, cx - 5.5, back + 2, back + 10, floorLower, r + 2.5));
+  const postR = keep(box(runtime, cx + 5.5, cx + 13, back + 2, back + 10, floorLower, r + 2.5));
+  const axle = keep(axleAlongX(runtime, r, cx - 13, cx + 13, ay, 0));
   const lower = runtime.Manifold.union([lowerBar, postL, postR, axle]);
-  const upperBar = keep(box(runtime, -half, half, back - 4, back + 10, floorUpper - 4, floorUpper));
-  const clipBlock = keep(box(runtime, -4.8, 4.8, back + 2, back + 10, -(bore + 1.8), floorUpper));
+  const upperBar = keep(box(runtime, cx - half, cx + half, back - 4, back + 10, floorUpper - 4, floorUpper));
+  const clipBlock = keep(box(runtime, cx - 4.8, cx + 4.8, back + 2, back + 10, -(bore + 1.8), floorUpper));
   const joined = keep(runtime.Manifold.union(upperBar, clipBlock));
-  const hole = keep(axleAlongX(runtime, bore, -6, 6, ay, 0));
-  const slot = keep(box(runtime, -6, 6, ay - 1.7, ay + 1.7, -(bore + 3), 0));
+  const hole = keep(axleAlongX(runtime, bore, cx - 6, cx + 6, ay, 0));
+  const slot = keep(box(runtime, cx - 6, cx + 6, ay - 1.7, ay + 1.7, -(bore + 3), 0));
   const upper = runtime.Manifold.difference(joined, runtime.Manifold.union(hole, slot));
   made.forEach((solid) => solid.delete());
   return { upper, lower };

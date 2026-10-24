@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import { createLocalId } from "@/lib/localIds";
-import { loadedManifoldRuntime, manifoldLoaderKnown, onManifoldReady, requestManifoldRuntime } from "@/lib/manifoldHandle";
+import { loadedManifoldRuntime, waitForManifoldRuntime } from "@/lib/manifoldHandle";
 import type { ManifoldToplevel } from "manifold-3d";
 import type { WorkplaneShape } from "@/types/layerling";
 
@@ -627,18 +627,7 @@ export function parseSvgForImport(source: string) {
  * has none) it returns at once, and the plain build is used.
  */
 export async function prepareSvgImport(timeoutMs = 10_000) {
-  if (loadedManifoldRuntime() || !manifoldLoaderKnown()) return;
-  await new Promise<void>((resolve) => {
-    const stop = onManifoldReady(() => {
-      stop();
-      resolve();
-    });
-    globalThis.setTimeout(() => {
-      stop();
-      resolve();
-    }, timeoutMs);
-    requestManifoldRuntime();
-  });
+  await waitForManifoldRuntime(timeoutMs);
 }
 
 /**

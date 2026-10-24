@@ -1645,3 +1645,49 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 .dental-brush-overlay.erase polyline { stroke: rgba(31, 111, 235, 0.35); }
 .dental-brush-overlay.erase circle { stroke: #1f6feb; }
 .dental-area-tools { flex-wrap: wrap; }
+
+/* Fork (build 55): the Texture panel's patterns, each with a small swatch drawn in CSS. */
+.surface-texture-patterns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+.surface-texture-patterns button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px 5px;
+  font-size: 11px;
+  font-weight: 650;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgba(127, 127, 127, 0.25);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.surface-texture-patterns button.active {
+  border-color: var(--accent, #0a84ff);
+  box-shadow: 0 0 0 1px var(--accent, #0a84ff) inset;
+}
+.surface-texture-patterns button:disabled { opacity: 0.55; cursor: default; }
+.surface-texture-swatch {
+  width: 34px;
+  height: 22px;
+  border-radius: 4px;
+  background-color: #8c97a3;
+}
+.swatch-knurl { background: repeating-linear-gradient(45deg, #6f7a86 0 3px, #b9c2cc 3px 6px), #8c97a3; background-blend-mode: multiply; background-image: repeating-linear-gradient(45deg, #6f7a86 0 3px, #b9c2cc 3px 6px), repeating-linear-gradient(-45deg, #6f7a86 0 3px, #b9c2cc 3px 6px); }
+.swatch-ribs { background: repeating-linear-gradient(90deg, #6f7a86 0 2px, #c3cbd3 2px 5px); }
+.swatch-dimples { background: radial-gradient(circle at 50% 50%, #5f6a76 0 2.5px, transparent 3px) 0 0 / 8px 8px, #b9c2cc; }
+.swatch-hexagons { background: radial-gradient(circle, transparent 0 3px, #6f7a86 3.4px 4.2px, transparent 4.4px) 0 0 / 9px 8px, #b9c2cc; }
+.swatch-bricks { background: linear-gradient(#6f7a86 1px, transparent 1px) 0 0 / 12px 6px, linear-gradient(90deg, #6f7a86 1px, transparent 1px) 0 0 / 12px 12px, linear-gradient(90deg, #6f7a86 1px, transparent 1px) 6px 6px / 12px 12px, #c3cbd3; }
+.swatch-weave { background: repeating-linear-gradient(0deg, #8e98a3 0 3px, #c3cbd3 3px 6px), #8c97a3; background-image: linear-gradient(90deg, rgba(95, 106, 118, 0.8) 50%, transparent 50%), repeating-linear-gradient(0deg, #8e98a3 0 3px, #c3cbd3 3px 6px); background-size: 6px 6px, auto; }
+.swatch-stone { background: radial-gradient(circle at 20% 30%, #6f7a86 0 3px, transparent 4px), radial-gradient(circle at 70% 60%, #6f7a86 0 4px, transparent 5px), radial-gradient(circle at 45% 80%, #7d8893 0 2px, transparent 3px), #b9c2cc; }
+.swatch-leather { background: radial-gradient(circle, #b9c2cc 0 2px, #7d8893 2.6px) 0 0 / 5px 5px; }
+.swatch-wood { background: repeating-radial-gradient(ellipse at 0% 120%, #9a8a74 0 2px, #cbb99f 2px 4px); }
+.swatch-fuzzy { background: radial-gradient(circle, #6f7a86 0.6px, transparent 1px) 0 0 / 3px 3px, radial-gradient(circle, #6f7a86 0.6px, transparent 1px) 1.5px 1.5px / 3px 3px, #b9c2cc; }
+.swatch-picture { background: linear-gradient(135deg, #5f6a76 0 35%, #c3cbd3 35% 65%, #8c97a3 65%); }
+.surface-texture-picture { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.surface-texture-picture button { display: inline-flex; align-items: center; gap: 6px; }

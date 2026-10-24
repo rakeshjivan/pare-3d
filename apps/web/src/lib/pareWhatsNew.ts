@@ -4,6 +4,16 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 55,
+    items: [
+      "Texture: a new Modify tool presses a pattern into a part's surface, or raises it out of it - knurl, ribs, dimples, hexagons, bricks, weave, stone, leather, wood, fuzzy, or a picture of your own. The faces it stands on stay flat and sharp edges stay crisp.",
+      "DXF: import DXF drawings from CAD programs and laser files (lines, arcs, circles, polylines, splines and blocks become a body at real size, holes and all), and export DXF outlines for laser cutters and CNC from the Export window.",
+      "Dental Studio: the hinge now always sits behind the molars. On quadrant scans that reach the front teeth the arch was sometimes laid backwards, which put the hinge on the incisors; the hinge is also centred on the molars now instead of on the midline.",
+      "Pictures (PNG, JPG) and SVGs import straight away: they no longer wait up to 10 seconds when the geometry engine cannot load.",
+      "Under the hood: the editor's biggest file was split into smaller ones (the toolbar, the top bar, clipboard, align and mirror, files), with no change in how anything works.",
+    ],
+  },
+  {
     build: 54,
     items: [
       "Make a clicker: Ready-made parts has a new Clicker group with a Clicker base (the pocket a keyboard switch presses into) and a Clicker top (the recess over the switch, with a keycap socket for its stem). Click Add, then click the flat face of each half: the cutter goes in level with it. Group to cut.",

@@ -5,28 +5,19 @@ import { setFeedbackContext } from "@/lib/feedback";
 import { ParametersPanel } from "./workplane/ParametersPanel";
 import { fieldPatchFromFormula } from "./workplane/ShapeInspector";
 import { formulaUsesParameter, renameInFormula, setActiveParameters, type DesignParameter } from "@/lib/designParameters";
-
-/** Opens the design's Parameters window (build 37). */
-const OPEN_PARAMETERS_EVENT = "pare3d:parameters";
-import { GuideHelpLink } from "@/components/GuideHelpLink";
-import { ShapeMenuPanel } from "@/components/workplane/ShapeMenuPanel";
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, PencilLine, Blend, Check, CircleHelp, Percent, Circle as CircleIcon, CloudUpload, Download, Eye, EyeOff, FilePlus2, FolderOpen, Hexagon as HexagonIcon, Info, ListTree, MoreHorizontal, Pencil, Pentagon as PentagonIcon, Rotate3d, Route as RouteIcon, Search, Square as SquareIcon, Star as StarIcon, Triangle as TriangleIcon, X } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { ObjectListPanel } from "@/components/workplane/ObjectListPanel";
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { useWheelField } from "@/lib/useWheelField";
-import { wheelNextValue } from "@/lib/wheelValueStep";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SAVED_VIEW_KEYS } from "@/lib/designView";
 import * as THREE from "three";
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
-import type { ComponentType, ReactNode, SVGProps } from "react";
-import { getLanguage, t, type MessageKey } from "@/lib/i18n";
+import { t, type MessageKey } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
-import { loftShapePatch, type LoftMeasures } from "@/lib/loftGeometry";
+import { loftShapePatch } from "@/lib/loftGeometry";
 import { hingeWorldParts } from "@/lib/hingeParts";
-import { copyViaSelectionField, decodeClipboardPayload, encodeClipboardPayload, LOCAL_CLIPBOARD_LIMIT, newestClipboard, type ClipboardPayload } from "@/lib/clipboardPayload";
-import { bentTubeNaturalDimensions, normalizedBentTubeFields } from "@/lib/bentTubeGeometry";
+import { newestClipboard } from "@/lib/clipboardPayload";
 import { GRIDFINITY_CLEARANCE, GRIDFINITY_GRID, GRIDFINITY_HEIGHT_UNIT, MAX_GRIDFINITY_HEIGHT_UNITS, MAX_GRIDFINITY_UNITS, MIN_GRIDFINITY_FLOOR_HEIGHT, gridfinityListPatch, gridfinitySize } from "@/lib/gridfinityGeometry";
-import { DEFAULT_THREAD_PROFILE, defaultThreadHeadHeight, normalizeThreadHeadHeight, threadNaturalFootprint, threadSettings } from "@/lib/threadGeometry";
+import { DEFAULT_THREAD_PROFILE, defaultThreadHeadHeight, threadSettings } from "@/lib/threadGeometry";
 import { curvedTextPatch, MAX_TEXT_SPACING, MIN_TEXT_SPACING } from "@/lib/textGeometry";
 import { normalizeTextEdge } from "@/lib/textEdge";
 import { DEFAULT_TEXT_LAYERS, layerTextKeyringArgument, placedKeyring, layerTextLayersError, nameTagOffsets, normalizeTextLayers, type NameTagKeyring } from "@/lib/textLayers";
@@ -41,15 +32,7 @@ import { iconSourceFromFile, PICTURE_FILE_ACCEPT, type IconSource } from "@/lib/
 import { loadedManifoldRuntime, onManifoldReady } from "@/lib/manifoldHandle";
 import { canApplySketchCornerTreatment } from "@/lib/sketchFilletChamfer";
 import {
-  normalizePolygonSides,
-  normalizeStarInnerPercent,
-  SKETCH_POLYGON_DEFAULT_SIDES,
-  SKETCH_POLYGON_MAX_SIDES,
-  SKETCH_POLYGON_MIN_SIDES,
-  SKETCH_STAR_DEFAULT_INNER_PERCENT,
-  SKETCH_STAR_MAX_INNER_PERCENT,
-  SKETCH_STAR_MIN_INNER_PERCENT,
-  sketchPrimitiveGeometry,
+  SKETCH_POLYGON_DEFAULT_SIDES, SKETCH_STAR_DEFAULT_INNER_PERCENT, sketchPrimitiveGeometry
 } from "@/lib/sketchPrimitives";
 import { cloneSketchProfile, orderedSketchPaths, withSegmentHandles, withSmoothSketchHandles } from "@/lib/sketchSmoothHandles";
 import { changesLockedOutline, setSketchPointsLocked, sketchLockState } from "@/lib/sketchLock";
@@ -58,73 +41,25 @@ import { chordHandles, withBezierHandles, withBezierStartHandle } from "@/lib/sk
 import { sketchProfileWithoutPoint } from "@/lib/sketchPointRemoval";
 import { sketchProfileWithArc, type SketchArcEnd } from "@/lib/sketchArc";
 import { withSegmentsConstruction } from "@/lib/sketchConstruction";
-import { alignAxesForWorkplane, cuboidAlongAxes, shiftAlongAxis, type AlignAxes } from "@/lib/alignFrame";
-import {
-  SketchBoltCircleIcon,
-  SketchEllipseIcon,
-  SketchHalfCircleIcon,
-  SketchPieSliceIcon,
-  ToolbarAlignIcon,
-  ToolbarCenterOnWorkplaneIcon,
-  ToolbarChamferIcon,
-  ToolbarCaretDownIcon,
-  ToolbarCopyIcon,
-  ToolbarDuplicateIcon,
-  ToolbarDropToWorkplaneIcon,
-  ToolbarBundleIcon,
-  ToolbarGroupIcon,
-  ToolbarGuideIcon,
-  ToolbarHideSelectedIcon,
-  ToolbarHomeIcon,
-  ToolbarImportIcon,
-  ToolbarIntersectionIcon, ToolbarIntersectPreviewIcon,
-  ToolbarKeyboardIcon,
-  ToolbarFilletIcon,
-  ToolbarHistoryIcon,
-  ToolbarHollowIcon,
-  ToolbarDeleteFaceIcon,
-  ToolbarSimplifyIcon,
-  ToolbarMirrorIcon,
-  ToolbarRotationPivotIcon,
-  ToolbarPatternIcon,
-  ToolbarHolePatternIcon,
-  ToolbarFaceToolIcon,
-  ToolbarConstructionLineIcon,
-  ToolbarMiddleLineIcon,
-  ToolbarLayFlatIcon,
-  ToolbarMateFacesIcon,
-  ToolbarNoteIcon,
-  ToolbarSplitIcon,
-  ToolbarPasteIcon,
-  ToolbarRedoIcon,
-  ToolbarSnapGridIcon,
-  ToolbarSettingsIcon,
-  ToolbarShapeAddIcon,
-  ToolbarTrashIcon,
-  ToolbarUngroupIcon,
-  ToolbarUndoIcon,
-  ToolbarVectorExportIcon,
-} from "./icons";
+import { alignAxesForWorkplane } from "@/lib/alignFrame";
 import { WorkplaneViewport, type LayFlatPick, type ViewportToolMemory } from "./WorkplaneViewport";
 import { layFlatRotation } from "@/lib/layFlat";
 import { SketchWorkspace, type SketchMeasurement, type SketchPrimitive, type SketchSelection, type SketchTool } from "./SketchWorkspace";
 import { EdgeModifierPanel, type EdgeChamferStyle } from "./workplane/EdgeModifierPanel";
 import { FitCheckPanel } from "./workplane/FitCheckPanel";
 import { MeshRoundPanel } from "./workplane/MeshRoundPanel";
+import { SurfaceTexturePanel } from "./workplane/SurfaceTexturePanel";
+import { picturePixels } from "@/lib/pictureIcon";
+import { DEFAULT_SURFACE_TEXTURE, pictureHeights, type SurfaceTextureOptions } from "@/lib/surfaceTexture";
 import { SurfaceTextPanel, type SurfaceTextSettings } from "./workplane/SurfaceTextPanel";
 import { SURFACE_TEXT_OVERSHOOT, SURFACE_TEXT_SINK, nearestSurfaceSpot, surfaceTextPositions } from "@/lib/surfaceText";
 import { anchorMotion, movePositions } from "@/lib/surfaceTextFollow";
 import { partGeometry, trianglesNear } from "@/lib/surfacePartCache";
 import { faceComponents } from "@/lib/meshComponents";
 import { movedPointIds, solveSketchConstraints } from "@/lib/sketchConstraints";
-
-/** The id of the letters shown while Text on a surface is open, before they are added. */
-const SURFACE_TEXT_PREVIEW_ID = "surface-text-preview";
-/** Fork (build 38): matches the viewport's id for the stand-in of a dragged surface text. */
-const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
 import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
-import { analyseDentalInBackground, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, roundMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
+import { analyseDentalInBackground, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
 import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
 import { DentalBrushOverlay, DentalTrimOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
@@ -163,15 +98,12 @@ import { bedOverhangs, keepDismissedOverhangs, printerPresetById, shapeBedFootpr
 import { SplitPanel, type SplitWorkplaneDirection } from "./workplane/SplitPanel";
 import { ReadyPartsSection } from "./ReadyPartsSection";
 import { MoreShapesSection } from "./MoreShapesSection";
-import { cachedFileSettings, getFileSettings, saveUserFile } from "@/lib/pareFiles";
+import { cachedFileSettings } from "@/lib/pareFiles";
 import { withFixedSides } from "@/lib/fixedSides";
 import { SavedFileToast } from "@/components/SavedFileToast";
-import { MORE_SHAPE_IDS, moreShapeFromDragId, moreShapeIcon, moreShapePart, type MoreShapeId } from "@/lib/moreShapes";
-import { HelpMenu } from "./HelpMenu";
-import { InstantTips } from "./InstantTips";
+import { moreShapeFromDragId, moreShapePart } from "@/lib/moreShapes";
 import { BusyIndicator } from "./BusyIndicator";
 import { beginBusy, setBusyCount } from "@/lib/busy";
-import { SaveStatus } from "./SaveStatus";
 import { WhatsNew } from "./WhatsNew";
 import { FastModeHint } from "./FastModeHint";
 import { checkBeforeSending, CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, PrintCheckPanel, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
@@ -184,8 +116,6 @@ import { toolLayout, toolPocketPositions, tracedSolidPositions, type ToolBinOpti
 import { TracePanel } from "@/components/workplane/TracePanel";
 import { layOutOnPlate, splitToFit } from "@/lib/splitToFit";
 import { whileBusy } from "@/lib/busy";
-import { MessageSquareText } from "lucide-react";
-import { PareBuildBadge } from "./PareVersionStatus";
 import { LithophanePanel, sampleImage, type LithophaneImage } from "./workplane/LithophanePanel";
 import { VoronoiPanel } from "./workplane/VoronoiPanel";
 import { LITHOPHANE_STAND, lithophanePositions, lithophaneThicknessMap, meshShapeFromPositions, normalizeLithophane, type LithophaneOptions } from "@/lib/lithophane";
@@ -194,7 +124,6 @@ import { sweepPlan } from "@/lib/cadSketchSweep";
 import { DistributePanel, type DistributeAction } from "./workplane/DistributePanel";
 import { arrangeOnPlate, spaceEvenly, spaceWithGap, type Footprint } from "@/lib/distribute";
 import { addFreehandStroke } from "@/lib/freehandStroke";
-import { Signature } from "lucide-react";
 import { placeCustomShape } from "@/lib/customShapePackage";
 import { buildReadyPart } from "@/lib/readyPartsBuild";
 import { mouseEarsPart, type ReadyPart } from "@/lib/readyParts";
@@ -206,24 +135,22 @@ import { HistoryViewOverlay, historyStateNameSuffix } from "./workplane/HistoryV
 import { useHistoryViewPicking } from "./workplane/useHistoryViewPicking";
 import { ShortcutsModal } from "./workplane/ShortcutsModal";
 import { InteractiveHelp } from "./InteractiveHelp";
-import { CommandPalette, type PaletteCommand } from "./workplane/CommandPalette";
-import { COMMAND_KEYWORDS, SHAPE_KEYWORDS } from "@/lib/commandKeywords";
 import { ShapeContextMenu, type ShapeContextMenuItem } from "./workplane/ShapeContextMenu";
 import { nextSelectionTransparency } from "@/lib/selectionTransparency";
-import { canonicalizeShape, cloneWorkplaneShapeTreeWithFreshIds, cleanNearZero, cleanRotationDegrees, isNonSolidShapeKind, meshYawDegrees, preservesEdgeTreatmentSize, serializeShapesForSync, shapeDepth, shapeExtrudeDeformPatch, shapeHasShapeDeform, shapeTaperPatch, shapeTransformShouldRemainEditable, shapeWidth, shapeWithParametricSource, patchTouchesBodyParameters, withHoleMode, workplaneShapesEqual, shellNeedingRebuild, hollowStretchSincePicture } from "@/lib/workplaneShapes";
+import { canonicalizeShape, cloneWorkplaneShapeTreeWithFreshIds, cleanNearZero, cleanRotationDegrees, isNonSolidShapeKind, meshYawDegrees, preservesEdgeTreatmentSize, shapeDepth, shapeHasShapeDeform, shapeTransformShouldRemainEditable, shapeWidth, shapeWithParametricSource, patchTouchesBodyParameters, withHoleMode, workplaneShapesEqual, shellNeedingRebuild, hollowStretchSincePicture } from "@/lib/workplaneShapes";
 import { workplaneCenteringOffset } from "@/lib/workplaneCentering";
 import { bakeCadMetadataForShapeTransform, cadBrepTransformForShape, cadModifierPrimitiveForAnalyticShape, cadModifierPrimitiveForBakedShape, importedStepPartForShape } from "@/lib/cadBakeMetadata";
 import { hasOneToOneCadComponentMapping } from "@/lib/cadModifierGroups";
 import { cadModifierGridfinityForShape, cadModifierHelicalGearForShape, cadModifierProfileForShape, cadModifierSpringForShape, cadModifierThreadForShape, cadProfileExpectation, cadProfileSegmentCount, textGlyphProfiles, withinExactProfileLimit } from "@/lib/cadProfileExtrusion";
 import { DEFAULT_OVERHANG_ANGLE, normalizeOverhangAngle, overhangArea } from "@/lib/overhang";
 import { sectionMeasurement, sectionPointToWorld, snapSectionPoint } from "@/lib/sectionMeasure";
-import { DEFAULT_INFILL_PERCENT, DEFAULT_PRINT_MATERIAL, DEFAULT_WALLS, INFILL_CHOICES, PRINT_MATERIAL_DENSITY, PRINT_MATERIALS, FILAMENT_DIAMETER_MM, WALL_CHOICES, normalizeInfillPercent, normalizePrintMaterial, normalizeWalls, printEstimate, printEstimateWithInfill, type PrintMaterial } from "@/lib/printEstimate";
+import { DEFAULT_INFILL_PERCENT, DEFAULT_WALLS, PRINT_MATERIAL_DENSITY, PRINT_MATERIALS, FILAMENT_DIAMETER_MM, normalizePrintMaterial, printEstimate, printEstimateWithInfill } from "@/lib/printEstimate";
 import { CAD_MODIFIER_MAX_SHARP_ANGLE, CAD_MODIFIER_REQUEST_TIMEOUT_MS, CAD_MODIFIER_PREPARE_TRIANGLE_LIMIT, cadModifierPrepareTimeoutMs, cadModifierTimeoutMessage, cadModifierUserErrorMessage, cadModifierWorkerFailureMessage, cadModifierCandidateEdge, defaultCadModifierTangentChain, rescueSharpAngleForEdges, selectableCadModifierEdge, type CadModifierRequestPhase } from "@/lib/cadModifierRuntime";
 import { createCadPreviewQueue } from "@/lib/cadPreviewQueue";
 import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, groupBeforeEdgeTreatments, restoreShapeBeforeEdgeTreatment, wasGroupBeforeEdgeTreatments } from "@/lib/edgeTreatmentHistory";
 import { historyStepsAround } from "@/lib/historyStepDescription";
 import { historyViewMcpCommand } from "./workplane/historyViewMcp";
-import { appendEditorHistorySnapshot, boundedEditorHistoryState, continuesKeyRun, type KeyRun, editorHistoryBranch, editorHistoryEntry, editorHistoryForExport, historyStateAt, hydrateEditorHistoryState, notesForHistoryIndex, projectSceneFingerprint, projectShapesFingerprint, workplaneForHistoryIndex, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState } from "@/lib/editorHistory";
+import { appendEditorHistorySnapshot, boundedEditorHistoryState, continuesKeyRun, type KeyRun, editorHistoryBranch, editorHistoryEntry, editorHistoryForExport, historyStateAt, hydrateEditorHistoryState, notesForHistoryIndex, projectSceneFingerprint, projectShapesFingerprint, workplaneForHistoryIndex, type EditorHistoryEntry, type EditorHistoryState } from "@/lib/editorHistory";
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
 import { composedShapeRotation, geometryRotationDegreesForShortcut, geometryRotationDelta, rotatedGeometryShapePatch } from "@/lib/geometryRotation";
 import { carryShapePivot, heightPatchKeepingBase, shapePivotFromWorld, shapePivotWorld, type PivotPoint } from "@/lib/rotationPivot";
@@ -231,16 +158,12 @@ import { createLocalId } from "@/lib/localIds";
 import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, trackOpenGroupLevels, type OpenGroupLevel } from "@/lib/openGroupParts";
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
-import { BambuSendButton } from "@/components/BambuSendButton";
-import { ForkDraftIcon, ForkToothIcon } from "./forkToolbarIcons";
-import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkLithophaneIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
-import { BookOpen, Import, Keyboard, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, StickyNote, Type, Upload, Variable } from "lucide-react";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { useEditorNotice } from "@/components/workplane/useEditorNotice";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
 import { PROJECT_THUMBNAIL_IDLE_MS, projectThumbnailSceneChanged, type ProjectThumbnailSceneKey } from "@/lib/projectThumbnail";
 import { importedShapeFromObj } from "@/lib/objImport";
-import { readImportSvgWidth, readKeepSvgPage, setImportSvgWidth, storeKeepSvgPage, takeImportSvgWidth } from "@/lib/importPreferences";
+import { takeImportSvgWidth } from "@/lib/importPreferences";
 import { importFailureSummary, importModelFiles } from "@/lib/modelImport";
 import { dedupeProjectAssets } from "@/lib/projectAssets";
 import { useCustomShapes } from "@/lib/useCustomShapes";
@@ -255,9 +178,6 @@ import { applySketchCorners } from "@/lib/sketchFilletChamfer";
 import { revolveAxisShift } from "@/lib/revolveAxis";
 import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketchRevolveSettings, type SketchRevolveMesh } from "@/lib/sketchRevolve";
 import { AppFooter } from "@/components/AppFooter";
-import { ThemeSwitch } from "@/components/ThemeSwitch";
-import { SimpleModeSwitch } from "@/components/SimpleModeSwitch";
-import { TinkercadGuideButton } from "@/components/TinkercadGuide";
 import { useFileAccept } from "@/lib/fileAccept";
 import { exportLylProject, importLylProject, LYL_CREATED_WITH_VERSION, LYL_MEDIA_TYPE } from "@/lib/lylProject";
 import { isBuildMessage, reportWorkerBuild } from "@/lib/buildStamp";
@@ -277,13 +197,12 @@ import {
   type LylFileHandle,
 } from "@/lib/lylFileAccess";
 import { simplifyTrianglePositions } from "@/lib/meshSimplify";
-import { clipboardShape, displayShapeName, iconTagAsset, qrCodeAsset, libraryShapeAssets, makeShapeFromAsset, nameTagAsset, shapeAssetColor, shapeAssetLabel, shapeAssetMenuLabel, toolbarShapeAssets } from "@/lib/shapeCatalog";
+import { displayShapeName, iconTagAsset, qrCodeAsset, libraryShapeAssets, makeShapeFromAsset, nameTagAsset, shapeAssetLabel, toolbarShapeAssets } from "@/lib/shapeCatalog";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { exportMeshesToStl } from "@/lib/stlExport";
 import { exportMeshesTo3mf, THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
-import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
-import { DEFAULT_TAPER_DIMENSION_MAX, readWorkspaceDefault, saveWorkspaceDefault, keyboardNudgeCoarseFactor, keyboardNudgeStep, normalizeShapeCustomizations, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
+import { DEFAULT_TAPER_DIMENSION_MAX, readWorkspaceDefault, saveWorkspaceDefault, keyboardNudgeCoarseFactor, keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
 import { MCP_GRIDFINITY_LIST_KEYS, mcpGridfinityListParams, mcpThreadSizeParams } from "@/lib/mcpShapeSettings";
 import { createNoteId, normalizeNotes, NOTE_COUNT_LIMIT, patchNote, referencePoints } from "@/lib/workplaneNotes";
 import { notesAfterShapeChange, notesPinnedTo, notesPutBack } from "@/lib/noteAnchoring";
@@ -304,7 +223,6 @@ import {
   type PlacementWorkplane,
 } from "@/lib/placementWorkplane";
 import { localizedError } from "@/lib/userErrors";
-import { alignNaturalCenter, type AlignPoint } from "@/lib/alignCenter";
 import { cylinderToEllipsePatch } from "@/lib/cylinderToEllipse";
 import { sketchBodyStretch, stretchedSketchProfile } from "@/lib/sketchResize";
 import { silhouetteSketchProfile } from "@/lib/sketchCadProfile";
@@ -324,10 +242,10 @@ import { screenAlignedNudge } from "@/lib/keyboardNudge";
 import { LAYERLING_MCP_HEARTBEAT_MS, LAYERLING_MCP_POLL_RETRY_MS, LAYERLING_MCP_ROUTE, type LayerlingMcpCommand, type LayerlingMcpSceneSummary, type LayerlingMcpViewFace } from "@/lib/layerlingMcpProtocol";
 import type { CadFaceInfo, CadModifierComponentMesh, CadModifierDeflection, CadModifierDisplayEdge, CadModifierEdge, CadModifierFaces, CadModifierGridfinityPart, CadModifierHelicalGearPart, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierProfilePart, CadModifierQuality, CadModifierSpringPart, CadModifierThreadPart, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { getSectionBounds, sectionAxisLetter, sectionMeshInFrame, sectionPlacementWorkplane, sectionPointFromFrame, sectionPointToFrame, type SectionFrame, type SectionOrientation, type SectionPlaneAxis, type SectionPlaneSettings } from "@/lib/sectionView";
-import { footprintCutOffset, projectSectionPoint, SECTION_VIEW_FACE, sectionSvgDocument, sliceMeshContours } from "@/lib/sectionSvg";
-import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ParametricSource, ProjectAsset, ShapeAsset, ShapeCustomization, ShapeKind, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, ShellEdges, ShellOpenings, ShellSide, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
-import { type Vec3, type MeshData, type Cuboid, type ShapeUpdatePatch, type ManifoldSolid, MIN_SHAPE_DIMENSION, resetManifoldRuntime, cleanModelDimension, getManifoldRuntime, meshForShape, meshReachAlong, appendMeshData, formatTriangleCount, shapeAabb, boundsForShapes, boundsForCuboids, meshAabb, boundsForPositions, quantizedPointKey } from "@/lib/editorMeshCore";
-import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, meshDataToManifoldMesh, shapeToManifoldSolid, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, exportSolidVolume, type ExportSolidVolume, PRINT_MATERIAL_STORAGE_KEY, PRINT_INFILL_STORAGE_KEY, PRINT_WALLS_STORAGE_KEY, formatEstimateNumber, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, disposeManifold, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
+import { projectSectionPoint, SECTION_VIEW_FACE, sectionSvgDocument, sliceMeshContours } from "@/lib/sectionSvg";
+import type { AlignAxis, AlignTarget, GridSize, ParametricSource, ProjectAsset, ShapeAsset, ShapeCustomization, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, ShellEdges, ShellOpenings, ShellSide, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
+import { type Vec3, type MeshData, type ShapeUpdatePatch, MIN_SHAPE_DIMENSION, resetManifoldRuntime, cleanModelDimension, getManifoldRuntime, meshForShape, meshReachAlong, appendMeshData, formatTriangleCount, boundsForShapes, boundsForCuboids, meshAabb, boundsForPositions } from "@/lib/editorMeshCore";
+import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, exportSolidVolume, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { handleViewArrowKey } from "@/lib/viewArrowKeys";
 import { escapeWasHandled } from "@/lib/escapeHandled";
 import { sketchEscapeAction } from "@/lib/sketchEscape";
@@ -339,22 +257,25 @@ import { drawingLabelsInLanguage } from "@/lib/drawingLabels";
 import { offersTextLayers, textLayerStack, layeredTextShape, nameTagSource, nameTagsFor, offersIconLayers, iconLayerStack, iconTagArea, layeredIconShape, iconTagCopies, svgIconArea, iconTagFromSvg, keyringTabShape, keyringTabTag, keyringTabAt, keyringTabPlace, textFreeKeyring, textFreeKeyringPlace, iconFreeKeyring, iconFreeKeyringPlace } from "@/lib/editorTextTags";
 import { DEFAULT_KEYRING_DIAMETER } from "@/lib/textGeometry";
 
+
+/** The id of the letters shown while Text on a surface is open, before they are added. */
+const SURFACE_TEXT_PREVIEW_ID = "surface-text-preview";
+/** Fork (build 38): matches the viewport's id for the stand-in of a dragged surface text. */
+const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
+
+import { TopActionPanel, type DirectExportFormat, type LylExportTarget, type LylHistoryLimit, type SvgExportView, type TopPanel, type ViewImageOptions } from "@/components/EditorTopActionPanel";
+import { DENTAL_MODEL_EVENT, FILL_HOLE_EVENT, MESH_CHECK_EVENT, OPEN_PARAMETERS_EVENT, type ToolbarMode } from "@/lib/editorShared";
+import { SecondaryToolbar, type SketchShapeOptions } from "@/components/EditorSecondaryToolbar";
+import { SHARED_CLIPBOARD_STORAGE_KEY, readSharedClipboard, readSystemClipboard, writeSharedClipboard } from "@/lib/editorClipboard";
+import { downloadBlobFile, downloadTextFile, footprintSvg, imagePlateDimensions, prepareImportedImage, toSvg } from "@/lib/editorFiles";
+import { alignedShapesForSelection, alignmentLabel, alignmentStatuses, effectiveAlignmentAnchorId, frameAabb, mirrorAxisLabel, mirroredShapesForSelection } from "@/lib/editorAlignMirror";
+import { MCP_BENT_TUBE_KEYS, applyMcpThreadSettings, mcpBentTubePatch, mcpExtrudeDeformPatch, mcpFiniteNumberArray, mcpLoftChange, mcpNumber, mcpNumberArray, mcpOptionalNumber, mcpPointInfo, mcpShapeCustomization, mcpString, mcpStringArray, mcpTaperPatch, readMcpEditorIdentity } from "@/lib/editorMcpParams";
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
-type TopPanel = "import" | "export" | null;
 
-/** Die Befehle der Suche, die im Verlaufsblick wach bleiben: sie aendern nichts am Entwurf. */
-/** Fork (build 21): which library shapes are on show, so a new shape whose neighbour is missing still appears. */
 /** Fork (build 24): the face tool's live preview, which can be grabbed and dragged again. */
 const FACE_TOOL_PREVIEW_ID = "face-tool-preview";
 const BLEND_PREVIEW_ID = "blend-preview";
-// Fork (build 30): the mesh check and Fill a hole, from the command search.
-const MESH_CHECK_EVENT = "pare3d:mesh-check";
-const FILL_HOLE_EVENT = "pare3d:fill-hole";
-const DENTAL_MODEL_EVENT = "pare3d:dental-model";
-const libraryShapeIds: ReadonlySet<string> = new Set(libraryShapeAssets.map((shape) => shape.id));
-
-const HISTORY_VIEW_COMMANDS = new Set(["history", "export", "guide", "shortcuts"]);
 
 /** MCP actions that only read or change the view, so they still work while the history view is open. */
 const HISTORY_VIEW_MCP_ACTIONS = new Set([
@@ -398,14 +319,6 @@ export type HistoryProjectRequest = {
   /** Das Bild der Arbeitsflaeche in diesem Stand, fuer die Karte in der Uebersicht. */
   thumbnailDataUrl: string | null;
 };
-type ExportFormat = "stl" | "3mf" | "obj" | "step" | "svg" | "png" | "lyl" | "drawing";
-type DirectExportFormat = Exclude<ExportFormat, "step" | "png" | "lyl" | "drawing">;
-type SvgExportView = "silhouette" | "footprint";
-type ViewImageOptions = { plate: boolean; transparent: boolean };
-type LylHistoryLimit = EditorHistoryExportLimit;
-/** "file" writes into the file the design is tied to (asking for one the first time), "fileAs" always asks (#251). */
-type LylExportTarget = "download" | "shared" | "file" | "fileAs";
-type ToolbarMode = "geometry" | "sketch";
 type OpenGroupOutcome = { ok: boolean; message: string; partIds?: string[]; groupId?: string };
 type WithoutRequestId<T> = T extends unknown ? Omit<T, "requestId"> : never;
 type CadModifierWorkerPayload = WithoutRequestId<CadModifierWorkerRequest>;
@@ -516,8 +429,6 @@ type BooleanAutomationResult = {
   groupId?: string;
   error?: string;
 };
-const SHARED_CLIPBOARD_STORAGE_KEY = "layerling.clipboard";
-const SYSTEM_CLIPBOARD_PREFIX = "LAYERLING/1\n";
 
 declare global {
   interface Window {
@@ -556,101 +467,6 @@ const MIN_EDGE_MODIFIER_AMOUNT = 0.001;
 const SEPARATE_PARTS_VERTEX_TOLERANCE = 0.0005;
 
 
-function parseClipboardShapes(serialized: string): ClipboardPayload<WorkplaneShape> | null {
-  const payload = decodeClipboardPayload(serialized);
-  if (!payload) return null;
-  const shapes = payload.shapes.flatMap((entry) => {
-    const shape = clipboardShape(entry);
-    return shape ? [shape] : [];
-  });
-  return { copiedAt: payload.copiedAt, shapes };
-}
-
-function readSharedClipboard(): ClipboardPayload<WorkplaneShape> | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  try {
-    const stored = window.localStorage.getItem(SHARED_CLIPBOARD_STORAGE_KEY);
-    if (!stored) return null;
-    // A large copy from an older layerling may still sit here and crowd out
-    // the project list; the tab and the system clipboard carry large copies.
-    if (stored.length > LOCAL_CLIPBOARD_LIMIT) {
-      window.localStorage.removeItem(SHARED_CLIPBOARD_STORAGE_KEY);
-      return null;
-    }
-    return parseClipboardShapes(stored);
-  } catch {
-    return null;
-  }
-}
-
-async function readSystemClipboard(): Promise<ClipboardPayload<WorkplaneShape> | null> {
-  if (typeof navigator === "undefined" || !navigator.clipboard?.readText) {
-    return null;
-  }
-  try {
-    const value = await navigator.clipboard.readText();
-    if (!value.startsWith(SYSTEM_CLIPBOARD_PREFIX)) return null;
-    return parseClipboardShapes(value.slice(SYSTEM_CLIPBOARD_PREFIX.length));
-  } catch {
-    return null;
-  }
-}
-
-function copyTextWithSelectionFallback(value: string) {
-  if (typeof document === "undefined" || typeof document.execCommand !== "function") {
-    return;
-  }
-  const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.readOnly = true;
-  textarea.setAttribute("aria-hidden", "true");
-  textarea.style.position = "fixed";
-  textarea.style.left = "-10000px";
-  textarea.style.top = "0";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  try {
-    document.execCommand("copy");
-  } catch {
-    // The modern Clipboard API below may still succeed.
-  }
-  textarea.remove();
-  previousFocus?.focus({ preventScroll: true });
-}
-
-function writeSharedClipboard(shapes: WorkplaneShape[], copiedAt: number) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  const serialized = encodeClipboardPayload(serializeShapesForSync(shapes), copiedAt);
-  try {
-    if (serialized.length > LOCAL_CLIPBOARD_LIMIT) {
-      // Too large for the small local storage: an older copy must not stay
-      // behind there either, or another tab would paste that instead.
-      window.localStorage.removeItem(SHARED_CLIPBOARD_STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(SHARED_CLIPBOARD_STORAGE_KEY, serialized);
-    }
-  } catch {
-    try {
-      window.localStorage.removeItem(SHARED_CLIPBOARD_STORAGE_KEY);
-    } catch {
-      // storage unavailable - the tab and the system clipboard still hold the copy
-    }
-  }
-  const systemPayload = `${SYSTEM_CLIPBOARD_PREFIX}${serialized}`;
-  const hasClipboardApi = Boolean(navigator.clipboard?.writeText);
-  if (copyViaSelectionField(systemPayload.length, hasClipboardApi)) copyTextWithSelectionFallback(systemPayload);
-  if (hasClipboardApi) {
-    void navigator.clipboard.writeText(systemPayload).catch(() => {
-      // Same-origin tabs still have the local-storage fallback.
-    });
-  }
-}
 
 /** A key ring hole (#215) is placed from the plate's real outline: the 2D kernel loads first. */
 /** The box of an icon's outline, from which a free key ring hole is placed (#598). */
@@ -1407,174 +1223,6 @@ function bakeShapeTransformIntoMesh(shape: WorkplaneShape): WorkplaneShape {
   });
 }
 
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-      } else {
-        reject(new Error("Image could not be read"));
-      }
-    });
-    reader.addEventListener("error", () => reject(new Error("Image could not be read")));
-    reader.readAsDataURL(file);
-  });
-}
-
-function loadImageElement(dataUrl: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.addEventListener("load", () => resolve(image));
-    image.addEventListener("error", () => reject(new Error("Image could not be decoded")));
-    image.src = dataUrl;
-  });
-}
-
-async function prepareImportedImage(file: File) {
-  const sourceUrl = await readFileAsDataUrl(file);
-  const image = await loadImageElement(sourceUrl);
-  const pixelWidth = image.naturalWidth || image.width;
-  const pixelHeight = image.naturalHeight || image.height;
-
-  if (!pixelWidth || !pixelHeight) {
-    throw new Error("Image has no readable dimensions");
-  }
-
-  const maxTextureSide = 2048;
-  const textureScale = Math.min(1, maxTextureSide / Math.max(pixelWidth, pixelHeight));
-  if (textureScale >= 1) {
-    return {
-      dataUrl: sourceUrl,
-      mimeType: file.type || "image/png",
-      pixelWidth,
-      pixelHeight,
-    };
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(pixelWidth * textureScale));
-  canvas.height = Math.max(1, Math.round(pixelHeight * textureScale));
-  const context = canvas.getContext("2d");
-  if (!context) {
-    throw new Error("Image could not be prepared");
-  }
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  const mimeType = file.type === "image/jpeg" || file.type === "image/webp" ? file.type : "image/png";
-  return {
-    dataUrl: canvas.toDataURL(mimeType, 0.92),
-    mimeType,
-    pixelWidth,
-    pixelHeight,
-  };
-}
-
-function imagePlateDimensions(pixelWidth: number, pixelHeight: number) {
-  const aspect = pixelWidth / Math.max(1, pixelHeight);
-  const targetMax = 72;
-  const minVisibleSide = 14;
-  const maxAllowedSide = 110;
-  let width = aspect >= 1 ? targetMax : targetMax * aspect;
-  let depth = aspect >= 1 ? targetMax / aspect : targetMax;
-  const minSide = Math.min(width, depth);
-
-  if (minSide < minVisibleSide) {
-    const boost = minVisibleSide / Math.max(0.001, minSide);
-    width *= boost;
-    depth *= boost;
-  }
-
-  const maxSide = Math.max(width, depth);
-  if (maxSide > maxAllowedSide) {
-    const shrink = maxAllowedSide / maxSide;
-    width *= shrink;
-    depth *= shrink;
-  }
-
-  return {
-    width: Number(width.toFixed(2)),
-    depth: Number(depth.toFixed(2)),
-    height: 1.6,
-  };
-}
-
-/**
- * The SVG of only what stands on the workplane (#692): the outlines of the section a hair above the lowest
- * point, drawn as lines in their colours. `shapes` are the visible ones to export, loose holes among them.
- */
-async function footprintSvg(shapes: readonly WorkplaneShape[], title: string) {
-  const { solids, meshes: cut } = await exportBodiesWithLooseHoles(shapes);
-  const { meshes, quellen } = await colorSeparatedExportMeshes(solids, cut);
-  const offset = footprintCutOffset(meshes);
-  const bodies = offset === null ? [] : meshes.map((mesh, index) => {
-    const body = solids[quellen[index]];
-    return { name: body ? displayShapeName(body) : mesh.name, color: body?.color ?? "#000000", loops: sliceMeshContours(mesh, "y", offset) };
-  });
-  const result = offset === null ? null : sectionSvgDocument(bodies, "y", offset, title);
-  if (!result) throw new Error(t("status.sectionSvgNothing"));
-  return result;
-}
-
-/** `cutMeshes` holds a body's mesh where loose holes have cut it (#203); the others are built from the shape. */
-async function toSvg(shapes: WorkplaneShape[], title: string, cutMeshes: ReadonlyArray<MeshData | null> = []) {
-  const runtime = await getManifoldRuntime();
-  const layers: SvgProjectionLayer[] = [];
-
-  for (const [index, shape] of shapes.entries()) {
-    const created: ManifoldSolid[] = [];
-    const projectedObjects: unknown[] = [];
-    try {
-      const cut = cutMeshes[index];
-      let solid: ManifoldSolid | null;
-      if (cut) {
-        const manifoldMesh = meshDataToManifoldMesh(runtime, cut);
-        try {
-          solid = runtime.Manifold.ofMesh(manifoldMesh);
-          created.push(solid);
-        } finally {
-          disposeManifold(manifoldMesh);
-        }
-      } else {
-        solid = shapeToManifoldSolid(runtime, shape, created);
-      }
-      if (!solid || solid.status() !== "NoError" || solid.numTri() < 1) {
-        throw new Error(`Could not convert ${shape.name} into a watertight SVG outline`);
-      }
-
-      // Seen from above with the front at the bottom, as the top view shows it: the plate's z runs
-      // down the page. Turned the other way, every export came out mirrored top to bottom (#197).
-      const topView = solid.rotate([-90, 0, 0]);
-      if (topView !== solid) created.push(topView);
-      const projection = topView.project();
-      projectedObjects.push(projection);
-      const simplified = projection.simplify(0.00001);
-      if (simplified !== projection) projectedObjects.push(simplified);
-      const polygons = simplified.toPolygons();
-      if (!polygons.length) throw new Error(`Top view of ${shape.name} has no exportable area`);
-      layers.push({ name: shape.name, color: shape.color, polygons });
-    } finally {
-      [...new Set([...projectedObjects, ...created])].reverse().forEach(disposeManifold);
-    }
-  }
-
-  return toSvgProjection(layers, title);
-}
-
-// Fork (build 22): known before the first export click, which may not wait for it.
-if (typeof window !== "undefined") void getFileSettings();
-
-function triggerBrowserDownload(filename: string, content: string, type: string) {
-  void saveUserFile(filename, new Blob([content], { type }), t("files.saveExport"));
-}
-
-async function downloadTextFile(filename: string, content: string, type: string) {
-  await saveUserFile(filename, new Blob([content], { type }), t("files.saveExport"));
-}
-
-async function downloadBlobFile(filename: string, blob: Blob) {
-  // Fork (build 22): into the folder chosen in Settings, or where the save dialog says.
-  await saveUserFile(filename, blob, t("files.saveExport"));
-}
 
 
 /**
@@ -1786,208 +1434,6 @@ function selectionCenterOnWorkplane(shapes: WorkplaneShape[], workplane: Placeme
 }
 
 
-const ALIGN_EPSILON = 0.0005;
-const ALIGN_AXES: AlignAxis[] = ["x", "y", "z"];
-const ALIGN_TARGETS: AlignTarget[] = ["min", "center", "max"];
-
-function alignCoordinate(bounds: Cuboid, axis: AlignAxis, target: AlignTarget, natural: AlignPoint | null = null, axes: AlignAxes | null = null) {
-  const min = axis === "x" ? bounds.minX : axis === "y" ? bounds.minY : bounds.minZ;
-  const max = axis === "x" ? bounds.maxX : axis === "y" ? bounds.maxY : bounds.maxZ;
-  if (target === "min") {
-    return min;
-  }
-  if (target === "max") {
-    return max;
-  }
-  // The middle of a pentagon or a star is not the middle of its box (#268).
-  if (natural) {
-    if (!axes) return natural[axis];
-    const direction = axes[axis];
-    return natural.x * direction.x + natural.y * direction.y + natural.z * direction.z;
-  }
-  return (min + max) / 2;
-}
-
-function alignmentLabel(axis: AlignAxis, target: AlignTarget) {
-  if (axis === "x") {
-    return target === "min" ? t("align.left") : target === "max" ? t("align.right") : t("align.center");
-  }
-  if (axis === "z") {
-    return target === "min" ? t("align.front") : target === "max" ? t("align.back") : t("align.middle");
-  }
-  return target === "min" ? t("align.bottom") : target === "max" ? t("align.top") : t("align.middle");
-}
-
-/** The box of a part along a workplane's axes, as the alignment measures it there (#232). */
-function frameAabb(shape: WorkplaneShape, axes: AlignAxes): Cuboid {
-  const mesh = shape.cylinderWrap && shape.importedMesh ? null : meshForShape(shape);
-  const own = mesh && mesh.vertices.length > 0 ? cuboidAlongAxes(mesh.vertices, axes) : null;
-  if (own) return own;
-  const box = shapeAabb(shape);
-  const corners: Array<[number, number, number]> = [];
-  for (const x of [box.minX, box.maxX]) for (const y of [box.minY, box.maxY]) for (const z of [box.minZ, box.maxZ]) corners.push([x, y, z]);
-  return cuboidAlongAxes(corners, axes) ?? box;
-}
-
-function alignmentStatuses(selection: WorkplaneShape[], anchorId: string | null, axes: AlignAxes | null = null): AlignHandleStatus[] {
-  if (selection.length < 2) {
-    return [];
-  }
-
-  const boundsById = new Map(selection.map((shape) => [shape.id, axes ? frameAabb(shape, axes) : meshAabb(shape)]));
-  const naturalById = new Map(selection.map((shape) => [shape.id, alignNaturalCenter(shape)]));
-  const anchorBounds = anchorId ? boundsById.get(anchorId) ?? null : null;
-  const referenceBounds = anchorBounds ?? boundsForCuboids(Array.from(boundsById.values()));
-  const referenceNatural = anchorBounds && anchorId ? naturalById.get(anchorId) ?? null : null;
-
-  return ALIGN_AXES.flatMap((axis) =>
-    ALIGN_TARGETS.map((target) => {
-      const targetValue = alignCoordinate(referenceBounds, axis, target, referenceNatural, axes);
-      const aligned = selection.every((shape) => {
-        const bounds = boundsById.get(shape.id);
-        return bounds ? Math.abs(alignCoordinate(bounds, axis, target, naturalById.get(shape.id) ?? null, axes) - targetValue) <= ALIGN_EPSILON : true;
-      });
-      const wouldMove = selection.some((shape) => {
-        if (shape.locked || shape.id === anchorId) {
-          return false;
-        }
-        const bounds = boundsById.get(shape.id);
-        return bounds ? Math.abs(alignCoordinate(bounds, axis, target, naturalById.get(shape.id) ?? null, axes) - targetValue) > ALIGN_EPSILON : false;
-      });
-      const label = alignmentLabel(axis, target);
-      return {
-        axis,
-        target,
-        aligned,
-        disabled: !wouldMove,
-        title: aligned ? t("align.already", { label }) : t("align.do", { label }),
-      };
-    }),
-  );
-}
-
-function alignedShapesForSelection(
-  shapes: WorkplaneShape[],
-  selectedIds: string[],
-  selectedShapes: WorkplaneShape[],
-  anchorId: string | null,
-  axis: AlignAxis,
-  target: AlignTarget,
-  axes: AlignAxes | null = null,
-) {
-  const selected = new Set(selectedIds);
-  const boundsById = new Map(selectedShapes.map((shape) => [shape.id, axes ? frameAabb(shape, axes) : meshAabb(shape)]));
-  const naturalById = new Map(selectedShapes.map((shape) => [shape.id, alignNaturalCenter(shape)]));
-  const anchorBounds = anchorId ? boundsById.get(anchorId) ?? null : null;
-  const referenceBounds = anchorBounds ?? boundsForCuboids(Array.from(boundsById.values()));
-  const referenceNatural = anchorBounds && anchorId ? naturalById.get(anchorId) ?? null : null;
-  const targetValue = alignCoordinate(referenceBounds, axis, target, referenceNatural, axes);
-  let moved = 0;
-
-  const nextShapes = shapes.map((shape) => {
-    if (!selected.has(shape.id) || shape.locked || shape.id === anchorId) {
-      return shape;
-    }
-    const bounds = boundsById.get(shape.id);
-    if (!bounds) {
-      return shape;
-    }
-    const delta = targetValue - alignCoordinate(bounds, axis, target, naturalById.get(shape.id) ?? null, axes);
-    if (Math.abs(delta) <= ALIGN_EPSILON) {
-      return shape;
-    }
-    moved += 1;
-    if (axes) {
-      // Along a workplane's axes the part moves along that axis of the world (#232).
-      const shift = shiftAlongAxis(axes, axis, delta);
-      return {
-        ...shape,
-        x: cleanNearZero(Number((shape.x + shift.x).toFixed(4)), ALIGN_EPSILON),
-        z: cleanNearZero(Number((shape.z + shift.z).toFixed(4)), ALIGN_EPSILON),
-        elevation: cleanNearZero(Number(((shape.elevation ?? 0) + shift.y).toFixed(4)), ALIGN_EPSILON),
-      };
-    }
-    if (axis === "x") {
-      return { ...shape, x: cleanNearZero(Number((shape.x + delta).toFixed(4)), ALIGN_EPSILON) };
-    }
-    if (axis === "z") {
-      return { ...shape, z: cleanNearZero(Number((shape.z + delta).toFixed(4)), ALIGN_EPSILON) };
-    }
-    return { ...shape, elevation: cleanNearZero(Number(((shape.elevation ?? 0) + delta).toFixed(4)), ALIGN_EPSILON) };
-  });
-
-  return { nextShapes, moved };
-}
-
-function effectiveAlignmentAnchorId(selection: WorkplaneShape[], requestedAnchorId: string | null) {
-  return selection.find((shape) => shape.locked)?.id
-    ?? (requestedAnchorId && selection.some((shape) => shape.id === requestedAnchorId) ? requestedAnchorId : null);
-}
-
-function mirrorAxisLabel(axis: AlignAxis) {
-  return axis === "x" ? t("mirror.leftRight") : axis === "z" ? t("mirror.frontBack") : t("mirror.topBottom");
-}
-
-function mirrorFlagPatch(shape: WorkplaneShape, axis: AlignAxis) {
-  if (axis === "x") {
-    return { mirrorX: !shape.mirrorX };
-  }
-  if (axis === "z") {
-    return { mirrorZ: !shape.mirrorZ };
-  }
-  return { mirrorY: !shape.mirrorY };
-}
-
-function reflectionMatrixForAxis(axis: AlignAxis) {
-  return new THREE.Matrix4().makeScale(axis === "x" ? -1 : 1, axis === "y" ? -1 : 1, axis === "z" ? -1 : 1);
-}
-
-function mirroredShapePatch(shape: WorkplaneShape, axis: AlignAxis, pivot: number): Partial<WorkplaneShape> {
-  const centerY = (shape.elevation ?? 0) + shape.height / 2;
-  const nextCenter = axis === "x" ? 2 * pivot - shape.x : axis === "z" ? 2 * pivot - shape.z : 2 * pivot - centerY;
-  const worldReflection = reflectionMatrixForAxis(axis);
-  const localReflection = reflectionMatrixForAxis(axis);
-  const currentRotation = new THREE.Matrix4().makeRotationFromQuaternion(quaternionForShape(shape));
-  const nextRotationMatrix = worldReflection.multiply(currentRotation).multiply(localReflection);
-  const nextQuaternion = new THREE.Quaternion().setFromRotationMatrix(nextRotationMatrix);
-  const rotationPatch = rotationFromQuaternion(nextQuaternion);
-  const positionPatch =
-    axis === "x"
-      ? { x: cleanNearZero(Number(nextCenter.toFixed(4)), ALIGN_EPSILON) }
-      : axis === "z"
-        ? { z: cleanNearZero(Number(nextCenter.toFixed(4)), ALIGN_EPSILON) }
-        : { elevation: cleanNearZero(Number((nextCenter - shape.height / 2).toFixed(4)), ALIGN_EPSILON) };
-
-  return {
-    ...shape,
-    ...positionPatch,
-    ...rotationPatch,
-    ...mirrorFlagPatch(shape, axis),
-  };
-}
-
-function mirroredShapesForSelection(shapes: WorkplaneShape[], selectedIds: string[], selectedShapes: WorkplaneShape[], axis: AlignAxis) {
-  if (selectedShapes.length === 0) {
-    return { nextShapes: shapes, moved: 0 };
-  }
-
-  const selected = new Set(selectedIds);
-  const selectionBounds = boundsForShapes(selectedShapes);
-  const pivot = axis === "x" ? (selectionBounds.minX + selectionBounds.maxX) / 2 : axis === "z" ? (selectionBounds.minZ + selectionBounds.maxZ) / 2 : (selectionBounds.minY + selectionBounds.maxY) / 2;
-  let moved = 0;
-  const nextShapes = shapes.map((shape) => {
-    if (!selected.has(shape.id) || shape.locked) {
-      return shape;
-    }
-    moved += 1;
-    return {
-      ...shape,
-      ...mirroredShapePatch(shape, axis, pivot),
-    };
-  });
-
-  return { nextShapes, moved };
-}
 
 
 function meshFaceComponents(mesh: MeshData, tolerance = SEPARATE_PARTS_VERTEX_TOLERANCE) {
@@ -2334,218 +1780,6 @@ async function separateSketchBodyParts(shape: WorkplaneShape) {
 }
 
 
-function mcpNumber(value: unknown, fallback: number) {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
-function mcpOptionalNumber(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-/**
- * Die formeigenen Werte eines Befehls, durch dieselbe Muehle gedreht wie die
- * Vorgaben im Arbeitsbereich: gleiche Grenzen, gleiche erlaubten Woerter. Was
- * dort nicht durchgeht, hat auch hier nichts verloren - sonst stuende spaeter
- * ein Wert im Paket, den der Pruefer beim Speichern ablehnt, und der ganze
- * Entwurf liesse sich nicht mehr sichern. Die Masse bleiben aussen vor, die
- * gehen ihren eigenen Weg.
- */
-/**
- * Die Segmente eines gebogenen Rohrs kommen als Liste - oder als der Text, den
- * `layerling_read_scene` fuer sie ausgibt. Beides wird angenommen, damit ein
- * gelesener Wert unveraendert zurueckgeschickt werden kann.
- */
-function mcpBentTubeSegments(value: unknown): unknown[] | undefined {
-  if (Array.isArray(value)) return value;
-  if (typeof value !== "string") return undefined;
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-
-/** A command's transition values as a change of measures - the same way the settings panel takes them. */
-function mcpLoftChange(params: Record<string, unknown>): Partial<LoftMeasures> {
-  const change: Partial<LoftMeasures> = {};
-  const outline = (value: unknown) => (value === "round" || value === "rectangle" || value === "polygon" ? value : undefined);
-  const bottomOutline = outline(params.loftBottomOutline);
-  const topOutline = outline(params.loftTopOutline);
-  if (bottomOutline) change.bottomOutline = bottomOutline;
-  if (topOutline) change.topOutline = topOutline;
-  const numbers: Array<[string, keyof LoftMeasures]> = [
-    ["loftBottomWidth", "bottomWidth"], ["loftBottomDepth", "bottomDepth"], ["loftTopWidth", "topWidth"], ["loftTopDepth", "topDepth"],
-    ["loftBottomCorner", "bottomCorner"], ["loftTopCorner", "topCorner"], ["loftBottomSides", "bottomSides"], ["loftTopSides", "topSides"],
-    ["loftOffsetX", "offsetX"], ["loftOffsetZ", "offsetZ"], ["loftWall", "wall"],
-    ["loftTwist", "twist"], ["loftTiltX", "tiltX"], ["loftTiltZ", "tiltZ"], ["loftSmooth", "smooth"],
-  ];
-  numbers.forEach(([param, key]) => {
-    const value = mcpOptionalNumber(params[param]);
-    if (value !== undefined) Object.assign(change, { [key]: value });
-  });
-  return change;
-}
-
-const MCP_BENT_TUBE_KEYS = ["bentTubeProfile", "bentTubeInnerProfile", "bentTubeSize", "bentTubeWall", "bentTubeQuality", "bentTubeSegments"] as const;
-
-/**
- * Ein gebogenes Rohr bekommt seinen Rahmen aus Profil und Segmenten. Nur wer
- * Breite, Tiefe oder Hoehe ausdruecklich angibt, dehnt es darauf.
- */
-function mcpBentTubePatch(shape: WorkplaneShape, params: Record<string, unknown>): Partial<WorkplaneShape> {
-  const segments = mcpBentTubeSegments(params.bentTubeSegments);
-  const fields = normalizedBentTubeFields({
-    ...shape,
-    bentTubeSegments: (segments as WorkplaneShape["bentTubeSegments"]) ?? shape.bentTubeSegments,
-  });
-  const natural = bentTubeNaturalDimensions(fields);
-  const width = mcpOptionalNumber(params.width ?? params.size) ?? natural.width;
-  const depth = mcpOptionalNumber(params.depth ?? params.size) ?? natural.depth;
-  const height = mcpOptionalNumber(params.height ?? params.size) ?? natural.height;
-  return { ...fields, width, depth, height, size: Math.max(width, depth) };
-}
-
-function mcpShapeCustomization(kind: ShapeKind, params: Record<string, unknown>): ShapeCustomization {
-  const entry = normalizeShapeCustomizations({ [kind]: params })[kind] ?? {};
-  const { width: _width, depth: _depth, height: _height, maxDimension: _maxDimension, ...settings } = entry;
-  // Eine Ausnahme: Die Beschriftung darf laenger sein als eine Vorgabe im
-  // Arbeitsbereich, wo 24 Zeichen reichen. Ein Schild im Entwurf traegt mehr,
-  // und das Paketformat begrenzt sie nicht.
-  if (kind === "text" && typeof params.text === "string" && params.text.trim()) settings.text = params.text;
-  return settings;
-}
-
-/**
- * Die Verjuengung steht in keiner Formvorgabe - sie gehoert dem einzelnen
- * Koerper, kommt also nicht durch `normalizeShapeCustomizations` und braucht
- * hier ihren eigenen Weg. Ohne ihn liest ein Client die vier Werte aus, setzt
- * sie zurueck und nichts geschieht. Die Grenzen sind dieselben wie im
- * Merkmalsfeld, damit ueber die Bruecke nichts entsteht, was sich dort nicht
- * mehr einstellen laesst.
- */
-function mcpTaperPatch(shape: WorkplaneShape, params: Record<string, unknown>, maxDimension: number): Partial<WorkplaneShape> {
-  return shapeTaperPatch(shape, {
-    topWidth: mcpOptionalNumber(params.taperTopWidth),
-    topDepth: mcpOptionalNumber(params.taperTopDepth),
-    bottomWidth: mcpOptionalNumber(params.taperBottomWidth),
-    bottomDepth: mcpOptionalNumber(params.taperBottomDepth),
-  }, maxDimension);
-}
-
-/**
- * Verdrehung und Neigung sind wie die Verjuengung Eigenschaften des einzelnen
- * Koerpers, nicht der Formvorgabe - derselbe eigene Weg wie `mcpTaperPatch`,
- * sonst nimmt die Bruecke die drei Werte zwar in ihr Schema auf, setzt sie
- * aber nie tatsaechlich am Koerper.
- */
-function mcpExtrudeDeformPatch(shape: WorkplaneShape, params: Record<string, unknown>): Partial<WorkplaneShape> {
-  return shapeExtrudeDeformPatch(shape, {
-    twist: mcpOptionalNumber(params.extrudeTwist),
-    offsetX: mcpOptionalNumber(params.extrudeTopOffsetX),
-    offsetZ: mcpOptionalNumber(params.extrudeTopOffsetZ),
-  });
-}
-
-/**
- * Ein Gewinde haengt an seinem Durchmesser: Breite und Tiefe gehoeren ihm, nicht
- * umgekehrt. Alle Gewindewerte gehen deshalb einmal durch `threadSettings` -
- * das ist dieselbe Pruefung wie im Merkmalsfeld - und der Platzbedarf wird neu
- * daraus gerechnet. Ohne diesen Schritt liest `canonicalizeShape` den alten
- * Rahmen als Zug am Anfasser und rechnet einen frisch gesetzten Durchmesser
- * wieder weg. Wer Breite oder Tiefe selbst angibt, meint genau das und behaelt
- * sie.
- */
-function applyMcpThreadSettings(
-  shape: WorkplaneShape,
-  params: Record<string, unknown>,
-  headFollowsStandard: boolean,
-): WorkplaneShape {
-  const requestedHead = mcpOptionalNumber(params.threadHeadHeight);
-  const merged = threadSettings({ ...shape, threadHeadHeight: requestedHead ?? shape.threadHeadHeight });
-  // Stand der Kopf auf seinem Normmass, waechst er mit dem Durchmesser mit -
-  // sonst saesse nach einem Wechsel von M8 auf M5 der Kopf einer M8 auf einer
-  // duenneren Schraube. Wer die Hoehe selbst angibt, behaelt sie.
-  const settings = requestedHead === undefined && headFollowsStandard
-    ? { ...merged, headHeight: normalizeThreadHeadHeight(defaultThreadHeadHeight(merged), merged) }
-    : merged;
-  const footprint = threadNaturalFootprint(settings);
-  const keepFootprint = params.width !== undefined || params.depth !== undefined || params.size !== undefined;
-  return {
-    ...shape,
-    threadRole: settings.role,
-    threadHead: settings.head,
-    threadHand: settings.hand,
-    threadProfile: settings.profile,
-    threadDiameter: settings.diameter,
-    threadPitch: settings.pitch,
-    threadClearance: settings.clearance,
-    threadBoltClearance: settings.boltClearance,
-    threadAxialClearance: settings.axialClearance,
-    threadDepth: settings.depth,
-    threadFlankAngle: settings.flankAngle,
-    threadQuality: settings.quality,
-    threadHeadHeight: settings.headHeight,
-    threadChamfer: settings.chamfer,
-    threadChamferBottom: settings.chamferLow,
-    threadHeadChamfer: settings.headChamfer,
-    ...(keepFootprint ? {} : {
-      width: footprint.width,
-      depth: footprint.depth,
-      size: Math.max(footprint.width, footprint.depth),
-    }),
-  };
-}
-
-function mcpString(value: unknown, fallback: string) {
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
-
-/** A reference point as an AI sees it: x and z on the plate, elevation as the height. */
-function mcpPointInfo(note: WorkplaneNote) {
-  const round = (value: number) => Number(value.toFixed(4));
-  return { id: note.id, x: round(note.x), z: round(note.z), elevation: round(note.y) };
-}
-
-function mcpStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0);
-  }
-  return typeof value === "string" && value.length > 0 ? [value] : [];
-}
-
-function mcpNumberArray(value: unknown): number[] {
-  return Array.isArray(value) ? value.filter((entry): entry is number => typeof entry === "number" && Number.isInteger(entry)) : [];
-}
-
-function mcpFiniteNumberArray(value: unknown): number[] {
-  return Array.isArray(value) ? value.filter((entry): entry is number => typeof entry === "number" && Number.isFinite(entry)) : [];
-}
-
-function readMcpEditorIdentity() {
-  const storageKey = "layerling.mcp.editorIdentity";
-  try {
-    const existing = JSON.parse(window.sessionStorage.getItem(storageKey) ?? "null") as { editorId?: unknown; editorNumber?: unknown } | null;
-    if (typeof existing?.editorId === "string" && typeof existing.editorNumber === "number") {
-      return { editorId: existing.editorId, editorNumber: existing.editorNumber };
-    }
-  } catch {
-    // Session identity is best-effort; fall through and create a new one.
-  }
-
-  const randomValues = new Uint32Array(1);
-  window.crypto?.getRandomValues?.(randomValues);
-  const editorNumber = 10000 + ((randomValues[0] || Math.floor(Math.random() * 90000)) % 90000);
-  const editorId = window.crypto?.randomUUID?.() ?? `layerling-editor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const identity = { editorId, editorNumber };
-  try {
-    window.sessionStorage.setItem(storageKey, JSON.stringify(identity));
-  } catch {
-    // Private browsing can block sessionStorage; the in-memory identity is enough for this tab.
-  }
-  return identity;
-}
 
 /** What a locked shape still lets through updateShape: none of it changes the body. */
 const LOCKED_SHAPE_PATCH_KEYS = new Set(["locked", "hidden", "name"]);
@@ -2926,7 +2160,7 @@ export function LayerlingEditor({
   // Left open on an iPad, which greys out files of types it does not know (#219).
   const projectFileAccept = useFileAccept(".lyl,.skf");
   const myShapesFileAccept = useFileAccept(".zip,.lyl,.skf");
-  const importFileAccept = useFileAccept(`.stl,.ply,.obj,.mtl,.zip,.3mf,.step,.stp,.svg,image/svg+xml,${PICTURE_FILE_ACCEPT}`);
+  const importFileAccept = useFileAccept(`.stl,.ply,.obj,.mtl,.zip,.3mf,.step,.stp,.svg,.dxf,image/svg+xml,${PICTURE_FILE_ACCEPT}`);
   const projectFileInputRef = useRef<HTMLInputElement | null>(null);
   const insertProjectFileInputRef = useRef<HTMLInputElement | null>(null);
   const sketchImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -9486,6 +8720,74 @@ export function LayerlingEditor({
     if (meshRoundTool && !(selectedIds.length === 1 && selectedIds[0] === meshRoundTool.shapeId) && !meshRoundTool.busy) setMeshRoundTool(null);
   }, [meshRoundTool, selectedIds]);
 
+  // Fork (build 55): Texture - a pattern pressed into or raised out of one part's surface.
+  const [textureTool, setTextureTool] = useState<{ shapeId: string; options: SurfaceTextureOptions; pictureName: string | null; busy: boolean; error: string | null } | null>(null);
+  const toggleTexture = useCallback(() => {
+    if (textureTool) {
+      setTextureTool(null);
+      return;
+    }
+    if (refuseLockedSelection()) return;
+    const shape = selectedShapes.length === 1 ? selectedShapes[0] : null;
+    if (!shape || shape.hole || isNonSolidShapeKind(shape.kind)) {
+      setNotice(t("texture.selectOne"));
+      return;
+    }
+    setTextureTool({ shapeId: shape.id, options: { ...DEFAULT_SURFACE_TEXTURE }, pictureName: null, busy: false, error: null });
+  }, [refuseLockedSelection, selectedShapes, textureTool]);
+  const pickTexturePicture = useCallback(async (file: File) => {
+    try {
+      const pixels = await picturePixels(file);
+      // At most 512 pixels a side: plenty for a texture, and quick to sample.
+      const factor = Math.min(1, 512 / Math.max(pixels.width, pixels.height));
+      let { width, height } = pixels;
+      let data: ArrayLike<number> = pixels.data;
+      if (factor < 1) {
+        const w = Math.max(1, Math.round(width * factor)), h = Math.max(1, Math.round(height * factor));
+        const scaled = new Uint8ClampedArray(w * h * 4);
+        for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) {
+          const sx = Math.min(width - 1, Math.floor(x / factor)), sy = Math.min(height - 1, Math.floor(y / factor));
+          for (let k = 0; k < 4; k += 1) scaled[(y * w + x) * 4 + k] = data[(sy * width + sx) * 4 + k];
+        }
+        width = w; height = h; data = scaled;
+      }
+      const picture = pictureHeights(data, width, height);
+      setTextureTool((current) => current ? { ...current, pictureName: file.name, options: { ...current.options, picture }, error: null } : current);
+    } catch {
+      setTextureTool((current) => current ? { ...current, error: t("texture.pictureUnreadable") } : current);
+    }
+  }, []);
+  const applyTexture = useCallback(() => {
+    const tool = textureTool;
+    const shape = tool ? shapesRef.current.find((candidate) => candidate.id === tool.shapeId) : null;
+    if (!tool || !shape) {
+      setTextureTool(null);
+      return;
+    }
+    setTextureTool({ ...tool, busy: true, error: null });
+    window.setTimeout(async () => {
+      try {
+        const positions = partGeom(shape).triangles;
+        const result = await textureMeshInBackground(positions, tool.options);
+        const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
+        if (!current || projectShapesFingerprint([current]) !== projectShapesFingerprint([shape])) {
+          setTextureTool(null);
+          setNotice(t("meshRound.changed"));
+          return;
+        }
+        const textured = canonicalizeShape(shapeWithWorldPositions(shape, Array.from(result.positions)));
+        const name = t(`texture.pattern.${tool.options.pattern}` as MessageKey);
+        commitShapes(shapesRef.current.map((candidate) => (candidate.id === shape.id ? textured : candidate)), textured.id, t(result.coarse ? "texture.doneCoarse" : "texture.done", { pattern: name, triangles: result.triangles.toLocaleString() }));
+        setTextureTool(null);
+      } catch (error) {
+        setTextureTool((latest) => latest ? { ...latest, busy: false, error: error instanceof Error ? localizedError(error.message) : String(error) } : latest);
+      }
+    }, 30);
+  }, [commitShapes, textureTool]);
+  useEffect(() => {
+    if (textureTool && !(selectedIds.length === 1 && selectedIds[0] === textureTool.shapeId) && !textureTool.busy) setTextureTool(null);
+  }, [selectedIds, textureTool]);
+
   // Fork (build 46, Dental Studio in build 47): raw intraoral scans to printable models.
   type DentalStudioState = {
     slots: Record<DentalSlot, string | null>;
@@ -13134,23 +12436,31 @@ export function LayerlingEditor({
     const failNotice = (label: string, error: unknown) => {
       setNotice(error instanceof Error ? localizedError(error.message) : t("status.exportFailed", { label }));
     };
-    if (format === "svg" && svgView === "footprint") {
+    // Fork (build 55): DXF writes the outlines the SVG export draws, for laser cutters, CNC and 2D CAD.
+    const asDxf = format === "dxf";
+    const outlineLabel = asDxf ? "DXF" : "SVG";
+    const saveOutlines = async (svg: string) => {
+      if (!asDxf) return downloadTextFile(projectExportFileName(exportName, "svg"), svg, "image/svg+xml;charset=utf-8");
+      const { svgOutlinesToDxf } = await import("@/lib/dxf");
+      return downloadTextFile(projectExportFileName(exportName, "dxf"), svgOutlinesToDxf(svg).dxf, "application/dxf");
+    };
+    if ((format === "svg" || asDxf) && svgView === "footprint") {
       // Only what stands on the workplane: the section a hair above the lowest point (#692).
       setNotice(t("status.buildingSvg"), true);
       void footprintSvg(sourceShapes, exportName.trim() || projectName)
-        .then((result) => downloadTextFile(projectExportFileName(exportName, "svg"), result.svg, "image/svg+xml;charset=utf-8"))
-        .then(() => finishNotice("SVG"))
-        .catch((error: unknown) => failNotice("SVG", error));
+        .then((result) => saveOutlines(result.svg))
+        .then(() => finishNotice(outlineLabel))
+        .catch((error: unknown) => failNotice(outlineLabel, error));
       return;
     }
-    if (format === "svg") {
+    if (format === "svg" || asDxf) {
       setNotice(t("status.buildingSvg"), true);
       const endExportBusy = beginBusy("export");
       void exportBodiesWithLooseHoles(sourceShapes)
         .then(({ solids: cutSolids, meshes, cut }) => toSvg(cutSolids, exportName.trim() || projectName, meshes.map((mesh, index) => (cut[index] ? mesh : null))))
-        .then((content) => downloadTextFile(projectExportFileName(exportName, "svg"), content, "image/svg+xml;charset=utf-8"))
-        .then(() => finishNotice("SVG"))
-        .catch((error: unknown) => failNotice("SVG", error))
+        .then((content) => saveOutlines(content))
+        .then(() => finishNotice(outlineLabel))
+        .catch((error: unknown) => failNotice(outlineLabel, error))
         .finally(() => endExportBusy());
       return;
     }
@@ -14772,6 +14082,7 @@ export function LayerlingEditor({
         { key: "deleteFace", label: t("editor.tool.deleteFace"), onSelect: () => startDeleteFaceTool("delete") },
         { key: "draft", label: t("draft.menu"), onSelect: startDraftTool },
         { key: "roundMesh", label: t("meshRound.menu"), onSelect: toggleMeshRound },
+        { key: "texture", label: t("texture.menu"), onSelect: toggleTexture },
         { key: "surfaceText", label: t(selectedShapes.length === 1 && selectedShapes[0].surfaceText ? "surfaceText.editMenu" : "surfaceText.menu"), onSelect: toggleSurfaceText },
       );
       if (!single.hole && !isNonSolidShapeKind(single.kind)) {
@@ -14920,6 +14231,8 @@ export function LayerlingEditor({
           canRound: !selectionLocked && selectedShapes.length === 1 && !selectedShapes[0].hole && !isNonSolidShapeKind(selectedShapes[0].kind),
           roundActive: Boolean(meshRoundTool),
           onRound: toggleMeshRound,
+          textureActive: Boolean(textureTool),
+          onTexture: toggleTexture,
           draftActive: deleteFaceTool?.mode === "draft",
           onDraft: startDraftTool,
           textActive: Boolean(surfaceTextTool),
@@ -15783,6 +15096,20 @@ export function LayerlingEditor({
           onCancel={() => setMeshRoundTool(null)}
         />
       ) : null}
+      {textureTool ? (
+        <SurfaceTexturePanel
+          targetName={displayShapeName(shapes.find((shape) => shape.id === textureTool.shapeId) ?? ({ name: "" } as WorkplaneShape))}
+          options={textureTool.options}
+          pictureName={textureTool.pictureName}
+          busy={textureTool.busy}
+          error={textureTool.error}
+          workspace={workspaceSettings}
+          onChange={(patch) => setTextureTool((current) => current && !current.busy ? { ...current, options: { ...current.options, ...patch }, error: null } : current)}
+          onPicture={(file) => void pickTexturePicture(file)}
+          onApply={applyTexture}
+          onCancel={() => setTextureTool(null)}
+        />
+      ) : null}
       {edgeModifier ? (
         <EdgeModifierPanel
           kind={edgeModifier.kind}
@@ -16012,2217 +15339,6 @@ export function LayerlingEditor({
   );
 }
 
-const sketchReferenceIcons = {
-  line: "sketch-tool-line.png",
-  arc: "sketch-tool-arc.png",
-  bezier: "sketch-tool-bezier-curve.png",
-  smooth: "sketch-tool-smooth-curve.png",
-  select: "sketch-tool-select.png",
-  image: "sketch-tool-add-image.png",
-  refine: "sketch-tool-add-or-remove-points.png",
-  erase: "sketch-tool-erase.png",
-  measure: "sketch-tool-measure.png",
-  sketchTo3d: "sketch-tool-sketch-to-3d.png",
-  editSketchTo3d: "sketch-tool-edit-sketch-to-3d.png",
-} as const;
-
-type SketchReferenceIconName = keyof typeof sketchReferenceIcons;
-
-function SketchReferenceIcon({ name }: { name: SketchReferenceIconName }) {
-  return (
-    <img
-      aria-hidden="true"
-      className="sketch-reference-icon"
-      data-sketch-icon={name}
-      draggable={false}
-      src={`/assets/editor/${sketchReferenceIcons[name]}`}
-      alt=""
-    />
-  );
-}
-
-type SketchShapeOptions = { sides: number; innerPercent: number };
-
-/** A number in the sketch shapes menu: typed freely, tidied to its limits when it is left. */
-function SketchShapeNumberField({ label, value, min, max, suffix, normalize, onChange }: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  suffix?: string;
-  normalize: (value: unknown) => number;
-  onChange: (value: number) => void;
-}) {
-  const [draft, setDraft] = useState(String(value));
-  useEffect(() => setDraft(String(value)), [value]);
-  const commit = () => {
-    const next = normalize(draft.replace(",", "."));
-    setDraft(String(next));
-    onChange(next);
-  };
-  // The mouse wheel in the clicked field (#536): whole numbers, so one notch is one, Shift ten.
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [focused, setFocused] = useState(false);
-  useWheelField(inputRef, focused, ({ direction, keys }) => {
-    const typed = Number(draft.replace(",", "."));
-    const next = normalize(wheelNextValue(Number.isFinite(typed) ? typed : value, direction, 1, { shift: keys.shift }));
-    setDraft(String(next));
-    onChange(next);
-  });
-  return (
-    <label>
-      <span>{label}</span>
-      <input
-        ref={inputRef}
-        type="text"
-        inputMode="decimal"
-        aria-label={label}
-        title={`${min} - ${max}`}
-        value={draft}
-        onFocus={(event) => { setFocused(true); event.currentTarget.select(); }}
-        onChange={(event) => setDraft(event.currentTarget.value)}
-        onBlur={() => { setFocused(false); commit(); }}
-        onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-      />
-      {suffix ? <span className="unit">{suffix}</span> : null}
-    </label>
-  );
-}
-
-const sketchShapeMenuItems = [
-  { primitive: "rectangle", label: "sketch.rectangle", icon: SquareIcon },
-  { primitive: "circle", label: "sketch.circle", icon: CircleIcon },
-  { primitive: "ellipse", label: "sketch.ellipse", icon: SketchEllipseIcon },
-  { primitive: "halfCircle", label: "sketch.halfCircle", icon: SketchHalfCircleIcon },
-  { primitive: "pieSlice", label: "sketch.pieSlice", icon: SketchPieSliceIcon },
-  { primitive: "triangle", label: "sketch.triangle", icon: TriangleIcon },
-  { primitive: "hexagon", label: "sketch.hexagon", icon: HexagonIcon },
-  { primitive: "polygon", label: "sketch.polygon", icon: PentagonIcon },
-  { primitive: "star", label: "sketch.star", icon: StarIcon },
-  { primitive: "boltCircle", label: "sketch.boltCircle", icon: SketchBoltCircleIcon },
-] satisfies Array<{ primitive: SketchPrimitive; label: MessageKey; icon: ComponentType<SVGProps<SVGSVGElement>> }>;
-
-/** The keys that do what a toolbar button does, shown beside it in the command search. */
-const COMMAND_SHORTCUTS: Readonly<Record<string, string>> = {
-  copy: "Ctrl+C",
-  paste: "Ctrl+V",
-  duplicate: "Ctrl+D",
-  delete: "Delete",
-  undo: "Ctrl+Z",
-  redo: "Ctrl+Y",
-  outliner: "Ctrl+Shift+O",
-  "toggle-hidden": "Ctrl+H",
-  "show-hidden": "Ctrl+Shift+H",
-  group: "Ctrl+G",
-  bundle: "Ctrl+B",
-  ungroup: "Ctrl+Shift+G",
-  align: "L",
-  mirror: "M",
-  fillet: "B",
-  chamfer: "Shift+B",
-  drop: "D",
-  note: "N",
-  import: "Ctrl+Shift+I",
-  intersect: "Ctrl+I",
-  "interactive-help": "Shift+F1",
-  export: "Ctrl+E",
-  "sketch-copy": "Ctrl+C",
-  "sketch-paste": "Ctrl+V",
-  "sketch-duplicate": "Ctrl+D",
-  "sketch-delete": "Delete",
-  "sketch-undo": "Ctrl+Z",
-  "sketch-redo": "Ctrl+Y",
-};
-
-type SketchIconName = Parameters<typeof SketchReferenceIcon>[0]["name"];
-
-/** A sketch tool's picture as a component of its own, for the command search. */
-function sketchPaletteIcon(name: SketchIconName) {
-  return function SketchPaletteIcon() {
-    return <SketchReferenceIcon name={name} />;
-  };
-}
-
-const SKETCH_PALETTE_ICONS = {
-  line: sketchPaletteIcon("line"),
-  arc: sketchPaletteIcon("arc"),
-  bezier: sketchPaletteIcon("bezier"),
-  smooth: sketchPaletteIcon("smooth"),
-  select: sketchPaletteIcon("select"),
-  image: sketchPaletteIcon("image"),
-  refine: sketchPaletteIcon("refine"),
-  erase: sketchPaletteIcon("erase"),
-};
-
-function SecondaryToolbar({
-  toolbarMode,
-  projectName,
-  onProjectNameChange,
-  onToolbarModeChange,
-  outlinerOpen,
-  onToggleOutliner,
-  alignMode,
-  canAlign,
-  canModifySelection,
-  canEdgeModify,
-  edgeModifierKind,
-  canGroup,
-  canIntersect,
-  canRedo,
-  canUngroup,
-  canUndo,
-  canHistoryView,
-  historyViewActive,
-  onHistoryView,
-  hasClipboard,
-  hasSelection,
-  hiddenShapeCount,
-  selectionHidden,
-  mirrorMode,
-  canSplit,
-  splitMode,
-  sketchActive,
-  sketchOperation,
-  sketchTool,
-  sketchCanUndo,
-  sketchCanRedo,
-  sketchHasSelection,
-  sketchHasClipboard,
-  canEditSketch,
-  canFilletSketchPoint,
-  sketchCornerDialog,
-  onSketchCornerDialog,
-  sketchConstruction,
-  onSketchConstruction,
-  sketchFromMiddle,
-  onSketchFromMiddle,
-  sketchStrokeActive,
-  onSketchStroke,
-  onStartSketch,
-  sketchIsNew,
-  onSketchOperation,
-  onEditSketch,
-  onSketchTool,
-  onSketchPrimitive,
-  sketchShapeOptions,
-  onSketchShapeOptions,
-  onSketchImage,
-  onSketchCopy,
-  onSketchPaste,
-  onSketchDuplicate,
-  onSketchDelete,
-  onSketchUndo,
-  onSketchRedo,
-  onSketchFinish,
-  onSketchCancel,
-  onHome,
-  onAlign,
-  onChamfer,
-  onCopy,
-  onDelete,
-  onDuplicate,
-  onCenterOnWorkplane,
-  onDropToWorkplane,
-  onLayFlat,
-  layFlatActive,
-  onMateFaces,
-  mateFacesActive,
-  onHolePattern,
-  holePatternActive,
-  canHolePattern,
-  onFaceTool,
-  onBlendBodies,
-  build33,
-  blendBodiesActive,
-  canBlendBodies,
-  faceToolActive,
-  canFaceTool,
-  onGroup,
-  onBundle,
-  onIntersect,
-  onIntersectPreview,
-  intersectPreviewActive,
-  onFillet,
-  onHollow,
-  hollowActive,
-  onDeleteFace,
-  deleteFaceActive,
-  canSimplify,
-  onSimplify,
-  simplifyActive,
-  onMirror,
-  onRotationPivot,
-  rotationPivotActive,
-  onArray,
-  arrayActive,
-  onScalePercent,
-  onCarryOntoFace,
-  scalePercentActive,
-  onSplit,
-  onPaste,
-  onRedo,
-  onSnap,
-  onShowHidden,
-  onToggleHidden,
-  onUngroup,
-  onUndo,
-  onTopPanel,
-  onAddShape,
-  onShortcuts,
-  onInteractiveHelp,
-  interactiveHelpActive,
-  onGuide,
-  noteMode,
-  notesVisible,
-  noteCount,
-  onNoteTool,
-  onToggleNotes,
-  overhangsVisible,
-  overhangAngle,
-  onToggleOverhangs,
-  renderMyShapes,
-  renderMoreShapes,
-  addMoreShape,
-  renderReadyParts,
-  onLithophane,
-  onTrace,
-  traceOpen,
-  onVoronoi,
-  lithophaneOpen,
-  dentalOpen,
-  voronoiOpen,
-  shapeCustomizations,
-  objects,
-  onSelectObject,
-}: {
-  toolbarMode: ToolbarMode;
-  projectName: string;
-  onProjectNameChange?: (name: string) => void;
-  onToolbarModeChange: (mode: ToolbarMode) => void;
-  outlinerOpen: boolean;
-  onToggleOutliner: () => void;
-  alignMode: boolean;
-  canAlign: boolean;
-  /** Something is selected and none of it is locked: the Modify and Arrange tools may act on it. */
-  canModifySelection: boolean;
-  canEdgeModify: boolean;
-  edgeModifierKind: CadModifierKind | null;
-  canGroup: boolean;
-  canIntersect: boolean;
-  canRedo: boolean;
-  canUngroup: boolean;
-  canUndo: boolean;
-  canHistoryView: boolean;
-  historyViewActive: boolean;
-  onHistoryView: () => void;
-  hasClipboard: boolean;
-  hasSelection: boolean;
-  hiddenShapeCount: number;
-  selectionHidden: boolean;
-  mirrorMode: boolean;
-  canSplit: boolean;
-  splitMode: boolean;
-  sketchActive: boolean;
-  sketchOperation: SketchOperation;
-  sketchTool: SketchTool;
-  sketchCanUndo: boolean;
-  sketchCanRedo: boolean;
-  sketchHasSelection: boolean;
-  sketchHasClipboard: boolean;
-  canEditSketch: boolean;
-  canFilletSketchPoint?: boolean;
-  sketchCornerDialog?: "fillet" | "chamfer" | null;
-  onSketchCornerDialog?: (dialog: "fillet" | "chamfer" | null) => void;
-  sketchConstruction?: boolean;
-  onSketchConstruction?: () => void;
-  sketchFromMiddle?: boolean;
-  onSketchFromMiddle?: () => void;
-  sketchStrokeActive?: boolean;
-  onSketchStroke?: () => void;
-  onStartSketch: (operation: SketchOperation) => void;
-  sketchIsNew: boolean;
-  onSketchOperation: (operation: SketchOperation) => void;
-  onEditSketch: () => void;
-  onSketchTool: (tool: SketchTool) => void;
-  onSketchPrimitive: (primitive: SketchPrimitive) => void;
-  sketchShapeOptions: SketchShapeOptions;
-  onSketchShapeOptions: (options: SketchShapeOptions) => void;
-  onSketchImage: () => void;
-  onSketchCopy: () => void;
-  onSketchPaste: () => void;
-  onSketchDuplicate: () => void;
-  onSketchDelete: () => void;
-  onSketchUndo: () => void;
-  onSketchRedo: () => void;
-  onSketchFinish: () => void;
-  onSketchCancel: () => void;
-  onHome?: () => void;
-  onAlign: () => void;
-  onChamfer: () => void;
-  onCopy: () => void;
-  onDelete: () => void;
-  onDuplicate: () => void;
-  onCenterOnWorkplane: () => void;
-  onDropToWorkplane: () => void;
-  onLayFlat: () => void;
-  layFlatActive: boolean;
-  onMateFaces: () => void;
-  mateFacesActive: boolean;
-  onHolePattern: () => void;
-  holePatternActive: boolean;
-  canHolePattern: boolean;
-  onFaceTool: () => void;
-  onBlendBodies: () => void;
-  /** Fork (build 33): Hull, Fit check and Round a mesh. */
-  build33: { canHull: boolean; onHull: () => void; fitActive: boolean; onFitCheck: () => void; canRound: boolean; roundActive: boolean; onRound: () => void; textActive: boolean; onText: () => void; draftActive: boolean; onDraft: () => void };
-  blendBodiesActive: boolean;
-  canBlendBodies: boolean;
-  faceToolActive: boolean;
-  canFaceTool: boolean;
-  onGroup: () => void;
-  onBundle: () => void;
-  onIntersect: () => void;
-  onIntersectPreview: () => void;
-  intersectPreviewActive: boolean;
-  onFillet: () => void;
-  onHollow: () => void;
-  hollowActive: boolean;
-  onDeleteFace: () => void;
-  deleteFaceActive: boolean;
-  canSimplify: boolean;
-  onSimplify: () => void;
-  simplifyActive: boolean;
-  onMirror: () => void;
-  onRotationPivot: () => void;
-  rotationPivotActive: boolean;
-  onArray: () => void;
-  arrayActive: boolean;
-  onScalePercent: () => void;
-  onCarryOntoFace: () => void;
-  scalePercentActive: boolean;
-  onSplit: () => void;
-  onPaste: () => void;
-  onRedo: () => void;
-  onSnap: () => void;
-  onShowHidden: () => void;
-  onToggleHidden: () => void;
-  onUngroup: () => void;
-  onUndo: () => void;
-  onTopPanel: (panel: TopPanel) => void;
-  onAddShape: (shape: ShapeAsset) => void;
-  onShortcuts: () => void;
-  onInteractiveHelp: () => void;
-  interactiveHelpActive: boolean;
-  onGuide: () => void;
-  noteMode: boolean;
-  notesVisible: boolean;
-  noteCount: number;
-  onNoteTool: () => void;
-  onToggleNotes: () => void;
-  overhangsVisible: boolean;
-  overhangAngle: number;
-  onToggleOverhangs: () => void;
-  /** Custom shapes above the library; gets the way to close the menu. */
-  renderMyShapes?: (close: () => void) => ReactNode;
-  renderMoreShapes?: (close: () => void, after: string | undefined, present: ReadonlySet<string>) => ReactNode;
-  addMoreShape?: (id: MoreShapeId) => void;
-  /** Fork: ready-made parts under the library; gets the way to close the menu. */
-  renderReadyParts?: (close: () => void) => ReactNode;
-  /** Fork: the lithophane and Voronoi makers. */
-  onLithophane?: () => void;
-  onTrace?: () => void;
-  traceOpen?: boolean;
-  onVoronoi?: () => void;
-  lithophaneOpen?: boolean;
-  dentalOpen?: boolean;
-  voronoiOpen?: boolean;
-  /** The shape defaults, so each library entry can show the colour it will be added in. */
-  shapeCustomizations: WorkplaneWorkspaceSettings["shapeCustomizations"];
-  /** The bodies of the design, so the command search can find them by name. */
-  objects: ReadonlyArray<{ id: string; name: string; kind: string; hidden: boolean }>;
-  onSelectObject: (id: string) => void;
-}) {
-  const [shapesOpen, setShapesOpen] = useState(false);
-  // The Shapes panel kept open while shapes are placed one after the other (#433); remembered in this browser.
-  const [geometryShapesPinned, setGeometryShapesPinned] = useState(false);
-  // The sketch's panel has its own pin, its own place and its own size (#577).
-  const [sketchShapesPinned, setSketchShapesPinned] = useState(false);
-  const shapesPinned = toolbarMode === "sketch" ? sketchShapesPinned : geometryShapesPinned;
-  const shapesPinnedRef = useRef(false);
-  shapesPinnedRef.current = shapesPinned;
-  useEffect(() => {
-    try {
-      // Fork: the Shapes panel is docked on the right unless it was unpinned.
-      const pinned = window.localStorage.getItem("layerling.editor.shapeMenuPinned") !== "false";
-      setGeometryShapesPinned(pinned);
-      setSketchShapesPinned(window.localStorage.getItem("layerling.sketch.shapeMenuPinned") === "true");
-      // A pinned panel is there again at the next start, not only its pin (forum, prmod3d).
-      // Fork (build 22): like Tinkercad, the Shapes panel is open whenever a design opens, pinned or not.
-      setShapesOpen(true);
-    } catch {
-      // Blocked storage: the panel closes after each shape, as it always did.
-    }
-  }, []);
-  const toggleShapesPinned = () => {
-    const next = !shapesPinnedRef.current;
-    const sketch = toolbarMode === "sketch";
-    (sketch ? setSketchShapesPinned : setGeometryShapesPinned)(next);
-    try {
-      window.localStorage.setItem(sketch ? "layerling.sketch.shapeMenuPinned" : "layerling.editor.shapeMenuPinned", String(next));
-    } catch {
-      // The pin still works for this visit.
-    }
-  };
-  // Fork: tell the page when the Shapes panel is docked, so the workplane makes room for it.
-  const shapeDockOn = toolbarMode === "geometry" && shapesPinned && shapesOpen;
-  useEffect(() => {
-    const root = document.documentElement;
-    if (shapeDockOn) root.dataset.shapeDock = "on";
-    else delete root.dataset.shapeDock;
-    window.dispatchEvent(new Event("resize"));
-    return () => {
-      delete root.dataset.shapeDock;
-    };
-  }, [shapeDockOn]);
-  /** Picking a shape closes the panel, unless it is pinned open. */
-  const closeShapesAfterPick = () => {
-    if (!shapesPinnedRef.current) setShapesOpen(false);
-  };
-  // On a narrow window the tools wrap onto more rows. Their real height goes
-  // into --editor-toolbar-height, which the workplane, the status and the menus
-  // below the bar are placed by.
-  const toolbarContentRef = useRef<HTMLDivElement | null>(null);
-  useLayoutEffect(() => {
-    const content = toolbarContentRef.current;
-    if (!content || typeof ResizeObserver === "undefined") return;
-    const root = document.documentElement;
-    const apply = () => {
-      const styles = getComputedStyle(root);
-      const title = parseFloat(styles.getPropertyValue("--editor-toolbar-title-height")) || 44;
-      const minimum = parseFloat(styles.getPropertyValue("--editor-toolbar-tools-height")) || 76;
-      const tools = content.offsetHeight;
-      // A hidden editor measures nothing; it keeps the one-row height.
-      root.style.setProperty("--editor-toolbar-height", `${Math.round(title + Math.max(minimum, tools))}px`);
-    };
-    apply();
-    const observer = new ResizeObserver(apply);
-    observer.observe(content);
-    return () => {
-      observer.disconnect();
-      root.style.removeProperty("--editor-toolbar-height");
-    };
-  }, []);
-  const [visibilityOpen, setVisibilityOpen] = useState(false);
-  const [modifyMoreOpen, setModifyMoreOpen] = useState(false);
-  const modifyMoreRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!modifyMoreOpen) return;
-    const onDown = (event: PointerEvent) => {
-      if (!modifyMoreRef.current?.contains(event.target as Node)) setModifyMoreOpen(false);
-    };
-    window.addEventListener("pointerdown", onDown);
-    return () => window.removeEventListener("pointerdown", onDown);
-  }, [modifyMoreOpen]);
-  const [visibilityMenuPosition, setVisibilityMenuPosition] = useState({ top: 0, left: 0 });
-  const shapesMenuRef = useRef<HTMLDivElement>(null);
-  const visibilityMenuRef = useRef<HTMLDivElement>(null);
-  const touchShapeStartRef = useRef<{ id: string; x: number; y: number } | null>(null);
-  const suppressNextShapeClickRef = useRef(false);
-  const cancelProjectNameEditRef = useRef(false);
-  const projectNameFieldRef = useRef<HTMLLabelElement>(null);
-  const projectNameInputRef = useRef<HTMLInputElement>(null);
-  const [projectNameDraft, setProjectNameDraft] = useState(projectName);
-  useEffect(() => {
-    setProjectNameDraft(projectName);
-  }, [projectName]);
-  useEffect(() => {
-    const finishProjectNameEdit = (event: PointerEvent) => {
-      const input = projectNameInputRef.current;
-      if (input && document.activeElement === input && !projectNameFieldRef.current?.contains(event.target as Node)) {
-        input.blur();
-      }
-    };
-    document.addEventListener("pointerdown", finishProjectNameEdit, true);
-    return () => document.removeEventListener("pointerdown", finishProjectNameEdit, true);
-  }, []);
-  const commitProjectName = (value: string) => {
-    const nextName = value.trim().slice(0, 80);
-    if (!nextName) {
-      setProjectNameDraft(projectName);
-      return;
-    }
-    setProjectNameDraft(nextName);
-    if (nextName !== projectName) onProjectNameChange?.(nextName);
-  };
-  const selectToolbarMode = (mode: "geometry" | "sketch") => {
-    setShapesOpen(false);
-    setVisibilityOpen(false);
-    onTopPanel(null);
-    onToolbarModeChange(mode);
-  };
-  // Fork (build 21): Ready-made parts is a window of its own, opened and closed from its toolbar
-  // button. It shares the right-hand dock with Shapes - one at a time - so the two never stack.
-  const [shapesTab, setShapesTab] = useState<"shapes" | "parts">("shapes");
-  const toggleShapesWindow = () => {
-    setVisibilityOpen(false);
-    if (shapesOpen && shapesTab === "shapes") {
-      setShapesOpen(false);
-    } else {
-      setShapesTab("shapes");
-      setShapesOpen(true);
-    }
-  };
-  const togglePartsWindow = () => {
-    setVisibilityOpen(false);
-    if (shapesOpen && shapesTab === "parts") {
-      // Closing it puts a pinned Shapes panel back, as it stood before.
-      setShapesTab("shapes");
-      if (!shapesPinnedRef.current) setShapesOpen(false);
-    } else {
-      setShapesTab("parts");
-      setShapesOpen(true);
-    }
-  };
-  const addShapeFromMenu = (shape: ShapeAsset) => {
-    onAddShape({ ...shape, name: shapeAssetLabel(shape) });
-    closeShapesAfterPick();
-  };
-  const addSketchShapeFromMenu = (primitive: SketchPrimitive) => {
-    onSketchPrimitive(primitive);
-    closeShapesAfterPick();
-  };
-  const startSketch = (operation: SketchOperation) => {
-    onStartSketch(operation);
-  };
-  useEffect(() => {
-    if (!historyViewActive) return;
-    setShapesOpen(false);
-    setVisibilityOpen(false);
-  }, [historyViewActive]);
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const openPalette = () => {
-    setShapesOpen(false);
-    setVisibilityOpen(false);
-    setPaletteOpen(true);
-  };
-  const openPaletteRef = useRef(openPalette);
-  openPaletteRef.current = openPalette;
-  useEffect(() => {
-    // Ctrl/Cmd+K opens the command search from anywhere in the editor, also
-    // while a field has the focus - the browsers' own use of the key (a search
-    // bar) is not worth keeping here.
-    const openOnShortcut = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== "k") return;
-      event.preventDefault();
-      openPaletteRef.current();
-    };
-    window.addEventListener("keydown", openOnShortcut);
-    return () => window.removeEventListener("keydown", openOnShortcut);
-  }, []);
-  // Leaving the sketch closes the sketch's shape palette; at the start there is nothing to close (a pinned panel opens then).
-  const sketchWasActiveRef = useRef(sketchActive);
-  useEffect(() => {
-    if (sketchWasActiveRef.current && !sketchActive) setShapesOpen(false);
-    sketchWasActiveRef.current = sketchActive;
-  }, [sketchActive]);
-  useEffect(() => {
-    if (!shapesOpen) return;
-    // Pinned open, a click elsewhere is the click that puts the shape, and Esc cancels the placing: neither closes the panel.
-    const closeOnPointerDown = (event: PointerEvent) => {
-      // Fork: the Ready-made parts button opens and closes its window itself.
-      if ((event.target as Element | null)?.closest?.('[data-layerling-tool="readyParts"]')) return;
-      if (!shapesPinnedRef.current && !shapesMenuRef.current?.contains(event.target as Node)) setShapesOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !shapesPinnedRef.current) setShapesOpen(false);
-    };
-    window.addEventListener("pointerdown", closeOnPointerDown);
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      window.removeEventListener("pointerdown", closeOnPointerDown);
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [shapesOpen]);
-  useEffect(() => {
-    if (!visibilityOpen) return;
-    const closeOnPointerDown = (event: PointerEvent) => {
-      if (!visibilityMenuRef.current?.contains(event.target as Node)) setVisibilityOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setVisibilityOpen(false);
-    };
-    const closeOnViewportChange = () => setVisibilityOpen(false);
-    window.addEventListener("pointerdown", closeOnPointerDown);
-    window.addEventListener("keydown", closeOnEscape);
-    window.addEventListener("resize", closeOnViewportChange);
-    window.addEventListener("scroll", closeOnViewportChange, true);
-    return () => {
-      window.removeEventListener("pointerdown", closeOnPointerDown);
-      window.removeEventListener("keydown", closeOnEscape);
-      window.removeEventListener("resize", closeOnViewportChange);
-      window.removeEventListener("scroll", closeOnViewportChange, true);
-    };
-  }, [visibilityOpen]);
-  const toggleVisibilityMenu = () => {
-    if (visibilityOpen) {
-      setVisibilityOpen(false);
-      return;
-    }
-    const triggerBounds = visibilityMenuRef.current?.getBoundingClientRect();
-    if (triggerBounds) {
-      const viewportGutter = 12;
-      const menuWidth = Math.min(276, Math.max(0, window.innerWidth - viewportGutter * 2));
-      setVisibilityMenuPosition({
-        top: triggerBounds.bottom + 8,
-        left: Math.max(
-          viewportGutter,
-          Math.min(
-            triggerBounds.left + triggerBounds.width / 2 - menuWidth / 2,
-            window.innerWidth - menuWidth - viewportGutter,
-          ),
-        ),
-      });
-    }
-    setShapesOpen(false);
-    onTopPanel(null);
-    setVisibilityOpen(true);
-  };
-  // Die Leiste haengt an der Sprache: ohne dieses Abonnement bliebe sie stehen,
-  // falls sie spaeter einmal memoisiert wird.
-  useLanguage();
-  const leftTools = [
-    { id: "copy", label: t("editor.tool.copy"), icon: ToolbarCopyIcon, action: onCopy, enabled: hasSelection },
-    { id: "paste", label: t("editor.tool.paste"), icon: ToolbarPasteIcon, action: onPaste, enabled: hasClipboard },
-    { id: "duplicate", label: t("editor.tool.duplicate"), icon: ToolbarDuplicateIcon, action: onDuplicate, enabled: hasSelection },
-    { id: "delete", label: t("editor.tool.delete"), icon: ToolbarTrashIcon, action: onDelete, enabled: canModifySelection },
-    { id: "undo", label: t("editor.tool.undo"), icon: ToolbarUndoIcon, action: onUndo, enabled: canUndo },
-    { id: "redo", label: t("editor.tool.redo"), icon: ToolbarRedoIcon, action: onRedo, enabled: canRedo },
-    { id: "history", label: t("editor.tool.history"), icon: ToolbarHistoryIcon, action: onHistoryView, enabled: canHistoryView, active: historyViewActive },
-  ];
-  const visibilityTools = [
-    {
-      id: "outliner",
-      label: outlinerOpen ? t("editor.tool.hideOutliner") : t("editor.tool.showOutliner"),
-      icon: ListTree,
-      action: () => {
-        setVisibilityOpen(false);
-        onToggleOutliner();
-      },
-      enabled: true,
-      active: outlinerOpen,
-    },
-    {
-      id: "toggle-hidden",
-      label: selectionHidden ? t("editor.tool.showSelected") : t("editor.tool.hideSelected"),
-      icon: ToolbarHideSelectedIcon,
-      action: () => {
-        setVisibilityOpen(false);
-        onToggleHidden();
-      },
-      enabled: hasSelection,
-    },
-  ];
-  const combineTools = [
-    { id: "group", label: t("editor.tool.group"), icon: ToolbarGroupIcon, action: onGroup, enabled: canGroup },
-    { id: "bundle", label: t("editor.tool.bundle"), icon: ToolbarBundleIcon, action: onBundle, enabled: canGroup },
-    { id: "ungroup", label: t("editor.tool.ungroup"), icon: ToolbarUngroupIcon, action: onUngroup, enabled: canUngroup },
-    { id: "intersect", label: t("editor.tool.intersect"), icon: ToolbarIntersectionIcon, action: onIntersect, enabled: canIntersect || intersectPreviewActive },
-    { id: "intersect-preview", label: t("editor.tool.intersectPreview"), icon: Blend, action: onIntersectPreview, enabled: canIntersect || intersectPreviewActive, active: intersectPreviewActive },
-    // Fork (build 25): a smooth piece joining two bodies.
-    { id: "blendBodies", label: t("blend.title"), icon: ForkBlendIcon, action: onBlendBodies, enabled: canBlendBodies || blendBodiesActive, active: blendBodiesActive },
-    // Fork (build 33).
-    { id: "hull", label: t("hull.title"), icon: Spline, action: build33.onHull, enabled: build33.canHull },
-  ];
-  const modifyTools = [
-    { id: "mirror", label: t("editor.tool.mirror"), icon: ToolbarMirrorIcon, action: onMirror, enabled: canModifySelection, active: mirrorMode },
-    { id: "pivot", label: t("editor.tool.rotationPivot"), icon: ToolbarRotationPivotIcon, action: onRotationPivot, enabled: canModifySelection, active: rotationPivotActive },
-    { id: "array", label: t("editor.tool.array"), icon: ToolbarPatternIcon, action: onArray, enabled: canModifySelection, active: arrayActive },
-    { id: "holePattern", label: t("holePattern.title"), icon: ToolbarHolePatternIcon, action: onHolePattern, enabled: canHolePattern, active: holePatternActive },
-    { id: "faceTool", label: t("faceTool.title"), icon: ToolbarFaceToolIcon, action: onFaceTool, enabled: canFaceTool, active: faceToolActive },
-    { id: "split", label: t("editor.tool.split"), icon: ToolbarSplitIcon, action: onSplit, enabled: splitMode || canSplit, active: splitMode },
-    { id: "chamfer", label: t("editor.tool.chamfer"), icon: ToolbarChamferIcon, action: onChamfer, enabled: canEdgeModify, active: edgeModifierKind === "chamfer" || edgeModifierKind === "chamfillet" },
-    { id: "fillet", label: t("editor.tool.fillet"), icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify, active: edgeModifierKind === "fillet" },
-    { id: "hollow", label: t("editor.tool.hollow"), icon: ToolbarHollowIcon, action: onHollow, enabled: canEdgeModify, active: hollowActive },
-    { id: "deleteFace", label: t("editor.tool.deleteFace"), icon: ToolbarDeleteFaceIcon, action: onDeleteFace, enabled: canEdgeModify, active: deleteFaceActive && !build33.draftActive },
-    { id: "draft", label: t("draft.title"), icon: ForkDraftIcon, action: build33.onDraft, enabled: canEdgeModify, active: build33.draftActive },
-    { id: "surfaceText", label: t("editor.tool.surfaceText"), icon: Type, action: build33.onText, enabled: true, active: build33.textActive },
-    { id: "roundAll", label: t("meshRound.title"), icon: Squircle, action: build33.onRound, enabled: build33.canRound || build33.roundActive, active: build33.roundActive },
-  ];
-  // Fork (build 32): the tools for an imported mesh, in a section of their own that shows only while one is selected.
-  const meshTools = [
-    { id: "meshCheck", label: t("meshCheck.command"), icon: ShieldCheck, action: () => window.dispatchEvent(new Event(MESH_CHECK_EVENT)), enabled: canSimplify },
-    { id: "fillHole", label: t("fillHole.command"), icon: PaintBucket, action: () => window.dispatchEvent(new Event(FILL_HOLE_EVENT)), enabled: canSimplify },
-    { id: "simplify", label: t("editor.tool.simplify"), icon: ToolbarSimplifyIcon, action: onSimplify, enabled: canSimplify, active: simplifyActive },
-    { id: "cutBelowBed", label: t("cutBelowBed.command"), icon: Scissors, action: () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT)), enabled: true },
-    { id: "roundMesh", label: t("meshRound.title"), icon: Squircle, action: build33.onRound, enabled: build33.canRound || build33.roundActive, active: build33.roundActive },
-  ];
-  // Fork (build 47): Dental Studio, in a toolbar section of its own.
-  const dentalTools = [
-    { id: "dentalModel", label: t("dental.title"), icon: ForkToothIcon, action: () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), enabled: true, active: Boolean(dentalOpen) },
-  ];
-  const arrangeTools = [
-    { id: "align", label: t("editor.tool.align"), icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign, active: alignMode },
-    { id: "snap", label: t("editor.tool.snapToGrid"), icon: ToolbarSnapGridIcon, action: onSnap, enabled: canModifySelection },
-    { id: "drop", label: t("editor.tool.dropToWorkplane"), icon: ToolbarDropToWorkplaneIcon, action: onDropToWorkplane, enabled: canModifySelection },
-    { id: "layFlat", label: t("editor.tool.layFlat"), icon: ToolbarLayFlatIcon, action: onLayFlat, enabled: canModifySelection, active: layFlatActive },
-    { id: "mateFaces", label: t("editor.tool.mateFaces"), icon: ToolbarMateFacesIcon, action: onMateFaces, enabled: canModifySelection, active: mateFacesActive },
-    { id: "center", label: t("editor.tool.centerOnWorkplane"), icon: ToolbarCenterOnWorkplaneIcon, action: onCenterOnWorkplane, enabled: canModifySelection },
-    // Fork: spacing parts out has its own button (it opens Align with the Space out panel).
-    { id: "spaceOut", label: t("distribute.title"), icon: ForkSpaceOutIcon, action: onAlign, enabled: canAlign, active: alignMode },
-    { id: "fitCheck", label: t("fitCheck.title"), icon: ScanSearch, action: build33.onFitCheck, enabled: true, active: build33.fitActive },
-  ];
-  // Fork: the makers - each opens its own panel.
-  const makeTools = [
-    { id: "readyParts", label: t("readyParts.title"), icon: ForkReadyPartsIcon, action: togglePartsWindow, enabled: !historyViewActive, active: (shapesOpen && shapesTab === "parts") || Boolean(lithophaneOpen || traceOpen || voronoiOpen) },
-    // Fork (build 32): Lithophane, Photo to outline and Voronoi moved into this window, under "Make from a picture".
-  ];
-  const sketchClipboardTools = [
-    { id: "sketch-copy", label: t("editor.tool.copy"), icon: ToolbarCopyIcon, action: onSketchCopy, enabled: sketchHasSelection },
-    { id: "sketch-paste", label: t("editor.tool.paste"), icon: ToolbarPasteIcon, action: onSketchPaste, enabled: sketchHasClipboard },
-    { id: "sketch-duplicate", label: t("editor.tool.duplicate"), icon: ToolbarDuplicateIcon, action: onSketchDuplicate, enabled: sketchHasSelection },
-    { id: "sketch-delete", label: t("editor.tool.delete"), icon: ToolbarTrashIcon, action: onSketchDelete, enabled: sketchHasSelection },
-  ];
-  const renderToolButton = (tool: (typeof leftTools)[number] | (typeof visibilityTools)[number] | (typeof combineTools)[number] | (typeof modifyTools)[number] | (typeof arrangeTools)[number] | (typeof makeTools)[number] | (typeof meshTools)[number] | (typeof dentalTools)[number]) => {
-    const { id, action, label } = tool;
-    // Fork: Pare 3D's own icon where there is one, and a short name under it.
-    const Icon = FORK_TOOL_ICONS[id] ?? tool.icon;
-    const shortLabel = getLanguage() === "en" ? FORK_SHORT_LABELS_EN[id] ?? label : label;
-    // Im Verlaufsblick schlaeft jedes Werkzeug ausser dem, das ihn beendet -
-    // wirklich, nicht nur im Aussehen: eine Auswahl aus der Zeit davor darf
-    // kein Loeschen freischalten, waehrend die Flaeche etwas anderes zeigt.
-    const enabled = tool.enabled && (!historyViewActive || id === "history");
-    const active = "active" in tool && Boolean(tool.active);
-    return (
-      <button
-        className={`toolbar-icon ${enabled ? "" : "disabled"} ${active ? "active" : ""}`}
-        key={id}
-        data-layerling-tool={id}
-        aria-label={label}
-        // Fork (build 16): the name and shortcut show at once on hover (fork.css), even on a greyed-out tool.
-        data-tip={`${label}${getLanguage() === "en" && FORK_TOOL_HINTS_EN[id] ? ` – ${FORK_TOOL_HINTS_EN[id]}` : ""}${COMMAND_SHORTCUTS[id] ? ` (${COMMAND_SHORTCUTS[id]})` : ""}`}
-        onClick={action}
-        disabled={!enabled}
-      >
-        <Icon />
-        <span className="tool-label" aria-hidden="true">{shortLabel}</span>
-      </button>
-    );
-  };
-
-  // Everything the toolbar and its menus can do, as entries of the command
-  // search. Built from the same lists as the buttons, so a new tool shows up in
-  // both without a second place to remember; only built while the search is open.
-  const buildPaletteCommands = (): PaletteCommand[] => buildAllPaletteCommands().map((command) =>
-    historyViewActive && !HISTORY_VIEW_COMMANDS.has(command.id) ? { ...command, enabled: false } : command,
-  );
-  const buildAllPaletteCommands = (): PaletteCommand[] => {
-    const fromTool = (
-      tool: { id: string; label: string; icon: PaletteCommand["icon"]; action: () => void; enabled: boolean; active?: boolean },
-      group: string,
-    ): PaletteCommand => ({
-      id: tool.id,
-      label: tool.label,
-      group,
-      keywords: COMMAND_KEYWORDS[tool.id],
-      shortcut: COMMAND_SHORTCUTS[tool.id],
-      icon: tool.icon,
-      enabled: tool.enabled,
-      active: tool.active,
-      run: () => tool.action(),
-    });
-    const plain = (
-      id: string,
-      label: string,
-      group: string,
-      enabled: boolean,
-      run: () => void,
-      extra: Partial<PaletteCommand> = {},
-    ): PaletteCommand => ({ id, label, group, keywords: COMMAND_KEYWORDS[id], shortcut: COMMAND_SHORTCUTS[id], enabled, run, ...extra });
-    const helpGroup = t("editor.group.help");
-    const helpCommands = [
-      plain("guide", t("editor.guide"), helpGroup, true, onGuide, { icon: ToolbarGuideIcon }),
-      plain("shortcuts", t("editor.keyboardShortcuts"), helpGroup, true, onShortcuts, { icon: ToolbarKeyboardIcon }),
-      plain("interactive-help", t("interactiveHelp.title"), helpGroup, true, onInteractiveHelp, { icon: CircleHelp, active: interactiveHelpActive }),
-    ];
-    if (toolbarMode === "sketch") {
-      const modeGroup = t("palette.group.mode");
-      const modeCommand = plain("mode-geometry", t("palette.switchGeometry"), modeGroup, true, () => selectToolbarMode("geometry"));
-      if (!sketchActive) {
-        const createGroup = t("sketch.group.create");
-        return [
-          plain("sketch-extrude", t("sketch.extrude"), createGroup, true, () => startSketch("extrude")),
-          plain("sketch-revolve", t("sketch.revolve"), createGroup, true, () => startSketch("revolve")),
-          plain("sketch-sweep", t("sketch.sweep"), createGroup, true, () => startSketch("sweep")),
-          plain("sketch-edit", t("sketch.editTo3d"), createGroup, canEditSketch, onEditSketch),
-          modeCommand,
-          ...helpCommands,
-        ];
-      }
-      const drawGroup = t("sketch.group.draw");
-      const selectGroup = t("sketch.group.select");
-      const finishGroup = t("sketch.group.finish");
-      return [
-        plain("sketch-line", t("sketch.line"), drawGroup, true, () => onSketchTool("line"), { icon: SKETCH_PALETTE_ICONS.line, active: sketchTool === "line" }),
-        plain("sketch-arc", t("sketch.arc"), drawGroup, true, () => onSketchTool("arc"), { icon: SKETCH_PALETTE_ICONS.arc, active: sketchTool === "arc" }),
-        plain("sketch-bezier", t("sketch.bezier"), drawGroup, true, () => onSketchTool("bezier"), { icon: SKETCH_PALETTE_ICONS.bezier, active: sketchTool === "bezier" }),
-        plain("sketch-smooth", t("sketch.smooth"), drawGroup, true, () => onSketchTool("smooth"), { icon: SKETCH_PALETTE_ICONS.smooth, active: sketchTool === "smooth" }),
-        plain("sketch-freehand", t("sketch.freehand"), drawGroup, true, () => onSketchTool("freehand"), { icon: Signature, active: sketchTool === "freehand", keywords: ["scribble", "freehand", "draw", "pen", "pencil", "kritzeln", "freihand"] }),
-        plain("sketch-construction", t("sketch.construction"), drawGroup, true, () => onSketchConstruction?.(), { icon: ToolbarConstructionLineIcon, active: Boolean(sketchConstruction), keywords: ["construction", "guide", "helper", "hilfslinie", "hilfs", "konstruktion"] }),
-        plain("sketch-from-middle", t("sketch.fromMiddle"), drawGroup, true, () => onSketchFromMiddle?.(), { icon: ToolbarMiddleLineIcon, active: Boolean(sketchFromMiddle), keywords: ["middle", "center", "centre", "mitte", "mittellinie", "symmetric", "symmetrisch"] }),
-        ...sketchShapeMenuItems.map(({ primitive, label, icon }) => plain(
-          `sketch-shape-${primitive}`,
-          t("palette.addShape", { shape: t(label) }),
-          t("sketch.group.shapes"),
-          true,
-          () => onSketchPrimitive(primitive),
-          { icon, keywords: [primitive] },
-        )),
-        plain("sketch-select", t("sketch.select"), selectGroup, true, () => onSketchTool("select"), { icon: SKETCH_PALETTE_ICONS.select, active: sketchTool === "select" }),
-        plain("sketch-image", t("sketch.addImage"), selectGroup, sketchTool === "select", onSketchImage, { icon: SKETCH_PALETTE_ICONS.image }),
-        plain("sketch-refine", t("sketch.refine"), selectGroup, true, () => onSketchTool("refine"), { icon: SKETCH_PALETTE_ICONS.refine, active: sketchTool === "refine" }),
-        plain("sketch-chamfer", t("sketch.chamferCorner"), selectGroup, Boolean(canFilletSketchPoint), () => onSketchCornerDialog?.(sketchCornerDialog === "chamfer" ? null : "chamfer"), { icon: ToolbarChamferIcon, active: sketchCornerDialog === "chamfer" }),
-        plain("sketch-fillet", t("sketch.filletCorner"), selectGroup, Boolean(canFilletSketchPoint), () => onSketchCornerDialog?.(sketchCornerDialog === "fillet" ? null : "fillet"), { icon: ToolbarFilletIcon, active: sketchCornerDialog === "fillet" }),
-        plain("sketch-erase", t("sketch.erase"), selectGroup, true, () => onSketchTool("erase"), { icon: SKETCH_PALETTE_ICONS.erase, active: sketchTool === "erase" }),
-        ...sketchClipboardTools.map((tool) => fromTool(tool, t("editor.group.clipboard"))),
-        plain("sketch-undo", t("editor.tool.undo"), t("editor.group.history"), sketchCanUndo, onSketchUndo, { icon: ToolbarUndoIcon }),
-        plain("sketch-redo", t("editor.tool.redo"), t("editor.group.history"), sketchCanRedo, onSketchRedo, { icon: ToolbarRedoIcon }),
-        plain("sketch-stroke", t("sketch.strokeHint"), finishGroup, true, () => onSketchStroke?.(), { icon: SKETCH_PALETTE_ICONS.line, active: Boolean(sketchStrokeActive) }),
-        plain("sketch-finish", sketchOperation === "revolve" ? t("sketch.finishRevolve") : sketchOperation === "sweep" ? t("sketch.finishSweep") : t("sketch.finishSketch"), finishGroup, true, onSketchFinish),
-        plain("sketch-cancel", t("sketch.cancel"), finishGroup, true, onSketchCancel),
-        modeCommand,
-        ...helpCommands,
-      ];
-    }
-    const shapesGroup = t("editor.group.shapes");
-    const visibilityGroup = t("editor.group.visibility");
-    const manageGroup = t("editor.group.manage");
-    return [
-      ...leftTools.slice(0, 4).map((tool) => fromTool(tool, t("editor.group.clipboard"))),
-      ...leftTools.slice(4).map((tool) => fromTool(tool, t("editor.group.history"))),
-      ...libraryShapeAssets.map((shape) => plain(
-        `shape-${shape.id}`,
-        t("palette.addShape", { shape: shapeAssetMenuLabel(shape) }),
-        shapesGroup,
-        true,
-        () => addShapeFromMenu(shape),
-        { image: shape.menuIcon, keywords: [shape.id, shape.name, ...(SHAPE_KEYWORDS[shape.id] ?? [])] },
-      )),
-      ...(addMoreShape ? MORE_SHAPE_IDS.map((id) => plain(
-        `shape-${id}`,
-        t("palette.addShape", { shape: t(`moreShapes.${id}`) }),
-        shapesGroup,
-        true,
-        () => addMoreShape(id),
-        { image: moreShapeIcon(id), keywords: [id, t(`moreShapes.${id}Hint`)] },
-      )) : []),
-      ...visibilityTools.map((tool) => fromTool(tool, visibilityGroup)),
-      plain(
-        "show-hidden",
-        hiddenShapeCount === 0 ? t("visibility.nothingHidden") : t("visibility.showAllHidden", { count: hiddenShapeCount }),
-        visibilityGroup,
-        hiddenShapeCount > 0,
-        onShowHidden,
-        { icon: Eye },
-      ),
-      plain("notes", t("visibility.notes"), visibilityGroup, noteCount > 0, onToggleNotes, { icon: notesVisible ? Eye : EyeOff, active: notesVisible }),
-      plain("overhangs", t("visibility.overhangs", { angle: overhangAngle }), visibilityGroup, true, onToggleOverhangs, { icon: AlertTriangle, active: overhangsVisible }),
-      ...combineTools.map((tool) => fromTool(tool, t("editor.group.combine"))),
-      ...modifyTools.map((tool) => fromTool(tool, t("editor.group.modify"))),
-      plain("carry", t("contextMenu.carry"), t("editor.group.arrange"), canModifySelection, onCarryOntoFace, { icon: ArrowDownToLine }),
-      plain("scalePercent", t("scalePercent.title"), t("editor.group.modify"), canModifySelection, onScalePercent, { icon: Percent, active: scalePercentActive }),
-      ...arrangeTools.map((tool) => fromTool(tool, t("editor.group.arrange"))),
-      plain("note", t("editor.tool.note"), manageGroup, true, onNoteTool, { icon: ToolbarNoteIcon, active: noteMode }),
-      plain("import", t("editor.import"), manageGroup, true, () => onTopPanel("import"), { icon: ToolbarImportIcon }),
-      plain("export", t("editor.export"), manageGroup, true, () => onTopPanel("export"), { icon: ToolbarVectorExportIcon }),
-      plain("print-check", t("printCheck.command"), manageGroup, true, () => window.dispatchEvent(new Event(PRINT_CHECK_EVENT))),
-      plain("split-to-fit", t("splitToFit.command"), manageGroup, true, () => window.dispatchEvent(new Event(SPLIT_TO_FIT_EVENT))),
-      plain("cut-below-bed", t("cutBelowBed.command"), manageGroup, true, () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT))),
-      plain("mesh-check", t("meshCheck.command"), manageGroup, hasSelection, () => window.dispatchEvent(new Event(MESH_CHECK_EVENT))),
-      plain("fill-hole", t("fillHole.command"), t("editor.group.modify"), hasSelection, () => window.dispatchEvent(new Event(FILL_HOLE_EVENT))),
-      plain("dental-model", t("dental.title"), t("editor.group.modify"), true, () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), { icon: ForkToothIcon }),
-      plain("settings", t("editor.workspaceSettings"), manageGroup, true, () => window.dispatchEvent(new Event("layerling:open-workspace-settings")), { icon: ToolbarSettingsIcon }),
-      plain("mode-sketch", t("palette.switchSketch"), t("palette.group.mode"), true, () => selectToolbarMode("sketch")),
-      ...helpCommands,
-      ...objects.map((object) => plain(
-        `object-${object.id}`,
-        t("palette.selectObject", { name: object.name }),
-        t("palette.group.objects"),
-        true,
-        () => onSelectObject(object.id),
-        { keywords: [object.name, object.kind, ...(object.hidden ? ["hidden", "ausgeblendet", "versteckt"] : [])], searchOnly: true, transient: true },
-      )),
-    ];
-  };
-
-  return (
-    <div className="secondary-toolbar" data-selection={canModifySelection ? "yes" : "no"}>
-      {paletteOpen ? <CommandPalette commands={buildPaletteCommands()} onClose={() => setPaletteOpen(false)} /> : null}
-      {toolbarMode === "geometry" && objects.length === 0 && !historyViewActive ? (
-        <div className="empty-plate-hint" aria-live="polite">
-          <strong>Your plate is empty</strong>
-          <span>{shapesPinned && shapesOpen ? "Drag a shape from the panel on the right onto the plate, or click one and then click the plate." : "Open Shapes in the toolbar and drag one onto the plate."}</span>
-        </div>
-      ) : null}
-      <div ref={toolbarContentRef} className={`toolbar-mode-content ${toolbarMode}`}>
-        {toolbarMode === "geometry" ? (
-          <>
-      {onHome ? (
-        <div className="tool-group editor-nav-group">
-          <div className="toolbar-section toolbar-home-section" data-group="home">
-            <div className="toolbar-section-label">{t("editor.group.home")}</div>
-            <div className="toolbar-section-tools">
-              <button className="toolbar-icon editor-home-control" aria-label={t("editor.homeDashboard")} title={t("editor.homeDashboard")} onClick={onHome}>
-                <ForkHomeIcon />
-                <span className="tool-label" aria-hidden="true">{getLanguage() === "en" ? "Home" : t("editor.group.home")}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      <div className="tool-group left">
-        <div className="toolbar-section" data-group="clipboard" inert={historyViewActive}>
-          <div className="toolbar-section-label">{t("editor.group.clipboard")}</div>
-          <div className="toolbar-section-tools">{leftTools.slice(0, 4).map(renderToolButton)}</div>
-        </div>
-        <div className="toolbar-section" data-group="history">
-          <div className="toolbar-section-label">{t("editor.group.history")}</div>
-          <div className="toolbar-section-tools">{leftTools.slice(4).map(renderToolButton)}</div>
-        </div>
-        <div className="toolbar-section toolbar-shapes-section" data-group="shapes" ref={shapesMenuRef} inert={historyViewActive}>
-          <div className="toolbar-section-label">{t("editor.group.shapes")}</div>
-          <div className="toolbar-section-tools">
-            <button
-              className={`shape-menu-trigger ${shapesOpen && shapesTab === "shapes" ? "active" : ""}`}
-              aria-label={t("editor.addShape")}
-              aria-expanded={shapesOpen && shapesTab === "shapes"}
-              onClick={toggleShapesWindow}
-            >
-              <ForkShapesIcon />
-              <span className="tool-label" aria-hidden="true">{t("editor.group.shapes")}</span>
-            </button>
-          </div>
-          {shapesOpen ? (
-            <ShapeMenuPanel
-              className={shapesPinned ? "shape-menu-docked" : ""}
-              title={renderReadyParts && shapesTab === "parts" ? t("readyParts.title") : t("shape.basicShapes")}
-              helpSection="addShape"
-              pinned={shapesPinned}
-              onTogglePinned={toggleShapesPinned}
-              resizable
-            >
-              <div className="shape-menu-body">
-              {renderReadyParts && shapesTab === "parts" ? renderReadyParts(closeShapesAfterPick) : (<>
-              {renderMyShapes ? (
-                <>
-                  {renderMyShapes(closeShapesAfterPick)}
-                  <div className="shape-menu-subtitle">{t("myShapes.basicShapes")}</div>
-                </>
-              ) : null}
-              <div className="shape-menu-list">
-                {libraryShapeAssets.map((shape) => (
-                  <Fragment key={shape.id}>
-                  <button
-                    className="shape-menu-item"
-                    type="button"
-                    title={shapeAssetMenuLabel(shape).replace(/\s+/g, " ")}
-                    aria-label={shapeAssetMenuLabel(shape).replace(/\s+/g, " ")}
-                    style={{ "--shape-default-color": shapeAssetColor(shape, shapeCustomizations[shape.kind]) } as CSSProperties}
-                    draggable
-                    onClick={() => {
-                      if (suppressNextShapeClickRef.current) {
-                        suppressNextShapeClickRef.current = false;
-                        return;
-                      }
-                      addShapeFromMenu(shape);
-                    }}
-                    onPointerDown={(event) => {
-                      if (event.pointerType === "touch") {
-                        touchShapeStartRef.current = { id: shape.id, x: event.clientX, y: event.clientY };
-                      }
-                    }}
-                    onPointerUp={(event) => {
-                      if (event.pointerType !== "touch") {
-                        return;
-                      }
-                      const start = touchShapeStartRef.current;
-                      touchShapeStartRef.current = null;
-                      if (!start || start.id !== shape.id || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) {
-                        return;
-                      }
-                      event.preventDefault();
-                      suppressNextShapeClickRef.current = true;
-                      window.setTimeout(() => {
-                        suppressNextShapeClickRef.current = false;
-                      }, 350);
-                      addShapeFromMenu(shape);
-                    }}
-                    onTouchStart={(event) => {
-                      const touch = event.changedTouches[0];
-                      if (touch) {
-                        touchShapeStartRef.current = { id: shape.id, x: touch.clientX, y: touch.clientY };
-                      }
-                    }}
-                    onTouchEnd={(event) => {
-                      const touch = event.changedTouches[0];
-                      const start = touchShapeStartRef.current;
-                      touchShapeStartRef.current = null;
-                      if (!touch || !start || start.id !== shape.id || Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > 8) {
-                        return;
-                      }
-                      event.preventDefault();
-                      suppressNextShapeClickRef.current = true;
-                      window.setTimeout(() => {
-                        suppressNextShapeClickRef.current = false;
-                      }, 350);
-                      addShapeFromMenu(shape);
-                    }}
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = "copy";
-                      event.dataTransfer.setData("application/x-layerling-shape", JSON.stringify(shape));
-                    }}
-                    onDragEnd={closeShapesAfterPick}
-                  >
-                    <span
-                      className="shape-menu-thumb"
-                      style={{ "--shape-icon": `url(/${shape.menuIcon.replace(/^\/+/, "")})` } as CSSProperties}
-                    >
-                      <img src={shape.menuIcon} alt="" draggable={false} />
-                    </span>
-                    <span className={shapeAssetMenuLabel(shape).split(/\s+/).some((word) => word.length > 13) ? "long-word" : undefined}>{shapeAssetMenuLabel(shape)}</span>
-                  </button>
-                  {renderMoreShapes ? renderMoreShapes(closeShapesAfterPick, shape.id, libraryShapeIds) : null}
-                  </Fragment>
-                ))}
-                {renderMoreShapes ? renderMoreShapes(closeShapesAfterPick, undefined, libraryShapeIds) : null}
-              </div>
-              </>)}
-              </div>
-            </ShapeMenuPanel>
-          ) : null}
-        </div>
-      </div>
-      <div className="toolbar-spacer" />
-      <div className="tool-group right" inert={historyViewActive}>
-        <div className="toolbar-section compact toolbar-visibility-section" data-group="visibility" ref={visibilityMenuRef}>
-          <div className="toolbar-section-label">{t("editor.group.visibility")}</div>
-          <div className="toolbar-section-tools">
-            {visibilityTools.map(renderToolButton)}
-            <span className="visibility-trigger-wrap">
-              <button
-                className={`toolbar-icon visibility-menu-trigger ${visibilityOpen ? "active" : ""}`}
-                type="button"
-                aria-label={t("editor.visibilityOptions")}
-                title={t("editor.visibilityOptions")}
-                aria-haspopup="menu"
-                aria-expanded={visibilityOpen}
-                onClick={toggleVisibilityMenu}
-              >
-                <ToolbarCaretDownIcon />
-              </button>
-              {hiddenShapeCount > 0 ? (
-                // What is hidden is seen without opening the menu; a click shows it all (#489).
-                <button
-                  className="visibility-hidden-badge"
-                  type="button"
-                  aria-label={t("visibility.showAllHidden", { count: hiddenShapeCount })}
-                  title={t("visibility.showAllHidden", { count: hiddenShapeCount })}
-                  onClick={onShowHidden}
-                >
-                  {hiddenShapeCount}
-                </button>
-              ) : null}
-            </span>
-          </div>
-          {visibilityOpen ? (
-            <div
-              className="visibility-dropdown"
-              role="menu"
-              aria-label={t("editor.visibilityOptions")}
-              style={visibilityMenuPosition}
-            >
-              <button
-                className="visibility-dropdown-action"
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setVisibilityOpen(false);
-                  onToggleOutliner();
-                }}
-              >
-                <ListTree size={20} aria-hidden="true" />
-                <strong>{outlinerOpen ? t("visibility.hideOutliner") : t("visibility.showOutliner")}</strong>
-              </button>
-              <button
-                className="visibility-dropdown-action"
-                type="button"
-                role="menuitem"
-                disabled={hiddenShapeCount === 0}
-                onClick={() => {
-                  setVisibilityOpen(false);
-                  onShowHidden();
-                }}
-              >
-                <Eye size={20} aria-hidden="true" />
-                <strong>{hiddenShapeCount === 0
-                  ? t("visibility.nothingHidden")
-                  : t("visibility.showAllHidden", { count: hiddenShapeCount })}</strong>
-              </button>
-              <button
-                className="visibility-dropdown-action"
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked={notesVisible}
-                disabled={noteCount === 0}
-                onClick={() => {
-                  setVisibilityOpen(false);
-                  onToggleNotes();
-                }}
-              >
-                {notesVisible ? <Eye size={20} aria-hidden="true" /> : <EyeOff size={20} aria-hidden="true" />}
-                <strong>{t("visibility.notes")}{noteCount > 0 ? ` (${noteCount})` : ""}</strong>
-              </button>
-              <button
-                className="visibility-dropdown-action"
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked={overhangsVisible}
-                onClick={() => {
-                  setVisibilityOpen(false);
-                  onToggleOverhangs();
-                }}
-              >
-                <AlertTriangle size={20} aria-hidden="true" className={overhangsVisible ? "overhang-menu-icon active" : "overhang-menu-icon"} />
-                <strong>{t("visibility.overhangs", { angle: overhangAngle })}</strong>
-              </button>
-              <div className="visibility-dropdown-help">
-                <span>{t("visibility.eyeAgain")}</span>
-                <span aria-hidden="true">·</span>
-                <span><kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>H</kbd>{t("visibility.allShortcut")}</span>
-                <GuideHelpLink section="selecting" iconSize={14} />
-              </div>
-            </div>
-          ) : null}
-        </div>
-        <div className="toolbar-section" data-group="combine">
-          <div className="toolbar-section-label">{t("editor.group.combine")}</div>
-          <div className="toolbar-section-tools">{combineTools.map(renderToolButton)}</div>
-        </div>
-        <div className="toolbar-section toolbar-overflow-section" data-group="modify" ref={modifyMoreRef}>
-          <div className="toolbar-section-label">{t("editor.group.modify")}</div>
-          <div className="toolbar-section-tools">
-            {modifyTools.filter((tool) => !FORK_OVERFLOW_TOOLS.has(tool.id)).map(renderToolButton)}
-            {/* Fork (build 33): the less used tools under "More", so the row fits on a laptop screen. */}
-            {modifyTools.some((tool) => FORK_OVERFLOW_TOOLS.has(tool.id)) ? <button
-              className={`toolbar-icon toolbar-more-trigger ${modifyMoreOpen || modifyTools.some((tool) => FORK_OVERFLOW_TOOLS.has(tool.id) && "active" in tool && tool.active) ? "active" : ""}`}
-              type="button"
-              data-layerling-tool="modifyMore"
-              aria-label={t("editor.moreTools")}
-              data-tip={t("editor.moreTools")}
-              aria-haspopup="menu"
-              aria-expanded={modifyMoreOpen}
-              onClick={() => setModifyMoreOpen((open) => !open)}
-            >
-              <MoreHorizontal />
-              <span className="tool-label" aria-hidden="true">{t("editor.more")}</span>
-            </button> : null}
-          </div>
-          {modifyMoreOpen && modifyTools.some((tool) => FORK_OVERFLOW_TOOLS.has(tool.id)) ? (
-            <div className="visibility-dropdown mesh-dropdown" role="menu" aria-label={t("editor.moreTools")}>
-              {modifyTools.filter((tool) => FORK_OVERFLOW_TOOLS.has(tool.id)).map((tool) => {
-                const Icon = FORK_TOOL_ICONS[tool.id] ?? tool.icon;
-                return (
-                  <button
-                    key={tool.id}
-                    className={`visibility-dropdown-action ${"active" in tool && tool.active ? "active" : ""}`}
-                    type="button"
-                    role="menuitem"
-                    data-layerling-tool={tool.id}
-                    disabled={!tool.enabled}
-                    onClick={() => {
-                      setModifyMoreOpen(false);
-                      tool.action();
-                    }}
-                  >
-                    <Icon width={18} height={18} />
-                    <span>{tool.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
-        {/* Fork (build 53): the mesh tools sit on the toolbar as their own buttons, not in a menu.
-            They wait for an imported mesh to be selected. */}
-        <div className="toolbar-section toolbar-mesh-section" data-group="mesh">
-          <div className="toolbar-section-label">{t("editor.group.mesh")}</div>
-          <div className="toolbar-section-tools">{meshTools.map(renderToolButton)}</div>
-        </div>
-        <div className="toolbar-section" data-group="arrange">
-          <div className="toolbar-section-label">{t("editor.group.arrange")}</div>
-          <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>
-        </div>
-        <div className="toolbar-section" data-group="make">
-          <div className="toolbar-section-label">{t("editor.group.make")}</div>
-          <div className="toolbar-section-tools">{makeTools.map(renderToolButton)}</div>
-        </div>
-        {/* Fork (build 47): Dental Studio has a place of its own. */}
-        <div className="toolbar-section" data-group="dental">
-          <div className="toolbar-section-label">{t("editor.group.dental")}</div>
-          <div className="toolbar-section-tools">{dentalTools.map(renderToolButton)}</div>
-        </div>
-      </div>
-          </>
-        ) : (
-          <div className="sketch-toolbar-ribbon" aria-label={t("sketch.toolbar")}>
-            {sketchActive ? (
-              <>
-                <div className="toolbar-section sketch-create-section" data-group="draw">
-                  <div className="toolbar-section-label">{t("sketch.group.draw")}</div>
-                  <div className="toolbar-section-tools">
-                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "line" ? "active" : ""}`} type="button" aria-label={t("sketch.line")} title={t("sketch.line")} onClick={() => onSketchTool("line")}>
-                      <SketchReferenceIcon name="line" />
-                    </button>
-                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "arc" ? "active" : ""}`} type="button" aria-label={t("sketch.arc")} title={t("status.sketchTool.arc")} onClick={() => onSketchTool("arc")}>
-                      <SketchReferenceIcon name="arc" />
-                    </button>
-                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "bezier" ? "active" : ""}`} type="button" aria-label={t("sketch.bezier")} title={t("sketch.bezier")} onClick={() => onSketchTool("bezier")}>
-                      <SketchReferenceIcon name="bezier" />
-                    </button>
-                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "smooth" ? "active" : ""}`} type="button" aria-label={t("sketch.smooth")} title={t("sketch.smooth")} onClick={() => onSketchTool("smooth")}>
-                      <SketchReferenceIcon name="smooth" />
-                    </button>
-                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "freehand" ? "active" : ""}`} type="button" aria-label={t("sketch.freehand")} title={t("sketch.freehandHint")} onClick={() => onSketchTool("freehand")}>
-                      <Signature className="sketch-freehand-icon" aria-hidden="true" />
-                    </button>
-                    <button className={`toolbar-icon sketch-tool-icon sketch-construction-toggle ${sketchConstruction ? "active" : ""}`} type="button" aria-pressed={Boolean(sketchConstruction)} aria-label={t("sketch.construction")} title={t("sketch.constructionHint")} onClick={onSketchConstruction}>
-                      <ToolbarConstructionLineIcon />
-                    </button>
-                    <button className={`toolbar-icon sketch-tool-icon sketch-from-middle-toggle ${sketchFromMiddle ? "active" : ""}`} type="button" aria-pressed={Boolean(sketchFromMiddle)} aria-label={t("sketch.fromMiddle")} title={t("sketch.fromMiddleHint")} onClick={onSketchFromMiddle}>
-                      <ToolbarMiddleLineIcon />
-                    </button>
-                  </div>
-                </div>
-                <div className="toolbar-section toolbar-shapes-section sketch-shapes-section" data-group="shapes" ref={shapesMenuRef}>
-                  <div className="toolbar-section-label">{t("sketch.group.shapes")}</div>
-                  <div className="toolbar-section-tools">
-                    <button
-                      className={`shape-menu-trigger ${shapesOpen ? "active" : ""}`}
-                      type="button"
-                      aria-label={t("sketch.addShape")}
-                      aria-haspopup="menu"
-                      aria-expanded={shapesOpen}
-                      onClick={() => {
-                        setVisibilityOpen(false);
-                        setShapesOpen((open) => !open);
-                      }}
-                    >
-                      <ToolbarShapeAddIcon />
-                    </button>
-                  </div>
-                  {shapesOpen ? (
-                    <ShapeMenuPanel
-                      className="sketch-shape-menu-dropdown"
-                      role="menu"
-                      ariaLabel={t("sketch.shapesMenu")}
-                      title={t("sketch.shapesTitle")}
-                      helpSection="sketchDrawing"
-                      pinned={shapesPinned}
-                      onTogglePinned={toggleShapesPinned}
-                      scope="sketch"
-                      resizable
-                    >
-                      <div className="shape-menu-list">
-                        {sketchShapeMenuItems.map(({ primitive, label, icon: Icon }) => (
-                          <button
-                            className="shape-menu-item sketch-primitive-source"
-                            key={primitive}
-                            type="button"
-                            role="menuitem"
-                            draggable
-                            title={t("sketch.addPrimitiveHint", { shape: t(label) })}
-                            onClick={() => addSketchShapeFromMenu(primitive)}
-                            onDragStart={(event) => {
-                              event.dataTransfer.effectAllowed = "copy";
-                              event.dataTransfer.setData("application/x-layerling-sketch-primitive", primitive);
-                            }}
-                            onDragEnd={closeShapesAfterPick}
-                          >
-                            <Icon className="sketch-shape-menu-icon" aria-hidden="true" />
-                            <span>{t(label)}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <div className="sketch-shape-options">
-                        <SketchShapeNumberField
-                          label={t("sketch.polygonSides")}
-                          value={sketchShapeOptions.sides}
-                          min={SKETCH_POLYGON_MIN_SIDES}
-                          max={SKETCH_POLYGON_MAX_SIDES}
-                          normalize={normalizePolygonSides}
-                          onChange={(sides) => onSketchShapeOptions({ ...sketchShapeOptions, sides })}
-                        />
-                        <SketchShapeNumberField
-                          label={t("sketch.starInner")}
-                          value={sketchShapeOptions.innerPercent}
-                          min={SKETCH_STAR_MIN_INNER_PERCENT}
-                          max={SKETCH_STAR_MAX_INNER_PERCENT}
-                          suffix="%"
-                          normalize={normalizeStarInnerPercent}
-                          onChange={(innerPercent) => onSketchShapeOptions({ ...sketchShapeOptions, innerPercent })}
-                        />
-                      </div>
-                    </ShapeMenuPanel>
-                  ) : null}
-                </div>
-                <div className="toolbar-section sketch-edit-section" data-group="select">
-                  <div className="toolbar-section-label">{t("sketch.group.select")}</div>
-                  <div className="toolbar-section-tools">
-                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "select" ? "active" : ""}`} type="button" aria-label={t("sketch.select")} title={t("sketch.select")} onClick={() => onSketchTool("select")}>
-                      <SketchReferenceIcon name="select" />
-                    </button>
-                    <button
-                      className={`toolbar-icon sketch-tool-icon ${sketchTool === "select" ? "" : "disabled"}`}
-                      type="button"
-                      aria-label={t("sketch.addImage")}
-                      title={sketchTool === "select" ? t("sketch.addImageReady") : t("sketch.addImageBlocked")}
-                      onClick={onSketchImage}
-                      disabled={sketchTool !== "select"}
-                    >
-                      <SketchReferenceIcon name="image" />
-                    </button>
-                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "refine" ? "active" : ""}`} type="button" aria-label={t("sketch.refine")} title={t("sketch.refine")} onClick={() => onSketchTool("refine")}>
-                      <SketchReferenceIcon name="refine" />
-                    </button>
-                    <button
-                      className={`toolbar-icon sketch-tool-icon ${canFilletSketchPoint ? "" : "disabled"} ${sketchCornerDialog === "chamfer" ? "active" : ""}`}
-                      type="button"
-                      aria-label={t("sketch.chamferCorner")}
-                      title={canFilletSketchPoint ? t("sketch.chamferCorner") : t("sketch.chamferCornerDisabled")}
-                      onClick={() => {
-                        if (!canFilletSketchPoint) return;
-                        onSketchCornerDialog?.(sketchCornerDialog === "chamfer" ? null : "chamfer");
-                      }}
-                      disabled={!canFilletSketchPoint}
-                    >
-                      <ToolbarChamferIcon />
-                    </button>
-                    <button
-                      className={`toolbar-icon sketch-tool-icon ${canFilletSketchPoint ? "" : "disabled"} ${sketchCornerDialog === "fillet" ? "active" : ""}`}
-                      type="button"
-                      aria-label={t("sketch.filletCorner")}
-                      title={canFilletSketchPoint ? t("sketch.filletCorner") : t("sketch.filletCornerDisabled")}
-                      onClick={() => {
-                        if (!canFilletSketchPoint) return;
-                        onSketchCornerDialog?.(sketchCornerDialog === "fillet" ? null : "fillet");
-                      }}
-                      disabled={!canFilletSketchPoint}
-                    >
-                      <ToolbarFilletIcon />
-                    </button>
-                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "erase" ? "active" : ""}`} type="button" aria-label={t("sketch.erase")} title={t("sketch.erase")} onClick={() => onSketchTool("erase")}>
-                      <SketchReferenceIcon name="erase" />
-                    </button>
-                  </div>
-                </div>
-                <div className="toolbar-section sketch-clipboard-section" data-group="clipboard">
-                  <div className="toolbar-section-label">{t("editor.group.clipboard")}</div>
-                  <div className="toolbar-section-tools">{sketchClipboardTools.map(renderToolButton)}</div>
-                </div>
-                <div className="toolbar-section sketch-history-section" data-group="history">
-                  <div className="toolbar-section-label">{t("editor.group.history")}</div>
-                  <div className="toolbar-section-tools">
-                    <button className={`toolbar-icon ${sketchCanUndo ? "" : "disabled"}`} type="button" aria-label={t("sketch.undo")} title={`${t("status.undo")} (${COMMAND_SHORTCUTS["sketch-undo"]})`} onClick={onSketchUndo} disabled={!sketchCanUndo}>
-                      <ToolbarUndoIcon />
-                    </button>
-                    <button className={`toolbar-icon ${sketchCanRedo ? "" : "disabled"}`} type="button" aria-label={t("sketch.redo")} title={`${t("status.redo")} (${COMMAND_SHORTCUTS["sketch-redo"]})`} onClick={onSketchRedo} disabled={!sketchCanRedo}>
-                      <ToolbarRedoIcon />
-                    </button>
-                  </div>
-                </div>
-                <div className="toolbar-spacer" />
-                {/* Fork (build 17): draw first, then choose how the outline becomes 3D. */}
-                {sketchIsNew ? (
-                  <div className="toolbar-section sketch-operation-section" data-group="create">
-                    <div className="toolbar-section-label">{t("sketch.makeAs")}</div>
-                    <div className="toolbar-section-tools sketch-operation-choice" role="radiogroup" aria-label={t("sketch.makeAs")}>
-                      {([
-                        ["extrude", ArrowUpFromLine, "sketch.opExtrude", "sketch.opExtrudeHint"],
-                        ["revolve", Rotate3d, "sketch.opRevolve", "sketch.opRevolveHint"],
-                        ["sweep", RouteIcon, "sketch.opSweep", "sketch.opSweepHint"],
-                      ] as const).map(([operation, Icon, label, hint]) => (
-                        <button
-                          key={operation}
-                          type="button"
-                          role="radio"
-                          aria-checked={sketchOperation === operation}
-                          className={`sketch-command-button sketch-operation-button ${sketchOperation === operation ? "active" : ""}`}
-                          data-sketch-operation={operation}
-                          title={t(hint)}
-                          onClick={() => onSketchOperation(operation)}
-                        >
-                          <Icon aria-hidden="true" />
-                          <span>{t(label)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                <div className="toolbar-section sketch-finish-section" data-group="finish">
-                  <div className="toolbar-section-label">{t("sketch.group.finish")}</div>
-                  <div className="toolbar-section-tools">
-                    <button
-                      className={`sketch-command-button ${sketchStrokeActive ? "active" : ""}`}
-                      type="button"
-                      aria-pressed={Boolean(sketchStrokeActive)}
-                      title={t("sketch.strokeHint")}
-                      onClick={onSketchStroke}
-                    >
-                      <SketchReferenceIcon name="line" />
-                      <span>{t("sketch.stroke")}</span>
-                    </button>
-                    <button className="sketch-command-button primary" type="button" onClick={onSketchFinish}>
-                      <Check />
-                      <span>{sketchOperation === "revolve" ? t("sketch.finishRevolve") : sketchOperation === "sweep" ? t("sketch.finishSweep") : t("sketch.finishSketch")}</span>
-                    </button>
-                    <button className="sketch-command-button cancel" type="button" onClick={onSketchCancel}>
-                      <X />
-                      <span>{t("sketch.cancel")}</span>
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="toolbar-section sketch-start-section" data-group="create">
-                <div className="toolbar-section-label">{t("sketch.group.create")}</div>
-                <div className="toolbar-section-tools">
-                  {/* Fork (build 17): one way in - draw first; Pull up, Spin round or Follow a path is chosen in the sketch. */}
-                  <button
-                    className="sketch-command-button primary"
-                    type="button"
-                    aria-label={t("sketch.newSketch")}
-                    title={t("sketch.newSketchHint")}
-                    data-layerling-tool="sketch-new"
-                    onClick={() => startSketch("extrude")}
-                  >
-                    <PencilLine aria-hidden="true" />
-                    <span>{t("sketch.newSketch")}</span>
-                  </button>
-                  <GuideHelpLink section="sketchToBody" />
-                  <button className={`sketch-command-button ${canEditSketch ? "" : "disabled"}`} type="button" aria-label={t("sketch.editTo3d")} title={t("sketch.editTo3d")} onClick={onEditSketch} disabled={!canEditSketch}>
-                    <SketchReferenceIcon name="editSketchTo3d" />
-                    <span>{t("sketch.edit")}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-            {/* Sketch mode has its own keys; the help opens from here too. */}
-            <div className="toolbar-section toolbar-actions-section" data-group="help">
-              <div className="toolbar-section-label">{t("editor.group.help")}</div>
-              <div className="action-buttons">
-                <button className="action-icon-button" aria-label={t("palette.open")} title={t("palette.open")} aria-haspopup="dialog" data-layerling-tool="command-search" onClick={openPalette}>
-                  <Search className="toolbar-search-icon" aria-hidden="true" />
-                </button>
-                {/* Fork: the quick guide, shortcuts, Interactive Help and the Tinkercad guide in one menu. */}
-                <HelpMenu interactiveHelpActive={interactiveHelpActive} onGuide={onGuide} onShortcuts={onShortcuts} onInteractiveHelp={onInteractiveHelp} />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      <div className="toolbar-title-row">
-        {/* The brand, in the same corner as on the start page. Not a link:
-            leaving the editor is not something to trigger by accident. */}
-        <div className="toolbar-brand">
-          <img src="/assets/pare3d/pare3d-icon.svg" alt="Pare 3D" />
-          <span className="toolbar-brand-text">
-            <span className="toolbar-brand-name">Pare 3D</span>
-            <span className="toolbar-brand-tagline">{t("brand.tagline")} <PareBuildBadge /></span>
-          </span>
-        </div>
-        <div className="toolbar-workspace-tabs" role="tablist" aria-label={t("editor.modeLabel")}>
-          <button
-            className={toolbarMode === "geometry" ? "active" : ""}
-            type="button"
-            role="tab"
-            aria-selected={toolbarMode === "geometry"}
-            onClick={() => selectToolbarMode("geometry")}
-          >
-            {t("editor.modeGeometry")}
-          </button>
-          <button
-            className={toolbarMode === "sketch" ? "active" : ""}
-            type="button"
-            role="tab"
-            aria-selected={toolbarMode === "sketch"}
-            onClick={() => selectToolbarMode("sketch")}
-            disabled={historyViewActive}
-          >
-            {t("editor.modeSketch")}
-          </button>
-        </div>
-        <div className="toolbar-project-name">
-          <label ref={projectNameFieldRef} className="toolbar-project-name-field" title={t("editor.renameProject")}>
-            <input
-              ref={projectNameInputRef}
-              aria-label={t("confirm.projectName")}
-              value={projectNameDraft}
-              maxLength={80}
-              spellCheck={false}
-              onChange={(event) => setProjectNameDraft(event.target.value)}
-              onBlur={(event) => {
-                if (cancelProjectNameEditRef.current) {
-                  cancelProjectNameEditRef.current = false;
-                  setProjectNameDraft(projectName);
-                  return;
-                }
-                commitProjectName(event.currentTarget.value);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") event.currentTarget.blur();
-                if (event.key === "Escape") {
-                  cancelProjectNameEditRef.current = true;
-                  event.currentTarget.blur();
-                }
-              }}
-            />
-            <Pencil size={13} strokeWidth={2.4} aria-hidden="true" />
-          </label>
-          <SaveStatus />
-        </div>
-        <div className="toolbar-title-row-actions">
-          {/* Fork: Manage and Help sit in the title row, in line, so the tools stay on one row. */}
-          {toolbarMode === "geometry" ? (
-            <div className="title-row-tools">
-              <BambuSendButton />
-            <div className="toolbar-section toolbar-actions-section" data-group="manage">
-              <div className="toolbar-section-label">{t("editor.group.manage")}</div>
-              <div className="action-buttons">
-                <button
-                  className={`action-icon-button ${noteMode ? "active" : ""}`}
-                  aria-label={t("editor.tool.note")}
-                  aria-pressed={noteMode}
-                  title={`${t("editor.tool.note")} (${COMMAND_SHORTCUTS.note})`}
-                  data-tip={topTip(t("editor.tool.note"), "pin a note to a spot on the design", COMMAND_SHORTCUTS.note)}
-                  onClick={onNoteTool}
-                  disabled={historyViewActive}
-                >
-                  <MessageSquareText className="title-icon" aria-hidden="true" />
-                </button>
-                <button className="action-icon-button" aria-label={t("editor.import")} title={`${t("editor.import")} (${COMMAND_SHORTCUTS.import})`} data-tip={topTip(t("editor.import"), "bring in STL, 3MF, STEP, SVG or images", COMMAND_SHORTCUTS.import)} onClick={() => onTopPanel("import")} disabled={historyViewActive}>
-                  <Import className="title-icon" aria-hidden="true" />
-                </button>
-                <button className="action-icon-button" aria-label={t("editor.export")} title={`${t("editor.export")} (${COMMAND_SHORTCUTS.export})`} data-tip={topTip(t("editor.export"), "save for printing (STL, 3MF) or as a design file", COMMAND_SHORTCUTS.export)} onClick={() => onTopPanel("export")}>
-                  <Upload className="title-icon" aria-hidden="true" />
-                </button>
-                {/* Fork (build 37): the design's named values. */}
-                <button className="action-icon-button" aria-label={t("parameters.title")} title={t("parameters.title")} data-layerling-tool="parameters" data-tip={topTip(t("parameters.title"), "named sizes any field can use - change one, every part follows")} onClick={() => window.dispatchEvent(new Event(OPEN_PARAMETERS_EVENT))} disabled={historyViewActive}>
-                  <Variable className="title-icon" aria-hidden="true" />
-                </button>
-                <button className="action-icon-button" aria-label={t("editor.workspaceSettings")} title={t("editor.workspaceSettings")} data-tip={topTip(t("editor.workspaceSettings"), "units, grid, plate and appearance")} onClick={() => window.dispatchEvent(new Event("layerling:open-workspace-settings"))}>
-                  <LucideSettings className="title-icon" aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-            <div className="toolbar-section toolbar-actions-section" data-group="help">
-              <div className="toolbar-section-label">{t("editor.group.help")}</div>
-              <div className="action-buttons">
-                <button className="action-icon-button" aria-label={t("palette.open")} title={t("palette.open")} aria-haspopup="dialog" data-layerling-tool="command-search" onClick={openPalette}>
-                  <Search className="title-icon" aria-hidden="true" />
-                </button>
-                {/* Fork: the quick guide, shortcuts, Interactive Help and the Tinkercad guide in one menu. */}
-                <HelpMenu interactiveHelpActive={interactiveHelpActive} onGuide={onGuide} onShortcuts={onShortcuts} onInteractiveHelp={onInteractiveHelp} />
-              </div>
-            </div>
-            </div>
-          ) : null}
-          <SimpleModeSwitch />
-          <InstantTips />
-          <ThemeSwitch />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Fork: a top-bar button's instant tip - its name, a few plain words (English) and its shortcut. */
-function topTip(label: string, hintEn: string, keys?: string) {
-  const hint = getLanguage() === "en" ? ` – ${hintEn}` : "";
-  return `${label}${hint}${keys ? ` (${keys})` : ""}`;
-}
-
-function TopActionPanel({
-  panel,
-  projectName,
-  shapeCount,
-  scopeLabel,
-  selectionLeavesOut,
-  onSelectAll,
-  onlyHoles,
-  hiddenCount = 0,
-  estimateShapes,
-  onEstimatePrint,
-  onClose,
-  onExport,
-  stlFileName = null,
-  onExportLyl,
-  onExportStep,
-  onExportDrawing,
-  drawingExporting,
-  onExportImage,
-  sharedProjectsEnabled,
-  lylExporting,
-  stepExporting,
-  onImportFiles,
-  onPickFile,
-  onPickProjectFile,
-  onPickInsertProjectFile,
-  workspaceHistoryLimit,
-}: {
-  panel: Exclude<TopPanel, null>;
-  projectName: string;
-  shapeCount: number;
-  scopeLabel: "selected" | "total";
-  /** Set when a selection is exported that leaves out visible bodies: how many are selected, how many are visible. */
-  selectionLeavesOut?: { selected: number; total: number } | null;
-  onSelectAll?: () => void;
-  onlyHoles?: boolean;
-  /** Ausgeblendete Teile, die der Export auslaesst - gesagt, bevor er laeuft. */
-  hiddenCount?: number;
-  /** Was exportiert wuerde - daraus Volumen, Gewicht und Filament. */
-  estimateShapes: readonly WorkplaneShape[];
-  onEstimatePrint: (shapes: readonly WorkplaneShape[]) => Promise<ExportSolidVolume>;
-  onClose: () => void;
-  onExport: (format: DirectExportFormat, exportName: string, chooseFile?: boolean, svgView?: SvgExportView) => void;
-  /** The STL file this design exports into, once one was chosen (Chrome and Edge). */
-  stlFileName?: string | null;
-  onExportLyl: (exportName: string, historyLimit: LylHistoryLimit, target?: LylExportTarget) => void;
-  onExportStep: (exportName: string) => void;
-  onExportDrawing: (exportName: string, format: "svg" | "pdf") => void;
-  drawingExporting: boolean;
-  onExportImage: (exportName: string, options: ViewImageOptions) => void;
-  sharedProjectsEnabled: boolean;
-  lylExporting: boolean;
-  stepExporting: boolean;
-  onImportFiles: (files: FileList | File[]) => void;
-  onPickFile: () => void;
-  onPickProjectFile: () => void;
-  onPickInsertProjectFile: () => void;
-  workspaceHistoryLimit: LylHistoryLimit;
-}) {
-  const [keepSvgPage, setKeepSvgPage] = useState(false);
-  useEffect(() => setKeepSvgPage(readKeepSvgPage()), []);
-  // The width a picture or an SVG comes in at; empty keeps its own size, and it counts for the next import only.
-  const [svgWidthText, setSvgWidthText] = useState(() => { const width = readImportSvgWidth(); return width ? String(width) : ""; });
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("stl");
-  const [drawingFormat, setDrawingFormat] = useState<"svg" | "pdf">("pdf");
-  const [svgView, setSvgView] = useState<SvgExportView>("silhouette");
-  const [exportName, setExportName] = useState(projectName);
-  const previousProjectNameRef = useRef(projectName);
-  // Starts at the history setting from the workspace settings, so a project
-  // file carries what the editor keeps unless it is changed here.
-  const [lylHistoryLimit, setLylHistoryLimit] = useState<LylHistoryLimit>(workspaceHistoryLimit);
-  useEffect(() => setLylHistoryLimit(workspaceHistoryLimit), [workspaceHistoryLimit]);
-  useEffect(() => {
-    const previousProjectName = previousProjectNameRef.current;
-    setExportName((current) => current === previousProjectName ? projectName : current);
-    previousProjectNameRef.current = projectName;
-  }, [projectName]);
-  // A custom number from the settings joins the usual stops in its place; the last stop, None,
-  // saves the design with its current state only, for sharing a file without its undo steps (#246).
-  const lylHistoryLimits = useMemo<readonly LylHistoryLimit[]>(() => {
-    const presets: number[] = [100, 50, 30];
-    const numbers = typeof workspaceHistoryLimit === "number" && !presets.includes(workspaceHistoryLimit)
-      ? [...presets, workspaceHistoryLimit].sort((a, b) => b - a)
-      : presets;
-    return ["unlimited", ...numbers, 0];
-  }, [workspaceHistoryLimit]);
-  const lylHistoryLimitIndex = Math.max(0, lylHistoryLimits.indexOf(lylHistoryLimit));
-  const [printMaterial, setPrintMaterial] = useState<PrintMaterial>(() => {
-    try {
-      return normalizePrintMaterial(window.localStorage.getItem(PRINT_MATERIAL_STORAGE_KEY));
-    } catch {
-      return DEFAULT_PRINT_MATERIAL;
-    }
-  });
-  const [printVolume, setPrintVolume] = useState<ExportSolidVolume | null>(null);
-  const [printInfill, setPrintInfill] = useState<number>(() => {
-    try {
-      return normalizeInfillPercent(window.localStorage.getItem(PRINT_INFILL_STORAGE_KEY));
-    } catch {
-      return DEFAULT_INFILL_PERCENT;
-    }
-  });
-  const [printWalls, setPrintWalls] = useState<number>(() => {
-    try {
-      return normalizeWalls(window.localStorage.getItem(PRINT_WALLS_STORAGE_KEY));
-    } catch {
-      return DEFAULT_WALLS;
-    }
-  });
-  const [imageOptions, setImageOptions] = useState<ViewImageOptions>({ plate: true, transparent: false });
-  const showPrintEstimate = panel === "export" && exportFormat !== "drawing" && exportFormat !== "svg" && exportFormat !== "png" && exportFormat !== "lyl" && shapeCount > 0;
-  // A picture shows the view as it is, not the selection, so the notes about what goes along do not apply.
-  const exportsBodies = exportFormat !== "lyl" && exportFormat !== "png";
-  // The estimate is worked out on a click, not on every opening and every change of format: for a finely traced
-  // multicolour model it takes as long as the export itself (#734). A change of the design or of the format asks again.
-  const [printAsked, setPrintAsked] = useState(false);
-  useEffect(() => {
-    setPrintAsked(false);
-    setPrintVolume(null);
-  }, [showPrintEstimate, estimateShapes]);
-  useEffect(() => {
-    if (!showPrintEstimate || !printAsked) return;
-    let cancelled = false;
-    setPrintVolume(null);
-    // Kurz warten: beim Tippen oder Ziehen im Hintergrund nicht jedes Mal neu verschmelzen.
-    const timer = window.setTimeout(() => {
-      onEstimatePrint(estimateShapes)
-        .then((result) => { if (!cancelled) setPrintVolume(result); })
-        .catch(() => { if (!cancelled) setPrintVolume(null); });
-    }, 200);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [showPrintEstimate, printAsked, estimateShapes, onEstimatePrint]);
-  const choosePrintMaterial = (value: string) => {
-    const material = normalizePrintMaterial(value);
-    setPrintMaterial(material);
-    try {
-      window.localStorage.setItem(PRINT_MATERIAL_STORAGE_KEY, material);
-    } catch {
-      // Ohne Speicher gilt die Wahl nur bis zum Schliessen.
-    }
-  };
-  const choosePrintInfill = (value: string) => {
-    const infill = normalizeInfillPercent(value);
-    setPrintInfill(infill);
-    try {
-      window.localStorage.setItem(PRINT_INFILL_STORAGE_KEY, String(infill));
-    } catch {
-      // Without storage the choice holds until the window closes.
-    }
-  };
-  const choosePrintWalls = (value: string) => {
-    const walls = normalizeWalls(value);
-    setPrintWalls(walls);
-    try {
-      window.localStorage.setItem(PRINT_WALLS_STORAGE_KEY, String(walls));
-    } catch {
-      // See above.
-    }
-  };
-  // Volume is the body's own; weight and filament count the walls and the infill, the solid numbers stand under them.
-  const estimate = printVolume
-    ? printEstimateWithInfill(printVolume.volumeMm3, { sideMm2: printVolume.sideMm2, flatMm2: printVolume.flatMm2 }, printMaterial, printInfill, printWalls)
-    : null;
-  const lylHistoryStop = (index: number) => ({ "--stop": index / (lylHistoryLimits.length - 1) }) as CSSProperties;
-  useLanguage();
-  const title = panel === "export" ? t("panel.export") : t("panel.import");
-
-  const exportDetails: Record<ExportFormat, { label: string; description: string; note: string }> = {
-    drawing: {
-      label: t("export.drawing.label"),
-      description: t("export.drawing.description"),
-      note: t("export.drawing.note"),
-    },
-    stl: {
-      label: "STL",
-      description: t("export.stl.description"),
-      note: t("export.stl.note"),
-    },
-    "3mf": {
-      label: "3MF",
-      description: t("export.3mf.description"),
-      note: t("export.3mf.note"),
-    },
-    obj: {
-      label: "OBJ",
-      description: t("export.obj.description"),
-      note: t("export.obj.note"),
-    },
-    step: {
-      label: "STEP",
-      description: t("export.step.description"),
-      note: t("export.step.note"),
-    },
-    svg: {
-      label: "SVG",
-      description: t("export.svg.description"),
-      note: t(svgView === "footprint" ? "export.svg.noteFootprint" : "export.svg.note"),
-    },
-    png: {
-      label: "PNG",
-      description: t("export.png.description"),
-      note: t("export.png.note"),
-    },
-    lyl: {
-      // Fork: named for what it is, not its file ending.
-      label: t("export.lyl.label"),
-      description: t("export.lyl.description"),
-      note: t("export.lyl.note"),
-    },
-  };
-  const selectedExport = exportDetails[exportFormat];
-  const runSelectedExport = () => {
-    if (drawingExporting || stepExporting || lylExporting) return;
-    if (exportFormat === "drawing") onExportDrawing(exportName, drawingFormat);
-    else if (exportFormat === "step") onExportStep(exportName);
-    else if (exportFormat === "png") onExportImage(exportName, imageOptions);
-    else if (exportFormat === "lyl") onExportLyl(exportName, lylHistoryLimit, lylFileAccessSupported() ? "fileAs" : "download");
-    else onExport(exportFormat, exportName, false, svgView);
-  };
-
-  return (
-    <div
-      className={`top-action-panel ${panel === "export" ? "export-action-panel" : panel === "import" ? "import-action-panel" : ""}`}
-      role="dialog"
-      aria-label={title}
-    >
-      <header>
-        <div className="top-action-heading">
-          <strong>{title}</strong>
-        </div>
-        <div className="panel-header-actions">
-          <GuideHelpLink section={panel === "import" ? "importing" : "exporting"} />
-          <button aria-label={t("panel.close", { title })} onClick={onClose}>
-            <X size={18} />
-          </button>
-        </div>
-      </header>
-      {panel === "import" ? (
-        <div className="top-action-body">
-          <button className="open-lyl-project-button" type="button" onClick={onPickProjectFile}>
-            <span className="open-lyl-project-icon"><FolderOpen size={18} /></span>
-            <span>
-              <strong>{t("import.openProject")}</strong>
-              <small>{t("import.openProjectHint")}</small>
-            </span>
-          </button>
-          <button className="open-lyl-project-button" type="button" onClick={onPickInsertProjectFile}>
-            <span className="open-lyl-project-icon"><FilePlus2 size={18} /></span>
-            <span>
-              <strong>{t("import.insertProject")}</strong>
-              <small>{t("import.insertProjectHint")}</small>
-            </span>
-          </button>
-          <div className="import-kind-divider"><span>{t("import.divider")}</span></div>
-          <button
-            className="import-drop-zone"
-            onClick={onPickFile}
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "copy";
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              if (event.dataTransfer.files.length > 0) {
-                onImportFiles(event.dataTransfer.files);
-              }
-            }}
-          >
-            <ToolbarImportIcon />
-            <strong>{t("import.dropZone")}</strong>
-            <span>{t("import.dropZoneHint")}</span>
-          </button>
-          <label className="import-option" title={t("import.keepSvgPageHint")}>
-            <input
-              type="checkbox"
-              checked={keepSvgPage}
-              onChange={(event) => {
-                setKeepSvgPage(event.currentTarget.checked);
-                storeKeepSvgPage(event.currentTarget.checked);
-              }}
-            />
-            <span>{t("import.keepSvgPage")}</span>
-          </label>
-          <label className="import-option import-width-option" title={t("import.svgWidthHint")}>
-            <span>{t("import.svgWidth")}</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={svgWidthText}
-              placeholder={t("import.svgWidthPlaceholder")}
-              onChange={(event) => {
-                const text = event.currentTarget.value;
-                setSvgWidthText(text);
-                const width = Number(text.replace(",", "."));
-                setImportSvgWidth(text.trim() && Number.isFinite(width) && width > 0 ? width : null);
-              }}
-            />
-          </label>
-        </div>
-      ) : null}
-      {panel === "export" ? (
-        <div className="export-dialog-body" data-help-section-all="exporting">
-          <section className="export-setting-section export-file-section">
-            <label htmlFor="export-file-name">{t("export.fileName")}</label>
-            <div className="export-file-input-wrap">
-              <input
-                id="export-file-name"
-                className="export-file-input"
-                value={exportName}
-                maxLength={120}
-                spellCheck={false}
-                onChange={(event) => setExportName(event.target.value)}
-                onFocus={(event) => event.currentTarget.select()}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && (shapeCount > 0 || !exportsBodies) && !stepExporting && !lylExporting && !drawingExporting) runSelectedExport();
-                }}
-              />
-              <span>.{exportFormat === "drawing" ? drawingFormat : exportFormat}</span>
-            </div>
-          </section>
-
-          <section className="export-setting-section">
-            <div className="export-section-heading">
-              <div>
-                <strong>{t("export.format")}</strong>
-              </div>
-              <span className="export-scope-badge">{exportFormat === "lyl"
-                  ? t("export.fullProject")
-                  : exportFormat === "png"
-                  ? t("export.png.scope")
-                  : t(scopeLabel === "selected" ? "export.scopeSelected" : "export.scopeTotal", { count: shapeCount })}</span>
-            </div>
-            <div className="export-format-slider" data-format={exportFormat} role="radiogroup" aria-label={t("export.formatLabel")}>
-              {(["stl", "3mf", "obj", "step", "svg", "png", "lyl", "drawing"] as const).map((format) => (
-                <button
-                  key={format}
-                  type="button"
-                  role="radio"
-                  aria-checked={exportFormat === format}
-                  aria-label={`${exportDetails[format].label}: ${exportDetails[format].description}`}
-                  title={format === "drawing" ? exportDetails[format].label : undefined}
-                  onClick={() => setExportFormat(format)}
-                >
-                  {format === "drawing" ? t("export.drawing.short") : exportDetails[format].label}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {exportFormat === "drawing" ? (
-            <section className="export-setting-section">
-              <label>
-                <strong>{t("export.drawing.fileFormat")}</strong>{" "}
-                <select aria-label={t("export.drawing.fileFormat")} value={drawingFormat} onChange={(event) => setDrawingFormat(event.target.value as "svg" | "pdf")}>
-                  <option value="pdf">PDF</option>
-                  <option value="svg">SVG</option>
-                </select>
-              </label>
-            </section>
-          ) : null}
-
-          {exportFormat === "svg" ? (
-            <section className="export-setting-section">
-              <label>
-                <strong>{t("export.svg.view")}</strong>{" "}
-                <select aria-label={t("export.svg.view")} value={svgView} onChange={(event) => setSvgView(event.target.value as SvgExportView)}>
-                  <option value="silhouette">{t("export.svg.viewSilhouette")}</option>
-                  <option value="footprint">{t("export.svg.viewFootprint")}</option>
-                </select>
-              </label>
-            </section>
-          ) : null}
-
-          {exportsBodies && selectionLeavesOut ? (
-            <div className="export-holes-only-warning export-selection-note" role="status">
-              <Info size={16} aria-hidden="true" />
-              <span>
-                {selectionLeavesOut.selected === 1
-                  ? t("export.selectionOnlyOne", { total: selectionLeavesOut.total })
-                  : t("export.selectionOnlyMany", { count: selectionLeavesOut.selected, total: selectionLeavesOut.total })}
-              </span>
-              {onSelectAll ? (
-                <button type="button" className="export-select-all-button" onClick={onSelectAll}>
-                  {t("export.selectAll")}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-
-          {exportsBodies && hiddenCount > 0 ? (
-            <div className="export-holes-only-warning export-hidden-note" role="status">
-              <EyeOff size={16} aria-hidden="true" />
-              <span>{hiddenCount === 1 ? t("export.hiddenOne") : t("export.hiddenMany", { count: hiddenCount })}</span>
-            </div>
-          ) : null}
-
-          {exportsBodies && onlyHoles ? (
-            <div className="export-holes-only-warning" role="status">
-              <Info size={16} aria-hidden="true" />
-              <span>{t("export.holesOnlyWarning")}</span>
-            </div>
-          ) : null}
-
-          {showPrintEstimate ? (
-            <section className="export-setting-section print-estimate-section" aria-live="polite">
-              <div className="export-section-heading">
-                <div>
-                  <strong>{t("export.estimateTitle")}</strong>
-                  <span>{t("export.estimateHint")}</span>
-                </div>
-                <select
-                  id="export-print-material"
-                  className="print-estimate-material"
-                  value={printMaterial}
-                  aria-label={t("export.estimateMaterial")}
-                  onChange={(event) => choosePrintMaterial(event.currentTarget.value)}
-                >
-                  {PRINT_MATERIALS.map((material) => (
-                    <option key={material} value={material}>{t(`export.material.${material}` as MessageKey)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="print-estimate-settings">
-                <label htmlFor="export-print-infill">
-                  <span>{t("export.estimateInfillLabel")}</span>
-                  <select id="export-print-infill" className="print-estimate-material" value={printInfill} onChange={(event) => choosePrintInfill(event.currentTarget.value)}>
-                    {INFILL_CHOICES.map((percent) => (
-                      <option key={percent} value={percent}>{percent} %</option>
-                    ))}
-                  </select>
-                </label>
-                <label htmlFor="export-print-walls" hidden={printInfill === 100}>
-                  <span>{t("export.estimateWallsLabel")}</span>
-                  <select id="export-print-walls" className="print-estimate-material" value={printWalls} onChange={(event) => choosePrintWalls(event.currentTarget.value)}>
-                    {WALL_CHOICES.map((count) => (
-                      <option key={count} value={count}>{count}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              {estimate ? (
-                <dl className="print-estimate-values">
-                  <div>
-                    <dt>{t("export.estimateVolume")}</dt>
-                    <dd>{formatEstimateNumber(estimate.solid.volumeCm3, estimate.solid.volumeCm3 < 10 ? 2 : 1)} cm³</dd>
-                  </div>
-                  <div>
-                    <dt>{t("export.estimateWeight")}</dt>
-                    <dd>{formatEstimateNumber(estimate.printed.grams, estimate.printed.grams < 10 ? 1 : 0)} g</dd>
-                  </div>
-                  <div>
-                    <dt>{t("export.estimateFilament")}</dt>
-                    <dd>{formatEstimateNumber(estimate.printed.filamentMeters, estimate.printed.filamentMeters < 10 ? 2 : 1)} m</dd>
-                  </div>
-                </dl>
-              ) : printAsked ? (
-                <span className="print-estimate-busy">{t("export.estimateBusy")}</span>
-              ) : (
-                <button type="button" className="print-estimate-material print-estimate-calculate" onClick={() => setPrintAsked(true)}>{t("export.estimateCalculate")}</button>
-              )}
-              {estimate ? (
-                <span className="print-estimate-note print-estimate-infill">
-                  {estimate.infillPercent === 100
-                    ? t("export.estimateSolidNote")
-                    : t("export.estimateInfill", {
-                      walls: estimate.walls,
-                      infill: estimate.infillPercent,
-                      grams: formatEstimateNumber(estimate.solid.grams, estimate.solid.grams < 10 ? 1 : 0),
-                    })}
-                </span>
-              ) : null}
-              {printVolume && printVolume.unionFailed > 0 ? (
-                <span className="print-estimate-note">{t("export.estimateOverlap")}</span>
-              ) : null}
-            </section>
-          ) : null}
-
-          {exportFormat === "png" ? (
-            <section className="export-setting-section export-image-section">
-              <label className="export-image-option" htmlFor="export-image-plate">
-                <input id="export-image-plate" type="checkbox" checked={imageOptions.plate} onChange={(event) => { const plate = event.currentTarget.checked; setImageOptions((current) => ({ ...current, plate })); }} />
-                <span>{t("export.png.plate")}</span>
-              </label>
-              <label className="export-image-option" htmlFor="export-image-transparent">
-                <input id="export-image-transparent" type="checkbox" checked={imageOptions.transparent} onChange={(event) => { const transparent = event.currentTarget.checked; setImageOptions((current) => ({ ...current, transparent })); }} />
-                <span>{t("export.png.transparent")}</span>
-              </label>
-            </section>
-          ) : null}
-
-          {exportFormat === "lyl" ? (
-            <section className="export-setting-section lyl-history-section">
-              <div className="export-section-heading">
-                <div>
-                  <strong>{t("export.historyTitle")}</strong>
-                  <span>{t("export.historyHint")}</span>
-                </div>
-              </div>
-              <div className="lyl-history-range-control" data-limit={String(lylHistoryLimit)} style={lylHistoryStop(lylHistoryLimitIndex)}>
-                <input
-                  className="lyl-history-range"
-                  type="range"
-                  min={0}
-                  max={lylHistoryLimits.length - 1}
-                  step={1}
-                  value={lylHistoryLimitIndex}
-                  aria-label={t("export.historyLabel")}
-                  aria-valuetext={lylHistoryLimit === "unlimited" ? t("export.unlimited") : lylHistoryLimit === 0 ? t("export.historyNone") : t("export.actionCount", { count: lylHistoryLimit })}
-                  onChange={(event) => setLylHistoryLimit(lylHistoryLimits[Number(event.currentTarget.value)] ?? "unlimited")}
-                />
-              </div>
-              <div className="lyl-history-range-labels" aria-hidden="true">
-                {lylHistoryLimits.map((limit, index) => (
-                  <span key={limit} className={lylHistoryLimit === limit ? "active" : undefined} style={lylHistoryStop(index)}>
-                    {limit === "unlimited" ? t("export.unlimited") : limit === 0 ? t("export.historyNone") : limit}
-                  </span>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          <div className="export-format-summary">
-            <div>
-              <strong>{selectedExport.label}</strong>
-              <span>{selectedExport.description}</span>
-            </div>
-            <p>{selectedExport.note}</p>
-          </div>
-
-          <footer className="export-dialog-footer">
-            {exportFormat === "stl" && stlFileName ? (
-              stlNameAsksForNewFile(exportName, projectName, stlFileName)
-                ? <span className="export-linked-file" title={exportName}>{t("export.stlNewFile", { name: projectExportFileName(exportName.trim().replace(/\.stl$/i, ""), "stl") })}</span>
-                : <span className="export-linked-file" title={stlFileName}>{t("export.stlLinkedFile", { name: stlFileName })}</span>
-            ) : null}
-            <div>
-              {exportFormat === "stl" && stlFileName ? (
-                <button className="export-shared-button" type="button" onClick={() => onExport("stl", exportName, true)} disabled={shapeCount === 0}>
-                  <span>{t("export.stlSaveAs")}</span>
-                </button>
-              ) : null}
-              {exportFormat === "lyl" && sharedProjectsEnabled ? (
-                <button
-                  className="export-shared-button"
-                  type="button"
-                  onClick={() => onExportLyl(exportName, lylHistoryLimit, "shared")}
-                  disabled={lylExporting || stepExporting || drawingExporting}
-                >
-                  <CloudUpload />
-                  <span>{t("export.saveToShared")}</span>
-                </button>
-              ) : null}
-              <button className="export-primary-button" onClick={runSelectedExport} disabled={(shapeCount === 0 && exportsBodies) || stepExporting || lylExporting || drawingExporting}>
-                <Download />
-                {exportFormat === "lyl" ? (lylExporting ? t("export.savingProject") : t("export.saveProject")) : null}
-                <span hidden={exportFormat === "lyl"}>
-                {drawingExporting && exportFormat === "drawing"
-                  ? t("status.buildingDrawing")
-                  : stepExporting && exportFormat === "step"
-                  ? t("export.buildingStep")
-                  : t("export.run", { format: selectedExport.label })}
-                </span>
-              </button>
-            </div>
-          </footer>
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 /** Fork (build 38): the middle of a part's box in the world, or undefined with no part. */
 function boxCenter(shape: WorkplaneShape | undefined): { x: number; y: number; z: number } | undefined {

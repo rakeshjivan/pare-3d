@@ -40,6 +40,11 @@ scope.onmessage = async (event: MessageEvent<MeshJobRequest>) => {
       const area = autoDentalArea(job.positions);
       const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalArea", area };
       scope.postMessage(reply, [area.buffer]);
+    } else if (job.kind === "texture") {
+      const { textureMeshPositions } = await import("@/lib/surfaceTexture");
+      const texture = textureMeshPositions(job.positions, job.options);
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "texture", texture };
+      scope.postMessage(reply, [texture.positions.buffer]);
     } else if (job.kind === "fit") {
       const { checkFit } = await import("@/lib/partTools");
       const report = await checkFit(job.shapes, job.clearance);

@@ -362,3 +362,20 @@ describe("Dental Studio (build 47)", () => {
     expect(pinchedEdges(less.parts[0].positions)).toBe(0);
   }, 120_000);
 });
+
+describe("Build 55: a quadrant's front is the end that bends", () => {
+  it("finds the hooked end of a J-shaped band, and nothing on a straight one", async () => {
+    const { endBends } = await import("@/lib/dentalArch");
+    // Laid along y: straight from y = 0 to 30 (the molars), then curving off to x = 10 by y = -10 (the incisors).
+    const pts: Array<[number, number]> = [];
+    for (let y = -10; y <= 30; y += 0.25) {
+      const x = y < 0 ? (y * y) / 10 : 0;
+      for (let w = -4; w <= 4; w += 1) pts.push([x + w, y]);
+    }
+    const bends = endBends(pts, -10, 30)!;
+    expect(bends.low).toBeGreaterThan(bends.high);
+    const straight: Array<[number, number]> = [];
+    for (let y = 0; y <= 40; y += 0.25) for (let w = -4; w <= 4; w += 1) straight.push([w, y]);
+    expect(endBends(straight, 0, 40)).toBeNull();
+  });
+});

@@ -9,6 +9,8 @@ let loaded: ManifoldToplevel | null = null;
 let loader: (() => Promise<ManifoldToplevel>) | null = null;
 let requested = false;
 const listeners = new Set<() => void>();
+/** Fork (build 55): told when a load fails, so a wait for the runtime ends then instead of at its time limit. */
+const failureListeners = new Set<() => void>();
 
 export function rememberManifoldRuntime(runtime: ManifoldToplevel) {
   if (loaded === runtime) return;
@@ -36,6 +38,29 @@ export function requestManifoldRuntime() {
   requested = true;
   void loader().then(rememberManifoldRuntime).catch(() => {
     requested = false;
+    failureListeners.forEach((listener) => listener());
+  });
+}
+
+/**
+ * Fork (build 55): waits until the runtime is there, its load fails, or `timeoutMs` passes -
+ * whichever comes first - and says whether it is there. A load that fails no longer holds a
+ * picture or SVG import up for the whole time limit.
+ */
+export function waitForManifoldRuntime(timeoutMs: number): Promise<boolean> {
+  if (loaded) return Promise.resolve(true);
+  if (!loader) return Promise.resolve(false);
+  return new Promise<boolean>((resolve) => {
+    const finish = () => {
+      listeners.delete(finish);
+      failureListeners.delete(finish);
+      globalThis.clearTimeout(timer);
+      resolve(loaded !== null);
+    };
+    const timer = globalThis.setTimeout(finish, timeoutMs);
+    listeners.add(finish);
+    failureListeners.add(finish);
+    requestManifoldRuntime();
   });
 }
 

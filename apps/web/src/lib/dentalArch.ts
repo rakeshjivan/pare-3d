@@ -165,6 +165,49 @@ function teethShape(v: Float64Array, f: number[]): { partial: boolean; axis: num
   return { partial: shape.partial || toothAtMiddle, axis: shape.axis };
 }
 
+/** How far a curve may wander off straight (mm) before an end counts as bent, and how much more one end must bend than the other. */
+const END_BEND = 2.5;
+const END_BEND_MARGIN = 1.5;
+
+/**
+ * How far each end of a long, narrow band (laid along y) bends away from the straight line through
+ * its middle half: the band's middle across, slice by slice. Null when neither end clearly bends
+ * more than the other.
+ */
+export function endBends(pts: ReadonlyArray<readonly [number, number]>, minY: number, maxY: number): { low: number; high: number } | null {
+  const slices = 10;
+  const span = maxY - minY;
+  if (!(span > 1e-6)) return null;
+  const xs: number[][] = Array.from({ length: slices }, () => []);
+  pts.forEach(([x, y]) => xs[Math.min(slices - 1, Math.max(0, Math.floor(((y - minY) / span) * slices)))].push(x));
+  const middleOf = (list: number[]) => {
+    if (list.length < 5) return null;
+    const sorted = [...list].sort((a, b) => a - b);
+    return (sorted[Math.floor(sorted.length * 0.1)] + sorted[Math.floor(sorted.length * 0.9)]) / 2;
+  };
+  const centres = xs.map(middleOf);
+  const at = (i: number) => minY + ((i + 0.5) / slices) * span;
+  // The straight line through the middle half, by least squares.
+  let n = 0, sy = 0, sx = 0, syy = 0, sxy = 0;
+  for (let i = 3; i <= 6; i += 1) {
+    const c = centres[i];
+    if (c === null) continue;
+    const y = at(i);
+    n += 1; sy += y; sx += c; syy += y * y; sxy += y * c;
+  }
+  if (n < 3) return null;
+  const slope = (n * sxy - sy * sx) / Math.max(1e-9, n * syy - sy * sy);
+  const offset = (sx - slope * sy) / n;
+  const off = (i: number) => {
+    const c = centres[i];
+    return c === null ? 0 : Math.abs(c - (offset + slope * at(i)));
+  };
+  const low = Math.max(off(0), off(1));
+  const high = Math.max(off(slices - 1), off(slices - 2));
+  if (Math.max(low, high) < END_BEND || Math.abs(low - high) < END_BEND_MARGIN) return null;
+  return { low, high };
+}
+
 /**
  * The turn about z that puts the gap between the last molars at the back (+y), from the top band of
  * an arch whose teeth point up. Seen from the middle of the arch, the teeth surround it except at the
@@ -195,7 +238,13 @@ function yawToBack(v: Float64Array, bandTop: number, plane = bandTop, teeth: { p
       pts.forEach(([x, y]) => { if (y >= lo && y <= hi) { a = Math.min(a, x); b = Math.max(b, x); } });
       return Number.isFinite(a) ? b - a : 0;
     };
-    if (width(minY, minY + span * 0.25) > width(maxY - span * 0.25, maxY)) {
+    // Build 55: a quadrant that reaches the front teeth bends round the canine towards the midline,
+    // and that bend is the front - the molar end runs straight. Only when neither end bends (a
+    // premolar-to-molar segment) does the wider end tell the molars. The bend made the front end
+    // look the wider one, which laid such quadrants backwards and put the hinge on the incisors.
+    const bend = endBends(pts, minY, maxY);
+    const frontAtMax = bend ? bend.high > bend.low : width(minY, minY + span * 0.25) > width(maxY - span * 0.25, maxY);
+    if (frontAtMax) {
       angle += Math.PI;
       pts = band.map(([x, y]) => rot(x - cx, y - cy, angle));
     }
