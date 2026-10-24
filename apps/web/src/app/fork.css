@@ -1638,3 +1638,10 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 .dental-studio-panel .dental-views button:disabled { opacity: 0.5; cursor: default; }
 .dental-studio-panel .dental-step { margin: 10px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: var(--foreground, #1d2430); }
 .dental-studio-panel .dental-trim .dental-step { margin-top: 0; }
+/* Fork (build 53): Dental Studio's tooth-area brush. */
+.dental-brush-overlay { cursor: none; }
+.dental-brush-overlay polyline { fill: none; stroke: rgba(242, 163, 58, 0.45); stroke-linecap: round; stroke-linejoin: round; }
+.dental-brush-overlay circle { fill: none; stroke: #f2a33a; stroke-width: 1.5; }
+.dental-brush-overlay.erase polyline { stroke: rgba(31, 111, 235, 0.35); }
+.dental-brush-overlay.erase circle { stroke: #1f6feb; }
+.dental-area-tools { flex-wrap: wrap; }

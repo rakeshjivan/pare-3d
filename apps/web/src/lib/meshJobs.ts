@@ -13,13 +13,15 @@ export type MeshJobRequest =
   | { id: number; base: string; kind: "fit"; shapes: WorkplaneShape[]; clearance: number }
   | { id: number; base: string; kind: "dentalAnalyse"; input: DentalStudioInput }
   | { id: number; base: string; kind: "dentalStudio"; input: DentalStudioInput; options: DentalStudioOptions }
-  | { id: number; base: string; kind: "dentalTrim"; positions: Float32Array; side: Float32Array; mode: DentalTrimMode; local: Float32Array };
+  | { id: number; base: string; kind: "dentalTrim"; positions: Float32Array; side: Float32Array; mode: DentalTrimMode; local: Float32Array }
+  | { id: number; base: string; kind: "dentalArea"; positions: Float32Array };
 export type MeshJobResponse =
   | { id: number; ok: true; kind?: "round"; result: { positions: Float32Array; voxel: number; coarse: boolean } }
   | { id: number; ok: true; kind: "fit"; report: FitReport }
   | { id: number; ok: true; kind: "dentalAnalyse"; analysis: DentalAnalysis }
   | { id: number; ok: true; kind: "dentalStudio"; result: DentalStudioResult }
   | { id: number; ok: true; kind: "dentalTrim"; trim: DentalTrimResult }
+  | { id: number; ok: true; kind: "dentalArea"; area: Uint8Array }
   | { id: number; ok: false; error: string };
 
 let worker: Worker | null = null;
@@ -42,6 +44,7 @@ function meshWorker(): Worker | null {
       else if (reply.kind === "dentalAnalyse") waiting.resolve(reply.analysis);
       else if (reply.kind === "dentalStudio") waiting.resolve(reply.result);
       else if (reply.kind === "dentalTrim") waiting.resolve(reply.trim);
+      else if (reply.kind === "dentalArea") waiting.resolve(reply.area);
       else waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
     };
     worker.onerror = () => {
@@ -153,6 +156,25 @@ export async function trimDentalScanInBackground(positions: Float32Array, side: 
     return await new Promise<DentalTrimResult>((resolve, reject) => {
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
       target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "dentalTrim", positions: data, side: sides, mode, local: own } satisfies MeshJobRequest, [data.buffer, sides.buffer, own.buffer]);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "worker-unavailable") return here();
+    throw error;
+  }
+}
+
+/** Dental Studio (build 53): the teeth Pare 3D finds on a scan (Z-up soup), one flag per triangle. */
+export async function dentalAreaInBackground(positions: Float32Array): Promise<Uint8Array> {
+  const here = async () => (await import("@/lib/dentalArea")).autoDentalArea(positions);
+  const target = meshWorker();
+  if (!target) return here();
+  const id = nextId;
+  nextId += 1;
+  const data = Float32Array.from(positions);
+  try {
+    return await new Promise<Uint8Array>((resolve, reject) => {
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "dentalArea", positions: data } satisfies MeshJobRequest, [data.buffer]);
     });
   } catch (error) {
     if (error instanceof Error && error.message === "worker-unavailable") return here();

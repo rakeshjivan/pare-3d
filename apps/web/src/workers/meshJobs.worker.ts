@@ -35,6 +35,11 @@ scope.onmessage = async (event: MessageEvent<MeshJobRequest>) => {
       delete (trim as { toothCorners?: Uint8Array }).toothCorners;
       const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalTrim", trim };
       scope.postMessage(reply, trim.positions ? [trim.keep.buffer, trim.positions.buffer] : [trim.keep.buffer]);
+    } else if (job.kind === "dentalArea") {
+      const { autoDentalArea } = await import("@/lib/dentalArea");
+      const area = autoDentalArea(job.positions);
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalArea", area };
+      scope.postMessage(reply, [area.buffer]);
     } else if (job.kind === "fit") {
       const { checkFit } = await import("@/lib/partTools");
       const report = await checkFit(job.shapes, job.clearance);

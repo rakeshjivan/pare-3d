@@ -124,12 +124,13 @@ const SURFACE_TEXT_PREVIEW_ID = "surface-text-preview";
 const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
 import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
-import { analyseDentalInBackground, checkFitInBackground, makeDentalStudioInBackground, roundMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
-import { DentalTrimOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
+import { analyseDentalInBackground, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, roundMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
+import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
+import { DentalBrushOverlay, DentalTrimOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
 import { looksLikeDentalScan, type DentalAnalysis, type DentalRole, type DentalStudioInput, type DentalStudioOptions } from "@/lib/dentalModel";
-import { DentalStudioPanel, dentalPreset, type DentalPreset, type DentalSlot, type DentalView } from "./workplane/DentalStudioPanel";
+import { DentalStudioPanel, dentalPreset, type DentalAreaTool, type DentalPreset, type DentalSlot, type DentalView } from "./workplane/DentalStudioPanel";
 import { ShellPanel } from "./workplane/ShellPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
 import { MateFacesPanel } from "./workplane/MateFacesPanel";
@@ -9520,6 +9521,12 @@ export function LayerlingEditor({
     return out;
   };
   const dentalCandidates = useCallback(() => shapesRef.current.filter((shape) => shape.importedMesh && !shape.groupedShapes?.length && !shape.hole && !shape.locked), []);
+  // Fork (build 53): the tooth area of each scan (one flag per triangle), with the scan's fingerprint it was made for.
+  const dentalAreas = useRef(new Map<string, { key: string; area: Uint8Array }>());
+  const dentalAreaFor = (shape: WorkplaneShape) => {
+    const known = dentalAreas.current.get(shape.id);
+    return known && known.key === projectShapesFingerprint([shape]) ? known.area : null;
+  };
   const dentalInput = useCallback((state: Pick<DentalStudioState, "slots" | "rolesChosen">): DentalStudioInput | null => {
     const find = (id: string | null) => (id ? shapesRef.current.find((shape) => shape.id === id) ?? null : null);
     const arches = (["upper", "lower"] as const).map((slot) => ({ slot, shape: find(state.slots[slot]) })).filter((entry) => entry.shape);
@@ -9571,7 +9578,7 @@ export function LayerlingEditor({
       return out;
     };
     return {
-      arches: arches.map(({ shape }) => ({ id: shape!.id, positions: scan(shape!) })),
+      arches: arches.map(({ shape }) => ({ id: shape!.id, positions: scan(shape!), area: dentalAreaFor(shape!) ?? undefined })),
       bite: bite ? scan(bite) : null,
       roles: state.rolesChosen ? roles : undefined,
     };
@@ -9711,6 +9718,68 @@ export function LayerlingEditor({
     setDentalTrim(null);
     setDentalHidden([]);
   }, []);
+  // Fork (build 53): designating the tooth area - found by Pare 3D, painted on or off by hand.
+  const [dentalAreaTool, setDentalAreaTool] = useState<{ slot: "upper" | "lower"; tool: DentalAreaTool } | null>(null);
+  const [dentalBrush, setDentalBrush] = useState(18);
+  const [dentalAreaBusy, setDentalAreaBusy] = useState(false);
+  const [dentalAreaVersion, setDentalAreaVersion] = useState(0);
+  const dentalAreaManual = dentalStudio?.options.margin === "manual";
+  const ensureDentalAreas = useCallback(async (force?: "upper" | "lower") => {
+    const state = dentalStudioRef.current;
+    if (!state) return;
+    const shapes = (["upper", "lower"] as const).map((slot) => ({ slot, shape: state.slots[slot] ? shapesRef.current.find((candidate) => candidate.id === state.slots[slot]) : undefined }));
+    const missing = shapes.filter(({ slot, shape }) => shape && (force === slot || !dentalAreaFor(shape)));
+    if (!missing.length) return;
+    setDentalAreaBusy(true);
+    try {
+      for (const { shape } of missing) {
+        const area = await dentalAreaInBackground(Float32Array.from(toZUp(worldTriangles(shape!))));
+        dentalAreas.current.set(shape!.id, { key: projectShapesFingerprint([shape!]), area });
+      }
+    } finally {
+      setDentalAreaBusy(false);
+      setDentalAreaVersion((version) => version + 1);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (dentalAreaManual && dentalStudio?.analysis) void ensureDentalAreas();
+  }, [dentalAreaManual, dentalStudio?.analysis, dentalStudio?.slots.upper, dentalStudio?.slots.lower, ensureDentalAreas]);
+  // The area tinted over the scans while it can be edited.
+  useEffect(() => {
+    const state = dentalStudioRef.current;
+    if (!dentalAreaManual || !state || state.stage === "making") { window.layerlingHighlight?.(null); return; }
+    const parts: number[] = [];
+    (["upper", "lower"] as const).forEach((slot) => {
+      const shape = state.slots[slot] ? shapesRef.current.find((candidate) => candidate.id === state.slots[slot]) : undefined;
+      if (!shape || dentalHidden.includes(shape.id)) return;
+      const area = dentalAreaFor(shape);
+      if (!area) return;
+      const world = worldTriangles(shape);
+      for (let t = 0; t < area.length; t += 1) if (area[t]) for (let k = 0; k < 9; k += 1) parts.push(world[t * 9 + k]);
+    });
+    window.layerlingHighlight?.(parts.length ? Float32Array.from(parts) : null);
+  }, [dentalAreaManual, dentalAreaVersion, dentalHidden, dentalStudio?.stage, dentalStudio?.slots.upper, dentalStudio?.slots.lower]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => window.layerlingHighlight?.(null), []);
+  const chooseDentalAreaTool = useCallback((slot: "upper" | "lower", tool: DentalAreaTool | null) => {
+    const state = dentalStudioRef.current;
+    if (!tool || !state) { setDentalAreaTool(null); setDentalHidden([]); return; }
+    setDentalAreaTool({ slot, tool });
+    setDentalHidden((Object.values(state.slots).filter((id) => id && id !== state.slots[slot]) as string[]));
+  }, []);
+  const applyDentalArea = useCallback((points: TrimPoint[]) => {
+    const tool = dentalAreaTool;
+    const state = dentalStudioRef.current;
+    const id = tool && state ? state.slots[tool.slot] : null;
+    const shape = id ? shapesRef.current.find((candidate) => candidate.id === id) : undefined;
+    const area = shape ? dentalAreaFor(shape) : null;
+    if (!tool || !shape || !area || !window.layerlingProjectPoints || !window.layerlingCameraPosition) return;
+    const world = worldTriangles(shape);
+    const { centre, front } = screenTriangles(world, window.layerlingProjectPoints(world), window.layerlingCameraPosition());
+    const add = tool.tool === "paint" || tool.tool === "lassoAdd";
+    if (tool.tool === "paint" || tool.tool === "erase") brushArea(area, centre, front, points, dentalBrush, add);
+    else lassoArea(area, centre, front, points, add);
+    setDentalAreaVersion((version) => version + 1);
+  }, [dentalAreaTool, dentalBrush]); // eslint-disable-line react-hooks/exhaustive-deps
   const applyDentalTrim = useCallback((line: TrimPoint[]) => {
     const trim = dentalTrim;
     const state = dentalStudioRef.current;
@@ -15634,6 +15703,12 @@ export function LayerlingEditor({
           onCancel={() => setSurfaceTextTool(null)}
         />
       ) : null}
+      {dentalStudio && dentalAreaTool && (dentalAreaTool.tool === "paint" || dentalAreaTool.tool === "erase") ? (
+        <DentalBrushOverlay hint={t("dental.areaHintPaint")} radius={dentalBrush} erase={dentalAreaTool.tool === "erase"} onDone={applyDentalArea} onCancel={() => chooseDentalAreaTool(dentalAreaTool.slot, null)} />
+      ) : null}
+      {dentalStudio && dentalAreaTool && (dentalAreaTool.tool === "lassoAdd" || dentalAreaTool.tool === "lassoRemove") ? (
+        <DentalTrimOverlay hint={t("dental.areaHintLasso")} onDone={applyDentalArea} onCancel={() => chooseDentalAreaTool(dentalAreaTool.slot, null)} />
+      ) : null}
       {dentalStudio && dentalTrim ? (
         <DentalTrimOverlay hint={t(dentalTrim.mode === "keep" ? "dental.trimHintKeep" : "dental.trimHintRemove")} onDone={applyDentalTrim} onCancel={stopDentalTrim} />
       ) : null}
@@ -15646,6 +15721,12 @@ export function LayerlingEditor({
           trimMode={dentalTrimMode}
           onTrimModeChange={setDentalTrimMode}
           onTrim={(slot) => (dentalTrim?.slot === slot ? stopDentalTrim() : startDentalTrim(slot, dentalTrimMode))}
+          areaTool={dentalAreaTool}
+          areaBusy={dentalAreaBusy}
+          brushSize={dentalBrush}
+          onAreaTool={chooseDentalAreaTool}
+          onBrushSize={setDentalBrush}
+          onResetArea={(slot) => { void ensureDentalAreas(slot); }}
           onView={showDentalView}
           analysis={dentalStudio.analysis}
           preset={dentalStudio.preset}
@@ -16429,7 +16510,6 @@ function SecondaryToolbar({
     };
   }, []);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
-  const [meshMenuOpen, setMeshMenuOpen] = useState(false);
   const [modifyMoreOpen, setModifyMoreOpen] = useState(false);
   const modifyMoreRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -16440,15 +16520,6 @@ function SecondaryToolbar({
     window.addEventListener("pointerdown", onDown);
     return () => window.removeEventListener("pointerdown", onDown);
   }, [modifyMoreOpen]);
-  const meshMenuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!meshMenuOpen) return;
-    const onDown = (event: PointerEvent) => {
-      if (!meshMenuRef.current?.contains(event.target as Node)) setMeshMenuOpen(false);
-    };
-    window.addEventListener("pointerdown", onDown);
-    return () => window.removeEventListener("pointerdown", onDown);
-  }, [meshMenuOpen]);
   const [visibilityMenuPosition, setVisibilityMenuPosition] = useState({ top: 0, left: 0 });
   const shapesMenuRef = useRef<HTMLDivElement>(null);
   const visibilityMenuRef = useRef<HTMLDivElement>(null);
@@ -17177,52 +17248,12 @@ function SecondaryToolbar({
             </div>
           ) : null}
         </div>
-        {(
-          // Fork (build 33): one button with a menu, so the row does not wrap. Fork (build 49): always
-          // on the toolbar; its tools wait for a mesh to be selected.
-          <div className="toolbar-section compact toolbar-mesh-section" data-group="mesh" ref={meshMenuRef}>
-            <div className="toolbar-section-label">{t("editor.group.mesh")}</div>
-            <div className="toolbar-section-tools">
-              <button
-                className={`toolbar-icon mesh-menu-trigger ${meshMenuOpen ? "active" : ""}`}
-                type="button"
-                data-layerling-tool="meshMenu"
-                aria-label={t("editor.meshTools")}
-                data-tip={t("editor.meshTools")}
-                aria-haspopup="menu"
-                aria-expanded={meshMenuOpen}
-                onClick={() => setMeshMenuOpen((open) => !open)}
-              >
-                <ShieldCheck />
-                <span className="tool-label" aria-hidden="true">{t("editor.group.mesh")}</span>
-              </button>
-            </div>
-            {meshMenuOpen ? (
-              <div className="visibility-dropdown mesh-dropdown" role="menu" aria-label={t("editor.meshTools")}>
-                {meshTools.map((tool) => {
-                  const Icon = tool.icon;
-                  return (
-                    <button
-                      key={tool.id}
-                      className="visibility-dropdown-action"
-                      type="button"
-                      role="menuitem"
-                      data-layerling-tool={tool.id}
-                      disabled={!tool.enabled}
-                      onClick={() => {
-                        setMeshMenuOpen(false);
-                        tool.action();
-                      }}
-                    >
-                      <Icon size={16} />
-                      <span>{tool.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-        )}
+        {/* Fork (build 53): the mesh tools sit on the toolbar as their own buttons, not in a menu.
+            They wait for an imported mesh to be selected. */}
+        <div className="toolbar-section toolbar-mesh-section" data-group="mesh">
+          <div className="toolbar-section-label">{t("editor.group.mesh")}</div>
+          <div className="toolbar-section-tools">{meshTools.map(renderToolButton)}</div>
+        </div>
         <div className="toolbar-section" data-group="arrange">
           <div className="toolbar-section-label">{t("editor.group.arrange")}</div>
           <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>

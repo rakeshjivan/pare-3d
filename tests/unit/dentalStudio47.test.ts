@@ -7,6 +7,7 @@ import { weld } from "@/lib/dentalMesh";
 import { plyToStlBytes } from "@/lib/plyImport";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { cutDentalScan, trimDentalScan } from "@/lib/dentalTrim";
+import { autoDentalArea } from "@/lib/dentalArea";
 import { layerlingToZUp } from "@/lib/meshCoordinates";
 import { dentalPreset } from "@/components/workplane/DentalStudioPanel";
 
@@ -342,4 +343,22 @@ describe("Dental Studio (build 47)", () => {
     // The teeth past the line stay whole.
     expect(maxX).toBeGreaterThan(10.3);
   });
+  it("builds from a tooth area the person approved, cut a band of gum round it (build 53)", async () => {
+    const positions = syntheticArch({ teethDown: true });
+    const area = autoDentalArea(positions);
+    let marked = 0;
+    for (const flag of area) marked += flag;
+    expect(marked).toBeGreaterThan(100);
+    const input = { arches: [{ id: "a", positions, area }] };
+    const made = await makeDentalStudio(input, { ...base, baseStyle: "clean", base: 3, margin: "manual", gum: 2 }, runtime as never);
+    expect(made.warnings).not.toContain("teeth");
+    expect(made.surface[0][-1]).toBeGreaterThanOrEqual(0.999);
+    expect(pinchedEdges(made.parts[0].positions)).toBe(0);
+    // A smaller area keeps less of the scan.
+    const half = Uint8Array.from(area);
+    for (let t = 0; t < half.length; t += 1) if (positions[t * 9] > 5) half[t] = 0;
+    const less = await makeDentalStudio({ arches: [{ id: "a", positions, area: half }] }, { ...base, baseStyle: "clean", base: 3, margin: "manual", gum: 2 }, runtime as never);
+    expect(less.parts[0].volume).toBeLessThan(made.parts[0].volume);
+    expect(pinchedEdges(less.parts[0].positions)).toBe(0);
+  }, 120_000);
 });

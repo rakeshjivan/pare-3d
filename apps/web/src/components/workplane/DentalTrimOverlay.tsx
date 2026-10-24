@@ -144,3 +144,66 @@ export function trimLineDistance(projected: Float32Array, line: TrimPoint[]): Fl
   }
   return out;
 }
+
+/**
+ * Fork (build 53): Dental Studio's brush for the tooth area. Press and drag to paint a stroke of
+ * `radius` pixels; letting go hands the stroke over. Esc gives up.
+ */
+export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel }: { hint: string; radius: number; erase: boolean; onDone: (points: TrimPoint[]) => void; onCancel: () => void }) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const [points, setPoints] = useState<TrimPoint[]>([]);
+  const [cursor, setCursor] = useState<TrimPoint | null>(null);
+  const drawing = useRef(false);
+  const line = useRef<TrimPoint[]>([]);
+  useEffect(() => {
+    setHost(document.querySelector<HTMLElement>(".workplane-plane"));
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onCancel(); }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onCancel]);
+  if (!host) return null;
+  const rect = host.getBoundingClientRect();
+  const local = (p: TrimPoint) => `${p[0] - rect.left},${p[1] - rect.top}`;
+  return createPortal(
+    <div
+      className={`dental-trim-overlay dental-brush-overlay${erase ? " erase" : ""}`}
+      role="application"
+      aria-label={hint}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        drawing.current = true;
+        line.current = [[event.clientX, event.clientY]];
+        setPoints(line.current);
+      }}
+      onPointerMove={(event) => {
+        setCursor([event.clientX, event.clientY]);
+        if (!drawing.current) return;
+        const last = line.current[line.current.length - 1];
+        if (last && Math.hypot(last[0] - event.clientX, last[1] - event.clientY) < 2) return;
+        line.current = [...line.current, [event.clientX, event.clientY]];
+        setPoints(line.current);
+      }}
+      onPointerLeave={() => setCursor(null)}
+      onPointerUp={(event) => {
+        if (!drawing.current) return;
+        drawing.current = false;
+        event.currentTarget.releasePointerCapture(event.pointerId);
+        const drawn = line.current;
+        line.current = [];
+        setPoints([]);
+        if (drawn.length) onDone(drawn);
+      }}
+    >
+      <p className="dental-trim-hint">{hint}</p>
+      <svg aria-hidden="true">
+        {points.length ? <polyline points={points.map(local).join(" ")} style={{ strokeWidth: radius * 2 }} /> : null}
+        {cursor ? <circle cx={cursor[0] - rect.left} cy={cursor[1] - rect.top} r={radius} /> : null}
+      </svg>
+    </div>,
+    host,
+  );
+}

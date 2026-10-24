@@ -47,6 +47,8 @@ export type DentalPartChoice = { id: string; name: string };
 export type DentalView = "occlusal" | "front" | "left" | "right" | "lingual";
 const DENTAL_VIEWS: readonly DentalView[] = ["occlusal", "front", "left", "right", "lingual"];
 
+export type DentalAreaTool = "paint" | "erase" | "lassoAdd" | "lassoRemove";
+
 /** Fork (build 47): Dental Studio - raw intraoral scans to printable models, one arch or a pair with its bite. */
 export function DentalStudioPanel({
   parts,
@@ -56,6 +58,12 @@ export function DentalStudioPanel({
   trimMode,
   onTrimModeChange,
   onTrim,
+  areaTool,
+  areaBusy,
+  brushSize,
+  onAreaTool,
+  onBrushSize,
+  onResetArea,
   onView,
   analysis,
   preset,
@@ -80,6 +88,12 @@ export function DentalStudioPanel({
   trimMode: "keep" | "remove";
   onTrimModeChange: (mode: "keep" | "remove") => void;
   onTrim: (slot: "upper" | "lower") => void;
+  areaTool: { slot: "upper" | "lower"; tool: DentalAreaTool } | null;
+  areaBusy: boolean;
+  brushSize: number;
+  onAreaTool: (slot: "upper" | "lower", tool: DentalAreaTool | null) => void;
+  onBrushSize: (size: number) => void;
+  onResetArea: (slot: "upper" | "lower") => void;
   onView: (slot: "upper" | "lower", view: DentalView) => void;
   analysis: DentalAnalysis | null;
   preset: DentalPreset;
@@ -189,19 +203,22 @@ export function DentalStudioPanel({
             <button key={view} type="button" disabled={!slots[arch] || !analysis} onClick={() => onView(arch, view)}>{t(`dental.view.${view}`)}</button>
           ))}
         </div>
-        <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.trimTitle")}>
-          {(["keep", "remove"] as const).map((mode) => (
-            <button key={mode} type="button" role="radio" aria-checked={trimMode === mode} className={trimMode === mode ? "active" : ""} disabled={busy || Boolean(trimming)} onClick={() => onTrimModeChange(mode)}>
-              {t(mode === "keep" ? "dental.trimKeep" : "dental.trimRemove")}
+        {/* Build 53: the tooth area, as Medit designates it - picked by Pare 3D, painted on or off by hand. */}
+        <div className="dental-trim-mode dental-area-tools" role="radiogroup" aria-label={t("dental.areaTools")}>
+          {(["paint", "erase", "lassoAdd", "lassoRemove"] as const).map((tool) => (
+            <button key={tool} type="button" role="radio" aria-checked={areaTool?.tool === tool && areaTool.slot === arch} className={areaTool?.tool === tool && areaTool.slot === arch ? "active" : ""} disabled={busy || !slots[arch] || !analysis || areaBusy} onClick={() => onAreaTool(arch, areaTool?.tool === tool && areaTool.slot === arch ? null : tool)}>
+              {t(`dental.area.${tool}`)}
             </button>
           ))}
         </div>
+        {areaTool?.tool === "paint" || areaTool?.tool === "erase" ? (
+          <EdgeModifierSlider label={t("dental.brushSize")} value={brushSize} min={4} max={80} step={1} workspace={workspace} disabled={busy} onChange={onBrushSize} />
+        ) : null}
+        <EdgeModifierSlider label={t("dental.expand")} value={options.gum ?? 3} min={0.5} max={10} step={0.5} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ gum: value })} />
         <div className="dental-trim-buttons">
-          <button type="button" className={trimming ? "active" : ""} disabled={(busy && !trimming) || !slots[arch] || !analysis} onClick={() => onTrim(arch)}>
-            <Scissors size={15} /> {t(trimming ? "dental.trimStop" : "dental.trimDraw")}
-          </button>
+          <button type="button" disabled={busy || !slots[arch] || areaBusy} onClick={() => onResetArea(arch)}>{t("dental.areaReset")}</button>
         </div>
-        {stage === "trimming" ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.trimming")}</p> : <p className="blend-hint">{t("dental.trimInfo")}</p>}
+        {areaBusy ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.areaFinding")}</p> : <p className="blend-hint">{t("dental.areaInfo")}</p>}
         </>) : null}
       </div>
       <h3 className="dental-step">{t("dental.step3")}</h3>

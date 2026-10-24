@@ -118,6 +118,27 @@ function crossingCorners(m: Mesh, edges: number[][]): Set<number> {
 export const EDGE_FRINGE = 1.2;
 
 /** Distance along the surface from the open edge, mm, worked out up to `limit` (Infinity beyond). */
+/** How far over the surface each corner is from the nearest corner marked in `seeds` (mm), up to `limit` (build 53). */
+export function distanceFrom(m: Mesh, seeds: Uint8Array, limit: number): Float64Array {
+  const n = m.v.length / 3;
+  const dist = new Float64Array(n).fill(Infinity);
+  const neighbours: number[][] = Array.from({ length: n }, () => []);
+  for (let t = 0; t < m.f.length; t += 3) for (let k = 0; k < 3; k += 1) {
+    const a = m.f[t + k], b = m.f[t + ((k + 1) % 3)];
+    neighbours[a].push(b); neighbours[b].push(a);
+  }
+  const queue: number[] = [];
+  for (let i = 0; i < n; i += 1) if (seeds[i]) { dist[i] = 0; queue.push(i); }
+  for (let head = 0; head < queue.length; head += 1) {
+    const v = queue[head];
+    for (const w of neighbours[v]) {
+      const d = dist[v] + Math.hypot(m.v[w * 3] - m.v[v * 3], m.v[w * 3 + 1] - m.v[v * 3 + 1], m.v[w * 3 + 2] - m.v[v * 3 + 2]);
+      if (d < dist[w] && d <= limit) { dist[w] = d; queue.push(w); }
+    }
+  }
+  return dist;
+}
+
 export function distanceFromEdge(m: Mesh, limit: number): Float64Array {
   const n = m.v.length / 3;
   const dist = new Float64Array(n).fill(Infinity);

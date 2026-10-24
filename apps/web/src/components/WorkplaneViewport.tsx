@@ -668,6 +668,10 @@ declare global {
     layerlingProjectPoints?: (points: ArrayLike<number>) => Float32Array;
     /** Fork (build 48): turns the view to look along -direction (scene axes) and frames these parts. */
     layerlingShowParts?: (ids: string[], direction: [number, number, number]) => boolean;
+    /** Fork (build 53): draws triangles (world, a soup) over the scene as a tinted highlight; null clears it. */
+    layerlingHighlight?: (triangles: Float32Array | null) => void;
+    /** Fork (build 53): where the camera is, in the world. */
+    layerlingCameraPosition?: () => [number, number, number];
     layerlingCaptureCanvasAsync?: () => Promise<string>;
     layerlingCaptureView?: (face?: LayerlingMcpViewFace) => Promise<string> | string;
     layerlingCaptureImage?: (options?: { plate?: boolean; transparent?: boolean; scale?: number }) => string;
@@ -8994,6 +8998,39 @@ export function WorkplaneViewport({
     };
     return () => { delete window.layerlingShowParts; };
   }, [focusSelection]);
+  // Fork (build 53): Dental Studio's tooth area, tinted over the scan while it is being designated.
+  useEffect(() => {
+    let mesh: THREE.Mesh | null = null;
+    const clear = () => {
+      const state = threeRef.current;
+      if (mesh && state) state.scene.remove(mesh);
+      mesh?.geometry.dispose();
+      (mesh?.material as THREE.Material | undefined)?.dispose();
+      mesh = null;
+      if (state) state.needsRender = true;
+    };
+    window.layerlingHighlight = (triangles) => {
+      const state = threeRef.current;
+      clear();
+      if (!state || !triangles || !triangles.length) return;
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(triangles, 3));
+      geometry.computeVertexNormals();
+      const material = new THREE.MeshBasicMaterial({ color: 0xf2a33a, transparent: true, opacity: 0.7, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      mesh = new THREE.Mesh(geometry, material);
+      mesh.renderOrder = 10;
+      state.scene.add(mesh);
+      state.needsRender = true;
+    };
+    window.layerlingCameraPosition = () => {
+      const state = threeRef.current;
+      if (!state) return [0, 0, 0];
+      state.camera.updateMatrixWorld();
+      const p = new THREE.Vector3().setFromMatrixPosition(state.camera.matrixWorld);
+      return [p.x, p.y, p.z];
+    };
+    return () => { clear(); delete window.layerlingHighlight; delete window.layerlingCameraPosition; };
+  }, []);
 
   // Fork: a design opened from a starter example is framed whole once its parts are drawn.
   useEffect(() => {

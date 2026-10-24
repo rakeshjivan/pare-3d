@@ -16,10 +16,10 @@
 import * as THREE from "three";
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
 import { alignToBite, archFrame, canineWidth, cleanScan, frontOf, isPartialArch, marginUp, pairFrame, palateScore, type CleanArch, type CleanReport } from "@/lib/dentalArch";
-import { blockOutline, cleanOutline, closeToFloor, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, hingeParts, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
+import { blockOutline, cleanOutline, closeToFloor, distanceFrom, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, hingeParts, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
 import {
-  applyMatrix, boundaryLoops, cloneMesh, convexHull, cutAlongField, cutBelow, dropFragments, smoothField, faceArea, loopLength, surfaceKept, pinchedEdges, solidPositions, toManifold, upwardness, weld,
+  applyMatrix, boundaryLoops, cloneMesh, convexHull, cutAlongField, cutBelow, dropFragments, smoothField, faceArea, loopLength, surfaceKept, pinchedEdges, PointGrid, solidPositions, toManifold, upwardness, weld,
   type ManifoldRuntime, type ManifoldSolid, type Mesh, type Ring,
 } from "@/lib/dentalMesh";
 
@@ -38,7 +38,8 @@ export type DentalInfill = "honeycomb" | "base" | "none";
 export type DentalBaseStyle = "follow" | "plate" | "ortho" | "clean" | "articulator";
 export type DentalInside = "solid" | "open" | "closed";
 
-export type DentalArchInput = { id: string; positions: ArrayLike<number> };
+/** `area` (build 53): the tooth area the person approved - one flag per triangle of `positions`. */
+export type DentalArchInput = { id: string; positions: ArrayLike<number>; area?: Uint8Array };
 export type DentalStudioInput = {
   arches: DentalArchInput[];
   bite?: ArrayLike<number> | null;
@@ -350,6 +351,7 @@ function buildArch(
   floor: number,
   ortho: Ring | null,
   labelLine: string,
+  area?: Uint8Array,
 ): Built {
   const warnings: string[] = [];
   const m = cloneMesh(arch.clean.mesh);
@@ -360,12 +362,16 @@ function buildArch(
   for (let i = 2; i < m.v.length; i += 3) { top = Math.max(top, m.v[i]); low = Math.min(low, m.v[i]); }
   const keep = keptDepthFor(arch, options);
   // The cut never passes through a tooth: keep is never less than arch.teeth.
-  const scanTeeth = toothZone(m, undefined, undefined, undefined, TIP_CEILING);
+  // Build 53: the tooth area the person approved, when there is one, is the teeth.
+  const scanTeeth = area ?? toothZone(m, undefined, undefined, undefined, TIP_CEILING);
   // Build 50: the crowns - what is promised, and what the clean outline is drawn round.
   // Within the teeth found as before: with a tip set aside, the crown's depth is measured from a
   // lower tip, and must not reach below the depth the cut keeps.
   const crowns = toothZone(m, TOOTH_CROWN, CROWN_REACH, undefined, TIP_CEILING, TIP_FLOOR, TIP_LONELY).map((inZone, i) => (inZone && scanTeeth[i] ? 1 : 0));
-  const level = -keep;
+  // The cut never passes through the approved area either.
+  let areaLow = Infinity;
+  if (area) for (let i = 0; i < area.length; i += 1) if (area[i]) areaLow = Math.min(areaLow, m.v[i * 3 + 2]);
+  const level = Math.min(-keep, areaLow - 1);
   const cut = level <= low + 1e-6 ? m : cutBelow(m, level);
   // A mark on the scan's corners, carried over to the corners of the cut (which keeps them in place).
   const onCut = (mark: Uint8Array) => {
@@ -377,10 +383,10 @@ function buildArch(
     return out;
   };
   // The teeth: never cut and never worn away - nor dropped as a loose piece.
-  let teeth = toothZone(cut, undefined, undefined, undefined, TIP_CEILING);
+  let teeth = area ? new Uint8Array(cut.v.length / 3) : toothZone(cut, undefined, undefined, undefined, TIP_CEILING);
   // What was teeth on the whole scan stays teeth: cutting the tissue away below can move the lowest
   // ground a tip is measured against, and must never shrink the teeth.
-  if (cut !== m) {
+  {
     const was = onCut(scanTeeth);
     for (let i = 0; i < teeth.length; i += 1) if (was[i]) teeth[i] = 1;
   }
@@ -395,7 +401,11 @@ function buildArch(
     // Build 52: cut exactly along a smooth margin - the band's edge as a smooth field over the
     // surface, cut along its zero line (triangles split there), never through the teeth.
     const field = new Float64Array(cut.v.length / 3);
-    toothZone(cut, TOOTH_CROWN + gum, TOOTH_REACH + gum + EDGE_FRINGE, undefined, TIP_CEILING, -Infinity, Infinity, field);
+    if (area) {
+      // Build 53: the band is `gum` wide round the approved area, measured over the surface.
+      const along = distanceFrom(cut, teeth, gum + 3);
+      for (let i = 0; i < field.length; i += 1) field[i] = gum - Math.min(along[i], gum + 3);
+    } else toothZone(cut, TOOTH_CROWN + gum, TOOTH_REACH + gum + EDGE_FRINGE, undefined, TIP_CEILING, -Infinity, Infinity, field);
     const smoothed = smoothField(cut, field, MARGIN_SMOOTHING, teeth);
     const trimmed = cutAlongField(cut, smoothed, teeth);
     const grown = new Uint8Array(trimmed.v.length / 3);
@@ -568,10 +578,27 @@ function buildArch(
 
 export async function makeDentalStudio(input: DentalStudioInput, options: DentalStudioOptions, given?: ManifoldRuntime): Promise<DentalStudioResult> {
   const prep = prepared(input);
+  // Build 53: an approved tooth area, carried from the scan's triangles to the cleaned scan's corners.
+  const areaOn = (id: string, mesh: Mesh): Uint8Array | undefined => {
+    const given = input.arches.find((entry) => entry.id === id);
+    if (!given?.area || options.margin !== "manual") return undefined;
+    const grid = new PointGrid(mesh.v, 0.05);
+    const out = new Uint8Array(mesh.v.length / 3);
+    let any = 0;
+    for (let t = 0; t < given.area.length; t += 1) {
+      if (!given.area[t]) continue;
+      for (let k = 0; k < 3; k += 1) {
+        const i = t * 9 + k * 3;
+        const hit = grid.nearest(given.positions[i], given.positions[i + 1], given.positions[i + 2]);
+        if (hit && hit[1] < 1e-3) { out[hit[0]] = 1; any += 1; }
+      }
+    }
+    return any ? out : undefined;
+  };
   // A clean base keeps a band of gum round the teeth, and no more.
   // Build 52: a margin drawn by hand is the margin - no gum band is cut on top of it.
-  if (options.margin === "manual") options = { ...options, gum: null };
-  else if (options.baseStyle === "clean" && (options.gum === null || options.gum === undefined)) options = { ...options, gum: CLEAN_GUM };
+  // Build 53: with an approved area, the gum band (Expand) runs round it; otherwise round the teeth found.
+  if ((options.margin === "manual" || options.baseStyle === "clean") && (options.gum === null || options.gum === undefined)) options = { ...options, gum: CLEAN_GUM };
   const apart = Boolean(prep.analysis.pair?.apart);
   if (apart) options = { ...options, layout: "print", hinge: false };
   const runtime = given ?? (await getManifoldRuntime());
@@ -598,7 +625,7 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
       ortho = arch.role === "upper" && shared ? mirrorRing(common) : common;
     }
     const line = userLabel ? (pair ? `${arch.role === "upper" ? "U" : "L"} ${userLabel}` : userLabel) : "";
-    return { arch, built: buildArch(runtime, arch, { ...options, base }, -depth, ortho, line) };
+    return { arch, built: buildArch(runtime, arch, { ...options, base }, -depth, ortho, line, areaOn(arch.id, arch.clean.mesh)) };
   });
   const warnings = [...new Set([...(apart ? ["apart"] : []), ...built.flatMap(({ built: b }) => b.warnings)])];
   const voxel = built.find(({ built: b }) => b.voxel !== null)?.built.voxel ?? null;
