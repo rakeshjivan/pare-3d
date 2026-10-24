@@ -471,7 +471,7 @@ export const FORK_TOOL_HINTS_EN: Readonly<Record<string, string>> = {
   simplify: "fewer triangles, for heavy imported models",
   meshCheck: "repair an imported model so it prints: holes, broken and doubled triangles, folds and loose pieces",
   fillHole: "click the wall of a hole in an imported model to fill it in",
-  cutBelowBed: "trim off what sinks below the plate",
+  cutBelowBed: "trim off what sinks below the plate: the selected parts, or every part when nothing is selected",
   hull: "wrap the selected parts in one smooth body - two cylinders become a rounded slot",
   fitCheck: "find parts that overlap or sit too close to print apart or move",
   roundMesh: "round every edge by one radius, also on imported meshes",

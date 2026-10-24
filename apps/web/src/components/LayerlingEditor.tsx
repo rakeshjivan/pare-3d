@@ -14741,6 +14741,8 @@ export function LayerlingEditor({
         { key: "selectAll", label: t("contextMenu.selectAll"), shortcut: "Ctrl+A", onSelect: selectAllVisible },
         { key: "selectMultiple", label: t("contextMenu.selectMultiple"), onSelect: startMultiSelect },
       ];
+      // Fork (build 53): with nothing chosen, cut every part below the workplane.
+      if (shapes.some((shape) => !shape.hole && !shape.hidden && !shape.locked && !isNonSolidShapeKind(shape.kind))) items.push({ key: "cutBelow", label: t("contextMenu.cutBelow"), separated: true, onSelect: () => void cutPartsBelowBed([]) });
       if (shapes.some((shape) => shape.hidden)) items.push({ key: "showHidden", label: t("contextMenu.showHidden"), shortcut: "Ctrl+Shift+H", onSelect: showHidden });
       if (referencePoints(notes).length > 0) items.push({ key: "removePoints", label: t("contextMenu.removeAllPoints", { count: referencePoints(notes).length }), danger: true, separated: true, onSelect: removeAllReferencePoints });
       return items;
@@ -16750,7 +16752,7 @@ function SecondaryToolbar({
     { id: "meshCheck", label: t("meshCheck.command"), icon: ShieldCheck, action: () => window.dispatchEvent(new Event(MESH_CHECK_EVENT)), enabled: canSimplify },
     { id: "fillHole", label: t("fillHole.command"), icon: PaintBucket, action: () => window.dispatchEvent(new Event(FILL_HOLE_EVENT)), enabled: canSimplify },
     { id: "simplify", label: t("editor.tool.simplify"), icon: ToolbarSimplifyIcon, action: onSimplify, enabled: canSimplify, active: simplifyActive },
-    { id: "cutBelowBed", label: t("cutBelowBed.command"), icon: Scissors, action: () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT)), enabled: canSimplify },
+    { id: "cutBelowBed", label: t("cutBelowBed.command"), icon: Scissors, action: () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT)), enabled: true },
     { id: "roundMesh", label: t("meshRound.title"), icon: Squircle, action: build33.onRound, enabled: build33.canRound || build33.roundActive, active: build33.roundActive },
   ];
   // Fork (build 47): Dental Studio, in a toolbar section of its own.

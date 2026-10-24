@@ -8,7 +8,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
     items: [
       "Dental Studio's Margin step can now edit the tooth area, the way Medit's model builder does: Pare 3D picks the teeth and tints them orange on the scan; paint more on, erase tissue it took for teeth, or lasso areas in or out, turning the view between strokes.",
       "The model keeps exactly the area you approved plus a band of gum round it (Expand into the gum, 3 mm by default), and cuts the scan smoothly along the band's edge. Back to automatic starts the area again.",
-      "The Mesh tools (Repair, Fill hole, Simplify, Cut below, Round) sit on the toolbar as their own buttons instead of in a menu; they light up when an imported mesh is selected.",
+      "The Mesh tools (Repair, Fill hole, Simplify, Cut below, Round) sit on the toolbar as their own buttons instead of in a menu; Repair, Fill hole and Simplify are for imported meshes; Round works on any one solid part, and Cut below on any solid parts, or on every part when nothing is selected.",
+      "Cut below the workplane is also in the right-click menu on empty space, where it trims every part.",
     ],
   },
   {
