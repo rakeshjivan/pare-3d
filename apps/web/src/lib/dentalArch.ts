@@ -13,6 +13,7 @@
  * separate bite scan (iterative closest point), for scanners that export the arches apart.
  */
 import * as THREE from "three";
+import { toothZone } from "@/lib/dentalBase";
 import {
   PointGrid, applyMatrix, boundaryLoops, convexHull, dropFragments, dropNonManifold, faceArea, fillLoop,
   loopLength, normalize, planeNormal, pointInPolygon, signedArea, weld,
@@ -79,6 +80,18 @@ function transformed(m: Mesh, matrix: THREE.Matrix4): Float64Array {
  * The cusp tips and incisal edges of an arch whose teeth point up: the highest point in each of 48
  * sectors round the arch, as far as they lie in the top 8 mm.
  */
+/**
+ * Cusp tips found tooth by tooth on the top surface (toothZone's tips), thinned to one per 1.5 mm;
+ * the sector tips below when too few are found.
+ */
+function localTips(v: Float64Array, f: number[]): number[][] {
+  const found: number[][] = [];
+  toothZone({ v: v as unknown as number[], f }, undefined, undefined, found);
+  const seen = new Set<string>();
+  const thinned = found.filter(([x, y]) => { const key = `${Math.round(x / 1.5)},${Math.round(y / 1.5)}`; if (seen.has(key)) return false; seen.add(key); return true; });
+  return thinned.length >= 8 ? thinned : cuspTips(v);
+}
+
 function cuspTips(v: Float64Array): number[][] {
   let top = -Infinity;
   for (let i = 2; i < v.length; i += 3) top = Math.max(top, v[i]);
@@ -107,8 +120,9 @@ function robustPlane(points: number[][]): { normal: Vec3; height: number } | nul
     c = [0, 0, 0];
     kept.forEach((p) => { c[0] += p[0]; c[1] += p[1]; c[2] += p[2]; });
     c = c.map((x) => x / kept.length);
-    const next = kept.filter((p) => Math.abs((p[0] - c[0]) * normal[0] + (p[1] - c[1]) * normal[1] + (p[2] - c[2]) * normal[2]) < 0.8);
-    if (next.length === kept.length) break;
+    const next = kept.filter((p) => Math.abs((p[0] - c[0]) * normal[0] + (p[1] - c[1]) * normal[1] + (p[2] - c[2]) * normal[2]) < 1.5);
+    // Never down to a few tips along one side: a curved arch keeps most of its tips.
+    if (next.length === kept.length || next.length < points.length * 0.6) break;
     kept = next;
   }
   return { normal, height: c[0] * normal[0] + c[1] * normal[1] + c[2] * normal[2] };
@@ -129,12 +143,26 @@ function bandShape(band: Ring): { partial: boolean; axis: number } {
 
 /** Whether an arch, in its frame (teeth up, occlusal plane at z = 0), is a quadrant or sextant rather than a full arch. */
 export function isPartialArch(m: Mesh, frame: THREE.Matrix4): boolean {
-  const v = transformed(m, frame);
-  let top = -Infinity;
-  for (let i = 2; i < v.length; i += 3) top = Math.max(top, v[i]);
-  const band: Ring = [];
-  for (let i = 0; i < v.length; i += 3) if (v[i + 2] > top - 5) band.push([v[i], v[i + 1]]);
-  return band.length >= 10 && bandShape(band).partial;
+  return teethShape(transformed(m, frame), m.f)?.partial ?? false;
+}
+
+/**
+ * The shape of the teeth seen from above, from the teeth found tooth by tooth (toothZone) rather
+ * than a band of height: a tilted arch, or tall front teeth, would leave only some teeth in a band.
+ */
+function teethShape(v: Float64Array, f: number[]): { partial: boolean; axis: number } | null {
+  const zone = toothZone({ v: v as unknown as number[], f });
+  const points: Ring = [];
+  for (let i = 0; i < zone.length; i += 1) if (zone[i]) points.push([v[i * 3], v[i * 3 + 1]]);
+  if (points.length < 10) return null;
+  const shape = bandShape(points);
+  // A full arch is a U: its middle is the tongue or palate, with no tooth there. A quadrant or a
+  // sextant has its teeth at its middle.
+  let cx = 0, cy = 0;
+  points.forEach(([x, y]) => { cx += x; cy += y; });
+  cx /= points.length; cy /= points.length;
+  const toothAtMiddle = points.some(([x, y]) => (x - cx) ** 2 + (y - cy) ** 2 < 9);
+  return { partial: shape.partial || toothAtMiddle, axis: shape.axis };
 }
 
 /**
@@ -143,16 +171,18 @@ export function isPartialArch(m: Mesh, frame: THREE.Matrix4): boolean {
  * back: the widest empty sector of directions is the gap. When the band closes all round (a scan of
  * a palate up to the teeth), the longest edge of the outline seen from above stands in.
  */
-function yawToBack(v: Float64Array, bandTop: number): { angle: number; centreX: number; centreY: number } {
+function yawToBack(v: Float64Array, bandTop: number, plane = bandTop, teeth: { partial: boolean; axis: number } | null = null): { angle: number; centreX: number; centreY: number } {
+  // The teeth near the occlusal plane: tall front teeth on their own would look like a sextant.
+  const level = Math.min(bandTop - 5, plane - 4);
   const band: Ring = [];
-  for (let i = 0; i < v.length; i += 3) if (v[i + 2] > bandTop - 5) band.push([v[i], v[i + 1]]);
+  for (let i = 0; i < v.length; i += 3) if (v[i + 2] > level) band.push([v[i], v[i + 1]]);
   if (band.length < 10) return { angle: 0, centreX: 0, centreY: 0 };
   let cx = 0, cy = 0;
   band.forEach(([x, y]) => { cx += x; cy += y; });
   cx /= band.length; cy /= band.length;
   // A quadrant or sextant (crown and bridge scans) is long and narrow seen from above: it is laid
   // along y with its wider end - the molars - at the back.
-  const shape = bandShape(band);
+  const shape = teeth ?? bandShape(band);
   if (shape.partial) {
     let angle = Math.PI / 2 - shape.axis;
     const rot = (x: number, y: number, a: number): [number, number] => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
@@ -214,17 +244,17 @@ function yawToBack(v: Float64Array, bandTop: number): { angle: number; centreX: 
 export function archFrame(m: Mesh, up: Vec3): THREE.Matrix4 {
   const turn = rotation(up, [0, 0, 1]);
   let v = transformed(m, turn);
-  const plane = robustPlane(cuspTips(v));
+  const plane = robustPlane(localTips(v, m.f));
   let level = new THREE.Matrix4();
   // The occlusal plane is used when it is plausibly near level with the margin's; otherwise the margin's stands.
   if (plane && plane.normal[2] > Math.cos((25 * Math.PI) / 180)) level = rotation(plane.normal, [0, 0, 1]);
   const leveled = level.clone().multiply(turn);
   v = transformed(m, leveled);
-  const tips = robustPlane(cuspTips(v));
+  const tips = robustPlane(localTips(v, m.f));
   let top = -Infinity;
   for (let i = 2; i < v.length; i += 3) top = Math.max(top, v[i]);
   const height = tips ? tips.height : top;
-  const yaw = yawToBack(v, top);
+  const yaw = yawToBack(v, top, height, teethShape(v, m.f));
   const spin = new THREE.Matrix4().makeRotationZ(yaw.angle);
   const shift = new THREE.Matrix4().makeTranslation(-yaw.centreX, -yaw.centreY, -height);
   return shift.multiply(spin).multiply(leveled);
@@ -304,7 +334,7 @@ export function pairFrame(upper: CleanArch, lower: CleanArch): PairFrame {
   const inOcclusion = touching.length >= 30;
   // Level by the lower's cusp tips and incisal edges, as for a single arch; the contacts set the height.
   let turn = rotation(common, [0, 0, 1]);
-  const tilted = robustPlane(cuspTips(transformed(lower.mesh, turn)));
+  const tilted = robustPlane(localTips(transformed(lower.mesh, turn), lower.mesh.f));
   if (tilted && tilted.normal[2] > Math.cos((25 * Math.PI) / 180)) turn = rotation(tilted.normal, [0, 0, 1]).multiply(turn);
   let height: number | null = null;
   if (inOcclusion) {
@@ -315,10 +345,10 @@ export function pairFrame(upper: CleanArch, lower: CleanArch): PairFrame {
   let top = -Infinity;
   for (let i = 2; i < v.length; i += 3) top = Math.max(top, v[i]);
   if (height === null) {
-    const tips = robustPlane(cuspTips(v));
+    const tips = robustPlane(localTips(v, lower.mesh.f));
     height = tips ? tips.height : top;
   }
-  const yaw = yawToBack(v, top);
+  const yaw = yawToBack(v, top, height, teethShape(v, lower.mesh.f));
   const spin = new THREE.Matrix4().makeRotationZ(yaw.angle);
   const shift = new THREE.Matrix4().makeTranslation(-yaw.centreX, -yaw.centreY, -height);
   return { frame: shift.multiply(spin).multiply(turn), contacts: touching.length, inOcclusion };

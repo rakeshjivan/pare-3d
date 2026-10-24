@@ -5,7 +5,7 @@
  * their own go too.
  */
 import { archFrame, cleanScan, marginUp } from "@/lib/dentalArch";
-import { toothZone } from "@/lib/dentalBase";
+import { TIP_CEILING, toothZone } from "@/lib/dentalBase";
 import { applyMatrix, cloneMesh, PointGrid } from "@/lib/dentalMesh";
 import { weldedVertexIds } from "@/lib/meshComponents";
 
@@ -25,7 +25,7 @@ export function trimDentalScan(positions: Float32Array, inside: Uint8Array, mode
   const clean = cleanScan(positions);
   const turned = cloneMesh(clean.mesh);
   applyMatrix(turned, archFrame(clean.mesh, marginUp(clean.mesh, clean.margin)));
-  const zone = toothZone(turned);
+  const zone = toothZone(turned, undefined, undefined, undefined, TIP_CEILING);
   const grid = new PointGrid(clean.mesh.v, 0.05);
   const tooth = new Uint8Array(corners);
   for (let i = 0; i < corners; i += 1) {

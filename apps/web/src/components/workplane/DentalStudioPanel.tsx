@@ -37,7 +37,8 @@ export function dentalPreset(preset: DentalPreset, depth: number, pair: boolean,
     return { ...common, keep: null, base: 5, baseStyle: "plate", inside: "solid" };
   }
   // Study model: hollow and open underneath to save resin, all the anatomy kept.
-  return { ...common, keep: null, base: 4, baseStyle: "follow", inside: "open" };
+  // Fork (build 49): on a clean base - trimmed to a smooth outline a few mm round the teeth, low.
+  return { ...common, keep: null, base: 3, baseStyle: "clean", gum: 3, inside: "open" };
 }
 
 export type DentalPartChoice = { id: string; name: string };
@@ -241,7 +242,7 @@ export function DentalStudioPanel({
           <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.baseStyle")}>
             <span className="edge-modifier-label">{t("dental.baseStyle")}</span>
             <div className="shell-opening-options">
-              {([["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
+              {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
                 <button key={value} type="button" role="radio" aria-checked={options.baseStyle === value} className={options.baseStyle === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ baseStyle: value })}>{label}</button>
               ))}
             </div>
@@ -256,7 +257,13 @@ export function DentalStudioPanel({
             </div>
           </div>
           {options.inside !== "solid" ? (
-            <EdgeModifierSlider label={t("dental.wall")} value={options.wall} min={DENTAL_MIN_WALL} max={DENTAL_MAX_WALL} step={0.1} coarse={{ step: 0.5, max: DENTAL_MAX_WALL }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ wall: value })} />
+            <>
+              <EdgeModifierSlider label={t("dental.wall")} value={options.wall} min={DENTAL_MIN_WALL} max={DENTAL_MAX_WALL} step={0.1} coarse={{ step: 0.5, max: DENTAL_MAX_WALL }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ wall: value })} />
+              <label className="edge-modifier-check">
+                <input type="checkbox" checked={(options.infill ?? "honeycomb") === "honeycomb"} disabled={busy} onChange={(event) => onOptionsChange({ infill: event.currentTarget.checked ? "honeycomb" : "none" })} />
+                <span>{t("dental.honeycomb")}</span>
+              </label>
+            </>
           ) : null}
           {pair ? (
             <>

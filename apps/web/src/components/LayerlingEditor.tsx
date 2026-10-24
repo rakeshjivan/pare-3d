@@ -177,6 +177,7 @@ import { checkBeforeSending, CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, PrintCheckP
 import { belowBedCutter } from "@/lib/cutBelowBed";
 import { fillHoleAt, isManifoldSolid, makeSolidPositions, meshHealth, pendingMeshChecks, shapeWithWorldPositions } from "@/lib/meshRepair";
 import { worldTriangles } from "@/lib/blend";
+import { repairStlPositions } from "@/lib/stlRepair";
 import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
 import { toolLayout, toolPocketPositions, tracedSolidPositions, type ToolBinOptions, type TraceOptions, type TraceResult } from "@/lib/photoTrace";
 import { TracePanel } from "@/components/workplane/TracePanel";
@@ -13267,6 +13268,23 @@ export function LayerlingEditor({
     const messages: string[] = [];
     for (const shape of targets) {
       const positions = worldTriangles(shape);
+      // Fork (build 49): Pare's own STL repair engine (as on parepdf.app); the simple capping
+      // stays as the fallback when that engine cannot run here.
+      try {
+        setNotice(t("meshRepair.working", { name: displayShapeName(shape) }), true);
+        const result = await repairStlPositions(positions, (step) => setNotice(`${displayShapeName(shape)}: ${step}…`, true));
+        if (result.unchanged) {
+          messages.push(t("meshCheck.ok", { name: displayShapeName(shape) }));
+          continue;
+        }
+        const solid = await isManifoldSolid(result.positions);
+        replacements.set(shape.id, canonicalizeShape(shapeWithWorldPositions(shape, Array.from(result.positions))));
+        const done = result.log.filter(([, count]) => count > 0).map(([what, count]) => (count > 1 ? `${what}: ${count}` : what)).join("; ");
+        messages.push(t(solid ? "meshRepair.done" : "meshRepair.partly", { name: displayShapeName(shape), done: done || t("meshRepair.tidied") }));
+        continue;
+      } catch {
+        // Fall through to the simple repair.
+      }
       if (meshHealth(positions).watertight && (await isManifoldSolid(positions))) {
         messages.push(t("meshCheck.ok", { name: displayShapeName(shape) }));
         continue;
@@ -14694,6 +14712,8 @@ export function LayerlingEditor({
         { key: "scalePercent", label: t("scalePercent.title"), onSelect: toggleScalePercentTool },
       );
     }
+    // Fork (build 49): for every solid object - whatever hangs below the workplane is cut off.
+    if (!selectionLocked && !allHoles) items.push({ key: "cutBelow", label: t("contextMenu.cutBelow"), onSelect: () => void cutPartsBelowBed(selectedShapes.map((shape) => shape.id)) });
     if (single && offersMeshSimplify(single) && !selectionLocked) items.push({ key: "simplify", label: t("contextMenu.simplify"), separated: true, onSelect: startSimplifyTool });
     if (single && single.importedMesh && !single.groupedShapes?.length && !single.hole && !selectionLocked) {
       items.push(
@@ -17156,8 +17176,9 @@ function SecondaryToolbar({
             </div>
           ) : null}
         </div>
-        {canSimplify ? (
-          // Fork (build 33): one button with a menu, so the row does not wrap when a mesh is selected.
+        {(
+          // Fork (build 33): one button with a menu, so the row does not wrap. Fork (build 49): always
+          // on the toolbar; its tools wait for a mesh to be selected.
           <div className="toolbar-section compact toolbar-mesh-section" data-group="mesh" ref={meshMenuRef}>
             <div className="toolbar-section-label">{t("editor.group.mesh")}</div>
             <div className="toolbar-section-tools">
@@ -17200,7 +17221,7 @@ function SecondaryToolbar({
               </div>
             ) : null}
           </div>
-        ) : null}
+        )}
         <div className="toolbar-section" data-group="arrange">
           <div className="toolbar-section-label">{t("editor.group.arrange")}</div>
           <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>

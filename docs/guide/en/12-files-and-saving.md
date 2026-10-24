@@ -102,10 +102,12 @@ Template pictures are added in sketch mode, see [Sketches](chapter:sketches).
 
 Downloaded STL, OBJ and 3MF files are often not quite solid: a face is missing, so the surface has an opening, or triangles are doubled or face the wrong way. A slicer may print such a file wrongly or not at all. Pare 3D checks every mesh you import. When one is not watertight, a card at the bottom of the work area says how many openings and broken spots it found:
 
-- **{{ui:meshCheck.makeSolid}}** closes every opening with a flat cap - an opening with another inside it, like the rim of a missing face that had a hole in it, gets a ring-shaped cap, so the hole stays open - turns all the triangles outward and checks that the result is a closed solid. If it can only be partly repaired, the message says so.
+- **{{ui:meshCheck.makeSolid}}** runs Pare's own repair engine, the one in Pare's STL View, Repair & Resize: it joins loose corners, removes broken, doubled and two-sided triangles, separates edges shared by too many triangles and pinched corners, turns every triangle the right way, fills the holes, drops loose crumbs, untangles places where the surface passes through itself and joins overlapping pieces into one closed solid - rebuilding a small area only where nothing else works. The message lists what it did. If it can only be partly repaired, the message says so. [[Ctrl]]+[[Z]] takes the repair back.
 - **{{ui:meshCheck.leave}}** keeps the mesh as it is.
 
-You can run the check again any time: select the part and click **Make solid** in the {{ui:editor.group.mesh}} group of the toolbar - it appears only while an imported mesh is selected, together with **Fill hole**, **Simplify** and **Cut below** - or right-click the part and choose {{ui:contextMenu.makeSolid}}, or search for it with [[Ctrl]]+[[K]].
+You can run the repair any time: select the part and choose **{{ui:meshCheck.command}}** in the {{ui:editor.group.mesh}} group of the toolbar - the group is always there, and its tools (with **Fill hole**, **Simplify** and **Cut below**) work on the imported mesh you select - or right-click the part and choose {{ui:contextMenu.makeSolid}}, or search for it with [[Ctrl]]+[[K]].
+
+**{{ui:contextMenu.cutBelow}}** is in the right-click menu of every solid part: whatever hangs below the workplane is cut off, so the part stands flat on the plate.
 
 ### Filling a hole
 
@@ -142,7 +144,7 @@ Click **{{ui:dental.title}}** in the {{ui:editor.group.dental}} group of the too
 
 **Then one click.** Choose what the models are for and click {{ui:dental.apply}}:
 
-- **{{ui:dental.study}}:** hollow with 2 mm walls and open underneath, on a 4 mm base. It saves about a third of the resin; no resin is trapped and no drain holes are needed.
+- **{{ui:dental.study}}:** on a **{{ui:dental.cleanBase}}** base, hollow with 2 mm walls and open underneath. The gum is kept as a band 3 mm deep below the teeth and cut level; the base follows the arch in a smooth, rounded outline with straight walls and a flat floor, 3 mm under the cut - no wall is ever built from the scan's ragged edge, so the model comes out as clean as one from a lab's model builder, about 18-25 mm tall. It saves about a third of the resin; no resin is trapped and no drain holes are needed.
 - **{{ui:dental.ortho}}:** solid, on a base trimmed the orthodontic way - back square to the midline, heels and buccal sides angled, the upper's front pointed and the lower's rounded, 3 mm clear of the teeth. A pair is placed in occlusion. Quadrants get a square block instead.
 - **{{ui:dental.aligner}}:** solid, about 18 mm tall in all - models for thermoforming should be 15-20 mm tall, as taller models stretch the sheet too thin.
 - **{{ui:dental.crown}}:** solid, with a plate across the palate or tongue space. Studies of printed models find solid models with a cross-arch plate the most accurate, and hollow ones the least.
@@ -152,7 +154,7 @@ Click **{{ui:dental.title}}** in the {{ui:editor.group.dental}} group of the too
 - **No tooth is ever cut off.** Pare 3D finds the teeth on each scan - everything within reach of a cusp tip and down to 10 mm below it, measured tooth by tooth, so a tilted arch or a quadrant is covered as well as a full arch - and no cut or trim goes into them. Where the scan's ragged edge folds under the teeth (a cheek flap tucked under the sulcus), what is under the teeth goes, not the teeth. Only the ragged fringe right at the scan's edge, at most 1.2 mm wide, may be trimmed beside a tooth - at the end of a quadrant, where the scan stops partway across a tooth. Every model is checked against its scan before it is handed over, and Pare 3D says so if any tooth surface could not be kept.
 - How deep the scan is kept is measured from the occlusal plane. By default Pare 3D keeps the scan down to where almost all of it ends - long tails of tissue that hang far below the gum are left out - and never more than 22 mm.
 - The teeth and gum you keep are the scan itself, untouched; the base is built from straight walls down to a flat floor. A pair stands equally tall.
-- A hollow model is hollowed on a fine grid of a fifth of the wall: the walls come out at least as thick as set (a little more in places).
+- A hollow model is hollowed on a fine grid of a fifth of the wall: the walls come out at least as thick as set (a little more in places). Inside, a honeycomb (6 mm cells, 0.8 mm walls) stands on the floor and carries the shell, so a hollow model is as stiff as a solid one for a fraction of the resin or filament. Slots at the foot of every honeycomb wall join the cells, so resin drains out through the vent holes of a closed model or the open bottom of an open one.
 - The {{ui:dental.hinge}} adds a snap-on hinge behind the last molars of a pair in occlusion: posts and an axle on the lower, a clip on the upper. Print both, snap the clip over the axle, and the models open and close in their bite.
 - Each model is one closed solid that replaces its scan; [[Ctrl]]+[[Z]] brings the scans back and [[Ctrl]]+[[Y]] makes the models again.
 

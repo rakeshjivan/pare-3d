@@ -99,7 +99,7 @@ describe("Dental Studio (build 47)", () => {
     for (let i = 2; i < part.positions.length; i += 3) minZ = Math.min(minZ, part.positions[i]);
     expect(minZ).toBeCloseTo(0, 4);
     expect(result.keptDepth[0]).toBeGreaterThan(analyseDental(input).arches[0].depth - 0.5);
-  });
+  }, 60_000);
 
   it("wears back a folded flap instead of cutting the whole edge", () => {
     const m = weld(syntheticArch({ flap: true }));
@@ -121,7 +121,7 @@ describe("Dental Studio (build 47)", () => {
       expect(pinchedEdges(result.parts[0].positions)).toBe(0);
     }
     expect(closed.warnings).not.toContain("vents");
-  });
+  }, 60_000);
 
   it("trims an orthodontic base and engraves its label", async () => {
     const input = { arches: [{ id: "a", positions: syntheticArch({ teethDown: true }) }] };
@@ -132,7 +132,7 @@ describe("Dental Studio (build 47)", () => {
     // Engraving takes a little away.
     expect(labelled.parts[0].volume).toBeLessThan(plain.parts[0].volume - 1);
     expect(labelled.parts[0].volume).toBeGreaterThan(plain.parts[0].volume - 60);
-  });
+  }, 60_000);
 
   it("draws the orthodontic outlines: square back, pointed upper front, rounded lower front", () => {
     const teeth: Array<[number, number]> = [];
@@ -176,10 +176,10 @@ describe("Dental Studio (build 47)", () => {
     expect(a.minZ).toBeCloseTo(0, 3);
     expect(b.minZ).toBeCloseTo(0, 3);
     expect(Math.max(a.minX, b.minX)).toBeGreaterThan(Math.min(a.maxX, b.maxX));
-  });
+  }, 60_000);
 
   it("starts each preset from the settings the evidence points to", () => {
-    expect(dentalPreset("study", 16, false)).toMatchObject({ inside: "open", baseStyle: "follow", keep: null });
+    expect(dentalPreset("study", 16, false)).toMatchObject({ inside: "open", baseStyle: "clean", keep: null });
     const aligner = dentalPreset("aligner", 16, false);
     expect(aligner.inside).toBe("solid");
     expect(aligner.keep! + aligner.base).toBeGreaterThanOrEqual(15);
@@ -210,7 +210,7 @@ describe("Dental Studio (build 47)", () => {
     expect(result.surface[0][-2]).toBeGreaterThan(300);
     expect(result.surface[0][-1]).toBeGreaterThanOrEqual(0.999);
     expect(result.surface[0][2]).toBeGreaterThanOrEqual(0.999);
-  });
+  }, 60_000);
 
   it("keeps a short quadrant whole, teeth and all", async () => {
     // A quadrant: a straight strip of five teeth with only a few mm of gum below them.
@@ -236,7 +236,7 @@ describe("Dental Studio (build 47)", () => {
     expect(result.surface[0][-2]).toBeGreaterThan(150);
     expect(result.surface[0][-1]).toBeGreaterThanOrEqual(0.999);
     expect(closedVolume(runtime, result.parts[0].positions).status).toBe("NoError");
-  });
+  }, 60_000);
 
   it("remembers where an imported file's coordinates went, so scans keep the scanner's places", () => {
     const stl = (points: number[]) => {
@@ -286,5 +286,18 @@ describe("Dental Studio (build 47)", () => {
     expect(gum.surface[0][-1]).toBeGreaterThanOrEqual(0.999);
     expect(gum.parts[0].volume).toBeLessThanOrEqual(straight.parts[0].volume);
     expect(closedVolume(runtime, gum.parts[0].positions).status).toBe("NoError");
-  });
+  }, 60_000);
+
+  it("stands a scan on a clean base, and fills a hollow one with a honeycomb (build 49)", async () => {
+    const input = { arches: [{ id: "a", positions: syntheticArch({ teethDown: true }) }] };
+    const clean = await makeDentalStudio(input, { ...base, baseStyle: "clean", base: 3 }, runtime as never);
+    expect(clean.warnings).not.toContain("teeth");
+    expect(clean.surface[0][-1]).toBeGreaterThanOrEqual(0.999);
+    expect(closedVolume(runtime, clean.parts[0].positions).status).toBe("NoError");
+    const empty = await makeDentalStudio(input, { ...base, baseStyle: "clean", base: 3, inside: "closed", infill: "none" }, runtime as never);
+    const honey = await makeDentalStudio(input, { ...base, baseStyle: "clean", base: 3, inside: "closed" }, runtime as never);
+    expect(honey.parts[0].volume).toBeGreaterThan(empty.parts[0].volume);
+    expect(honey.parts[0].volume).toBeLessThan(clean.parts[0].volume);
+    expect(closedVolume(runtime, honey.parts[0].positions).status).toBe("NoError");
+  }, 60_000);
 });

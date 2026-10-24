@@ -4,6 +4,17 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 49,
+    items: [
+      "Dental Studio makes cleaner models: the new Clean base (now the default for study models) cuts the gum level a set depth below the teeth and stands the scan on a smooth, rounded base with straight walls - no rough walls built from the scan's edge.",
+      "Hollow models get a honeycomb inside: as stiff as solid for a fraction of the resin or filament, with slots so resin drains through the vents.",
+      "Arches are levelled on the cusp tips of every tooth, and a full arch with tall front teeth is no longer taken for a quadrant.",
+      "Every Dental Studio model is written as one clean, closed surface with no pinched or open edges, checked on 15 real scans, and a fold of cheek or tongue standing high above the teeth is no longer taken for a tooth.",
+      "Make solid now runs Pare's own STL repair engine (from Pare's STL View, Repair & Resize): holes, broken and doubled triangles, folds, pinches and loose crumbs. The Mesh group stays on the toolbar.",
+      "Cut below the workplane is in the right-click menu of every solid part.",
+    ],
+  },
+  {
     build: 48,
     items: [
       "Dental Studio: trim a scan by hand - choose the arch, turn the view and draw a line round what to keep (or what to remove). Teeth are never trimmed, even inside the line, and Ctrl+Z takes a trim back.",

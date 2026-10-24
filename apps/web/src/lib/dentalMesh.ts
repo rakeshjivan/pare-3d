@@ -507,10 +507,13 @@ export function solidPositions(solid: ManifoldSolid): Float32Array {
   for (let i = 0; i < n; i += 1) for (let k = 0; k < 3; k += 1) px[i * 3 + k] = mesh.vertProperties[i * mesh.numProp + k];
   // Where the solid touches itself (two lobes of a cavity meeting at an edge) Manifold keeps two
   // vertices at one place. Joined again on import they would make an edge of four faces, so each
-  // copy is moved 2 microns towards its own neighbours: apart, the solid welds back cleanly.
+  // copy is moved a few microns towards its own neighbours: apart, the solid welds back as
+  // Manifold built it.
   const at = new Map<string, number[]>();
   for (let i = 0; i < n; i += 1) {
-    const key = `${px[i * 3]},${px[i * 3 + 1]},${px[i * 3 + 2]}`;
+    // Compared as they will be written (32-bit floats): two corners a nanometre apart in Manifold's
+    // doubles land on one point in the file, and a slicer would read them as one.
+    const key = `${Math.fround(px[i * 3])},${Math.fround(px[i * 3 + 1])},${Math.fround(px[i * 3 + 2])}`;
     const list = at.get(key);
     if (list) list.push(i);
     else at.set(key, [i]);
@@ -529,13 +532,32 @@ export function solidPositions(solid: ManifoldSolid): Float32Array {
       }
       sum.set(v, entry);
     }
+    const way = new Map<number, [number, number, number]>();
     sum.forEach(([x, y, z, count], v) => {
       const dx = x / count - px[v * 3], dy = y / count - px[v * 3 + 1], dz = z / count - px[v * 3 + 2];
       const length = Math.hypot(dx, dy, dz) || 1;
-      px[v * 3] += (dx / length) * 0.002;
-      px[v * 3 + 1] += (dy / length) * 0.002;
-      px[v * 3 + 2] += (dz / length) * 0.002;
+      way.set(v, [dx / length, dy / length, dz / length]);
     });
+    // Copies whose neighbours lie the same way (thin flaps stacked on each other) would land on one
+    // point again, so each copy in a group goes a little further than the one before.
+    at.forEach((list) => {
+      if (list.length < 2) return;
+      list.forEach((v, j) => {
+        const d = way.get(v) ?? [0, 0, 1];
+        const step = 0.002 * (j + 1);
+        px[v * 3] += d[0] * step; px[v * 3 + 1] += d[1] * step; px[v * 3 + 2] += d[2] * step;
+      });
+    });
+    // Checked as written: any corners still on one point are moved apart along z by a micron more.
+    for (let round = 0; round < 6; round += 1) {
+      const seen = new Map<string, number>();
+      let moved = false;
+      for (const v of wanted) {
+        const key = `${Math.fround(px[v * 3])},${Math.fround(px[v * 3 + 1])},${Math.fround(px[v * 3 + 2])}`;
+        if (seen.has(key)) { px[v * 3 + 2] += 0.001 * (round + 1); moved = true; } else seen.set(key, v);
+      }
+      if (!moved) break;
+    }
   }
   const out = new Float32Array(mesh.triVerts.length * 3);
   for (let i = 0; i < mesh.triVerts.length; i += 1) {
@@ -544,20 +566,212 @@ export function solidPositions(solid: ManifoldSolid): Float32Array {
     out[i * 3 + 1] = px[base + 1];
     out[i * 3 + 2] = px[base + 2];
   }
+  return tidyForFile(out);
+}
+
+/**
+ * Makes a triangle list read as one clean closed surface once a slicer joins corners that sit at the
+ * same point (as written, in 32-bit floats). Triangles that collapse to a line, and pairs of the same
+ * triangle facing both ways, are dropped. Where two parts of the surface still meet at a corner or an
+ * edge, each part gets its own copy of the corner, 2 microns towards its own side.
+ */
+export function tidyForFile(soup: Float32Array): Float32Array {
+  const count = soup.length / 3;
+  const ids = new Int32Array(count);
+  const at = new Map<string, number>();
+  const pts: number[] = [];
+  // Corners are joined only where they are the same point, as an STL file is read.
+  for (let i = 0; i < count; i += 1) {
+    const x = soup[i * 3], y = soup[i * 3 + 1], z = soup[i * 3 + 2];
+    const key = `${x},${y},${z}`;
+    let id = at.get(key);
+    if (id === undefined) { id = pts.length / 3; at.set(key, id); pts.push(x, y, z); }
+    ids[i] = id;
+  }
+  // Drop collapsed triangles, and a triangle met by its own mirror image.
+  let tris: number[] = [];
+  const faceOf = new Map<string, number>();
+  for (let t = 0; t < count; t += 3) {
+    const a = ids[t], b = ids[t + 1], c = ids[t + 2];
+    if (a === b || b === c || a === c) continue;
+    const sorted = [a, b, c].sort((x, y) => x - y).join(",");
+    const other = faceOf.get(sorted);
+    if (other !== undefined && other >= 0) {
+      const oa = tris[other], ob = tris[other + 1], oc = tris[other + 2];
+      const same = (oa === a && ob === b && oc === c) || (oa === b && ob === c && oc === a) || (oa === c && ob === a && oc === b);
+      if (!same) { tris[other] = -1; faceOf.set(sorted, -1); continue; }
+    }
+    faceOf.set(sorted, tris.length);
+    tris.push(a, b, c);
+  }
+  const dropped: number[] = [];
+  for (let t = 0; t < tris.length; t += 3) if (tris[t] >= 0) dropped.push(tris[t], tris[t + 1], tris[t + 2]);
+  tris = dropped;
+  const nt = tris.length / 3;
+  const edgeKey = (a: number, b: number) => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
+  const edgeUse = new Map<number, number>();
+  for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) {
+    const key = edgeKey(tris[t * 3 + k], tris[t * 3 + ((k + 1) % 3)]);
+    edgeUse.set(key, (edgeUse.get(key) ?? 0) + 1);
+  }
+  const corners = new Map<number, number[]>();
+  for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) {
+    const v = tris[t * 3 + k];
+    const list = corners.get(v);
+    if (list) list.push(t); else corners.set(v, [t]);
+  }
+  // Where an edge is used by more than two triangles, pair them as the solid does: each triangle with
+  // the first one met turning from it into the material. Two parts touching along an edge each keep
+  // their own pair; a sheet of no thickness pairs its two faces with each other.
+  const orig = Int32Array.from(tris);
+  const partner = new Map<string, number>();
+  const onEdge = new Map<number, number[]>();
+  for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) {
+    const key = edgeKey(orig[t * 3 + k], orig[t * 3 + ((k + 1) % 3)]);
+    if ((edgeUse.get(key) ?? 0) <= 2) continue;
+    const list = onEdge.get(key);
+    if (list) list.push(t); else onEdge.set(key, [t]);
+  }
+  const P = (i: number) => [pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2]];
+  const sub = (a: number[], b: number[]) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  onEdge.forEach((faces, key) => {
+    const a = Math.floor(key / 4294967296), b = key % 4294967296;
+    const pa = P(a), d = sub(P(b), pa);
+    const dl = Math.hypot(d[0], d[1], d[2]) || 1;
+    const axis = [d[0] / dl, d[1] / dl, d[2] / dl];
+    const info = faces.map((t) => {
+      const c = [0, 1, 2].map((k) => orig[t * 3 + k]);
+      const third = c.find((x) => x !== a && x !== b)!;
+      let r = sub(P(third), pa);
+      r = sub(r, axis.map((x) => x * dot(r, axis)));
+      const normal = cross(sub(P(c[1]), P(c[0])), sub(P(c[2]), P(c[0])));
+      const forward = c.findIndex((x) => x === a);
+      const ab = c[(forward + 1) % 3] === b;
+      return { t, r, ab, turn: Math.sign(dot(cross(r, normal.map((x) => -x)), axis)) || 1 };
+    });
+    const ref = info[0].r;
+    const angle = (r: number[]) => Math.atan2(dot(cross(ref, r), axis), dot(ref, r));
+    const choice = info.map((f) => {
+      let best = -1, bestGap = Infinity;
+      info.forEach((g, j) => {
+        if (g === f || g.ab === f.ab) return;
+        let gap = (angle(g.r) - angle(f.r)) * f.turn;
+        gap = ((gap % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        if (gap > 2 * Math.PI - 1e-3) gap = 0;
+        if (gap < bestGap) { bestGap = gap; best = j; }
+      });
+      return best;
+    });
+    choice.forEach((j, i) => {
+      if (j >= 0 && choice[j] === i) partner.set(`${info[i].t}:${key}`, info[j].t);
+    });
+  });
+  // At each corner, the triangles around it fall into fans joined by their shared edges.
+  // One fan is a clean corner; more than one is a pinch, and each fan gets its own copy.
+  let next = pts.length / 3;
+  corners.forEach((list, v) => {
+    if (list.length < 3) return;
+    const fan = new Map<number, number>();
+    let fans = 0;
+    for (const start of list) {
+      if (fan.has(start)) continue;
+      const stack = [start];
+      fan.set(start, fans);
+      while (stack.length) {
+        const t = stack.pop()!;
+        for (let k = 0; k < 3; k += 1) {
+          const w = orig[t * 3 + k];
+          if (w === v) continue;
+          const key = edgeKey(v, w);
+          const use = edgeUse.get(key);
+          if (use === 2) {
+            for (const u of list) {
+              if (fan.has(u)) continue;
+              if (orig[u * 3] === w || orig[u * 3 + 1] === w || orig[u * 3 + 2] === w) { fan.set(u, fans); stack.push(u); }
+            }
+          } else if (use && use > 2) {
+            const u = partner.get(`${t}:${key}`);
+            if (u !== undefined && !fan.has(u)) { fan.set(u, fans); stack.push(u); }
+          }
+        }
+      }
+      fans += 1;
+    }
+    if (fans < 2) return;
+    for (let f = 1; f < fans; f += 1) {
+      let sx = 0, sy = 0, sz = 0, n = 0;
+      const mine = list.filter((t) => fan.get(t) === f);
+      for (const t of mine) for (let k = 0; k < 3; k += 1) {
+        const w = orig[t * 3 + k];
+        if (w === v) continue;
+        sx += pts[w * 3]; sy += pts[w * 3 + 1]; sz += pts[w * 3 + 2]; n += 1;
+      }
+      const dx = sx / n - pts[v * 3], dy = sy / n - pts[v * 3 + 1], dz = sz / n - pts[v * 3 + 2];
+      const length = Math.hypot(dx, dy, dz) || 1;
+      const id = next; next += 1;
+      pts.push(pts[v * 3] + (dx / length) * 0.002, pts[v * 3 + 1] + (dy / length) * 0.002, pts[v * 3 + 2] + (dz / length) * 0.002);
+      for (const t of mine) for (let k = 0; k < 3; k += 1) if (orig[t * 3 + k] === v) tris[t * 3 + k] = id;
+    }
+  });
+  // A split must never open the surface: where a copy left an edge with one triangle, the corners
+  // of that edge go back to the corner they came from (and the pinch there stays as it was).
+  const from = new Map<number, number>();
+  tris.forEach((id, i) => { if (id !== orig[i]) from.set(id, orig[i]); });
+  for (let round = 0; round < 8 && from.size; round += 1) {
+    const use = new Map<number, number>();
+    for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) {
+      const key = edgeKey(tris[t * 3 + k], tris[t * 3 + ((k + 1) % 3)]);
+      use.set(key, (use.get(key) ?? 0) + 1);
+    }
+    const undo = new Set<number>();
+    for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) {
+      const a = tris[t * 3 + k], b = tris[t * 3 + ((k + 1) % 3)];
+      if (use.get(edgeKey(a, b)) !== 1) continue;
+      if (from.has(a)) undo.add(a);
+      if (from.has(b)) undo.add(b);
+    }
+    if (!undo.size) break;
+    for (let i = 0; i < tris.length; i += 1) if (undo.has(tris[i])) tris[i] = orig[i];
+    undo.forEach((id) => from.delete(id));
+  }
+  const all = pts;
+  const out = new Float32Array(tris.length * 3);
+  for (let i = 0; i < tris.length; i += 1) {
+    out[i * 3] = all[tris[i] * 3];
+    out[i * 3 + 1] = all[tris[i] * 3 + 1];
+    out[i * 3 + 2] = all[tris[i] * 3 + 2];
+  }
   return out;
 }
 
-/** The cavity of a hollow model: the solid shrunk by `wall`, carried on down through the floor. */
+/**
+ * Edges that are not shared by exactly two triangles once corners at the same point are joined, as
+ * an STL file is read (the 32-bit values it holds): pinched edges and open ones. 0 is a clean,
+ * closed surface.
+ */
 export function pinchedEdges(positions: ArrayLike<number>): number {
-  const m = weld(positions, 1e-5);
-  const counts = new Map<number, number>();
-  for (let t = 0; t < m.f.length; t += 3) for (let k = 0; k < 3; k += 1) {
-    const key = edgeKey(m.f[t + k], m.f[t + ((k + 1) % 3)]);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+  const id = new Map<string, number>();
+  const ids = new Int32Array(Math.floor(positions.length / 3));
+  for (let i = 0; i < ids.length; i += 1) {
+    const key = `${Math.fround(positions[i * 3])},${Math.fround(positions[i * 3 + 1])},${Math.fround(positions[i * 3 + 2])}`;
+    let n = id.get(key);
+    if (n === undefined) { n = id.size; id.set(key, n); }
+    ids[i] = n;
   }
-  let pinched = 0;
-  counts.forEach((count) => { if (count > 2) pinched += 1; });
-  return pinched;
+  const counts = new Map<number, number>();
+  for (let t = 0; t + 2 < ids.length; t += 3) {
+    const a = ids[t], b = ids[t + 1], c = ids[t + 2];
+    if (a === b || b === c || a === c) continue;
+    for (const [x, y] of [[a, b], [b, c], [c, a]]) {
+      const key = edgeKey(x, y);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  let bad = 0;
+  counts.forEach((count) => { if (count !== 2) bad += 1; });
+  return bad;
 }
 
 
