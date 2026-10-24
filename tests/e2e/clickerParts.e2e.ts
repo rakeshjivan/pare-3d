@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 (globalThis as unknown as { window: unknown }).window = { location: { href: pathToFileURL(resolve("apps/web/public") + "/").href } };
-import { CLICKER_BASE_HEIGHT, CLICKER_TOP_HEIGHT, clickerBasePart, clickerTopPart } from "@/lib/clickerParts";
+import { CLICKER_BASE_HEIGHT, CLICKER_DEFAULT_GAP, CLICKER_SOCKET_DEPTH, clickerBasePart, clickerTopPart } from "@/lib/clickerParts";
 import { buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { meshForShape } from "@/lib/editorMeshCore";
 import { canonicalizeShape } from "@/lib/workplaneShapes";
@@ -36,10 +36,10 @@ function openEdges(positions: number[]) {
 
 describe("Clicker pieces (build 54, reworked in build 56)", () => {
   const base = clickerBasePart("Clicker base").shapes[0];
-  const top = clickerTopPart("Clicker top").shapes[0];
+  const [top, stemHole] = clickerTopPart("Clicker top", "Stem hole").shapes;
 
   it("are closed, of the switch's size, and keep it", () => {
-    for (const piece of [base, top]) {
+    for (const piece of [base, top, stemHole]) {
       expect(piece.fixedSize).toBe(true);
       expect(openEdges(piece.importedMesh!.positions)).toBe(0);
       const resized = canonicalizeShape({ ...piece, width: 40, depth: 9, height: 20, size: 40 });
@@ -47,8 +47,10 @@ describe("Clicker pieces (build 54, reworked in build 56)", () => {
     }
     expect(base.hole).toBe(true);
     expect(top.hole).toBe(false);
+    expect(stemHole.hole).toBe(true);
     expect([base.width, base.depth, base.height]).toEqual([15.8, 15.9, CLICKER_BASE_HEIGHT]);
-    expect([top.width, top.depth, top.height]).toEqual([5.6, 5.6, CLICKER_TOP_HEIGHT]);
+    expect([top.width, top.depth, top.height]).toEqual([5.6, 5.6, CLICKER_DEFAULT_GAP]);
+    expect(clickerTopPart("t", "h", 4.5).shapes[0].height).toBe(4.5);
   });
 
   it("sinks the whole switch into a base, its top level with the face", async () => {
@@ -61,14 +63,19 @@ describe("Clicker pieces (build 54, reworked in build 56)", () => {
     expect(vertices.some(([x, y]) => Math.abs(Math.abs(x) - 7.9) < 0.01 && Math.abs(y - (20 - 6.6)) < 0.01)).toBe(true);
   });
 
-  it("adds the stem post to a top, 4.5 mm proud, with the cross hole in it", async () => {
+  it("adds the stem post to a top, as long as the gap, with the cross hole reaching into the top", async () => {
     const half = block(10);
     const post = canonicalizeShape({ ...top, elevation: 10 });
-    const result = await buildGroupedShapeFromSelection([half, post], 400000);
-    expect(volume(result.group!) - volume(half)).toBeCloseTo(70.92, 0);
+    const hole = canonicalizeShape({ ...stemHole, elevation: 10 + (stemHole.elevation ?? 0) });
+    const result = await buildGroupedShapeFromSelection([half, post, hole], 400000);
     const { vertices } = meshForShape(result.group!);
-    expect(Math.max(...vertices.map((v) => v[1]))).toBeCloseTo(14.5, 3);
-    // The cross hole reaches 3.8 mm into the post from its end.
-    expect(vertices.some(([x, y, z]) => Math.abs(Math.abs(x) - 2.17) < 0.01 && Math.abs(z) < 0.8 && Math.abs(y - (14.5 - 3.8)) < 0.06)).toBe(true);
+    expect(Math.max(...vertices.map((v) => v[1]))).toBeCloseTo(10 + CLICKER_DEFAULT_GAP, 3);
+    // The cross hole's floor: 3.8 mm in from the post's end, so 1.3 mm into the top itself.
+    const floor = 10 + CLICKER_DEFAULT_GAP - CLICKER_SOCKET_DEPTH;
+    expect(vertices.some(([x, y, z]) => Math.abs(Math.abs(x) - 2.17) < 0.01 && Math.abs(z) < 0.8 && Math.abs(y - floor) < 0.01)).toBe(true);
+    // Added: the post less the hole; taken: the hole's part in the top.
+    const cross = 2 * 4.34 * 1.45 - 1.45 * 1.45;
+    const disc = 0.5 * 96 * 2.8 * 2.8 * Math.sin((2 * Math.PI) / 96);
+    expect(volume(result.group!) - volume(half)).toBeCloseTo(disc * CLICKER_DEFAULT_GAP - cross * CLICKER_SOCKET_DEPTH, 0);
   });
 });

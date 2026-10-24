@@ -5,7 +5,7 @@
  * a freehand line; letting go closes it. Points are in page pixels. Esc gives up.
  */
 import { smoothRing } from "@/lib/dentalBase";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { createPortal } from "react-dom";
 
 export type TrimPoint = [number, number];
@@ -39,7 +39,10 @@ export function DentalTrimOverlay({ hint, onDone, onCancel }: { hint: string; on
       className="dental-trim-overlay"
       role="application"
       aria-label={hint}
+      onWheel={passToView.wheel}
+      onContextMenu={(event) => event.preventDefault()}
       onPointerDown={(event) => {
+        if (passToView.pointerDown(event)) return;
         if (event.button !== 0) return;
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -149,6 +152,53 @@ export function trimLineDistance(projected: Float32Array, line: TrimPoint[]): Fl
  * Fork (build 53): Dental Studio's brush for the tooth area. Press and drag to paint a stroke of
  * `radius` pixels; letting go hands the stroke over. Esc gives up.
  */
+/**
+ * Fork (build 56): the drawing overlays keep the left button for drawing and hand everything else
+ * to the 3D view under them - right or middle drag turns and pans it, the wheel zooms - so the
+ * model can be looked at from every side while its tooth area or margin is edited.
+ */
+function viewCanvas(overlay: HTMLElement) {
+  return overlay.parentElement?.querySelector<HTMLCanvasElement>("canvas") ?? null;
+}
+
+export const passToView = {
+  pointerDown(event: ReactPointerEvent<HTMLElement>) {
+    if (event.button === 0) return false;
+    const overlay = event.currentTarget;
+    const canvas = viewCanvas(overlay);
+    if (!canvas) return false;
+    event.preventDefault();
+    // Out of the way until the button comes up, so the drag goes to the view.
+    overlay.style.pointerEvents = "none";
+    const restore = () => {
+      overlay.style.pointerEvents = "";
+      window.removeEventListener("pointerup", restore, true);
+      window.removeEventListener("pointercancel", restore, true);
+    };
+    window.addEventListener("pointerup", restore, true);
+    window.addEventListener("pointercancel", restore, true);
+    const native = event.nativeEvent;
+    canvas.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, cancelable: true, composed: true,
+      pointerId: native.pointerId, pointerType: native.pointerType, isPrimary: native.isPrimary,
+      button: native.button, buttons: native.buttons, clientX: native.clientX, clientY: native.clientY,
+      screenX: native.screenX, screenY: native.screenY, ctrlKey: native.ctrlKey, shiftKey: native.shiftKey, altKey: native.altKey, metaKey: native.metaKey,
+    }));
+    return true;
+  },
+  wheel(event: ReactWheelEvent<HTMLElement>) {
+    const canvas = viewCanvas(event.currentTarget);
+    if (!canvas) return;
+    const native = event.nativeEvent;
+    canvas.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true, cancelable: true, composed: true,
+      deltaX: native.deltaX, deltaY: native.deltaY, deltaZ: native.deltaZ, deltaMode: native.deltaMode,
+      clientX: native.clientX, clientY: native.clientY, screenX: native.screenX, screenY: native.screenY,
+      ctrlKey: native.ctrlKey, shiftKey: native.shiftKey, altKey: native.altKey, metaKey: native.metaKey,
+    }));
+  },
+};
+
 export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel }: { hint: string; radius: number; erase: boolean; onDone: (points: TrimPoint[]) => void; onCancel: () => void }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
   const [points, setPoints] = useState<TrimPoint[]>([]);
@@ -172,6 +222,7 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel }: { 
       role="application"
       aria-label={hint}
       onPointerDown={(event) => {
+        if (passToView.pointerDown(event)) return;
         if (event.button !== 0) return;
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -179,6 +230,8 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel }: { 
         line.current = [[event.clientX, event.clientY]];
         setPoints(line.current);
       }}
+      onWheel={passToView.wheel}
+      onContextMenu={(event) => event.preventDefault()}
       onPointerMove={(event) => {
         setCursor([event.clientX, event.clientY]);
         if (!drawing.current) return;

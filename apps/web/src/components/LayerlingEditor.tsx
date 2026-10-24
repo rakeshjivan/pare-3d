@@ -5121,8 +5121,10 @@ export function LayerlingEditor({
    * once (grouped with it, so Ungroup still takes it apart). A face that is curved, or a part too
    * thin or small for the switch, is said so; the cutter is then left where it was set down.
    */
-  const cutClickerInto = useCallback(async (cutterId: string, part: WorkplaneShape, target: { point: PlacementPoint; normal: PlacementPoint; workplane: PlacementWorkplane; hit?: PlacementPoint }, sink: number, cutterName: string, insertEntry: unknown) => {
+  const cutClickerInto = useCallback(async (pieceIds: readonly string[], part: WorkplaneShape, target: { point: PlacementPoint; normal: PlacementPoint; workplane: PlacementWorkplane; hit?: PlacementPoint }, sinks: ReadonlyMap<string, number>, cutterName: string, insertEntry: unknown) => {
     const before = shapesRef.current;
+    // The first piece leads (the pocket, or the top's post); the others (the post's cross hole) come along.
+    const cutterId = pieceIds[0];
     const cutter = before.find((shape) => shape.id === cutterId);
     if (!cutter) return;
     const read = readPerforableFace(worldTrianglePositions(part), target.hit ?? target.point, target.normal);
@@ -5154,29 +5156,36 @@ export function LayerlingEditor({
     } else {
       notes.push(t("clicker.notFlat"));
     }
-    const patches = carriedOntoFace(before, [cutterId], { ...target, point }, cutterId);
+    const patches = carriedOntoFace(before, pieceIds, { ...target, point }, cutterId);
     const length = Math.hypot(target.normal.x, target.normal.y, target.normal.z) || 1;
-    const patch = patches.get(cutterId) ?? {};
-    const moved = { ...cutter, ...patch };
-    const placed = canonicalizeShape(sink
-      ? { ...moved, x: moved.x - (target.normal.x / length) * sink, z: moved.z - (target.normal.z / length) * sink, elevation: (moved.elevation ?? 0) - (target.normal.y / length) * sink }
-      : moved);
+    const placedById = new Map<string, WorkplaneShape>();
+    for (const id of pieceIds) {
+      const piece = before.find((shape) => shape.id === id);
+      if (!piece) continue;
+      const moved = { ...piece, ...(patches.get(id) ?? {}) };
+      const sink = sinks.get(id) ?? 0;
+      placedById.set(id, canonicalizeShape(sink
+        ? { ...moved, x: moved.x - (target.normal.x / length) * sink, z: moved.z - (target.normal.z / length) * sink, elevation: (moved.elevation ?? 0) - (target.normal.y / length) * sink }
+        : moved));
+    }
+    const placedPieces = [...placedById.values()];
+    const leaveSetDown = (message: string) => commitShapes(before.map((shape) => placedById.get(shape.id) ?? shape), [...placedById.keys()], message);
     if (!read.ok) {
-      commitShapes(before.map((shape) => (shape.id === cutterId ? placed : shape)), [cutterId], notes.join(" "));
+      leaveSetDown(notes.join(" "));
       return;
     }
     const fingerprint = projectShapesFingerprint(shapesRef.current);
-    const result = await whileBusy("combine", () => buildGroupedShapeFromSelection([part, placed], workspaceSettingsRef.current.booleanTriangleLimit));
+    const result = await whileBusy("combine", () => buildGroupedShapeFromSelection([part, ...placedPieces], workspaceSettingsRef.current.booleanTriangleLimit));
     if (projectShapesFingerprint(shapesRef.current) !== fingerprint) {
       setNotice(t("status.groupChanged"));
       return;
     }
     if (!result.group) {
-      commitShapes(before.map((shape) => (shape.id === cutterId ? placed : shape)), [cutterId], result.failureNotice);
+      leaveSetDown(result.failureNotice ?? "");
       return;
     }
     const cut = canonicalizeShape({ ...result.group, name: part.name });
-    const next = before.filter((shape) => shape.id !== cutterId).map((shape) => (shape.id === part.id ? cut : shape));
+    const next = before.filter((shape) => !placedById.has(shape.id)).map((shape) => (shape.id === part.id ? cut : shape));
     commitShapes(next, [cut.id], [t(cutter.hole ? "clicker.cut" : "clicker.added", { cutter: cutterName, part: displayShapeName(part) }), ...notes].join(" "), undefined, insertEntry);
   }, [commitShapes]);
 
@@ -5208,9 +5217,9 @@ export function LayerlingEditor({
     carryFaceTextRef.current = false;
     const cutInto = carryCutIntoRef.current;
     carryCutIntoRef.current = null;
-    const part = cutInto && ids.length === 1 && target.shapeId && !ids.includes(target.shapeId) ? shapes.find((shape) => shape.id === target.shapeId) : undefined;
+    const part = cutInto && target.shapeId && !ids.includes(target.shapeId) ? shapes.find((shape) => shape.id === target.shapeId) : undefined;
     if (cutInto && part && !part.hole && !part.locked && !isNonSolidShapeKind(part.kind)) {
-      void cutClickerInto(ids[0], part, target, carrySinkRef.current.get(ids[0]) ?? 0, cutInto.name, cutInto.entry);
+      void cutClickerInto(ids, part, target, carrySinkRef.current, cutInto.name, cutInto.entry);
       carrySinkRef.current = new Map();
       carryAfterNoticeRef.current = null;
       return;
