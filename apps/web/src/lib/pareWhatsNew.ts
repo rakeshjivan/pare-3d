@@ -9,6 +9,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Clicker in one click each: Add the Clicker base, click the base's flat face, and the pocket goes into the middle of the face and is cut in at once; the same for the Clicker top. No moving, centring or grouping by hand.",
       "The clicker now hides the switch: the base pocket takes the whole switch, its top level with the face (build 54's held only the part under a keyboard plate, so the switch stood out). The top is a post that pushes onto the stem, as long as the gap you choose between the halves: 2.5 mm by default (enough for a blue switch to click), up to 4.5 mm for the full 4 mm press.",
       "Dental Studio: models made in occlusion now stand on the workplane instead of hanging below it, still in their bite.",
+      "Dental Studio, editing the tooth area: right-drag turns the model, middle-drag pans and the wheel zooms while a brush or lasso is active, so you can look round the teeth as you paint or erase.",
+      "Dental Studio: the painted tooth area turns and moves with its model, and your edits are kept when the model is turned.",
     ],
   },
   {
