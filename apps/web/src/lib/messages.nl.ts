@@ -3617,6 +3617,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "dental.step2": "2 · Met de hand bijsnijden (zo nodig)",
   "dental.step3": "3 · Het model",
   "dental.cleanBase": "Strak",
+  "dental.basePresets": "Voet onder de rand",
+  "dental.basePresetsHint": "Hoe ver de voet onder de bijgesneden rand reikt; kies er een, of stel met de schuif elke hoogte in.",
   "dental.articulatorBase": "Articulatorplaat",
   "dental.notches": "Positioneerinkepingen aan de voet",
   "dental.notchesHint": "Halfronde inkepingen aan de voet van de wand, voor en opzij, zodat een lab het model steeds hetzelfde plaatst.",

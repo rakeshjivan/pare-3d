@@ -3618,6 +3618,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "dental.step2": "2 · Von Hand beschneiden (bei Bedarf)",
   "dental.step3": "3 · Das Modell",
   "dental.cleanBase": "Sauber",
+  "dental.basePresets": "Sockel unter dem Rand",
+  "dental.basePresetsHint": "Wie weit der Sockel unter den beschnittenen Rand reicht; eine wählen oder am Schieber jede Höhe einstellen.",
   "dental.articulatorBase": "Artikulatorplatte",
   "dental.notches": "Positionierkerben am Fuß",
   "dental.notchesHint": "Halbrunde Kerben am Fuß der Wand, vorn und seitlich, damit ein Labor das Modell immer gleich aufsetzt.",

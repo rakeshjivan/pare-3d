@@ -242,7 +242,7 @@ export function DentalStudioPanel({
           <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.baseStyle")}>
             <span className="edge-modifier-label">{t("dental.baseStyle")}</span>
             <div className="shell-opening-options">
-              {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")], ["articulator", t("dental.articulatorBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
+              {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
                 <button key={value} type="button" role="radio" aria-checked={options.baseStyle === value} className={options.baseStyle === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ baseStyle: value })}>{label}</button>
               ))}
             </div>
@@ -262,6 +262,16 @@ export function DentalStudioPanel({
             </>
           ) : null}
           <EdgeModifierSlider label={t(options.baseStyle === "ortho" ? "dental.orthoHeight" : "dental.base")} value={options.base} min={DENTAL_MIN_BASE} max={DENTAL_MAX_BASE} step={0.5} coarse={{ step: 0.5, max: 20 }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ base: value })} />
+          {options.baseStyle !== "ortho" ? (
+            <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.basePresets")} title={t("dental.basePresetsHint")}>
+              <span className="edge-modifier-label">{t("dental.basePresets")}</span>
+              <div className="shell-opening-options">
+                {[3, 5, 10, 15].map((value) => (
+                  <button key={value} type="button" role="radio" aria-checked={Math.abs(options.base - value) < 1e-6} className={Math.abs(options.base - value) < 1e-6 ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ base: value })}>{`${value} mm`}</button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.inside")}>
             <span className="edge-modifier-label">{t("dental.inside")}</span>
             <div className="shell-opening-options">

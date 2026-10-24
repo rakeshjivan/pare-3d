@@ -16,7 +16,7 @@
 import * as THREE from "three";
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
 import { alignToBite, archFrame, canineWidth, cleanScan, frontOf, isPartialArch, marginUp, pairFrame, palateScore, type CleanArch, type CleanReport } from "@/lib/dentalArch";
-import { blockOutline, cleanOutline, closeToFloor, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, underFill, capOutsideCrowns, CAP_ABOVE_PLANE, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, hingeParts, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
+import { blockOutline, cleanOutline, closeToFloor, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, hingeParts, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
 import {
   applyMatrix, boundaryLoops, cloneMesh, convexHull, cutBelow, dropFragments, faceArea, loopLength, surfaceKept, pinchedEdges, solidPositions, toManifold, upwardness, weld,
@@ -423,6 +423,8 @@ function buildArch(
   const keepSolid = (solid: ManifoldSolid) => { made.push(solid); return solid; };
   let solid = keepSolid(toManifold(runtime, closed.mesh));
   let footprint: Ring[] = closed.outline;
+  // The outline whose front face carries the label (orthodontic and articulator bases).
+  let labelRing: Ring | null = options.baseStyle === "ortho" ? ortho : null;
   if (options.baseStyle === "ortho" && ortho) {
     const block = keepSolid(prism(runtime, ortho, floor, floor + Math.max(DENTAL_MIN_BASE, options.base)));
     solid = keepSolid(runtime.Manifold.union(solid, block));
@@ -432,21 +434,18 @@ function buildArch(
   } else if (options.baseStyle === "clean" || options.baseStyle === "articulator") {
     // The block fills the outline up to where the scan was cut; above it only the scan shows,
     // trimmed to the same outline.
-    const rings = cleanOutline(runtime, cut, teeth, Math.max(0.5, options.gum ?? CLEAN_GUM), { mesh: m, crowns });
+    const rings = cleanOutline(runtime, cut, teeth, Math.max(0.5, options.gum ?? CLEAN_GUM), { mesh: m, crowns, partial: arch.partial });
     if (rings.length) {
       const blockTop = Math.max(floor + Math.max(DENTAL_MIN_BASE, options.base), level);
-      // Build 50: under the gum filled, so the wall rises clean to it all round.
-      const fill = keepSolid(underFill(runtime, cut, rings, floor));
-      if (fill.status() === "NoError" && !fill.isEmpty()) solid = keepSolid(runtime.Manifold.union(solid, fill));
-      // Tissue standing above the teeth beside them (the pad behind the last molar, a fold) is
-      // trimmed level just over the occlusal plane; the crowns, and 1 mm round them, are not.
-      const cap = keepSolid(capOutsideCrowns(runtime, rings, m, crowns, CAP_ABOVE_PLANE, top + 5));
-      if (!cap.isEmpty()) solid = keepSolid(runtime.Manifold.difference(solid, cap));
       if (options.baseStyle === "articulator") {
         // The scan trimmed to its outline, standing on a block for a magnetic articulator plate.
         const trim = keepSolid(prismOf(runtime, rings, floor - 0.001, top + 5));
         solid = keepSolid(runtime.Manifold.intersection(solid, trim));
-        const plate = articulatorOutline(rings);
+        // Build 51: shaped as an orthodontic base round the arch (back square, heels angled, the
+        // upper's front pointed and the lower's rounded); a quadrant gets a square block.
+        const around = rings.filter((ring) => signedRing(ring) > 0).flat();
+        const plate = arch.partial ? articulatorOutline(rings) : orthoOutline(around, arch.role, 2);
+        labelRing = plate;
         const block = keepSolid(prism(runtime, plate, floor, blockTop));
         solid = keepSolid(runtime.Manifold.union(solid, block));
         solid = keepSolid(runtime.Manifold.difference(solid, keepSolid(articulatorPockets(runtime, plate, floor))));
@@ -502,8 +501,8 @@ function buildArch(
   }
   const text = labelText(labelLine);
   if (text) {
-    if (options.baseStyle === "ortho" && ortho && options.base >= 3) {
-      const side = outlineSide(ortho, arch.partial ? 0 : arch.role === "upper" ? -25 : -35);
+    if ((options.baseStyle === "ortho" || options.baseStyle === "articulator") && labelRing && options.base >= 3) {
+      const side = outlineSide(labelRing, arch.partial ? 0 : arch.role === "upper" ? -25 : -35);
       const sideLength = Math.hypot(side.b[0] - side.a[0], side.b[1] - side.a[1]);
       let height = Math.min(5, options.base * 0.55);
       const width = labelWidth(text, height);
@@ -542,10 +541,14 @@ function buildArch(
   // What is promised: the teeth, all but the ragged fringe right at the scan's edge.
   const fromEdge = distanceFromEdge(m, EDGE_FRINGE);
   // Build 50: the crowns (CROWN_REACH from their tips), not the gum or flaps of tissue beside them.
-  const promised = crowns.map((inZone, i) => (inZone && fromEdge[i] > EDGE_FRINGE ? 1 : 0));
+  // Build 51: the teeth as found on the whole scan - within TOOTH_REACH of every cusp tip and down
+  // to TOOTH_CROWN below it - not the narrower crowns the outline is drawn round.
+  const promised = scanTeeth.map((inZone, i) => (inZone && fromEdge[i] > EDGE_FRINGE ? 1 : 0));
   for (const depth of [2, 4, 6, 8, 10, 12]) kept[depth] = surfaceKept(m, out, -depth, scanTeeth);
   kept[-3] = surfaceKept(m, out, -Infinity, scanTeeth);
   kept[-1] = surfaceKept(m, out, -Infinity, promised);
+  // The teeth as found before build 50 (wider: within TOOTH_REACH of every tip), all but the fringe.
+  kept[-4] = surfaceKept(m, out, -Infinity, scanTeeth.map((inZone, i) => (inZone && fromEdge[i] > EDGE_FRINGE ? 1 : 0)));
   let toothArea = 0;
   for (let t = 0; t < m.f.length / 3; t += 1) if (scanTeeth[m.f[t * 3]] && scanTeeth[m.f[t * 3 + 1]] && scanTeeth[m.f[t * 3 + 2]]) toothArea += faceArea(m, t);
   kept[-2] = toothArea;

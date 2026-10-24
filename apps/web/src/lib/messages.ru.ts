@@ -3605,6 +3605,8 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "dental.step2": "2 · Обрезка вручную (если нужно)",
   "dental.step3": "3 · Модель",
   "dental.cleanBase": "Чистый",
+  "dental.basePresets": "Основание ниже края",
+  "dental.basePresetsHint": "Насколько основание уходит ниже обрезанного края; выберите вариант или задайте любую высоту ползунком.",
   "dental.articulatorBase": "Пластина артикулятора",
   "dental.notches": "Установочные пазы у основания",
   "dental.notchesHint": "Полукруглые пазы у основания стенки спереди и по бокам, чтобы лаборатория каждый раз устанавливала модель одинаково.",

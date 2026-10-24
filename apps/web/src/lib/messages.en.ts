@@ -3618,6 +3618,8 @@ export const MESSAGES_EN = {
   "dental.step2": "2 · Trim by hand (if needed)",
   "dental.step3": "3 · The model",
   "dental.cleanBase": "Clean",
+  "dental.basePresets": "Base below the margin",
+  "dental.basePresetsHint": "How far the base reaches below the trimmed margin; pick one, or set any height on the slider.",
   "dental.articulatorBase": "Articulator plate",
   "dental.notches": "Locator notches round the foot",
   "dental.notchesHint": "Half-round notches at the foot of the wall, front and sides, so a lab can seat the model the same way each time.",

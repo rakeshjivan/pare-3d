@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 51,
+    items: [
+      "Fixed: build 50's Clean base could cut into the front of proclined teeth. The Clean base is back to build 49's shape, built from the scan's own margin, and the check that no tooth is cut measures the whole tooth zone again.",
+      "The base's outline is smoothed before the wall goes up, so the wall below the gum turns gently instead of in rows of vertical stripes.",
+      "The Articulator plate base is taken out until it is rebuilt on the same safe margin.",
+      "Choose how far the base reaches below the trimmed margin: 3, 5, 10 or 15 mm, or any height on the slider.",
+    ],
+  },
+  {
     build: 50,
     items: [
       "Dental Studio's Clean base now looks like a model builder's: the outline is drawn round the crowns in a smooth band, the wall rises straight from a flat floor to meet the gum all round, the hollow under curving gum is filled, and flaps of tongue or cheek beside the teeth are cut away.",

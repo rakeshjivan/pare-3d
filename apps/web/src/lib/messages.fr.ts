@@ -3593,6 +3593,8 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "dental.step2": "2 · Découper à la main (si besoin)",
   "dental.step3": "3 · Le modèle",
   "dental.cleanBase": "Net",
+  "dental.basePresets": "Socle sous la limite",
+  "dental.basePresetsHint": "Jusqu'où le socle descend sous la limite découpée ; choisissez-en une, ou réglez n'importe quelle hauteur au curseur.",
   "dental.articulatorBase": "Plaque d'articulateur",
   "dental.notches": "Encoches de repérage au pied",
   "dental.notchesHint": "Encoches demi-rondes au pied du mur, devant et sur les côtés, pour qu'un laboratoire place le modèle toujours de la même façon.",

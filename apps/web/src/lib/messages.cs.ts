@@ -3617,6 +3617,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "dental.step2": "2 · Ruční ořez (podle potřeby)",
   "dental.step3": "3 · Model",
   "dental.cleanBase": "Čistý",
+  "dental.basePresets": "Základna pod okrajem",
+  "dental.basePresetsHint": "Jak daleko sahá základna pod oříznutý okraj; vyberte jednu, nebo nastavte libovolnou výšku posuvníkem.",
   "dental.articulatorBase": "Deska artikulátoru",
   "dental.notches": "Vodicí zářezy u paty",
   "dental.notchesHint": "Půlkruhové zářezy u paty stěny vpředu a po stranách, aby laboratoř model usadila vždy stejně.",

@@ -3596,6 +3596,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "dental.step2": "2 · Ročno obrezovanje (po potrebi)",
   "dental.step3": "3 · Model",
   "dental.cleanBase": "Čist",
+  "dental.basePresets": "Podstavek pod robom",
+  "dental.basePresetsHint": "Kako daleč podstavek sega pod obrezani rob; izberite eno ali nastavite poljubno višino z drsnikom.",
   "dental.articulatorBase": "Plošča artikulatorja",
   "dental.notches": "Vodilne zareze ob dnu",
   "dental.notchesHint": "Polkrožne zareze ob dnu stene spredaj in ob straneh, da laboratorij model vsakič enako namesti.",
