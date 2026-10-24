@@ -1091,6 +1091,12 @@ export type WorkplaneShape = {
    */
   multicolor?: boolean;
   locked?: boolean;
+  /**
+   * Fork (build 54): keeps its size - it fits a standard part (the clicker cutters fit keyboard
+   * switches). It can be moved and turned; canonicalizeShape holds its width, depth and height at
+   * the mesh's own, and the resize handles are not offered.
+   */
+  fixedSize?: boolean;
   hidden?: boolean;
   /** Drawn see-through in its own colour, like the usual "Transparent". Display only - a solid stays a solid. */
   transparent?: boolean;

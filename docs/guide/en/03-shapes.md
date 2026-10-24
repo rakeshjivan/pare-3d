@@ -172,6 +172,17 @@ The result is a mesh like an imported model. Undo lays the shape flat again; for
 - **{{ui:fitTest.title}}:** see [Print fit and the fit test](chapter:printing).
 - **{{ui:enclosure.title}}:** a box for a circuit board. Give the board's size and thickness, the tallest part on it and the room under it; the enclosure gets standoffs at the board's holes (for heat-set inserts or self-tapping screws), cut-outs for the ports you list (USB-C, micro USB, USB-A, a DC jack, HDMI - on any side, at the height you set) and a lid with vents if you like.
 
+### Making a clicker
+
+The group **{{ui:readyParts.cat.clicker}}** turns any shape into a clicker built round a keyboard switch (Cherry MX style, the kind sold for mechanical keyboards). It has two cutters, and both are holes:
+
+- **{{ui:readyParts.clickerBase}}:** the pocket the switch presses into - 14 mm square and 8.7 mm deep, with notches its clips snap into.
+- **{{ui:readyParts.clickerTop}}:** the recess that sits over the top of the switch, with a keycap socket (a post with a cross-shaped hole) left standing in the middle; it pushes onto the switch's stem.
+
+Split your shape into a base and a top and lay each half with its flat face up. Press {{ui:readyParts.add}} beside a cutter and click the flat face it belongs in: the cutter goes in level with that face. Select each half with its cutter and group them to cut it. Print both halves, press the switch into the base and push the top onto its stem.
+
+The cutters keep their size - they fit standard switches - so they have no resize handles and cannot be tapered, twisted or wrapped. Move and turn them as usual.
+
 ## Making from a photo or a pattern
 
 The {{ui:readyParts.title}} window's group {{ui:readyParts.cat.pictures}} has three tools that build a body from something else; {{ui:readyParts.open}} opens each in its own panel:

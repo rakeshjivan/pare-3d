@@ -3008,7 +3008,7 @@ export function ShapeInspector({
           onSegmentChange={onBentTubeSegmentChange}
         />
       ) : null}
-      {showTaperCards ? (
+      {showTaperCards && !shape.fixedSize ? (
         <div className={`property-card ${taperOpen ? "" : "collapsed"}`} data-help-section-all="shapeSettings">
           <button
             className="property-card-header"
@@ -3027,7 +3027,7 @@ export function ShapeInspector({
           ) : null}
         </div>
       ) : null}
-      {showTaperCards ? (
+      {showTaperCards && !shape.fixedSize ? (
         <div className={`property-card ${twistOpen ? "" : "collapsed"}`} data-help-section-all="shapeSettings">
           <button
             className="property-card-header"
@@ -3047,7 +3047,8 @@ export function ShapeInspector({
         </div>
       ) : null}
       {/* Build 35: wrapping comes after the sizes, position, rotation, taper and twist. */}
-      {onWrapAroundCylinder ? (
+      {/* Fork (build 54): a part that keeps its size is not tapered, twisted or wrapped either. */}
+      {onWrapAroundCylinder && !shape.fixedSize ? (
         <CylinderWrapCard
           key={shape.id}
           shape={shape}

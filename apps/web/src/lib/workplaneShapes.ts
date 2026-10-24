@@ -468,6 +468,13 @@ export function canonicalizeShape(unrepaired: WorkplaneShape): WorkplaneShape {
     mirrorY: shape.mirrorY || undefined,
     mirrorZ: shape.mirrorZ || undefined,
   };
+  // Fork (build 54): a part that fits something standard keeps its size, whatever tried to change it.
+  if (shape.fixedSize && shape.importedMesh) {
+    next.width = shape.importedMesh.baseWidth;
+    next.depth = shape.importedMesh.baseDepth;
+    next.height = shape.importedMesh.baseHeight;
+    next.size = Math.max(next.width, next.depth);
+  }
   if (shape.kind === "thread") {
     const footprint = threadFootprintPatch(next);
     Object.assign(next, footprint);

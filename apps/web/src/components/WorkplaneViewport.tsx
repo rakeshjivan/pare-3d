@@ -5769,7 +5769,10 @@ export function WorkplaneViewport({
       const activeWorkplane = placementWorkplaneRef.current;
       const frame = selectionFrameForShapes(shapesRef.current, ids, activeWorkplane);
       const shape = frame?.singleShape ?? shapesRef.current.find((entry) => entry.id === ids[0]);
-      if (!frame || !shape || ids.length === 0 || ids.some((id) => shapesRef.current.find((entry) => entry.id === id)?.locked)) {
+      if (!frame || !shape || ids.length === 0 || ids.some((id) => {
+        const entry = shapesRef.current.find((candidate) => candidate.id === id);
+        return entry?.locked || (entry?.fixedSize && (kind === "scale" || kind === "height"));
+      })) {
         return;
       }
 
@@ -7972,7 +7975,10 @@ export function WorkplaneViewport({
           : undefined;
         const scaleStartPoint = scalePlane ? toRawPlanePoint(event.clientX, event.clientY, scalePlane) ?? undefined : undefined;
         const point = scalePlane ? scaleStartPoint : toPlanePoint(event.clientX, event.clientY);
-        const selectionHeld = selectedIdsRef.current.some((id) => shapesRef.current.find((entry) => entry.id === id)?.locked);
+        const selectionHeld = selectedIdsRef.current.some((id) => {
+          const entry = shapesRef.current.find((candidate) => candidate.id === id);
+          return entry?.locked || (entry?.fixedSize && (handle.kind === "scale" || handle.kind === "height"));
+        });
         if (!shape || !frame || shape.locked || selectionHeld || (!point && handle.kind !== "height" && handle.kind !== "lift" && handle.kind !== "rotate")) {
           return;
         }
@@ -12934,12 +12940,14 @@ function syncTransformOverlay(
       : [widthMidHandleKey, depthMidHandleKey, heightHandleKey]
     : [];
 
+  // Fork (build 54): a part that keeps its size (fixedSize) offers no resize handles.
+  const sizeFixed = selectedIds.some((id) => shapes.find((shape) => shape.id === id)?.fixedSize);
   const next = {
     id: frame.ids.join("|"),
     width: rect.width,
     height: rect.height,
     guides: [],
-    handles,
+    handles: sizeFixed ? handles.filter((handle) => handle.kind !== "scale" && handle.kind !== "height") : handles,
     rotateHandles,
     dimensions: dimensionMarks,
     alwaysVisibleDimensionKeys,

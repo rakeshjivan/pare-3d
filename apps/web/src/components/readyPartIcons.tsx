@@ -151,3 +151,27 @@ export function FlexiPartIcon() {
     </PartIcon>
   );
 }
+
+/** Fork (build 54): the clicker's base - a block with the square switch pocket cut into its top. */
+export function ClickerBasePartIcon() {
+  return (
+    <PartIcon>
+      <path d="M6 18L24 10L42 18V34L24 42L6 34Z" {...SOFT} />
+      <path d="M6 18L24 10L42 18V34L24 42L6 34Z" />
+      <path d="M6 18L24 26L42 18M24 26V42" />
+      <path d="M16 18L24 14.5L32 18L24 21.5Z" {...ACCENT} />
+    </PartIcon>
+  );
+}
+
+/** Fork (build 54): the clicker's top - the recess with the cross-shaped keycap socket in it. */
+export function ClickerTopPartIcon() {
+  return (
+    <PartIcon>
+      <rect x="8" y="8" width="32" height="32" rx="4" {...SOFT} />
+      <rect x="8" y="8" width="32" height="32" rx="4" />
+      <circle cx="24" cy="24" r="8" />
+      <path d="M21.5 17H26.5V21.5H31V26.5H26.5V31H21.5V26.5H17V21.5H21.5Z" {...ACCENT} />
+    </PartIcon>
+  );
+}

@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 54,
+    items: [
+      "Make a clicker: Ready-made parts has a new Clicker group with a Clicker base (the pocket a keyboard switch presses into) and a Clicker top (the recess over the switch, with a keycap socket for its stem). Click Add, then click the flat face of each half: the cutter goes in level with it. Group to cut.",
+      "The clicker cutters keep their size so they fit standard Cherry MX style switches: no resize handles, and no taper, twist or wrap.",
+    ],
+  },
+  {
     build: 53,
     items: [
       "Dental Studio's Margin step can now edit the tooth area, the way Medit's model builder does: Pare 3D picks the teeth and tints them orange on the scan; paint more on, erase tissue it took for teeth, or lasso areas in or out, turning the view between strokes.",

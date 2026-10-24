@@ -1,9 +1,10 @@
 "use client";
 
-import { BoxPartIcon, FlexiPartIcon, HingePartIcon, InsertPartIcon, JarPartIcon, NutPartIcon, ParaboloidPartIcon, SnapPartIcon } from "@/components/readyPartIcons";
+import { BoxPartIcon, ClickerBasePartIcon, ClickerTopPartIcon, FlexiPartIcon, HingePartIcon, InsertPartIcon, JarPartIcon, NutPartIcon, ParaboloidPartIcon, SnapPartIcon } from "@/components/readyPartIcons";
 import { DEFAULT_JAR, jarParts, normalizeJar, type JarOptions } from "@/lib/readyJar";
 import { DEFAULT_FLEXI_CHAIN, flexiChainParts, normalizeFlexiChain, type FlexiChainOptions } from "@/lib/flexiJoint";
 import { useState } from "react";
+import { CLICKER_BASE_HEIGHT, CLICKER_TOP_HEIGHT, clickerBasePart, clickerTopPart } from "@/lib/clickerParts";
 import { ForkLithophaneIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -34,7 +35,7 @@ import {
 } from "@/lib/readyParts";
 
 /** Fork: the Shapes panel's "Ready-made parts" - built from ordinary shapes, placed with a click. */
-export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: ReadyPart[], options?: { sink?: number; carry?: boolean }) => void; onMake?: (maker: "lithophane" | "trace" | "voronoi") => void }) {
+export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: ReadyPart[], options?: { sink?: number; carry?: boolean; onFace?: { hint: string; placed: string } }) => void; onMake?: (maker: "lithophane" | "trace" | "voronoi") => void }) {
   useLanguage();
   const [insertSize, setInsertSize] = useState<MetricSize>("M3");
   const [nutSize, setNutSize] = useState<MetricSize>("M3");
@@ -256,6 +257,28 @@ export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: Read
               </button>
             </div>
           ) : null}
+          {/* Fork (build 54): the two cutters that make a clicker round a keyboard switch. */}
+          <h4 className="ready-parts-category">{t("readyParts.cat.clicker")}</h4>
+          <p className="ready-part-note">{t("readyParts.clickerHowTo")}</p>
+          {([
+            ["base", ClickerBasePartIcon, t("readyParts.clickerBase"), t("readyParts.clickerBaseHint"), () => clickerBasePart(t("readyParts.clickerBase")), CLICKER_BASE_HEIGHT],
+            ["top", ClickerTopPartIcon, t("readyParts.clickerTop"), t("readyParts.clickerTopHint"), () => clickerTopPart(t("readyParts.clickerTop")), CLICKER_TOP_HEIGHT],
+          ] as const).map(([key, Icon, title, hint, make, depth]) => (
+            <div className="ready-part" key={key} data-ready-part={`clicker-${key}`}>
+              <Icon />
+              <div>
+                <strong>{title}</strong>
+                <span>{hint}</span>
+              </div>
+              <button
+                type="button"
+                className="ready-part-add"
+                onClick={() => onInsert([make()], { sink: depth, onFace: { hint: t("readyParts.clickerPlaceHint"), placed: t("readyParts.clickerPlaced") } })}
+              >
+                {t("readyParts.add")}
+              </button>
+            </div>
+          ))}
           {onMake ? (
             <>
               <h4 className="ready-parts-category">{t("readyParts.cat.pictures")}</h4>

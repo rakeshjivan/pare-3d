@@ -6825,20 +6825,21 @@ export function LayerlingEditor({
   }, [splitTargetPoints]);
 
   /** Fork: ready-made parts, built and placed like a saved custom shape (they hang on the pointer when that is on). */
-  const insertReadyParts = useCallback(async (parts: ReadyPart[], options: { sink?: number; carry?: boolean; at?: PlacementPoint } = {}) => {
+  const insertReadyParts = useCallback(async (parts: ReadyPart[], options: { sink?: number; carry?: boolean; at?: PlacementPoint; onFace?: { hint: string; placed: string } } = {}) => {
     const sourceProjectId = splitProjectIdRef.current;
     const built = await Promise.all(parts.map((part) => buildReadyPart(part, workspaceSettingsRef.current.booleanTriangleLimit)));
     if (splitProjectIdRef.current !== sourceProjectId) return;
     const { shapes: inserted } = placeCustomShape({ shapes: built }, options.at ?? placementWorkplaneRef.current.origin, []);
     commitShapes([...shapesRef.current, ...inserted], inserted.map((shape) => shape.id), t("readyParts.inserted", { name: parts.map((part) => part.name).join(" + ") }));
-    if (!options.at && (options.carry || workspaceSettingsRef.current.clickToPlaceShapes) && inserted.length) {
+    if (!options.at && (options.carry || options.onFace || workspaceSettingsRef.current.clickToPlaceShapes) && inserted.length) {
       setCruiseAsset(null);
-      // Cut-in text goes into the face it is set down on by its depth (dropCarried).
+      // Cut-in text goes into the face it is set down on by its depth (dropCarried); so do the
+      // clicker cutters (build 54), which open on the face they are set down on.
       carrySinkRef.current = options.sink ? new Map(inserted.map((shape) => [shape.id, options.sink!])) : new Map();
-      carryAfterNoticeRef.current = options.carry ? t("readyParts.textPlaced") : null;
+      carryAfterNoticeRef.current = options.onFace ? options.onFace.placed : options.carry ? t("readyParts.textPlaced") : null;
       carryFaceTextRef.current = Boolean(options.carry);
       setCarryIds(inserted.map((shape) => shape.id));
-      setNotice(t(options.carry ? "readyParts.textPlaceHint" : "status.carryPlace"));
+      setNotice(options.onFace ? options.onFace.hint : t(options.carry ? "readyParts.textPlaceHint" : "status.carryPlace"));
     }
   }, [commitShapes]);
 
