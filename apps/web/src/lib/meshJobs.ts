@@ -13,7 +13,7 @@ export type MeshJobRequest =
   | { id: number; base: string; kind: "fit"; shapes: WorkplaneShape[]; clearance: number }
   | { id: number; base: string; kind: "dentalAnalyse"; input: DentalStudioInput }
   | { id: number; base: string; kind: "dentalStudio"; input: DentalStudioInput; options: DentalStudioOptions }
-  | { id: number; base: string; kind: "dentalTrim"; positions: Float32Array; inside: Uint8Array; mode: DentalTrimMode };
+  | { id: number; base: string; kind: "dentalTrim"; positions: Float32Array; side: Float32Array; mode: DentalTrimMode; local: Float32Array };
 export type MeshJobResponse =
   | { id: number; ok: true; kind?: "round"; result: { positions: Float32Array; voxel: number; coarse: boolean } }
   | { id: number; ok: true; kind: "fit"; report: FitReport }
@@ -141,18 +141,18 @@ export function makeDentalStudioInBackground(input: DentalStudioInput, options: 
   return dentalJob((id, base, data) => ({ id, base, kind: "dentalStudio", input: data, options }), input, async (data) => (await import("@/lib/dentalModel")).makeDentalStudio(data, options));
 }
 
-/** Dental Studio (build 48): which triangles of a scan a trim keeps (Z-up soup, one inside flag per corner). */
-export async function trimDentalScanInBackground(positions: Float32Array, inside: Uint8Array, mode: DentalTrimMode): Promise<DentalTrimResult> {
-  const here = async () => (await import("@/lib/dentalTrim")).trimDentalScan(positions, inside, mode);
+/** Dental Studio (build 48/52): a scan cut along a trim line (Z-up soup, how far inside the line each corner is, and the soup in the part's own coordinates). */
+export async function trimDentalScanInBackground(positions: Float32Array, side: Float32Array, mode: DentalTrimMode, local: Float32Array): Promise<DentalTrimResult> {
+  const here = async () => (await import("@/lib/dentalTrim")).cutDentalScan(positions, side, mode, local);
   const target = meshWorker();
   if (!target) return here();
   const id = nextId;
   nextId += 1;
-  const data = Float32Array.from(positions), flags = Uint8Array.from(inside);
+  const data = Float32Array.from(positions), sides = Float32Array.from(side), own = Float32Array.from(local);
   try {
     return await new Promise<DentalTrimResult>((resolve, reject) => {
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
-      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "dentalTrim", positions: data, inside: flags, mode } satisfies MeshJobRequest, [data.buffer, flags.buffer]);
+      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "dentalTrim", positions: data, side: sides, mode, local: own } satisfies MeshJobRequest, [data.buffer, sides.buffer, own.buffer]);
     });
   } catch (error) {
     if (error instanceof Error && error.message === "worker-unavailable") return here();

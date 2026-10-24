@@ -877,3 +877,69 @@ export function surfaceKept(scan: Mesh, result: ArrayLike<number>, level: number
   }
   return total > 0 ? kept / total : 1;
 }
+
+/**
+ * Build 52: `field` (one value per corner) averaged with its neighbours `rounds` times, each corner
+ * where `hold` is set kept at least where it was - so its zero line runs smooth along the surface.
+ */
+export function smoothField(m: Mesh, field: Float64Array, rounds: number, hold?: Uint8Array): Float64Array {
+  const n = m.v.length / 3;
+  const neighbours: number[][] = Array.from({ length: n }, () => []);
+  for (let t = 0; t < m.f.length; t += 3) for (let k = 0; k < 3; k += 1) {
+    const a = m.f[t + k], b = m.f[t + ((k + 1) % 3)];
+    neighbours[a].push(b); neighbours[b].push(a);
+  }
+  let current = Float64Array.from(field);
+  for (let round = 0; round < rounds; round += 1) {
+    const next = new Float64Array(n);
+    for (let i = 0; i < n; i += 1) {
+      const list = neighbours[i];
+      if (!list.length) { next[i] = current[i]; continue; }
+      let sum = current[i];
+      for (const j of list) sum += current[j];
+      next[i] = sum / (list.length + 1);
+      if (hold?.[i]) next[i] = Math.max(next[i], field[i]);
+    }
+    current = next;
+  }
+  return current;
+}
+
+/**
+ * Build 52: what of the mesh lies where `field` is above zero, cut exactly along its zero line -
+ * triangles that cross it are split there, not dropped whole - so the cut edge is a clean line.
+ * Corners where `keep` is set are kept whatever the field says (the teeth).
+ */
+export function cutAlongField(m: Mesh, field: Float64Array, keep?: Uint8Array): Mesh {
+  const v = m.v.slice();
+  const f: number[] = [];
+  const inside = (i: number) => field[i] > 0 || Boolean(keep?.[i]);
+  const level = (i: number) => (keep?.[i] ? Math.max(field[i], 1e-3) : field[i]);
+  const crossing = new Map<number, number>();
+  const point = (a: number, b: number) => {
+    const key = a < b ? a * 4294967296 + b : b * 4294967296 + a;
+    const known = crossing.get(key);
+    if (known !== undefined) return known;
+    const fa = level(a), fb = level(b);
+    const t = Math.min(1, Math.max(0, fa / (fa - fb)));
+    const id = v.length / 3;
+    for (let k = 0; k < 3; k += 1) v.push(m.v[a * 3 + k] + (m.v[b * 3 + k] - m.v[a * 3 + k]) * t);
+    crossing.set(key, id);
+    return id;
+  };
+  for (let t = 0; t < m.f.length; t += 3) {
+    const c = [m.f[t], m.f[t + 1], m.f[t + 2]];
+    const ins = c.map(inside);
+    const count = ins.filter(Boolean).length;
+    if (count === 3) { f.push(...c); continue; }
+    if (count === 0) continue;
+    // Rotate so the odd one out comes first.
+    let r = 0;
+    while (count === 1 ? !ins[r] : ins[r]) r += 1;
+    const a = c[r], b = c[(r + 1) % 3], d = c[(r + 2) % 3];
+    const ab = point(a, b), ad = point(a, d);
+    if (count === 1) f.push(a, ab, ad);
+    else f.push(ab, b, d, ab, d, ad);
+  }
+  return { v, f };
+}

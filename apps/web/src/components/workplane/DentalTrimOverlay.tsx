@@ -4,6 +4,7 @@
  * Fork (build 48): Dental Studio's trim line. While it is up, a press and drag over the view draws
  * a freehand line; letting go closes it. Points are in page pixels. Esc gives up.
  */
+import { smoothRing } from "@/lib/dentalBase";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -99,4 +100,47 @@ export function insideTrimLine(projected: Float32Array, line: TrimPoint[]): Uint
     if (px >= 0 && py >= 0 && px < width && py < height && mask[(py * width + px) * 4 + 3] > 127) inside[i] = 1;
   }
   return inside;
+}
+
+/**
+ * Build 52: how far each projected point (x, y pairs in page pixels) lies inside the closed line,
+ * in pixels - negative outside - after the line itself is smoothed, so a cut along zero follows a
+ * clean curve rather than the hand's wobble.
+ */
+export function trimLineDistance(projected: Float32Array, line: TrimPoint[]): Float32Array {
+  const count = projected.length / 2;
+  const out = new Float32Array(count).fill(-1e6);
+  if (line.length < 3) return out;
+  const ring = smoothRing(line.map(([x, y]) => [x, y] as [number, number]), 3, 18, 3);
+  const n = ring.length;
+  // Inside or out from the smoothed line drawn into a mask; the distance only matters near the
+  // line, so segments are looked up in a grid, and anything further than `far` counts as `far`.
+  const inside = insideTrimLine(projected, ring);
+  const far = 24, cell = 24;
+  const buckets = new Map<string, number[]>();
+  for (let k = 0; k < n; k += 1) {
+    const [ax, ay] = ring[k], [bx, by] = ring[(k + 1) % n];
+    for (let gx = Math.floor(Math.min(ax, bx) / cell); gx <= Math.floor(Math.max(ax, bx) / cell); gx += 1) for (let gy = Math.floor(Math.min(ay, by) / cell); gy <= Math.floor(Math.max(ay, by) / cell); gy += 1) {
+      const key = `${gx},${gy}`;
+      const list = buckets.get(key);
+      if (list) list.push(k); else buckets.set(key, [k]);
+    }
+  }
+  for (let i = 0; i < count; i += 1) {
+    const px = projected[i * 2], py = projected[i * 2 + 1];
+    let best = far;
+    const gx = Math.floor(px / cell), gy = Math.floor(py / cell);
+    for (let dx0 = -1; dx0 <= 1; dx0 += 1) for (let dy0 = -1; dy0 <= 1; dy0 += 1) {
+      const list = buckets.get(`${gx + dx0},${gy + dy0}`);
+      if (!list) continue;
+      for (const k of list) {
+        const [ax, ay] = ring[k], [bx, by] = ring[(k + 1) % n];
+        const dx = bx - ax, dy = by - ay;
+        const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+        best = Math.min(best, Math.hypot(px - ax - dx * t, py - ay - dy * t));
+      }
+    }
+    out[i] = inside[i] ? Math.max(best, 1e-3) : -Math.max(best, 1e-3);
+  }
+  return out;
 }

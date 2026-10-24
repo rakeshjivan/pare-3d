@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 52,
+    items: [
+      "Dental Studio cuts the gum along a smooth margin: the edge of the band to keep is smoothed along the surface and the scan is cut exactly on it (triangles split there), so the model's margin is clean instead of ragged. The teeth are never cut.",
+      "Step 2 is now Margin: Automatic (Pare 3D finds a smooth margin through the gum and cuts exactly on it) or Draw by hand (you draw the margin; the scan is cut smoothly along your line and nothing more is taken).",
+      "Trimming by hand cuts exactly along the line you draw, smoothed: no jagged edge of whole triangles left behind.",
+    ],
+  },
+  {
     build: 51,
     items: [
       "Fixed: build 50's Clean base could cut into the front of proclined teeth. The Clean base is back to build 49's shape, built from the scan's own margin, and the check that no tooth is cut measures the whole tooth zone again.",

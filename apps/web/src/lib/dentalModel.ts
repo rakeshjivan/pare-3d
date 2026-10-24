@@ -19,7 +19,7 @@ import { alignToBite, archFrame, canineWidth, cleanScan, frontOf, isPartialArch,
 import { blockOutline, cleanOutline, closeToFloor, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, hingeParts, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
 import {
-  applyMatrix, boundaryLoops, cloneMesh, convexHull, cutBelow, dropFragments, faceArea, loopLength, surfaceKept, pinchedEdges, solidPositions, toManifold, upwardness, weld,
+  applyMatrix, boundaryLoops, cloneMesh, convexHull, cutAlongField, cutBelow, dropFragments, smoothField, faceArea, loopLength, surfaceKept, pinchedEdges, solidPositions, toManifold, upwardness, weld,
   type ManifoldRuntime, type ManifoldSolid, type Mesh, type Ring,
 } from "@/lib/dentalMesh";
 
@@ -84,6 +84,8 @@ export type DentalStudioOptions = {
   notches?: boolean;
   /** Fork (build 50): a bar joining the back ends of a full arch, so it cannot spread while it prints. */
   tieBar?: boolean;
+  /** Fork (build 52): the margin found by Pare 3D (a smooth band of gum below the teeth), or drawn by hand with the trim. */
+  margin?: "auto" | "manual";
 };
 
 export type DentalSmooth = "off" | "low" | "high";
@@ -172,6 +174,8 @@ function keptDepthFor(arch: { depth: number; teeth: number }, options: DentalStu
 
 /** Gum kept below the teeth by a clean base when none is set, mm. */
 export const CLEAN_GUM = 3;
+/** Rounds of smoothing the margin's line gets along the surface before the cut (build 52). */
+export const MARGIN_SMOOTHING = 40;
 
 function signedRing(ring: Ring) {
   let area = 0;
@@ -373,7 +377,7 @@ function buildArch(
     return out;
   };
   // The teeth: never cut and never worn away - nor dropped as a loose piece.
-  const teeth = toothZone(cut, undefined, undefined, undefined, TIP_CEILING);
+  let teeth = toothZone(cut, undefined, undefined, undefined, TIP_CEILING);
   // What was teeth on the whole scan stays teeth: cutting the tissue away below can move the lowest
   // ground a tip is measured against, and must never shrink the teeth.
   if (cut !== m) {
@@ -388,11 +392,17 @@ function buildArch(
     // Following the gum line: what lies further below the teeth than the gum asked for goes.
     // As far out as down: the gum round the teeth, plus room for the edge's fringe.
     const gum = Math.max(0.5, options.gum);
-    const band = toothZone(cut, TOOTH_CROWN + gum, TOOTH_REACH + gum + EDGE_FRINGE, undefined, TIP_CEILING);
-    const f: number[] = [];
-    const kept = (v: number) => band[v] || teeth[v];
-    for (let t = 0; t < cut.f.length; t += 3) if (kept(cut.f[t]) || kept(cut.f[t + 1]) || kept(cut.f[t + 2])) f.push(cut.f[t], cut.f[t + 1], cut.f[t + 2]);
-    cut.f = f;
+    // Build 52: cut exactly along a smooth margin - the band's edge as a smooth field over the
+    // surface, cut along its zero line (triangles split there), never through the teeth.
+    const field = new Float64Array(cut.v.length / 3);
+    toothZone(cut, TOOTH_CROWN + gum, TOOTH_REACH + gum + EDGE_FRINGE, undefined, TIP_CEILING, -Infinity, Infinity, field);
+    const smoothed = smoothField(cut, field, MARGIN_SMOOTHING, teeth);
+    const trimmed = cutAlongField(cut, smoothed, teeth);
+    const grown = new Uint8Array(trimmed.v.length / 3);
+    grown.set(teeth.subarray(0, Math.min(teeth.length, grown.length)));
+    cut.v = trimmed.v;
+    cut.f = trimmed.f;
+    teeth = grown;
     dropFragments(cut, 0.05, teeth);
   }
   smoothEdge(cut, SMOOTH_ROUNDS[options.smooth ?? "low"], teeth);
@@ -559,7 +569,9 @@ function buildArch(
 export async function makeDentalStudio(input: DentalStudioInput, options: DentalStudioOptions, given?: ManifoldRuntime): Promise<DentalStudioResult> {
   const prep = prepared(input);
   // A clean base keeps a band of gum round the teeth, and no more.
-  if (options.baseStyle === "clean" && (options.gum === null || options.gum === undefined)) options = { ...options, gum: CLEAN_GUM };
+  // Build 52: a margin drawn by hand is the margin - no gum band is cut on top of it.
+  if (options.margin === "manual") options = { ...options, gum: null };
+  else if (options.baseStyle === "clean" && (options.gum === null || options.gum === undefined)) options = { ...options, gum: CLEAN_GUM };
   const apart = Boolean(prep.analysis.pair?.apart);
   if (apart) options = { ...options, layout: "print", hinge: false };
   const runtime = given ?? (await getManifoldRuntime());

@@ -595,7 +595,7 @@ export const TOOTH_REACH = 5.5;
  * of cheek or tongue standing far above the occlusal plane, or lying well below it) and find no teeth.
  * `lonely`: a group of tips further than this from every other group finds no teeth.
  */
-export function toothZone(m: Mesh, crown = TOOTH_CROWN, reachOut = TOOTH_REACH, tipsOut?: number[][], ceiling = Infinity, lowest = -Infinity, lonely = Infinity): Uint8Array {
+export function toothZone(m: Mesh, crown = TOOTH_CROWN, reachOut = TOOTH_REACH, tipsOut?: number[][], ceiling = Infinity, lowest = -Infinity, lonely = Infinity, fieldOut?: Float64Array): Uint8Array {
   const cell = 0.5;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (let i = 0; i < m.v.length; i += 3) { minX = Math.min(minX, m.v[i]); maxX = Math.max(maxX, m.v[i]); minY = Math.min(minY, m.v[i + 1]); maxY = Math.max(maxY, m.v[i + 1]); }
@@ -680,6 +680,22 @@ export function toothZone(m: Mesh, crown = TOOTH_CROWN, reachOut = TOOTH_REACH, 
   for (let i = 0; i < zone.length; i += 1) {
     const r = reach[at(m.v[i * 3], m.v[i * 3 + 1])];
     if (Number.isFinite(r) && m.v[i * 3 + 2] > r - crown) zone[i] = 1;
+  }
+  if (fieldOut) {
+    // Build 52: how far inside the zone each corner is (mm; negative outside) - the round distance
+    // from the nearest tip against `reachOut`, and the height above `crown` below the tips in reach.
+    // Zero runs along the zone's edge, so a smooth cut can follow it.
+    const mask = new Uint8Array(nx * ny);
+    for (let k = 0; k < mask.length; k += 1) if (Number.isFinite(tips[k])) mask[k] = 1;
+    const squared = squaredDistanceTo(mask, nx, ny, 1);
+    const wide = pass(tips, reachOut + 4, Math.max, -Infinity);
+    for (let i = 0; i < zone.length; i += 1) {
+      const k = at(m.v[i * 3], m.v[i * 3 + 1]);
+      const across = reachOut - Math.sqrt(squared[k]) * cell;
+      const r = wide[k];
+      const down = Number.isFinite(r) ? m.v[i * 3 + 2] - (r - crown) : -10;
+      fieldOut[i] = Math.min(across, down);
+    }
   }
   return zone;
 }

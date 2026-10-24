@@ -168,6 +168,15 @@ export function DentalStudioPanel({
       </div>
       <div className="dental-trim">
         <h3 className="dental-step">{t("dental.step2")}</h3>
+        <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.step2")}>
+          {(["auto", "manual"] as const).map((value) => (
+            <button key={value} type="button" role="radio" aria-checked={(options.margin ?? "auto") === value} className={(options.margin ?? "auto") === value ? "active" : ""} disabled={busy || Boolean(trimming)} onClick={() => onOptionsChange({ margin: value })}>
+              {t(value === "auto" ? "dental.marginAuto" : "dental.marginManual")}
+            </button>
+          ))}
+        </div>
+        <p className="blend-hint">{t((options.margin ?? "auto") === "auto" ? "dental.marginAutoHint" : "dental.marginManualHint")}</p>
+        {(options.margin ?? "auto") === "manual" ? (<>
         <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.trimArch")}>
           {(["upper", "lower"] as const).map((slot) => (
             <button key={slot} type="button" role="radio" aria-checked={arch === slot} className={arch === slot ? "active" : ""} disabled={!slots[slot] || Boolean(trimming)} onClick={() => setArch(slot)}>
@@ -193,6 +202,7 @@ export function DentalStudioPanel({
           </button>
         </div>
         {stage === "trimming" ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.trimming")}</p> : <p className="blend-hint">{t("dental.trimInfo")}</p>}
+        </>) : null}
       </div>
       <h3 className="dental-step">{t("dental.step3")}</h3>
       <div className="dental-presets" role="radiogroup" aria-label={t("dental.purpose")}>

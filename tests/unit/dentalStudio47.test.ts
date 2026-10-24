@@ -6,7 +6,7 @@ import { labelSection, labelText } from "@/lib/dentalLabel";
 import { weld } from "@/lib/dentalMesh";
 import { plyToStlBytes } from "@/lib/plyImport";
 import { importedShapeFromStl } from "@/lib/stlImport";
-import { trimDentalScan } from "@/lib/dentalTrim";
+import { cutDentalScan, trimDentalScan } from "@/lib/dentalTrim";
 import { layerlingToZUp } from "@/lib/meshCoordinates";
 import { dentalPreset } from "@/components/workplane/DentalStudioPanel";
 
@@ -326,4 +326,20 @@ describe("Dental Studio (build 47)", () => {
     for (let k = 2; k < p.length; k += 3) lowest = Math.min(lowest, p[k]);
     expect(lowest).toBeCloseTo(0, 3);
   }, 120_000);
+  it("cuts a scan exactly along a drawn line, smooth, never the teeth (build 52)", () => {
+    const arch = syntheticArch();
+    const corners = arch.length / 3;
+    // A straight line at x = 10.3 (between grid columns): keep what lies left of it.
+    const side = new Float32Array(corners);
+    for (let i = 0; i < corners; i += 1) side[i] = 10.3 - arch[i * 3];
+    const result = cutDentalScan(arch, side, "keep", arch);
+    expect(result.positions).toBeDefined();
+    const p = result.positions!;
+    let maxX = -Infinity, onLine = 0;
+    for (let i = 0; i < p.length; i += 3) { maxX = Math.max(maxX, p[i]); if (Math.abs(p[i] - 10.3) < 1e-4) onLine += 1; }
+    // The edge is the line itself, where the teeth allow it: no ragged triangle edge beyond it on the gum.
+    expect(onLine).toBeGreaterThan(20);
+    // The teeth past the line stay whole.
+    expect(maxX).toBeGreaterThan(10.3);
+  });
 });

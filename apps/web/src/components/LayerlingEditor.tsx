@@ -125,7 +125,7 @@ const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
 import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
 import { analyseDentalInBackground, checkFitInBackground, makeDentalStudioInBackground, roundMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
-import { DentalTrimOverlay, insideTrimLine, type TrimPoint } from "./workplane/DentalTrimOverlay";
+import { DentalTrimOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
 import { looksLikeDentalScan, type DentalAnalysis, type DentalRole, type DentalStudioInput, type DentalStudioOptions } from "@/lib/dentalModel";
@@ -9719,12 +9719,12 @@ export function LayerlingEditor({
     if (!trim || !state || !shape?.importedMesh || !window.layerlingProjectPoints) return;
     const mesh = shape.importedMesh;
     const world = worldTriangles(shape);
-    const inside = insideTrimLine(window.layerlingProjectPoints(world), line);
+    const side = trimLineDistance(window.layerlingProjectPoints(world), line);
     const fingerprint = projectShapesFingerprint([shape]);
     setDentalStudio({ ...state, stage: "trimming", error: null });
     window.setTimeout(async () => {
       try {
-        const result = await trimDentalScanInBackground(toZUp(world), inside, trim.mode);
+        const result = await trimDentalScanInBackground(toZUp(world), side, trim.mode, Float32Array.from(mesh.positions));
         const current = shapesRef.current.find((candidate) => candidate.id === id);
         if (!current || projectShapesFingerprint([current]) !== fingerprint) throw new Error(t("dental.changed"));
         if (!result.removed) {
@@ -9738,8 +9738,9 @@ export function LayerlingEditor({
           for (let t = 0; t * 9 < values.length; t += 1) if (keepTriangle(t)) for (let k = 0; k < 9; k += 1) out.push(values[t * 9 + k]);
           return out;
         };
-        let positions = pick(mesh.positions);
-        const normals = mesh.normals?.length === mesh.positions.length ? pick(mesh.normals) : undefined;
+        // Build 52: cut exactly along the line; the cut scan replaces the old (its normals are made afresh).
+        let positions = result.positions ? Array.from(result.positions) : pick(mesh.positions);
+        const normals = !result.positions && mesh.normals?.length === mesh.positions.length ? pick(mesh.normals) : undefined;
         let next: WorkplaneShape = { ...shape, importedMesh: { ...mesh, positions, normals, triangleCount: positions.length / 9, assetId: undefined, storageResourceId: undefined } };
         // Unturned and at its size, the part is centred on what is left; the file's own place goes with it.
         const plain = !shape.rotation && !shape.rotationX && !shape.rotationZ && !shape.mirrorX && !shape.mirrorY && !shape.mirrorZ

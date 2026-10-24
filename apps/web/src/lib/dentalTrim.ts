@@ -6,19 +6,64 @@
  */
 import { archFrame, cleanScan, marginUp } from "@/lib/dentalArch";
 import { TIP_CEILING, toothZone } from "@/lib/dentalBase";
-import { applyMatrix, cloneMesh, PointGrid } from "@/lib/dentalMesh";
+import { applyMatrix, cloneMesh, cutAlongField, PointGrid } from "@/lib/dentalMesh";
 import { weldedVertexIds } from "@/lib/meshComponents";
 
 export type DentalTrimMode = "keep" | "remove";
 
-/** `keep`: one flag per triangle of the scan as it was handed in. */
-export type DentalTrimResult = { keep: Uint8Array; removed: number; protectedTriangles: number };
+/**
+ * `keep`: one flag per triangle of the scan as it was handed in. `positions` (build 52): the scan
+ * cut exactly along the line, in the coordinates of `local` - when given, it replaces the scan.
+ */
+export type DentalTrimResult = { keep: Uint8Array; removed: number; protectedTriangles: number; positions?: Float32Array };
+
+/**
+ * Build 52: the scan cut exactly along the (smoothed) line drawn - triangles that cross it are split
+ * on it - so the trimmed edge is clean. `side`: per corner, how far inside the line it falls
+ * (negative outside); `local`: the same soup in the part's own coordinates, which the result is in.
+ */
+export function cutDentalScan(positions: Float32Array, side: Float32Array, mode: DentalTrimMode, local: Float32Array): DentalTrimResult {
+  const triangles = Math.floor(positions.length / 9);
+  const corners = triangles * 3;
+  const inside = new Uint8Array(corners);
+  for (let i = 0; i < corners; i += 1) if (side[i] > 0) inside[i] = 1;
+  // The teeth and the floating bits, decided as before.
+  const plain = trimDentalScan(positions, inside, mode);
+  const tooth = plain.toothCorners!;
+  const points: Float32Array[] = [];
+  for (let i = 0; i < corners; i += 1) points.push(positions.subarray(i * 3, i * 3 + 3));
+  const ids = weldedVertexIds(points, 1e-4);
+  let count = 0;
+  for (let i = 0; i < ids.length; i += 1) count = Math.max(count, ids[i] + 1);
+  const v = new Array<number>(count * 3).fill(0);
+  const field = new Float64Array(count).fill(-1e6);
+  const keepCorner = new Uint8Array(count);
+  for (let i = 0; i < corners; i += 1) {
+    const id = ids[i];
+    v[id * 3] = local[i * 3]; v[id * 3 + 1] = local[i * 3 + 1]; v[id * 3 + 2] = local[i * 3 + 2];
+    field[id] = mode === "keep" ? side[i] : -side[i];
+    if (tooth[i]) keepCorner[id] = 1;
+  }
+  const f: number[] = [];
+  let crossed = 0;
+  // Triangles the plain trim dropped as floating bits stay dropped; the rest are cut on the line.
+  for (let t = 0; t < triangles; t += 1) {
+    const a = ids[t * 3], b = ids[t * 3 + 1], c = ids[t * 3 + 2];
+    const crosses = (field[a] > 0) !== (field[b] > 0) || (field[b] > 0) !== (field[c] > 0);
+    if (crosses) crossed += 1;
+    if (plain.keep[t] || crosses) f.push(a, b, c);
+  }
+  const cut = cutAlongField({ v, f }, field, keepCorner);
+  const out = new Float32Array(cut.f.length * 3);
+  for (let i = 0; i < cut.f.length; i += 1) for (let k = 0; k < 3; k += 1) out[i * 3 + k] = cut.v[cut.f[i] * 3 + k];
+  return { keep: plain.keep, removed: plain.removed + crossed, protectedTriangles: plain.protectedTriangles, positions: out };
+}
 
 /**
  * `positions`: the scan as a triangle soup (Z-up); `inside`: one flag per corner, whether it falls
  * inside the line drawn on screen.
  */
-export function trimDentalScan(positions: Float32Array, inside: Uint8Array, mode: DentalTrimMode): DentalTrimResult {
+export function trimDentalScan(positions: Float32Array, inside: Uint8Array, mode: DentalTrimMode): DentalTrimResult & { toothCorners?: Uint8Array } {
   const triangles = Math.floor(positions.length / 9);
   const corners = triangles * 3;
   // The teeth, found as Dental Studio finds them: on the cleaned scan, teeth up.
@@ -74,5 +119,5 @@ export function trimDentalScan(positions: Float32Array, inside: Uint8Array, mode
   }
   let removed = 0;
   for (let t = 0; t < triangles; t += 1) if (!keep[t]) removed += 1;
-  return { keep, removed, protectedTriangles };
+  return { keep, removed, protectedTriangles, toothCorners: tooth };
 }
