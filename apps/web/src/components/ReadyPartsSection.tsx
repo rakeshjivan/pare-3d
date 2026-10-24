@@ -35,7 +35,7 @@ import {
 } from "@/lib/readyParts";
 
 /** Fork: the Shapes panel's "Ready-made parts" - built from ordinary shapes, placed with a click. */
-export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: ReadyPart[], options?: { sink?: number; carry?: boolean; onFace?: { hint: string; placed: string } }) => void; onMake?: (maker: "lithophane" | "trace" | "voronoi") => void }) {
+export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: ReadyPart[], options?: { sink?: number; carry?: boolean; onFace?: { hint: string; placed: string; cutInto?: boolean } }) => void; onMake?: (maker: "lithophane" | "trace" | "voronoi") => void }) {
   useLanguage();
   const [insertSize, setInsertSize] = useState<MetricSize>("M3");
   const [nutSize, setNutSize] = useState<MetricSize>("M3");
@@ -273,7 +273,7 @@ export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: Read
               <button
                 type="button"
                 className="ready-part-add"
-                onClick={() => onInsert([make()], { sink: depth, onFace: { hint: t("readyParts.clickerPlaceHint"), placed: t("readyParts.clickerPlaced") } })}
+                onClick={() => onInsert([make()], { sink: depth, onFace: { hint: t("readyParts.clickerPlaceHint"), placed: t("readyParts.clickerPlaced"), cutInto: true } })}
               >
                 {t("readyParts.add")}
               </button>

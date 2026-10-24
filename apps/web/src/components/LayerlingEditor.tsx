@@ -2034,6 +2034,8 @@ export function LayerlingEditor({
   const carrySinkRef = useRef(new Map<string, number>());
   /** Fork: what to say once the carried parts are set down, instead of the usual line. */
   const carryAfterNoticeRef = useRef<string | null>(null);
+  /** Fork (build 56): a clicker cutter being carried is centred on the face it is set on and cut into its part there. */
+  const carryCutIntoRef = useRef<{ name: string } | null>(null);
   // Fork: connectors for the cut, remembered between splits.
   const [splitConnectors, setSplitConnectorsState] = useState<CutConnectorOptions>(() => {
     try {
@@ -5111,6 +5113,71 @@ export function LayerlingEditor({
     [commitShapes, placementWorkplane, shapes],
   );
 
+  /**
+   * Fork (build 56): one click makes a clicker half. The cutter goes into the flat face that was
+   * clicked, centred on it, level with it and lined up with the face, and is cut into the part at
+   * once (grouped with it, so Ungroup still takes it apart). A face that is curved, or a part too
+   * thin or small for the switch, is said so; the cutter is then left where it was set down.
+   */
+  const cutClickerInto = useCallback(async (cutterId: string, part: WorkplaneShape, target: { point: PlacementPoint; normal: PlacementPoint; workplane: PlacementWorkplane; hit?: PlacementPoint }, sink: number, cutterName: string) => {
+    const before = shapesRef.current;
+    const cutter = before.find((shape) => shape.id === cutterId);
+    if (!cutter) return;
+    const read = readPerforableFace(worldTrianglePositions(part), target.hit ?? target.point, target.normal);
+    const notes: string[] = [];
+    let point = target.point;
+    if (read.ok) {
+      // The middle of the face: the centroid of its outer edge.
+      const outer = read.face.outline.loops.reduce<{ u: number; v: number }[] | null>((best, loop) => {
+        const area = (ring: { u: number; v: number }[]) => Math.abs(ring.reduce((sum, a, i) => { const b = ring[(i + 1) % ring.length]; return sum + a.u * b.v - b.u * a.v; }, 0) / 2);
+        return !best || area(loop) > area(best) ? loop : best;
+      }, null);
+      if (outer && outer.length >= 3) {
+        let cu = 0, cv = 0, twice = 0;
+        let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+        outer.forEach((a, i) => {
+          const b = outer[(i + 1) % outer.length];
+          const cross = a.u * b.v - b.u * a.v;
+          twice += cross; cu += (a.u + b.u) * cross; cv += (a.v + b.v) * cross;
+          minU = Math.min(minU, a.u); maxU = Math.max(maxU, a.u); minV = Math.min(minV, a.v); maxV = Math.max(maxV, a.v);
+        });
+        if (Math.abs(twice) > 1e-9) {
+          cu /= 3 * twice; cv /= 3 * twice;
+          const { origin, xAxis, zAxis } = read.face.workplane;
+          point = { x: origin.x + xAxis.x * cu + zAxis.x * cv, y: origin.y + xAxis.y * cu + zAxis.y * cv, z: origin.z + xAxis.z * cu + zAxis.z * cv };
+        }
+        if (Math.min(maxU - minU, maxV - minV) < Math.max(cutter.width, cutter.depth) + 2) notes.push(t("clicker.faceSmall", { size: Math.max(cutter.width, cutter.depth).toFixed(0) }));
+      }
+      if (read.face.thickness < cutter.height + 1) notes.push(t("clicker.tooThin", { depth: cutter.height.toFixed(1) }));
+    } else {
+      notes.push(t("clicker.notFlat"));
+    }
+    const patches = carriedOntoFace(before, [cutterId], { ...target, point }, cutterId);
+    const length = Math.hypot(target.normal.x, target.normal.y, target.normal.z) || 1;
+    const patch = patches.get(cutterId) ?? {};
+    const moved = { ...cutter, ...patch };
+    const placed = canonicalizeShape(sink
+      ? { ...moved, x: moved.x - (target.normal.x / length) * sink, z: moved.z - (target.normal.z / length) * sink, elevation: (moved.elevation ?? 0) - (target.normal.y / length) * sink }
+      : moved);
+    if (!read.ok) {
+      commitShapes(before.map((shape) => (shape.id === cutterId ? placed : shape)), [cutterId], notes.join(" "));
+      return;
+    }
+    const fingerprint = projectShapesFingerprint(shapesRef.current);
+    const result = await whileBusy("combine", () => buildGroupedShapeFromSelection([part, placed], workspaceSettingsRef.current.booleanTriangleLimit));
+    if (projectShapesFingerprint(shapesRef.current) !== fingerprint) {
+      setNotice(t("status.groupChanged"));
+      return;
+    }
+    if (!result.group) {
+      commitShapes(before.map((shape) => (shape.id === cutterId ? placed : shape)), [cutterId], result.failureNotice);
+      return;
+    }
+    const cut = canonicalizeShape({ ...result.group, name: part.name });
+    const next = before.filter((shape) => shape.id !== cutterId).map((shape) => (shape.id === part.id ? cut : shape));
+    commitShapes(next, [cut.id], [t("clicker.cut", { cutter: cutterName, part: displayShapeName(part) }), ...notes].join(" "));
+  }, [commitShapes]);
+
   /** Sets the parts picked up with C down on the face (or the workplane) that was clicked, as one step. */
   const carryFaceTextRef = useRef(false);
   const dropCarried = useCallback((target: { point: PlacementPoint; normal: PlacementPoint; workplane: PlacementWorkplane; shapeId?: string; hit?: PlacementPoint }) => {
@@ -5137,6 +5204,15 @@ export function LayerlingEditor({
       }
     }
     carryFaceTextRef.current = false;
+    const cutInto = carryCutIntoRef.current;
+    carryCutIntoRef.current = null;
+    const part = cutInto && ids.length === 1 && target.shapeId && !ids.includes(target.shapeId) ? shapes.find((shape) => shape.id === target.shapeId) : undefined;
+    if (cutInto && part && !part.hole && !part.locked && !isNonSolidShapeKind(part.kind)) {
+      void cutClickerInto(ids[0], part, target, carrySinkRef.current.get(ids[0]) ?? 0, cutInto.name);
+      carrySinkRef.current = new Map();
+      carryAfterNoticeRef.current = null;
+      return;
+    }
     const patches = carriedOntoFace(shapes, ids, target, ids[0]);
     // Fork: parts that go into the face (cut-in text) move that far along the face's normal, inwards.
     const sinks = carrySinkRef.current;
@@ -5154,7 +5230,7 @@ export function LayerlingEditor({
     const after = carryAfterNoticeRef.current;
     carryAfterNoticeRef.current = null;
     commitShapes(next, ids, after ?? t("status.carryPlaced", { count: ids.length }));
-  }, [commitShapes, shapes]);
+  }, [commitShapes, cutClickerInto, shapes]);
 
   /*
    * The fill of an extruded sketch body changed from outside sketch mode - area, a line round it
@@ -6059,7 +6135,7 @@ export function LayerlingEditor({
   }, [splitTargetPoints]);
 
   /** Fork: ready-made parts, built and placed like a saved custom shape (they hang on the pointer when that is on). */
-  const insertReadyParts = useCallback(async (parts: ReadyPart[], options: { sink?: number; carry?: boolean; at?: PlacementPoint; onFace?: { hint: string; placed: string } } = {}) => {
+  const insertReadyParts = useCallback(async (parts: ReadyPart[], options: { sink?: number; carry?: boolean; at?: PlacementPoint; onFace?: { hint: string; placed: string; cutInto?: boolean } } = {}) => {
     const sourceProjectId = splitProjectIdRef.current;
     const built = await Promise.all(parts.map((part) => buildReadyPart(part, workspaceSettingsRef.current.booleanTriangleLimit)));
     if (splitProjectIdRef.current !== sourceProjectId) return;
@@ -6072,6 +6148,7 @@ export function LayerlingEditor({
       carrySinkRef.current = options.sink ? new Map(inserted.map((shape) => [shape.id, options.sink!])) : new Map();
       carryAfterNoticeRef.current = options.onFace ? options.onFace.placed : options.carry ? t("readyParts.textPlaced") : null;
       carryFaceTextRef.current = Boolean(options.carry);
+      carryCutIntoRef.current = options.onFace?.cutInto ? { name: parts.map((part) => part.name).join(" + ") } : null;
       setCarryIds(inserted.map((shape) => shape.id));
       setNotice(options.onFace ? options.onFace.hint : t(options.carry ? "readyParts.textPlaceHint" : "status.carryPlace"));
     }
@@ -6082,6 +6159,7 @@ export function LayerlingEditor({
     if (!carryIds) {
       carrySinkRef.current = new Map();
       carryAfterNoticeRef.current = null;
+      carryCutIntoRef.current = null;
     }
   }, [carryIds]);
 
