@@ -174,14 +174,14 @@ The result is a mesh like an imported model. Undo lays the shape flat again; for
 
 ### Making a clicker
 
-The group **{{ui:readyParts.cat.clicker}}** turns any shape into a clicker built round a keyboard switch (Cherry MX style, the kind sold for mechanical keyboards). It has two cutters, and both are holes:
+The group **{{ui:readyParts.cat.clicker}}** turns any shape into a clicker built round a keyboard switch (Cherry MX style, the kind sold for mechanical keyboards: a 15 mm housing and 4 mm of travel). It has two pieces:
 
-- **{{ui:readyParts.clickerBase}}:** the pocket the switch presses into - 14 mm square and 8.7 mm deep, with notches its clips snap into.
-- **{{ui:readyParts.clickerTop}}:** the recess that sits over the top of the switch, with a keycap socket (a post with a cross-shaped hole) left standing in the middle; it pushes onto the switch's stem.
+- **{{ui:readyParts.clickerBase}}:** a hole - the pocket the whole switch sinks into, 15.3 mm deep. The top of the switch ends up level with the face; below, notches hold the switch's clips, the way a keyboard plate does.
+- **{{ui:readyParts.clickerTop}}:** a solid post with a cross-shaped hole that pushes onto the switch's stem. It stands 4.5 mm out of the face, so the switch can be pressed its full 4 mm before the halves touch.
 
-Split your shape into a base and a top and lay each half with its flat face up. Press {{ui:readyParts.add}} beside a cutter and click the flat face it belongs in: the cutter goes in level with that face. Select each half with its cutter and group them to cut it. Print both halves, press the switch into the base and push the top onto its stem.
+Split your shape into a base and a top and lay each half with its flat face up. Press {{ui:readyParts.add}} beside {{ui:readyParts.clickerBase}} and click the base's flat face: the pocket goes into the middle of that face, level with it, and is cut in at once. Do the same with {{ui:readyParts.clickerTop}} on the top's flat face: the post is added to its middle. Both halves are groups afterwards, so Ungroup takes the piece out again. If the face is curved, the piece is set down where you clicked and not joined; if the base is thinner than the pocket is deep (about 16 mm), the notice says so.
 
-The cutters keep their size - they fit standard switches - so they have no resize handles and cannot be tapered, twisted or wrapped. Move and turn them as usual.
+Print both halves, press the switch into the base until its clips snap in, and push the top onto its stem. The pieces keep their size - they fit standard switches - so they have no resize handles and cannot be tapered, twisted or wrapped.
 
 ## Making from a photo or a pattern
 

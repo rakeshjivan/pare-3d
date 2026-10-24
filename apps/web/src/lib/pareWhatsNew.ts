@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 56,
+    items: [
+      "Clicker in one click each: Add the Clicker base, click the base's flat face, and the pocket goes into the middle of the face and is cut in at once; the same for the Clicker top. No moving, centring or grouping by hand.",
+      "The clicker now hides the switch: the base pocket takes the whole switch, its top level with the face (build 54's held only the part under a keyboard plate, so the switch stood out). The top is a post that pushes onto the stem and stands 4.5 mm out, leaving room for the 4 mm press.",
+    ],
+  },
+  {
     build: 55,
     items: [
       "Texture: a new Modify tool presses a pattern into a part's surface, or raises it out of it - knurl, ribs, dimples, hexagons, bricks, weave, stone, leather, wood, fuzzy, or a picture of your own. The faces it stands on stay flat and sharp edges stay crisp.",

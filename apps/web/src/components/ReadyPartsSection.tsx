@@ -4,7 +4,7 @@ import { BoxPartIcon, ClickerBasePartIcon, ClickerTopPartIcon, FlexiPartIcon, Hi
 import { DEFAULT_JAR, jarParts, normalizeJar, type JarOptions } from "@/lib/readyJar";
 import { DEFAULT_FLEXI_CHAIN, flexiChainParts, normalizeFlexiChain, type FlexiChainOptions } from "@/lib/flexiJoint";
 import { useState } from "react";
-import { CLICKER_BASE_HEIGHT, CLICKER_TOP_HEIGHT, clickerBasePart, clickerTopPart } from "@/lib/clickerParts";
+import { CLICKER_BASE_HEIGHT, clickerBasePart, clickerTopPart } from "@/lib/clickerParts";
 import { ForkLithophaneIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -262,7 +262,7 @@ export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: Read
           <p className="ready-part-note">{t("readyParts.clickerHowTo")}</p>
           {([
             ["base", ClickerBasePartIcon, t("readyParts.clickerBase"), t("readyParts.clickerBaseHint"), () => clickerBasePart(t("readyParts.clickerBase")), CLICKER_BASE_HEIGHT],
-            ["top", ClickerTopPartIcon, t("readyParts.clickerTop"), t("readyParts.clickerTopHint"), () => clickerTopPart(t("readyParts.clickerTop")), CLICKER_TOP_HEIGHT],
+            ["top", ClickerTopPartIcon, t("readyParts.clickerTop"), t("readyParts.clickerTopHint"), () => clickerTopPart(t("readyParts.clickerTop")), 0],
           ] as const).map(([key, Icon, title, hint, make, depth]) => (
             <div className="ready-part" key={key} data-ready-part={`clicker-${key}`}>
               <Icon />

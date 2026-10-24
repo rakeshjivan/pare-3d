@@ -2035,7 +2035,7 @@ export function LayerlingEditor({
   /** Fork: what to say once the carried parts are set down, instead of the usual line. */
   const carryAfterNoticeRef = useRef<string | null>(null);
   /** Fork (build 56): a clicker cutter being carried is centred on the face it is set on and cut into its part there. */
-  const carryCutIntoRef = useRef<{ name: string } | null>(null);
+  const carryCutIntoRef = useRef<{ name: string; entry: unknown } | null>(null);
   // Fork: connectors for the cut, remembered between splits.
   const [splitConnectors, setSplitConnectorsState] = useState<CutConnectorOptions>(() => {
     try {
@@ -3689,7 +3689,7 @@ export function LayerlingEditor({
   const keyRunRef = useRef<KeyRun | null>(null);
 
   const commitShapes = useCallback(
-    (next: WorkplaneShape[], nextSelection: string | string[] | null = selectedIds, message?: string, keyRunKey?: string) => {
+    (next: WorkplaneShape[], nextSelection: string | string[] | null = selectedIds, message?: string, keyRunKey?: string, replaceEntry?: unknown) => {
       // Solange der Verlaufsblick offen ist, zeigt die Flaeche nicht den
       // Entwurf. Eine Aenderung, die jetzt noch durchkaeme - ueber einen
       // Umweg, den die Leiste nicht kennt -, traefe etwas, das keiner sieht.
@@ -3718,7 +3718,9 @@ export function LayerlingEditor({
       if (nextNotes !== notes) setNotes(nextNotes);
       const now = Date.now();
       const currentIndex = historyIndexRef.current;
-      const replaceCurrent = keyRunKey !== undefined && continuesKeyRun(keyRunRef.current, keyRunKey, now, historyRef.current[currentIndex], currentIndex === historyRef.current.length - 1);
+      // Fork (build 56): a step that finishes the one before it (a clicker piece set in after it was added) takes its place, so one undo takes both back.
+      const finishesStep = replaceEntry !== undefined && historyRef.current[currentIndex] === replaceEntry && currentIndex === historyRef.current.length - 1;
+      const replaceCurrent = finishesStep || (keyRunKey !== undefined && continuesKeyRun(keyRunRef.current, keyRunKey, now, historyRef.current[currentIndex], currentIndex === historyRef.current.length - 1));
       const changed = appendHistorySnapshot(canonicalNext, validSelection, nextNotes, placementWorkplaneRef.current, replaceCurrent);
       if (keyRunKey !== undefined) {
         // Only a step the keys just made can be replaced by the next press.
@@ -5119,7 +5121,7 @@ export function LayerlingEditor({
    * once (grouped with it, so Ungroup still takes it apart). A face that is curved, or a part too
    * thin or small for the switch, is said so; the cutter is then left where it was set down.
    */
-  const cutClickerInto = useCallback(async (cutterId: string, part: WorkplaneShape, target: { point: PlacementPoint; normal: PlacementPoint; workplane: PlacementWorkplane; hit?: PlacementPoint }, sink: number, cutterName: string) => {
+  const cutClickerInto = useCallback(async (cutterId: string, part: WorkplaneShape, target: { point: PlacementPoint; normal: PlacementPoint; workplane: PlacementWorkplane; hit?: PlacementPoint }, sink: number, cutterName: string, insertEntry: unknown) => {
     const before = shapesRef.current;
     const cutter = before.find((shape) => shape.id === cutterId);
     if (!cutter) return;
@@ -5148,7 +5150,7 @@ export function LayerlingEditor({
         }
         if (Math.min(maxU - minU, maxV - minV) < Math.max(cutter.width, cutter.depth) + 2) notes.push(t("clicker.faceSmall", { size: Math.max(cutter.width, cutter.depth).toFixed(0) }));
       }
-      if (read.face.thickness < cutter.height + 1) notes.push(t("clicker.tooThin", { depth: cutter.height.toFixed(1) }));
+      if (cutter.hole && read.face.thickness < cutter.height + 1) notes.push(t("clicker.tooThin", { depth: cutter.height.toFixed(1) }));
     } else {
       notes.push(t("clicker.notFlat"));
     }
@@ -5175,7 +5177,7 @@ export function LayerlingEditor({
     }
     const cut = canonicalizeShape({ ...result.group, name: part.name });
     const next = before.filter((shape) => shape.id !== cutterId).map((shape) => (shape.id === part.id ? cut : shape));
-    commitShapes(next, [cut.id], [t("clicker.cut", { cutter: cutterName, part: displayShapeName(part) }), ...notes].join(" "));
+    commitShapes(next, [cut.id], [t(cutter.hole ? "clicker.cut" : "clicker.added", { cutter: cutterName, part: displayShapeName(part) }), ...notes].join(" "), undefined, insertEntry);
   }, [commitShapes]);
 
   /** Sets the parts picked up with C down on the face (or the workplane) that was clicked, as one step. */
@@ -5208,7 +5210,7 @@ export function LayerlingEditor({
     carryCutIntoRef.current = null;
     const part = cutInto && ids.length === 1 && target.shapeId && !ids.includes(target.shapeId) ? shapes.find((shape) => shape.id === target.shapeId) : undefined;
     if (cutInto && part && !part.hole && !part.locked && !isNonSolidShapeKind(part.kind)) {
-      void cutClickerInto(ids[0], part, target, carrySinkRef.current.get(ids[0]) ?? 0, cutInto.name);
+      void cutClickerInto(ids[0], part, target, carrySinkRef.current.get(ids[0]) ?? 0, cutInto.name, cutInto.entry);
       carrySinkRef.current = new Map();
       carryAfterNoticeRef.current = null;
       return;
@@ -6148,7 +6150,7 @@ export function LayerlingEditor({
       carrySinkRef.current = options.sink ? new Map(inserted.map((shape) => [shape.id, options.sink!])) : new Map();
       carryAfterNoticeRef.current = options.onFace ? options.onFace.placed : options.carry ? t("readyParts.textPlaced") : null;
       carryFaceTextRef.current = Boolean(options.carry);
-      carryCutIntoRef.current = options.onFace?.cutInto ? { name: parts.map((part) => part.name).join(" + ") } : null;
+      carryCutIntoRef.current = options.onFace?.cutInto ? { name: parts.map((part) => part.name).join(" + "), entry: historyRef.current[historyIndexRef.current] } : null;
       setCarryIds(inserted.map((shape) => shape.id));
       setNotice(options.onFace ? options.onFace.hint : t(options.carry ? "readyParts.textPlaceHint" : "status.carryPlace"));
     }
@@ -9256,11 +9258,19 @@ export function LayerlingEditor({
           return;
         }
         const made = new Map<string, WorkplaneShape>();
-        result.parts.forEach((part) => {
+        // Fork (build 56): the models stand on the workplane. A pair set up in occlusion is built
+        // round its bite, so the lower one hung below the plate; both go up together, keeping the bite.
+        const world = result.parts.map((part) => fromZUp(part.positions, offset));
+        let lowest = Infinity;
+        world.forEach((positions) => { for (let i = 1; i < positions.length; i += 3) lowest = Math.min(lowest, positions[i]); });
+        const lift = Number.isFinite(lowest) ? -lowest : 0;
+        result.parts.forEach((part, index) => {
           const shape = current.find((candidate) => candidate.id === part.id);
           if (!shape) return;
           const name = t(part.role === "upper" ? "dental.upperModel" : "dental.lowerModel", { name: displayShapeName(shape) });
-          made.set(part.id, canonicalizeShape({ ...shapeWithWorldPositions(shape, fromZUp(part.positions, offset)), name }));
+          const positions = world[index];
+          if (lift) for (let i = 1; i < positions.length; i += 3) positions[i] += lift;
+          made.set(part.id, canonicalizeShape({ ...shapeWithWorldPositions(shape, positions), name }));
         });
         const next = shapesRef.current.map((shape) => made.get(shape.id) ?? (shape.id === state.slots.bite ? { ...shape, hidden: true } : shape));
         const heights = result.parts.map((part) => part.height.toFixed(1)).join(" / ");
