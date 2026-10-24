@@ -4,6 +4,16 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 50,
+    items: [
+      "Dental Studio's Clean base now looks like a model builder's: the outline is drawn round the crowns in a smooth band, the wall rises straight from a flat floor to meet the gum all round, the hollow under curving gum is filled, and flaps of tongue or cheek beside the teeth are cut away.",
+      "Choose what fills a hollow model: Empty, a Honeycomb base (the bottom 6 mm only) or a full Honeycomb - now with two or three drain slots at the foot of every wall.",
+      "Half-round locator notches at the foot of a Clean base, and an optional tie bar across the back of a full arch so it cannot spread while it prints.",
+      "A new, optional Articulator plate base: a solid block with square pockets underneath for a magnetic articulator plate.",
+      "The height shown for each model is the model's own, not the scan's highest point.",
+    ],
+  },
+  {
     build: 49,
     items: [
       "Dental Studio makes cleaner models: the new Clean base (now the default for study models) cuts the gum level a set depth below the teeth and stands the scan on a smooth, rounded base with straight walls - no rough walls built from the scan's edge.",

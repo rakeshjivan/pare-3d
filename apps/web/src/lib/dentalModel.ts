@@ -16,7 +16,7 @@
 import * as THREE from "three";
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
 import { alignToBite, archFrame, canineWidth, cleanScan, frontOf, isPartialArch, marginUp, pairFrame, palateScore, type CleanArch, type CleanReport } from "@/lib/dentalArch";
-import { blockOutline, cleanOutline, closeToFloor, distanceFromEdge, honeycombIn, prismOf, EDGE_FRINGE, hingeParts, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, toothZone } from "@/lib/dentalBase";
+import { blockOutline, cleanOutline, closeToFloor, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, underFill, capOutsideCrowns, CAP_ABOVE_PLANE, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, hingeParts, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
 import {
   applyMatrix, boundaryLoops, cloneMesh, convexHull, cutBelow, dropFragments, faceArea, loopLength, surfaceKept, pinchedEdges, solidPositions, toManifold, upwardness, weld,
@@ -34,7 +34,8 @@ export const DENTAL_VENT_RADIUS = 1.5;
 
 export type DentalRole = "upper" | "lower";
 /** Fork (build 49): "clean" - the scan trimmed to a smooth outline round the teeth on a low block. */
-export type DentalBaseStyle = "follow" | "plate" | "ortho" | "clean";
+export type DentalInfill = "honeycomb" | "base" | "none";
+export type DentalBaseStyle = "follow" | "plate" | "ortho" | "clean" | "articulator";
 export type DentalInside = "solid" | "open" | "closed";
 
 export type DentalArchInput = { id: string; positions: ArrayLike<number> };
@@ -76,8 +77,13 @@ export type DentalStudioOptions = {
   gum?: number | null;
   /** Fork (build 48): smooth the scan's ragged edge before the base goes on (never the teeth). */
   smooth?: DentalSmooth;
-  /** Fork (build 49): what fills a hollow model - a honeycomb (the default) or nothing. */
-  infill?: "honeycomb" | "none";
+  /** Fork (build 49/50): what fills a hollow model - a honeycomb all the way up (the default), a
+   * honeycomb in the base only (stiff where it matters, empty above), or nothing. */
+  infill?: DentalInfill;
+  /** Fork (build 50): half-round notches round the foot of a clean base, for seating it. On unless false. */
+  notches?: boolean;
+  /** Fork (build 50): a bar joining the back ends of a full arch, so it cannot spread while it prints. */
+  tieBar?: boolean;
 };
 
 export type DentalSmooth = "off" | "low" | "high";
@@ -351,16 +357,28 @@ function buildArch(
   const keep = keptDepthFor(arch, options);
   // The cut never passes through a tooth: keep is never less than arch.teeth.
   const scanTeeth = toothZone(m, undefined, undefined, undefined, TIP_CEILING);
+  // Build 50: the crowns - what is promised, and what the clean outline is drawn round.
+  // Within the teeth found as before: with a tip set aside, the crown's depth is measured from a
+  // lower tip, and must not reach below the depth the cut keeps.
+  const crowns = toothZone(m, TOOTH_CROWN, CROWN_REACH, undefined, TIP_CEILING, TIP_FLOOR, TIP_LONELY).map((inZone, i) => (inZone && scanTeeth[i] ? 1 : 0));
   const level = -keep;
   const cut = level <= low + 1e-6 ? m : cutBelow(m, level);
+  // A mark on the scan's corners, carried over to the corners of the cut (which keeps them in place).
+  const onCut = (mark: Uint8Array) => {
+    if (cut === m) return mark;
+    const was = new Set<string>();
+    for (let i = 0; i < mark.length; i += 1) if (mark[i]) was.add(`${m.v[i * 3]},${m.v[i * 3 + 1]},${m.v[i * 3 + 2]}`);
+    const out = new Uint8Array(cut.v.length / 3);
+    for (let i = 0; i < out.length; i += 1) if (was.has(`${cut.v[i * 3]},${cut.v[i * 3 + 1]},${cut.v[i * 3 + 2]}`)) out[i] = 1;
+    return out;
+  };
   // The teeth: never cut and never worn away - nor dropped as a loose piece.
   const teeth = toothZone(cut, undefined, undefined, undefined, TIP_CEILING);
   // What was teeth on the whole scan stays teeth: cutting the tissue away below can move the lowest
   // ground a tip is measured against, and must never shrink the teeth.
   if (cut !== m) {
-    const was = new Set<string>();
-    for (let i = 0; i < scanTeeth.length; i += 1) if (scanTeeth[i]) was.add(`${m.v[i * 3]},${m.v[i * 3 + 1]},${m.v[i * 3 + 2]}`);
-    for (let i = 0; i < teeth.length; i += 1) if (!teeth[i] && was.has(`${cut.v[i * 3]},${cut.v[i * 3 + 1]},${cut.v[i * 3 + 2]}`)) teeth[i] = 1;
+    const was = onCut(scanTeeth);
+    for (let i = 0; i < teeth.length; i += 1) if (was[i]) teeth[i] = 1;
   }
   // Guarded: the teeth, all but the fringe right at the scan's own edge (not edges a trim makes here).
   const scanEdge = distanceFromEdge(cut, EDGE_FRINGE);
@@ -411,16 +429,35 @@ function buildArch(
     const trim = keepSolid(prism(runtime, ortho, floor - 0.001, top + 5));
     solid = keepSolid(runtime.Manifold.intersection(solid, trim));
     footprint = [ortho];
-  } else if (options.baseStyle === "clean") {
+  } else if (options.baseStyle === "clean" || options.baseStyle === "articulator") {
     // The block fills the outline up to where the scan was cut; above it only the scan shows,
     // trimmed to the same outline.
-    const rings = cleanOutline(runtime, cut, teeth, Math.max(0.5, options.gum ?? CLEAN_GUM));
+    const rings = cleanOutline(runtime, cut, teeth, Math.max(0.5, options.gum ?? CLEAN_GUM), { mesh: m, crowns });
     if (rings.length) {
-      const block = keepSolid(prismOf(runtime, rings, floor, Math.max(floor + Math.max(DENTAL_MIN_BASE, options.base), level)));
-      solid = keepSolid(runtime.Manifold.union(solid, block));
-      const trim = keepSolid(prismOf(runtime, rings, floor - 0.001, top + 5));
-      solid = keepSolid(runtime.Manifold.intersection(solid, trim));
-      footprint = rings.filter((ring) => signedRing(ring) > 0);
+      const blockTop = Math.max(floor + Math.max(DENTAL_MIN_BASE, options.base), level);
+      // Build 50: under the gum filled, so the wall rises clean to it all round.
+      const fill = keepSolid(underFill(runtime, cut, rings, floor));
+      if (fill.status() === "NoError" && !fill.isEmpty()) solid = keepSolid(runtime.Manifold.union(solid, fill));
+      // Tissue standing above the teeth beside them (the pad behind the last molar, a fold) is
+      // trimmed level just over the occlusal plane; the crowns, and 1 mm round them, are not.
+      const cap = keepSolid(capOutsideCrowns(runtime, rings, m, crowns, CAP_ABOVE_PLANE, top + 5));
+      if (!cap.isEmpty()) solid = keepSolid(runtime.Manifold.difference(solid, cap));
+      if (options.baseStyle === "articulator") {
+        // The scan trimmed to its outline, standing on a block for a magnetic articulator plate.
+        const trim = keepSolid(prismOf(runtime, rings, floor - 0.001, top + 5));
+        solid = keepSolid(runtime.Manifold.intersection(solid, trim));
+        const plate = articulatorOutline(rings);
+        const block = keepSolid(prism(runtime, plate, floor, blockTop));
+        solid = keepSolid(runtime.Manifold.union(solid, block));
+        solid = keepSolid(runtime.Manifold.difference(solid, keepSolid(articulatorPockets(runtime, plate, floor))));
+        footprint = [plate];
+      } else {
+        const block = keepSolid(prismOf(runtime, rings, floor, blockTop));
+        solid = keepSolid(runtime.Manifold.union(solid, block));
+        const trim = keepSolid(prismOf(runtime, rings, floor - 0.001, top + 5));
+        solid = keepSolid(runtime.Manifold.intersection(solid, trim));
+        footprint = rings.filter((ring) => signedRing(ring) > 0);
+      }
     }
   } else if (options.baseStyle === "plate") {
     const hull = convexHull(closed.outline.flat());
@@ -433,7 +470,7 @@ function buildArch(
     footprint = [hull];
   }
   let voxel: number | null = null;
-  if (options.inside !== "solid") {
+  if (options.inside !== "solid" && options.baseStyle !== "articulator") {
     const open = options.inside === "open";
     const wall = Math.max(DENTAL_MIN_WALL, Math.min(DENTAL_MAX_WALL, options.wall));
     const before = solidPositions(solid);
@@ -442,7 +479,8 @@ function buildArch(
     voxel = cavity.voxel;
     if (!cavity.solid.isEmpty()) {
       // Fork (build 49): a honeycomb inside carries the shell, so hollow is as stiff as solid.
-      const taken = (options.infill ?? "honeycomb") === "honeycomb" ? keepSolid(honeycombIn(runtime, cavity.solid, floor, open)) : cavity.solid;
+      const infill = options.infill ?? "honeycomb";
+      const taken = infill === "none" ? cavity.solid : keepSolid(honeycombIn(runtime, cavity.solid, floor, open, infill === "base" ? floor + HONEYCOMB_BASE_HEIGHT : Infinity));
       solid = keepSolid(runtime.Manifold.difference(solid, taken.isEmpty() ? cavity.solid : taken));
       if (!open) {
         if (!cavity.vents.length) warnings.push("vents");
@@ -452,6 +490,15 @@ function buildArch(
         }
       }
     }
+  }
+  // Build 50: the finishing touches of a clean base - locator notches, and a tie bar if asked for.
+  if (options.baseStyle === "clean" || options.baseStyle === "articulator") {
+    const outer = footprint.reduce<Ring | null>((best, ring) => (!best || Math.abs(signedRing(ring)) > Math.abs(signedRing(best)) ? ring : best), null);
+    if (outer && options.tieBar && !arch.partial) {
+      const bar = tieBar(runtime, outer, floor);
+      if (bar) solid = keepSolid(runtime.Manifold.union(solid, keepSolid(bar)));
+    }
+    if (outer && options.baseStyle === "clean" && options.notches !== false) solid = keepSolid(runtime.Manifold.difference(solid, keepSolid(locatorNotches(runtime, outer, floor))));
   }
   const text = labelText(labelLine);
   if (text) {
@@ -494,7 +541,8 @@ function buildArch(
   const kept: Record<number, number> = {};
   // What is promised: the teeth, all but the ragged fringe right at the scan's edge.
   const fromEdge = distanceFromEdge(m, EDGE_FRINGE);
-  const promised = scanTeeth.map((inZone, i) => (inZone && fromEdge[i] > EDGE_FRINGE ? 1 : 0));
+  // Build 50: the crowns (CROWN_REACH from their tips), not the gum or flaps of tissue beside them.
+  const promised = crowns.map((inZone, i) => (inZone && fromEdge[i] > EDGE_FRINGE ? 1 : 0));
   for (const depth of [2, 4, 6, 8, 10, 12]) kept[depth] = surfaceKept(m, out, -depth, scanTeeth);
   kept[-3] = surfaceKept(m, out, -Infinity, scanTeeth);
   kept[-1] = surfaceKept(m, out, -Infinity, promised);
@@ -564,8 +612,10 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
   // Lay out: base down on the plate, the upper turned over beside the lower; or upper on lower.
   const out: DentalPart[] = [];
   let offsetX = 0;
-  built.forEach(({ arch, built: b }, i) => {
+  built.forEach(({ arch }, i) => {
     let solid = solids[i];
+    // The model's own height, as built (the scan's highest point may have been trimmed away).
+    const own = solid.boundingBox();
     if (!pair || options.layout === "print") {
       if (pair && arch.role === "upper") {
         const turned = transformSolid(solid, FLIP);
@@ -583,7 +633,7 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
         offsetX += box.max[0] - box.min[0] + 8;
       }
     }
-    out.push({ id: arch.id, role: arch.role, positions: solidPositions(solid), height: b.top - b.floor, volume: solid.volume() });
+    out.push({ id: arch.id, role: arch.role, positions: solidPositions(solid), height: own.max[2] - own.min[2], volume: solid.volume() });
     toFree.push(solid);
   });
   if (pair && options.layout === "print") {

@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import {
   DENTAL_MAX_BASE, DENTAL_MAX_WALL, DENTAL_MIN_BASE, DENTAL_MIN_WALL,
-  type DentalAnalysis, type DentalBaseStyle, type DentalInside, type DentalStudioOptions,
+  type DentalAnalysis, type DentalBaseStyle, type DentalInfill, type DentalInside, type DentalStudioOptions,
 } from "@/lib/dentalModel";
 import type { WorkplaneWorkspaceSettings } from "@/types/layerling";
 
@@ -242,11 +242,25 @@ export function DentalStudioPanel({
           <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.baseStyle")}>
             <span className="edge-modifier-label">{t("dental.baseStyle")}</span>
             <div className="shell-opening-options">
-              {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
+              {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")], ["articulator", t("dental.articulatorBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
                 <button key={value} type="button" role="radio" aria-checked={options.baseStyle === value} className={options.baseStyle === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ baseStyle: value })}>{label}</button>
               ))}
             </div>
           </div>
+          {options.baseStyle === "clean" || options.baseStyle === "articulator" ? (
+            <>
+              {options.baseStyle === "clean" ? (
+                <label className="edge-modifier-check" title={t("dental.notchesHint")}>
+                  <input type="checkbox" checked={options.notches !== false} disabled={busy} onChange={(event) => onOptionsChange({ notches: event.currentTarget.checked })} />
+                  <span>{t("dental.notches")}</span>
+                </label>
+              ) : <p className="blend-hint">{t("dental.articulatorHint")}</p>}
+              <label className="edge-modifier-check" title={t("dental.tieBarHint")}>
+                <input type="checkbox" checked={Boolean(options.tieBar)} disabled={busy} onChange={(event) => onOptionsChange({ tieBar: event.currentTarget.checked })} />
+                <span>{t("dental.tieBar")}</span>
+              </label>
+            </>
+          ) : null}
           <EdgeModifierSlider label={t(options.baseStyle === "ortho" ? "dental.orthoHeight" : "dental.base")} value={options.base} min={DENTAL_MIN_BASE} max={DENTAL_MAX_BASE} step={0.5} coarse={{ step: 0.5, max: 20 }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ base: value })} />
           <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.inside")}>
             <span className="edge-modifier-label">{t("dental.inside")}</span>
@@ -259,10 +273,14 @@ export function DentalStudioPanel({
           {options.inside !== "solid" ? (
             <>
               <EdgeModifierSlider label={t("dental.wall")} value={options.wall} min={DENTAL_MIN_WALL} max={DENTAL_MAX_WALL} step={0.1} coarse={{ step: 0.5, max: DENTAL_MAX_WALL }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ wall: value })} />
-              <label className="edge-modifier-check">
-                <input type="checkbox" checked={(options.infill ?? "honeycomb") === "honeycomb"} disabled={busy} onChange={(event) => onOptionsChange({ infill: event.currentTarget.checked ? "honeycomb" : "none" })} />
-                <span>{t("dental.honeycomb")}</span>
-              </label>
+              <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.infill")} title={t("dental.infillHint")}>
+                <span className="edge-modifier-label">{t("dental.infill")}</span>
+                <div className="shell-opening-options">
+                  {([["none", t("dental.infillNone")], ["base", t("dental.infillBase")], ["honeycomb", t("dental.infillFull")]] as Array<[DentalInfill, string]>).map(([value, label]) => (
+                    <button key={value} type="button" role="radio" aria-checked={(options.infill ?? "honeycomb") === value} className={(options.infill ?? "honeycomb") === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ infill: value })}>{label}</button>
+                  ))}
+                </div>
+              </div>
             </>
           ) : null}
           {pair ? (

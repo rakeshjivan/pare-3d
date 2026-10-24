@@ -579,6 +579,10 @@ export const TOOTH_CROWN = 10;
 /** How far out from a cusp tip, seen from above, a tooth's surface reaches, mm. */
 /** How far above the occlusal plane a cusp tip may stand (mm); higher points are soft tissue. */
 export const TIP_CEILING = 6;
+/** How far below the occlusal plane a cusp tip may lie, for the crowns (mm); lower points are soft tissue. */
+export const TIP_FLOOR = -5;
+/** Neighbouring teeth's cusps lie closer than this to one another, even across a missing tooth (mm). */
+export const TIP_LONELY = 11;
 export const TOOTH_REACH = 5.5;
 
 /**
@@ -587,10 +591,11 @@ export const TOOTH_REACH = 5.5;
  * that are the highest within 3 mm and stand at least 2.5 mm above the surface within 6 mm - which a
  * cheek flap, the palate or the floor of the mouth seldom do. Measured locally, so a tilted or curved
  * arch and a quadrant are covered alike.
- * `ceiling`: in a levelled frame, tips higher than this are not cusps (a fold of cheek or tongue
- * standing far above the occlusal plane) and found no teeth.
+ * `ceiling`, `lowest`: in a levelled frame, tips higher or lower than these are not cusps (a fold
+ * of cheek or tongue standing far above the occlusal plane, or lying well below it) and find no teeth.
+ * `lonely`: a group of tips further than this from every other group finds no teeth.
  */
-export function toothZone(m: Mesh, crown = TOOTH_CROWN, reachOut = TOOTH_REACH, tipsOut?: number[][], ceiling = Infinity): Uint8Array {
+export function toothZone(m: Mesh, crown = TOOTH_CROWN, reachOut = TOOTH_REACH, tipsOut?: number[][], ceiling = Infinity, lowest = -Infinity, lonely = Infinity): Uint8Array {
   const cell = 0.5;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (let i = 0; i < m.v.length; i += 3) { minX = Math.min(minX, m.v[i]); maxX = Math.max(maxX, m.v[i]); minY = Math.min(minY, m.v[i + 1]); maxY = Math.max(maxY, m.v[i + 1]); }
@@ -630,11 +635,45 @@ export function toothZone(m: Mesh, crown = TOOTH_CROWN, reachOut = TOOTH_REACH, 
   const tips = new Float64Array(nx * ny).fill(-Infinity);
   for (let k = 0; k < tips.length; k += 1) {
     if (!Number.isFinite(top[k])) continue;
-    if (top[k] >= near[k] - 0.3 && top[k] - around[k] >= 2.5 && top[k] <= ceiling) {
-      tips[k] = top[k];
-      if (tipsOut) tipsOut.push([minX + ((k % nx) + 0.5) * cell, minY + (Math.floor(k / nx) + 0.5) * cell, top[k]]);
+    if (top[k] >= near[k] - 0.3 && top[k] - around[k] >= 2.5 && top[k] <= ceiling && top[k] >= lowest) tips[k] = top[k];
+  }
+  if (Number.isFinite(lonely)) {
+    // Teeth stand in a row: a group of tips further than `lonely` from every other group, where
+    // there are others, is a lump of tissue beside the teeth.
+    const groups: number[][] = [];
+    const group = new Int32Array(nx * ny).fill(-1);
+    for (let k = 0; k < tips.length; k += 1) {
+      if (!Number.isFinite(tips[k]) || group[k] >= 0) continue;
+      const members: number[] = [];
+      const stack = [k];
+      group[k] = groups.length;
+      while (stack.length) {
+        const i = stack.pop()!;
+        members.push(i);
+        const x = i % nx, y = Math.floor(i / nx);
+        for (let dy = -3; dy <= 3; dy += 1) for (let dx = -3; dx <= 3; dx += 1) {
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= nx || yy >= ny) continue;
+          const j = yy * nx + xx;
+          if (Number.isFinite(tips[j]) && group[j] < 0) { group[j] = groups.length; stack.push(j); }
+        }
+      }
+      groups.push(members);
+    }
+    if (groups.length >= 3) {
+      const far = groups.map((members, g) => {
+        for (let h = 0; h < groups.length; h += 1) {
+          if (h === g) continue;
+          for (const i of members) for (const j of groups[h]) {
+            if (Math.hypot((i % nx) - (j % nx), Math.floor(i / nx) - Math.floor(j / nx)) * cell <= lonely) return false;
+          }
+        }
+        return true;
+      });
+      groups.forEach((members, g) => { if (far[g]) for (const i of members) tips[i] = -Infinity; });
     }
   }
+  if (tipsOut) for (let k = 0; k < tips.length; k += 1) if (Number.isFinite(tips[k])) tipsOut.push([minX + ((k % nx) + 0.5) * cell, minY + (Math.floor(k / nx) + 0.5) * cell, tips[k]]);
   // The highest cusp tip within reach of each cell.
   const reach = pass(tips, reachOut, Math.max, -Infinity);
   const zone = new Uint8Array(m.v.length / 3);
@@ -677,11 +716,21 @@ export function smoothEdge(m: Mesh, rounds: number, keep?: Uint8Array) {
  * a horseshoe for a full arch, a rounded bar for a quadrant. Returned as rings (counter-clockwise
  * outlines, clockwise holes), simplified to about 0.05 mm.
  */
-export function cleanOutline(runtime: ManifoldRuntime, m: Mesh, teeth: Uint8Array, grow: number): Ring[] {
+/** How far the clean base's outline runs outside the teeth, seen from above (mm). */
+export const CLEAN_CLEARANCE = 3;
+/**
+ * How far a crown reaches from its cusp tips, seen from above (mm). Wider than any crown round its
+ * tips (a molar's buccal face bulges about 1 mm past its cusps), narrower than TOOTH_REACH, which
+ * also takes in the gum and any flap of tongue or cheek beside the teeth.
+ */
+export const CROWN_REACH = 4;
+
+export function cleanOutline(runtime: ManifoldRuntime, m: Mesh, teeth: Uint8Array, grow: number, scan?: { mesh: Mesh; crowns: Uint8Array }): Ring[] {
   const cell = 0.5;
   const key = (ix: number, iy: number) => (ix + 32768) * 65536 + (iy + 32768);
   // Seen from above, as cells: the teeth, and everything the scan covers (triangles filled in).
-  const footprint = (wanted: (t: number) => boolean) => {
+  const footprint = (wanted: (t: number) => boolean, mesh: Mesh = m) => {
+    const m = mesh;
     const cells = new Set<number>();
     for (let t = 0; t < m.f.length; t += 3) {
       if (!wanted(t)) continue;
@@ -704,18 +753,27 @@ export function cleanOutline(runtime: ManifoldRuntime, m: Mesh, teeth: Uint8Arra
   const scanCells = footprint(() => true);
   const made: Array<{ delete: () => void }> = [toothCells, scanCells];
   const keep = <T extends { delete: () => void }>(section: T) => { made.push(section); return section; };
-  // The scan as kept (cut flat at the gum line) seen from above, 0.6 mm inside its edge: the outline
-  // then runs through the scan where it comes down to the cut, so the wall's top edge is level and
-  // meets the scan cleanly. Gaps under 3 mm between pieces are bridged, jags under 2 mm smoothed
-  // out, and the teeth always stay inside.
+  // Build 50: the outline is drawn round the teeth, as a model builder draws it - a smooth band
+  // CLEAN_CLEARANCE outside them, the gaps between teeth bridged - and kept inside the scan as kept,
+  // so the wall rises until it meets the scan's own gum and its top edge follows the gum. The scan's
+  // ragged edge, flaps of tongue or cheek and the curtain closing them down are cut away outside it.
   void grow;
-  // The teeth with 0.3 mm to spare: a tooth's upright face sits right on its cells' edge, and the
-  // outline is later simplified by up to 0.05 mm.
-  const teethShape = keep(keep(toothCells.offset(1.5, "Round", 2, 24)).offset(-1.2, "Round", 2, 24));
-  const scanShape = keep(keep(scanCells.offset(1, "Round", 2, 24)).offset(-1.6, "Round", 2, 24));
-  const bridged = keep(keep(scanShape.offset(3, "Round", 2, 48)).offset(-3, "Round", 2, 48));
-  const opened = keep(keep(bridged.offset(-2, "Round", 2, 48)).offset(2, "Round", 2, 48));
-  const smooth = keep(keep(runtime.CrossSection.union(opened, teethShape)).simplify(0.05));
+  // The crowns alone (near the cusp tips, not the gum or tissue round them) set the band, and are
+  // always inside it with 0.3 mm to spare.
+  // On the whole scan when it is given (before the cut and the smoothing moved anything).
+  const source = scan?.mesh ?? m;
+  const crowns = scan?.crowns ?? toothZone(m, TOOTH_CROWN, CROWN_REACH, undefined, TIP_CEILING, TIP_FLOOR, TIP_LONELY);
+  const crownCells = keep(footprint((t) => Boolean(crowns[source.f[t]] && crowns[source.f[t + 1]] && crowns[source.f[t + 2]]), source));
+  const teethShape = keep(keep(crownCells.offset(1.5, "Round", 2, 24)).offset(-1.2, "Round", 2, 24));
+  const bridgedTeeth = keep(keep(crownCells.offset(6, "Round", 2, 96)).offset(-6, "Round", 2, 96));
+  const band = keep(bridgedTeeth.offset(CLEAN_CLEARANCE, "Round", 2, 96));
+  const filled = keep(keep(scanCells.offset(0.5, "Round", 2, 24)).offset(-0.5, "Round", 2, 24));
+  const bound = keep(filled.offset(-0.8, "Round", 2, 48));
+  const within = keep(runtime.CrossSection.intersection(band, bound));
+  // Rounded off: bulges and notches under 3 mm go, never past the band.
+  const opened = keep(keep(within.offset(-1.5, "Round", 2, 64)).offset(1.5, "Round", 2, 64));
+  const rounded = keep(runtime.CrossSection.intersection(keep(keep(opened.offset(1.5, "Round", 2, 64)).offset(-1.5, "Round", 2, 64)), band));
+  const smooth = keep(keep(runtime.CrossSection.union(rounded, teethShape)).simplify(0.01));
   const rings = smooth.toPolygons().map((polygon) => polygon.map(([x, y]) => [x, y] as [number, number]));
   made.forEach((section) => section.delete());
   // Specks (under 4 mm²) go.
@@ -740,6 +798,270 @@ export function prismOf(runtime: ManifoldRuntime, rings: Ring[], bottom: number,
 }
 
 // ---------------------------------------------------------------------------------------------
+// Filling under the gum (build 50)
+
+/** The grid the gum is filled under, mm. */
+export const UNDER_FILL_CELL = 0.1;
+/** How far in from the outline the fill rises to the gum (mm); further in, the scan closes itself. */
+export const UNDER_FILL_BAND = 2;
+
+/**
+ * A solid standing on the floor and rising to just under the scan's surface. Where the gum curves
+ * back under itself (the vestibule), the scan closed straight down from its edge leaves a hollow
+ * under the overhang; this fills it, so a wall cut through there rises clean to the gum. Seen from
+ * above, each cell rises to the lowest point of the scan over it (exactly, from the triangles
+ * clipped to the cell), so the fill never comes through any surface.
+ */
+export function underFill(runtime: ManifoldRuntime, m: Mesh, rings: Ring[], floor: number): ManifoldSolid {
+  const cell = UNDER_FILL_CELL;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const ring of rings) for (const [x, y] of ring) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  minX -= 1; minY -= 1; maxX += 1; maxY += 1;
+  const nx = Math.ceil((maxX - minX) / cell), ny = Math.ceil((maxY - minY) / cell);
+  const low = new Float64Array(nx * ny).fill(Infinity);
+  // The exact lowest point of each triangle over each cell: the triangle clipped to the cell, whose
+  // lowest point is one of the clipped polygon's corners.
+  const clip = (poly: number[][], axis: 0 | 1, at: number, keepAbove: boolean) => {
+    const out: number[][] = [];
+    for (let n = 0; n < poly.length; n += 1) {
+      const p = poly[n], q = poly[(n + 1) % poly.length];
+      const pin = keepAbove ? p[axis] >= at : p[axis] <= at, qin = keepAbove ? q[axis] >= at : q[axis] <= at;
+      if (pin) out.push(p);
+      if (pin !== qin) {
+        const t = (at - p[axis]) / (q[axis] - p[axis]);
+        out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t]);
+      }
+    }
+    return out;
+  };
+  for (let t = 0; t < m.f.length; t += 3) {
+    const tri = [0, 1, 2].map((k) => [m.v[m.f[t + k] * 3], m.v[m.f[t + k] * 3 + 1], m.v[m.f[t + k] * 3 + 2]]);
+    const x0 = Math.max(0, Math.floor((Math.min(tri[0][0], tri[1][0], tri[2][0]) - minX) / cell));
+    const x1 = Math.min(nx - 1, Math.floor((Math.max(tri[0][0], tri[1][0], tri[2][0]) - minX) / cell));
+    const y0 = Math.max(0, Math.floor((Math.min(tri[0][1], tri[1][1], tri[2][1]) - minY) / cell));
+    const y1 = Math.min(ny - 1, Math.floor((Math.max(tri[0][1], tri[1][1], tri[2][1]) - minY) / cell));
+    for (let iy = y0; iy <= y1; iy += 1) for (let ix = x0; ix <= x1; ix += 1) {
+      const k = iy * nx + ix;
+      if (x0 === x1 && y0 === y1) { low[k] = Math.min(low[k], tri[0][2], tri[1][2], tri[2][2]); continue; }
+      const cx0 = minX + ix * cell, cy0 = minY + iy * cell;
+      let poly = clip(tri, 0, cx0, true);
+      if (poly.length) poly = clip(poly, 0, cx0 + cell, false);
+      if (poly.length) poly = clip(poly, 1, cy0, true);
+      if (poly.length) poly = clip(poly, 1, cy0 + cell, false);
+      for (const p of poly) if (p[2] < low[k]) low[k] = p[2];
+    }
+  }
+  const skin = floor + 0.02;
+  // Only a band inside the outline rises; the rest stays a skin on the floor (and is simplified away).
+  const inner = new runtime.CrossSection(rings, "Positive");
+  const shrunk = inner.offset(-UNDER_FILL_BAND, "Round", 2, 32);
+  const deep = shrunk.toPolygons();
+  inner.delete(); shrunk.delete();
+  const inDeep = new Uint8Array(nx * ny);
+  for (const ring of deep) {
+    // Scanline fill of each ring (even-odd across the rings gives the inset area).
+    let ry0 = Infinity, ry1 = -Infinity;
+    for (const [, y] of ring) { ry0 = Math.min(ry0, y); ry1 = Math.max(ry1, y); }
+    for (let iy = Math.max(0, Math.floor((ry0 - minY) / cell)); iy <= Math.min(ny - 1, Math.floor((ry1 - minY) / cell)); iy += 1) {
+      const yc = minY + (iy + 0.5) * cell;
+      const xs: number[] = [];
+      for (let n = 0; n < ring.length; n += 1) {
+        const [ax, ay] = ring[n], [bx, by] = ring[(n + 1) % ring.length];
+        if ((ay <= yc) !== (by <= yc)) xs.push(ax + ((yc - ay) / (by - ay)) * (bx - ax));
+      }
+      xs.sort((p, q) => p - q);
+      for (let n = 0; n + 1 < xs.length; n += 2) {
+        for (let ix = Math.max(0, Math.ceil((xs[n] - minX) / cell - 0.5)); ix <= Math.min(nx - 1, Math.floor((xs[n + 1] - minX) / cell - 0.5)); ix += 1) inDeep[iy * nx + ix] ^= 1;
+      }
+    }
+  }
+  const height = (ix: number, iy: number) => {
+    if (ix < 0 || iy < 0 || ix >= nx || iy >= ny) return skin;
+    const k = iy * nx + ix;
+    if (!Number.isFinite(low[k]) || inDeep[k]) return skin;
+    return Math.max(skin, low[k] - 0.02);
+  };
+  // Corners take the lowest of the cells round them; the top is the grid, the bottom the floor.
+  const cx = nx + 1, cy = ny + 1;
+  const v: number[] = [];
+  for (let j = 0; j < cy; j += 1) for (let i = 0; i < cx; i += 1) {
+    const z = Math.min(height(i - 1, j - 1), height(i, j - 1), height(i - 1, j), height(i, j));
+    v.push(minX + i * cell, minY + j * cell, z);
+  }
+  for (let j = 0; j < cy; j += 1) for (let i = 0; i < cx; i += 1) v.push(minX + i * cell, minY + j * cell, floor);
+  const top = (i: number, j: number) => j * cx + i, bottom = (i: number, j: number) => cx * cy + j * cx + i;
+  const f: number[] = [];
+  for (let j = 0; j < ny; j += 1) for (let i = 0; i < nx; i += 1) {
+    f.push(top(i, j), top(i + 1, j), top(i + 1, j + 1), top(i, j), top(i + 1, j + 1), top(i, j + 1));
+    f.push(bottom(i, j), bottom(i + 1, j + 1), bottom(i + 1, j), bottom(i, j), bottom(i, j + 1), bottom(i + 1, j + 1));
+  }
+  // The four sides.
+  for (let i = 0; i < nx; i += 1) {
+    f.push(bottom(i, 0), bottom(i + 1, 0), top(i + 1, 0), bottom(i, 0), top(i + 1, 0), top(i, 0));
+    f.push(bottom(i + 1, ny), bottom(i, ny), top(i, ny), bottom(i + 1, ny), top(i, ny), top(i + 1, ny));
+  }
+  for (let j = 0; j < ny; j += 1) {
+    f.push(bottom(0, j + 1), bottom(0, j), top(0, j), bottom(0, j + 1), top(0, j), top(0, j + 1));
+    f.push(bottom(nx, j), bottom(nx, j + 1), top(nx, j + 1), bottom(nx, j), top(nx, j + 1), top(nx, j));
+  }
+  const mesh = new runtime.Mesh({ numProp: 3, vertProperties: new Float32Array(v), triVerts: new Uint32Array(f) });
+  const grid = new runtime.Manifold(mesh);
+  // The flat skin and the even slopes come down to a few triangles.
+  const simple = grid.simplify(0.005);
+  grid.delete();
+  return simple;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Finishing a clean base (build 50): locator notches, a tie bar, an articulator plate block
+
+/** Tissue beside the teeth is trimmed this far above the occlusal plane (mm). */
+export const CAP_ABOVE_PLANE = 1;
+
+/**
+ * What to take away above `from` (in a levelled frame, the occlusal plane at z = 0) inside the
+ * outline but outside the crowns of `scan` and 1 mm round them: tissue standing above the teeth.
+ */
+export function capOutsideCrowns(runtime: ManifoldRuntime, rings: Ring[], scan: Mesh, crowns: Uint8Array, from: number, to: number): ManifoldSolid {
+  const cell = 0.5;
+  const cells = new Set<number>();
+  const key = (ix: number, iy: number) => (ix + 32768) * 65536 + (iy + 32768);
+  for (let t = 0; t < scan.f.length; t += 3) {
+    if (!(crowns[scan.f[t]] || crowns[scan.f[t + 1]] || crowns[scan.f[t + 2]])) continue;
+    for (let k = 0; k < 3; k += 1) cells.add(key(Math.floor(scan.v[scan.f[t + k] * 3] / cell), Math.floor(scan.v[scan.f[t + k] * 3 + 1] / cell)));
+  }
+  const squares: Ring[] = [];
+  cells.forEach((k) => {
+    const x = (Math.floor(k / 65536) - 32768) * cell, y = ((k % 65536) - 32768) * cell;
+    squares.push([[x, y], [x + cell, y], [x + cell, y + cell], [x, y + cell]]);
+  });
+  const crownCells = new runtime.CrossSection(squares, "Positive");
+  const near = crownCells.offset(1.5, "Round", 2, 24);
+  crownCells.delete();
+  const outline = new runtime.CrossSection(rings, "Positive");
+  const wide = outline.offset(1, "Round", 2, 24);
+  outline.delete();
+  const beside = runtime.CrossSection.difference(wide, near);
+  wide.delete(); near.delete();
+  if (beside.isEmpty() || to <= from) { beside.delete(); return runtime.Manifold.cube([0.001, 0.001, 0.001]).translate([1e6, 1e6, 1e6]); }
+  const solid = beside.extrude(to - from).translate([0, 0, from]);
+  beside.delete();
+  return solid;
+}
+
+/** Half-round notches at the foot of the wall: radius and height, mm. */
+export const NOTCH_RADIUS = 1.5;
+export const NOTCH_HEIGHT = 2;
+
+function ringCentroid(ring: Ring): [number, number] {
+  let x = 0, y = 0;
+  ring.forEach(([px, py]) => { x += px; y += py; });
+  return [x / ring.length, y / ring.length];
+}
+
+/** Where a ray from `from` at `angle` degrees last leaves the ring, or null. */
+function rayExit(ring: Ring, from: [number, number], angle: number): [number, number] | null {
+  const dx = Math.cos((angle * Math.PI) / 180), dy = Math.sin((angle * Math.PI) / 180);
+  let best = -Infinity;
+  for (let n = 0; n < ring.length; n += 1) {
+    const [ax, ay] = ring[n], [bx, by] = ring[(n + 1) % ring.length];
+    const ex = bx - ax, ey = by - ay;
+    const det = dx * -ey - dy * -ex;
+    if (Math.abs(det) < 1e-12) continue;
+    const wx = ax - from[0], wy = ay - from[1];
+    const t = (wx * -ey - wy * -ex) / det, u = (dx * wy - dy * wx) / det;
+    if (t > 0 && u >= 0 && u <= 1) best = Math.max(best, t);
+  }
+  return Number.isFinite(best) ? [from[0] + dx * best, from[1] + dy * best] : null;
+}
+
+/**
+ * Half-round notches cut into the foot of the outer wall - at the front and either side (front at
+ * -y) - which a lab uses to seat the model the same way each time.
+ */
+export function locatorNotches(runtime: ManifoldRuntime, outer: Ring, floor: number): ManifoldSolid {
+  const centre = ringCentroid(outer);
+  const cuts: ManifoldSolid[] = [];
+  for (const angle of [-90, -30, -150, 20, 160]) {
+    const at = rayExit(outer, centre, angle);
+    if (!at) continue;
+    cuts.push(runtime.Manifold.cylinder(NOTCH_HEIGHT + 0.01, NOTCH_RADIUS, NOTCH_RADIUS, 32).translate([at[0], at[1], floor - 0.01]));
+  }
+  if (!cuts.length) return runtime.Manifold.cube([0.001, 0.001, 0.001]).translate([1e6, 1e6, 1e6]);
+  const all = runtime.Manifold.union(cuts);
+  cuts.forEach((cut) => cut.delete());
+  return all;
+}
+
+/** The tie bar's cross-section, mm. */
+export const TIE_BAR_WIDTH = 3;
+export const TIE_BAR_HEIGHT = 3;
+
+/**
+ * A bar across the back of a horseshoe arch (front at -y), joining its two ends at the floor, so the
+ * arch cannot spread or warp while it prints. Snapped or cut off afterwards. Null when the outline
+ * is not a horseshoe (a quadrant, or an arch with a palate).
+ */
+export function tieBar(runtime: ManifoldRuntime, outer: Ring, floor: number): ManifoldSolid | null {
+  let maxY = -Infinity, minY = Infinity;
+  outer.forEach(([, y]) => { maxY = Math.max(maxY, y); minY = Math.min(minY, y); });
+  const backY = maxY - Math.min(8, (maxY - minY) * 0.15);
+  const [cx] = ringCentroid(outer);
+  // Where the line across the back crosses the outline: a horseshoe crosses it four times.
+  const xs: number[] = [];
+  for (let n = 0; n < outer.length; n += 1) {
+    const [ax, ay] = outer[n], [bx, by] = outer[(n + 1) % outer.length];
+    if ((ay <= backY) !== (by <= backY)) xs.push(ax + ((backY - ay) / (by - ay)) * (bx - ax));
+  }
+  xs.sort((p, q) => p - q);
+  if (xs.length < 4 || !(xs[1] < cx && xs[2] > cx)) return null;
+  const from = (xs[0] + xs[1]) / 2, to = (xs[xs.length - 2] + xs[xs.length - 1]) / 2;
+  return runtime.Manifold.cube([to - from, TIE_BAR_WIDTH, TIE_BAR_HEIGHT]).translate([from, backY - TIE_BAR_WIDTH / 2, floor]);
+}
+
+/** The block of an articulator plate base: the outline's box, 2 mm clear, its corners cut at 45°. */
+export function articulatorOutline(rings: Ring[]): Ring {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const ring of rings) for (const [x, y] of ring) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  minX -= 2; minY -= 2; maxX += 2; maxY += 2;
+  const c = Math.min(8, (maxX - minX) / 4, (maxY - minY) / 4);
+  return [[minX + c, minY], [maxX - c, minY], [maxX, minY + c], [maxX, maxY - c], [maxX - c, maxY], [minX + c, maxY], [minX, maxY - c], [minX, minY + c]];
+}
+
+/** Square pockets in the block's underside, for the magnetic plate: size, rib and depth, mm. */
+export const POCKET_SIZE = 4;
+export const POCKET_RIB = 1.6;
+export const POCKET_DEPTH = 2;
+
+/** The pockets in a grid inside the block's outline, 3 mm in from its edge. */
+export function articulatorPockets(runtime: ManifoldRuntime, plate: Ring, floor: number): ManifoldSolid {
+  const outline = new runtime.CrossSection([plate], "Positive");
+  const inside = outline.offset(-3, "Miter");
+  outline.delete();
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of plate) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  const step = POCKET_SIZE + POCKET_RIB;
+  const squares: Ring[] = [];
+  for (let y = minY; y + POCKET_SIZE <= maxY; y += step) for (let x = minX; x + POCKET_SIZE <= maxX; x += step) {
+    squares.push([[x, y], [x + POCKET_SIZE, y], [x + POCKET_SIZE, y + POCKET_SIZE], [x, y + POCKET_SIZE]]);
+  }
+  const grid = new runtime.CrossSection(squares, "Positive");
+  // Whole squares only: those that lie inside the inset outline.
+  const kept = squares.filter((square) => {
+    const one = new runtime.CrossSection([square], "Positive");
+    const within = runtime.CrossSection.intersection(one, inside);
+    const whole = within.area() >= one.area() * 0.999;
+    one.delete(); within.delete();
+    return whole;
+  });
+  grid.delete(); inside.delete();
+  const section = new runtime.CrossSection(kept.length ? kept : [[[0, 0], [0.001, 0], [0.001, 0.001]]], "Positive");
+  const pockets = section.extrude(POCKET_DEPTH + 0.01).translate([0, 0, floor - 0.01]);
+  section.delete();
+  return pockets;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Honeycomb inside a hollow model (build 49)
 
 /** Honeycomb cells (across the flats) and their walls, mm. */
@@ -747,6 +1069,8 @@ export const HONEYCOMB_CELL = 6;
 export const HONEYCOMB_WALL = 0.8;
 /** Slots through the foot of every wall, so the cells drain into one another (resin), mm high. */
 export const HONEYCOMB_SLOT = 1.2;
+/** A honeycomb in the base only rises this far above the floor (mm). */
+export const HONEYCOMB_BASE_HEIGHT = 6;
 
 /**
  * Hexagonal walls filling a model's cavity: they stand on the floor and carry the shell, so a hollow
@@ -754,7 +1078,7 @@ export const HONEYCOMB_SLOT = 1.2;
  * join the cells, so resin drains through the model's vents (or the open bottom). Returns what to
  * take out of the solid in place of the cavity.
  */
-export function honeycombIn(runtime: ManifoldRuntime, cavity: ManifoldSolid, floor: number, open = false): ManifoldSolid {
+export function honeycombIn(runtime: ManifoldRuntime, cavity: ManifoldSolid, floor: number, open = false, upTo = Infinity): ManifoldSolid {
   const box = cavity.boundingBox();
   const [x0, y0, z0] = box.min, [x1, y1, z1] = box.max;
   const across = HONEYCOMB_CELL, radius = across / Math.sqrt(3); // hexagon with flats `across` apart
@@ -774,7 +1098,9 @@ export function honeycombIn(runtime: ManifoldRuntime, cavity: ManifoldSolid, flo
   const frame: Ring = [[x0 - 2 * across, y0 - 2 * across], [x1 + 2 * across, y0 - 2 * across], [x1 + 2 * across, y1 + 2 * across], [x0 - 2 * across, y1 + 2 * across]];
   // Holes run clockwise inside the counter-clockwise frame.
   const section = new runtime.CrossSection([frame, ...holes.map((ring) => ring.slice().reverse())], "EvenOdd");
-  const walls = section.extrude(z1 - z0 + 2).translate([0, 0, z0 - 1]);
+  // In the base only: the walls stop `upTo`, and the cavity above is left empty.
+  const wallTop = Math.min(z1 + 1, upTo);
+  const walls = section.extrude(Math.max(0.1, wallTop - (z0 - 1))).translate([0, 0, z0 - 1]);
   section.delete();
   // What is taken out of the solid: the cavity less the walls, so the walls are never joined on
   // (faces lying on faces would pinch), plus drain slots - low bars both ways across the floor.
@@ -782,8 +1108,9 @@ export function honeycombIn(runtime: ManifoldRuntime, cavity: ManifoldSolid, flo
   walls.delete();
   const bars: ManifoldSolid[] = [];
   const low = Math.max(floor, z0) - 0.01;
-  for (let x = x0 + stepX / 4; x <= x1; x += stepX / 2) bars.push(runtime.Manifold.cube([0.9, y1 - y0 + 2, HONEYCOMB_SLOT + 0.01]).translate([x, y0 - 1, low]));
-  for (let y = y0 + stepY / 3; y <= y1; y += stepY) bars.push(runtime.Manifold.cube([x1 - x0 + 2, 0.9, HONEYCOMB_SLOT + 0.01]).translate([x0 - 1, y, low]));
+  // Build 50: narrow slots close together, so every wall has two or three at its foot.
+  for (let x = x0 + stepX / 8; x <= x1; x += stepX / 3) bars.push(runtime.Manifold.cube([0.7, y1 - y0 + 2, HONEYCOMB_SLOT + 0.01]).translate([x, y0 - 1, low]));
+  for (let y = y0 + stepY / 5; y <= y1; y += stepY / 2) bars.push(runtime.Manifold.cube([x1 - x0 + 2, 0.7, HONEYCOMB_SLOT + 0.01]).translate([x0 - 1, y, low]));
   // Open underneath, every cell drains through the bottom already.
   if (open || !bars.length) { bars.forEach((bar) => bar.delete()); return cells; }
   const slots = runtime.Manifold.union(bars);
