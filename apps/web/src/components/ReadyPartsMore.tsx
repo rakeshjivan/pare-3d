@@ -5,7 +5,7 @@ import { t } from "@/lib/i18n";
 import { MmField } from "@/components/ReadyPartsSection";
 import { EnclosurePartIcon, FitTestPartIcon } from "@/components/readyPartIcons";
 import { FIT_TEST_CLEARANCES, fitTestParts, readMyPrintFit, saveMyPrintFit } from "@/lib/fitTest";
-import { hingeFitTestParts, readMyHingeFit, saveMyHingeFit } from "@/lib/hingeFitTest";
+import { ballFitTestParts, hingeFitTestParts, readMyHingeFit, saveMyHingeFit } from "@/lib/hingeFitTest";
 import { HINGE_TEST_FITS } from "@/lib/dentalBase";
 import { DEFAULT_ENCLOSURE, enclosureParts, normalizeEnclosure, PORT_SIZES, type EnclosureOptions, type EnclosurePort, type EnclosureSide, type PortPreset } from "@/lib/enclosure";
 import { METRIC_SIZES, type MetricSize, type ReadyPart } from "@/lib/readyParts";
@@ -79,6 +79,12 @@ export function HingeFitTestCard({ onInsert }: { onInsert: Insert }) {
           <p>{t("hingeTest.steps")}</p>
           <button type="button" className="ready-part-make" onClick={() => onInsert(hingeFitTestParts({ strip: t("hingeTest.strip"), clip: t("hingeTest.clip") }))}>
             {t("hingeTest.make")}
+          </button>
+          <button type="button" className="ready-part-make" onClick={() => onInsert(ballFitTestParts({ strip: t("hingeTest.ballStrip"), clip: t("hingeTest.ballClip") }))}>
+            {t("hingeTest.makeBall")}
+          </button>
+          <button type="button" className="ready-part-make" onClick={() => onInsert(ballFitTestParts({ strip: t("hingeTest.ballStrip"), clip: t("hingeTest.ballClip") }, "dropin"))}>
+            {t("hingeTest.makeDropIn")}
           </button>
           <div className="ready-part-fit" role="group" aria-label={t("hingeTest.which")}>
             <span>{t("hingeTest.which")}</span>

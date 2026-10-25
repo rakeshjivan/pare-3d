@@ -671,12 +671,34 @@ export const INCISAL_TABLE_ANGLE = 30;
  * - `table`: "guide" slopes the lower's incisal table up towards the back at INCISAL_TABLE_ANGLE, so
  *   the models part as the lower slides forward, as anterior guidance parts the teeth; "flat" stays level.
  */
-export type HingeMotion = { condyle?: number; pinRaise?: number; table?: "flat" | "guide" };
+export type HingeMotion = { condyle?: number; pinRaise?: number; table?: "flat" | "guide"; joint?: HingeJoint };
+
+/**
+ * Build 63: how the halves join. "ball" (the default): ball condyles on the lower, each held in a cup
+ * on the upper by two flexing tongues - it centres itself, so it neither slides nor rocks, and the
+ * tongues bend instead of the resin stretching, for brittle model resins. "dropin": the same balls,
+ * each dropping into a cup through a channel slanting down and back, and lifting out the same way -
+ * nothing snaps or flexes. "axle": the clip and axle of builds 58-62.
+ */
+export type HingeJoint = "ball" | "dropin" | "axle";
+/**
+ * Build 63: the drop-in joint's channel, degrees back from straight down: the way each ball goes into
+ * its cup and lifts out again. Nothing flexes; the upper's weight keeps the balls seated.
+ */
+export const DROP_IN_CHANNEL = 35;
+/** Build 63: the ball condyle's radius, mm (10 mm across). */
+export const HINGE_BALL_RADIUS = 5;
+/** How far the tongues reach in under the ball, mm each side, at the standard fit. */
+export const BALL_SNAP = 0.4;
+/** The tongues: thickness, width (along y) and the slits that free them, mm. */
+export const TONGUE = { thick: 2.2, width: 6, slit: 0.6 };
 
 /** Where the axle runs, in the pair's frame, for a hinge whose models' backs are at `back`. */
 export function hingeAxleY(back: number, motion: HingeMotion = {}) {
   const angle = (motion.condyle ?? 0) * deg;
-  return back + 6 + (angle > 0 ? HINGE_PATH_LENGTH * Math.cos(angle) : 0);
+  // Build 63: a ball's cup reaches R + 3 in front of its centre; it stays behind the models' backs.
+  const reach = (motion.joint ?? "ball") !== "axle" ? HINGE_BALL_RADIUS + 3 : 6;
+  return back + reach + (angle > 0 ? HINGE_PATH_LENGTH * Math.cos(angle) : 0);
 }
 
 /** A prism along x from x0 to x1 whose cross-section is `ring` in (y, z). */
@@ -722,11 +744,17 @@ export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number,
   const clipHalf = HINGE_CLIP_HALF;
   const postIn = clipHalf + Math.max(0.05, clearance), postOut = postIn + HINGE_POST_WIDTH;
   // Bearing centres: inside the ends of the back when two fit with room between them, else one in the middle.
-  const centres = half >= 2 * postOut + 1 ? [cx - half + postOut, cx + half - postOut] : [cx];
+  const joint = motion.joint ?? "ball";
+  const ball = joint !== "axle";
+  const R = HINGE_BALL_RADIUS, fit = Math.max(0.05, clearance);
+  // A ball bearing's half-width: the cup and the tongues outside it.
+  const ballHalf = R + fit + TONGUE.thick + 0.2;
+  const bearingHalf = ball ? ballHalf : postOut;
+  const centres = half >= 2 * bearingHalf + 1 ? [cx - half + bearingHalf, cx + half - bearingHalf] : [cx];
   const made: ManifoldSolid[] = [];
   const keep = <T extends ManifoldSolid>(solid: T) => { made.push(solid); return solid; };
   // The bearing block: 4 mm round the axle behind it, and round the whole slot in front.
-  const yBack = ay + 4, yFront = back + 2;
+  const yBack = ay + ((motion.joint ?? "ball") !== "axle" ? HINGE_BALL_RADIUS + 3 : 4), yFront = back + 2;
   const clipBottom = dz - (bore + 1.8);
   // Build 61: each bar reaches 4 mm into its own model's back, wherever that is - a shorter arch's
   // base ends in front of the other's, and a bar measured from the longer one would miss it.
@@ -734,6 +762,65 @@ export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number,
   const upperParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, Math.min(back, backs?.upper ?? back) - 4, yBack, floorUpper - 4, floorUpper))];
   const cuts: ManifoldSolid[] = [];
   for (const c of centres) {
+    if (ball) {
+      // Build 63: the ball condyle. The lower: a pedestal from its base, a neck, the ball on top,
+      // centred on the hinge line (y = ay, z = 0).
+      const ballY = ay, neck = 2.5;
+      // The pedestal stands below everything of the upper's that swings down behind the ball as it
+      // opens (the cup block reaches R + 3 behind the centre), so it opens a full 90 degrees.
+      const ped = R + 4;
+      lowerParts.push(
+        keep(box(runtime, c - 4, c + 4, ballY - 4, ballY + 4, floorLower, -ped)),
+        keep(runtime.Manifold.cylinder(ped + 0.5, neck, neck, 32).translate([c, ballY, -ped - 0.25])),
+        keep(runtime.Manifold.sphere(R, 64).translate([c, ballY, 0])),
+      );
+      // The upper: a block above the ball's equator with a cup for it (the fit all round), and two
+      // tongues either side reaching under the equator. Along a protrusion path the cup runs
+      // forward and down with the ball.
+      const y0 = ballY + dy - (R + 3), y1 = ballY + R + 3, zTop = Math.max(R + 3, 0);
+      const outer = R + fit + TONGUE.thick;
+      if (joint === "dropin") {
+        // Build 63: the drop-in cup - a block round the ball reaching 3 mm under its equator at the
+        // front and sides, the seat (the fit all round), and the channel the ball comes in by:
+        // as wide as the seat, slanting down and back out of the block.
+        upperParts.push(keep(box(runtime, c - outer, c + outer, y0, y1, dz - 3, floorUpper)));
+        const tilt = DROP_IN_CHANNEL * deg, run = R + 8;
+        const seat = keep(runtime.Manifold.sphere(R + fit, 64).translate([c, ballY, 0]));
+        const out = keep(runtime.Manifold.sphere(R + fit, 64).translate([c, ballY + Math.sin(tilt) * run, -Math.cos(tilt) * run]));
+        cuts.push(keep(runtime.Manifold.hull([seat, out])));
+        if (path > 0) {
+          const end = keep(runtime.Manifold.sphere(R + fit, 64).translate([c, ballY + dy, dz]));
+          cuts.push(keep(runtime.Manifold.hull([seat, end])));
+        }
+        // Room behind the ball for the neck as the hinge opens.
+        cuts.push(keep(box(runtime, c - neck - 0.6, c + neck + 0.6, ballY, y1 + 1, dz - 4, neck + 1)));
+        continue;
+      }
+      upperParts.push(keep(box(runtime, c - outer, c + outer, y0, y1, 0, floorUpper)));
+      // Where the tongues' lips stop: far enough under the equator that the gap there is the ball's
+      // radius less BALL_SNAP - the ball spreads them that much as it goes in.
+      const lip = Math.sqrt(Math.max(0, (R + fit) ** 2 - (R + fit - BALL_SNAP - fit) ** 2));
+      for (const side of [-1, 1]) {
+        const xin = c + side * (R + fit - 0.6), xout = c + side * outer;
+        upperParts.push(keep(box(runtime, Math.min(xin, xout), Math.max(xin, xout), ballY + dy - TONGUE.width / 2, ballY + TONGUE.width / 2, dz - lip, zTop)));
+        // The slits that free each tongue: in front, behind, and between it and the cup up to the
+        // height where the cup no longer reaches it.
+        const sx0 = Math.min(c + side * (R + fit - 1.2), xout + side * 0.5), sx1 = Math.max(c + side * (R + fit - 1.2), xout + side * 0.5);
+        cuts.push(
+          keep(box(runtime, sx0, sx1, ballY + dy - TONGUE.width / 2 - TONGUE.slit, ballY + dy - TONGUE.width / 2, dz - lip - 1, zTop)),
+          keep(box(runtime, sx0, sx1, ballY + TONGUE.width / 2, ballY + TONGUE.width / 2 + TONGUE.slit, dz - lip - 1, zTop)),
+          keep(box(runtime, Math.min(c + side * (R + fit - 1.2), c + side * (R + fit - 0.6)), Math.max(c + side * (R + fit - 1.2), c + side * (R + fit - 0.6)), ballY + dy - TONGUE.width / 2, ballY + TONGUE.width / 2, dz - lip - 1, zTop)),
+        );
+      }
+      const cup = keep(runtime.Manifold.sphere(R + fit, 64).translate([c, ballY, 0]));
+      if (path > 0) {
+        const end = keep(runtime.Manifold.sphere(R + fit, 64).translate([c, ballY + dy, dz]));
+        cuts.push(keep(runtime.Manifold.hull([cup, end])));
+      } else cuts.push(cup);
+      // Room behind the ball for the neck as the hinge opens (it swings back).
+      cuts.push(keep(box(runtime, c - neck - 0.6, c + neck + 0.6, ballY, y1 + 1, -1, neck + 1)));
+      continue;
+    }
     lowerParts.push(
       keep(box(runtime, c - postOut, c - postIn, yFront, yBack, floorLower, r + 2.5)),
       keep(box(runtime, c + postIn, c + postOut, yFront, yBack, floorLower, r + 2.5)),

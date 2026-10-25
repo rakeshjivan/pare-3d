@@ -4,6 +4,22 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 63,
+    items: [
+      "Ball condyles: the printed articulator's joint is now a 10 mm ball on the lower, behind each last molar like a condyle, seated in a cup on the upper. A ball in a cup centres itself, so the hinge neither slides from side to side nor rocks. Two tongues either side of each cup, freed by slits, bend to let the ball in and hold it just under its widest point - they bend rather than the resin stretching, so it suits brittle model resins. The clip and axle stays as a choice (Joint, in step 4).",
+      "The protrusion path, incisal pin and guide table work with the ball condyles: along a path the cup runs forward and down with the ball.",
+      "A ball joint fit test joins the hinge fit test (Ready-made parts, and the link beside Hinge fit, which prints the test for the joint you have chosen).",
+    ],
+  },
+  {
+    build: 63,
+    items: [
+      "The articulator's joint is now a choice, under Articulator > Joint. Ball, snap-in (the new default): a 10 mm ball condyle behind each last molar on the lower, held in a cup on the upper by two tongues that flex as it snaps in - it centres itself, so it neither slides from side to side nor rocks, and the tongues bend instead of the resin stretching, for brittle model resins.",
+      "Ball, drop-in: the same balls slide into their cups through a channel slanting down and back, and lift out the same way. Nothing snaps or flexes, so nothing can crack; the upper's weight keeps it seated, and it lifts off if pulled. Clip and axle: the hinge of builds 58 to 62.",
+      "Each joint has its own fit test: Print a hinge fit test in Dental Studio prints the one for the joint chosen; Ready-made parts > Hinge fit test has all three.",
+    ],
+  },
+  {
     build: 62,
     items: [
       "Dental Studio bevels the bottom edge of the base (0.8 mm at 45 degrees), as 3Shape does, so a scraper gets under the model and it comes off the build plate without chipping. Bevel the bottom edge, under Adjust the settings > Base, turns it off.",

@@ -1,5 +1,5 @@
 import { libraryShapeAssets, makeShapeFromAsset } from "@/lib/shapeCatalog";
-import { HINGE_AXLE_RADIUS, HINGE_CLIP_HALF, HINGE_FITS, HINGE_POST_WIDTH, HINGE_TEST_FITS } from "@/lib/dentalBase";
+import { BALL_SNAP, DROP_IN_CHANNEL, HINGE_AXLE_RADIUS, HINGE_BALL_RADIUS, HINGE_CLIP_HALF, HINGE_FITS, HINGE_POST_WIDTH, HINGE_TEST_FITS, TONGUE } from "@/lib/dentalBase";
 import type { ReadyPart } from "@/lib/readyParts";
 import type { WorkplaneShape } from "@/types/layerling";
 
@@ -83,6 +83,79 @@ export function hingeFitTestParts(names: { strip: string; clip: string }): Ready
         { ...label(fitText(fit), c, z - 6.5), name: `${name} label` },
       ],
     });
+  });
+  return parts;
+}
+
+/**
+ * Build 63: the ball condyle fit test - the models' ball joint, once for each fit. A strip of five
+ * balls on their necks, and five cups, each with its two tongues, printed opening up as the upper's
+ * hinge prints; turned over, each cup snaps down onto its ball.
+ */
+export function ballFitTestParts(names: { strip: string; clip: string }, joint: "ball" | "dropin" = "ball"): ReadyPart[] {
+  const R = HINGE_BALL_RADIUS;
+  const spacing = 2 * (R + 0.2 + TONGUE.thick) + 8;
+  const count = HINGE_TEST_FITS.length;
+  const length = spacing * count + 2;
+  const centre = (index: number) => -length / 2 + 1 + spacing / 2 + index * spacing;
+  const sphere = (x: number, z: number, centreY: number, radius: number) =>
+    makeShapeFromAsset(asset("sphere"), { x, z, elevation: centreY - radius }, { width: radius * 2, depth: radius * 2, height: radius * 2, steps: 64 });
+  // The strip: the ball's centre R + 4 over the plate (the plate stands where the models' pedestal
+  // does), on a 5 mm neck.
+  const ball = PLATE + R + 4;
+  const strip: WorkplaneShape[] = [{ ...box(0, 1.5, 0, length, 17, PLATE), name: names.strip, color: "#4f7fa8" }];
+  HINGE_TEST_FITS.forEach((fit, index) => {
+    const c = centre(index);
+    strip.push(
+      { ...makeShapeFromAsset(asset("cylinder"), { x: c, z: 0, elevation: PLATE }, { width: 5, depth: 5, height: ball - PLATE }), name: `${names.strip} neck`, color: "#4f7fa8" },
+      { ...sphere(c, 0, ball, R), name: `${names.strip} ball`, color: "#4f7fa8" },
+      { ...label(fitText(fit), c, 7), name: `${names.strip} ${fitText(fit)}` },
+    );
+  });
+  const parts: ReadyPart[] = [{ name: names.strip, shapes: strip, group: true }];
+  HINGE_TEST_FITS.forEach((fit, index) => {
+    const c = centre(index);
+    const z = 26;
+    const outer = R + fit + TONGUE.thick;
+    // The cup's centre sits R + 3 over the plate: the block reaches up to it, the tongues past it.
+    const cupY = PLATE + R + 3;
+    const lip = Math.sqrt(Math.max(0, (R + fit) ** 2 - (R - BALL_SNAP) ** 2));
+    const name = `${names.clip} ${fitText(fit)}`;
+    const shapes: WorkplaneShape[] = [
+      { ...box(c, z - 2, 0, outer * 2 + 4, 2 * (R + 3) + 6, PLATE), name, color: "#f08a24" },
+      { ...box(c, z, PLATE, outer * 2, 2 * (R + 3), cupY - PLATE + (joint === "dropin" ? 3 : 0)), name, color: "#f08a24" },
+    ];
+    if (joint === "dropin") {
+      // The drop-in cup: the block 3 mm past the cup's centre all round, the seat, and the channel
+      // slanting out of it (up and back as it prints) that the ball comes in by.
+      const tilt = (DROP_IN_CHANNEL * Math.PI) / 180, run = R + 8;
+      const mid = { z: z + (Math.sin(tilt) * run) / 2, y: cupY + (Math.cos(tilt) * run) / 2 };
+      const channel = makeShapeFromAsset(asset("cylinder"), { x: c, z: mid.z, elevation: mid.y - run / 2 }, { width: (R + fit) * 2, depth: (R + fit) * 2, height: run });
+      shapes.push(
+        { ...sphere(c, z, cupY, R + fit), name: `${name} cup`, hole: true },
+        { ...channel, rotationX: DROP_IN_CHANNEL, name: `${name} channel`, hole: true },
+        { ...box(c, z + (R + 3) / 2 + 0.5, cupY - 3.5, 6.2, R + 4, 7.5), name: `${name} neck room`, hole: true },
+        { ...label(fitText(fit), c, z - (R + 3) - 1.5), name: `${name} label` },
+      );
+      parts.push({ name, group: true, shapes });
+      return;
+    }
+    for (const side of [-1, 1]) {
+      const xin = R + fit - 0.6;
+      // The tongue, from the plate up past the cup's centre by the lip.
+      shapes.push({ ...box(c + side * (xin + outer) / 2, z, PLATE, outer - xin, TONGUE.width, cupY + lip - PLATE), name, color: "#f08a24" });
+      // Slits either side of it and between it and the cup.
+      const sx0 = R + fit - 1.2, sx1 = outer + 0.5;
+      for (const dz of [-1, 1]) shapes.push({ ...box(c + side * (sx0 + sx1) / 2, z + dz * (TONGUE.width + TONGUE.slit) / 2, PLATE, sx1 - sx0, TONGUE.slit, cupY + lip + 1 - PLATE), name: `${name} slit`, hole: true });
+      shapes.push({ ...box(c + side * (R + fit - 0.9), z, PLATE, 0.6, TONGUE.width, cupY + lip + 1 - PLATE), name: `${name} slit`, hole: true });
+    }
+    shapes.push(
+      { ...sphere(c, z, cupY, R + fit), name: `${name} cup`, hole: true },
+      // Room for the neck to swing as it opens.
+      { ...box(c, z + (R + 3) / 2 + 0.5, cupY - 3.5, 6.2, R + 4, 4.5), name: `${name} neck room`, hole: true },
+      { ...label(fitText(fit), c, z - (R + 3) - 1.5), name: `${name} label` },
+    );
+    parts.push({ name, group: true, shapes });
   });
   return parts;
 }

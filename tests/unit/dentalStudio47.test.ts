@@ -408,8 +408,8 @@ describe("Build 58: the hinge sits on two wide bearings, fits close and stops at
 
   it("closes the clip round the axle by the chosen fit, and the stop meets in the occlusal plane", async () => {
     const { hingeParts } = await import("@/lib/dentalBase");
-    const tight = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { x: 0, upperY: -30, lowerY: -30 });
-    const loose = hingeParts(runtime, 25, -25, 25, 20, -20, 0.3, { x: 0, upperY: -30, lowerY: -30 });
+    const tight = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { x: 0, upperY: -30, lowerY: -30 }, { joint: "axle" });
+    const loose = hingeParts(runtime, 25, -25, 25, 20, -20, 0.3, { x: 0, upperY: -30, lowerY: -30 }, { joint: "axle" });
     // A looser fit takes more out of the clips.
     expect(loose.upper.volume()).toBeLessThan(tight.upper.volume());
     // The stop: the upper reaches down to z = 0 in front of the arch, the lower up to it.
@@ -441,9 +441,9 @@ describe("Build 60: protrusion path, incisal pin and guide table, opening check"
   };
   it("opens the clip into a slot along the condylar path, and keeps a plain hinge a round bore", async () => {
     const { hingeParts, hingeAxleY, HINGE_PATH_LENGTH } = await import("@/lib/dentalBase");
-    const plain = hingeParts(runtime, 25, -25, 25, 20, -20);
-    const path = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, null, { condyle: 30 });
-    const ay = hingeAxleY(25, { condyle: 30 });
+    const plain = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, null, { joint: "axle" });
+    const path = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, null, { condyle: 30, joint: "axle" });
+    const ay = hingeAxleY(25, { condyle: 30, joint: "axle" });
     expect(path.axleY).toBeCloseTo(ay, 6);
     expect(plain.axleY).toBeCloseTo(31, 6);
     // The far end of the path, in the upper's clip: open with the path, solid without it.
@@ -487,7 +487,7 @@ describe("Build 60: protrusion path, incisal pin and guide table, opening check"
     const parts = hingeParts(runtime, 25, -25, 25, 20, -20);
     expect(hingeOpening(runtime, parts.upper, parts.lower, parts.axleY)).toBe(90);
     // A wall behind the axle on the lower, standing up into the way of the upper's back bar as it turns down.
-    const wall = runtime.Manifold.cube([50, 2, 40]).translate([-25, parts.axleY + 6, -20]);
+    const wall = runtime.Manifold.cube([50, 2, 22]).translate([-25, parts.axleY + 9, -20]);
     const blocked = runtime.Manifold.union(parts.lower, wall);
     const angle = hingeOpening(runtime, parts.upper, blocked, parts.axleY);
     expect(angle).toBeGreaterThan(0);
@@ -582,7 +582,7 @@ describe("Build 62: longer clips, end play the fit itself", () => {
     const { hingeParts, HINGE_CLEARANCE } = await import("@/lib/dentalBase");
     expect(HINGE_CLEARANCE).toBe(0.1);
     for (const fit of [0.05, 0.1, 0.2]) {
-      const parts = hingeParts(runtime, 25, -25, 25, 20, -20, fit);
+      const parts = hingeParts(runtime, 25, -25, 25, 20, -20, fit, null, { joint: "axle" });
       // Level with the axle's top, behind it: the clip on the upper, the posts on the lower.
       const at = (solid: typeof parts.upper) => {
         const s = runtime.Manifold.intersection(solid, runtime.Manifold.cube([60, 0.4, 0.4]).translate([-30, parts.axleY + 3, 1]));
@@ -598,5 +598,90 @@ describe("Build 62: longer clips, end play the fit itself", () => {
       expect(gap).toBeCloseTo(fit, 3);
       [parts.upper, parts.lower].forEach((s) => s.delete());
     }
+  });
+});
+
+describe("Build 63: ball condyles held by flexing tongues", () => {
+  let runtime: ManifoldToplevel;
+  beforeAll(async () => {
+    runtime = await manifoldModule();
+    runtime.setup();
+  });
+  const filled = (solid: { volume: () => number }, x: number, y: number, z: number) => {
+    const probe = runtime.Manifold.cube([0.1, 0.1, 0.1], true).translate([x, y, z]);
+    const piece = runtime.Manifold.intersection(solid as never, probe);
+    const v = piece.volume();
+    piece.delete(); probe.delete();
+    return v > 0.0005;
+  };
+  it("is the default: two balls on a full arch, one piece each half, nothing touching at rest, opening 90 degrees", async () => {
+    const { hingeParts, hingeOpening, HINGE_BALL_RADIUS: R } = await import("@/lib/dentalBase");
+    const parts = hingeParts(runtime, 25, -25, 25, 20, -20, 0.1);
+    const pieces = (solid: typeof parts.upper) => { const list = solid.decompose(); const n = list.length; list.forEach((p) => p.delete()); return n; };
+    expect(pieces(parts.upper)).toBe(1);
+    expect(pieces(parts.lower)).toBe(1);
+    const overlap = runtime.Manifold.intersection(parts.upper, parts.lower);
+    expect(overlap.volume()).toBeLessThan(0.001);
+    overlap.delete();
+    // A ball either side, on the hinge line.
+    const ay = parts.axleY;
+    const balls = [-1, 1].map((side) => filled(parts.lower, side * (25 - (R + 0.1 + 2.2 + 0.2)), ay, R - 0.2));
+    expect(balls).toEqual([true, true]);
+    expect(hingeOpening(runtime, parts.upper, parts.lower, ay)).toBe(90);
+    [parts.upper, parts.lower].forEach((s) => s.delete());
+  });
+
+  it("holds the ball: the tongues reach in under its widest point, and the gap at the equator is the fit", async () => {
+    const { hingeParts, HINGE_BALL_RADIUS: R } = await import("@/lib/dentalBase");
+    for (const fit of [0.05, 0.1, 0.2]) {
+      const parts = hingeParts(runtime, 25, -25, 25, 20, -20, fit);
+      const c = 25 - (R + fit + 2.2 + 0.2), ay = parts.axleY;
+      // Under the equator, inside the ball's own radius seen from above: the tongue's lip (it goes
+      // as deep as the cup needs for the lip to reach 0.4 mm in from the ball's widest point).
+      const z = -Math.sqrt((R + fit) ** 2 - (R - 0.3) ** 2) - 0.08;
+      expect(filled(parts.upper, c + R - 0.3, ay, z)).toBe(true);
+      expect(filled(parts.upper, c - R + 0.3, ay, z)).toBe(true);
+      // At the equator: free just outside the ball, the tongue just beyond the fit.
+      expect(filled(parts.upper, c + R + fit * 0.5, ay, 0)).toBe(false);
+      expect(filled(parts.upper, c + R + fit + 0.1, ay, 0)).toBe(true);
+      [parts.upper, parts.lower].forEach((s) => s.delete());
+    }
+  });
+});
+
+describe("Build 63: drop-in ball condyles", () => {
+  let runtime: ManifoldToplevel;
+  beforeAll(async () => {
+    runtime = await manifoldModule();
+    runtime.setup();
+  });
+  it("seats each ball through a slanting channel: held in front, at the sides and above, free to lift out back and down", async () => {
+    const { hingeParts, hingeOpening, HINGE_BALL_RADIUS: R, DROP_IN_CHANNEL } = await import("@/lib/dentalBase");
+    const fit = 0.1;
+    const parts = hingeParts(runtime, 25, -25, 25, 20, -20, fit, null, { joint: "dropin" });
+    const pieces = (solid: typeof parts.upper) => { const list = solid.decompose(); const n = list.length; list.forEach((p) => p.delete()); return n; };
+    expect(pieces(parts.upper)).toBe(1);
+    expect(pieces(parts.lower)).toBe(1);
+    const overlap = runtime.Manifold.intersection(parts.upper, parts.lower);
+    expect(overlap.volume()).toBeLessThan(0.001);
+    overlap.delete();
+    expect(hingeOpening(runtime, parts.upper, parts.lower, parts.axleY)).toBe(90);
+    const c = 25 - (R + fit + 2.2 + 0.2), ay = parts.axleY;
+    // The ball, moved along the channel: it never meets the upper on the way out...
+    const tilt = (DROP_IN_CHANNEL * Math.PI) / 180;
+    for (const d of [2, 6, 12]) {
+      const ball = runtime.Manifold.sphere(R, 48).translate([c, ay + Math.sin(tilt) * d, -Math.cos(tilt) * d]);
+      const hit = runtime.Manifold.intersection(ball, parts.upper);
+      expect(hit.volume()).toBeLessThan(0.01);
+      hit.delete(); ball.delete();
+    }
+    // ...but moved any other way - forward, sideways, up, straight down - it does.
+    for (const [mx, my, mz] of [[0, -1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, -0.7, -0.7]]) {
+      const ball = runtime.Manifold.sphere(R, 48).translate([c + mx, ay + my, mz]);
+      const hit = runtime.Manifold.intersection(ball, parts.upper);
+      expect(hit.volume()).toBeGreaterThan(0.01);
+      hit.delete(); ball.delete();
+    }
+    [parts.upper, parts.lower].forEach((s) => s.delete());
   });
 });

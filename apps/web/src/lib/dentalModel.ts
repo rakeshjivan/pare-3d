@@ -71,6 +71,8 @@ export type DentalStudioOptions = {
   hingeFit?: number;
   /** Build 58: the stop at the front that sets the closed bite; on when left out. */
   incisalStop?: boolean;
+  /** Build 63: snap-in ball condyles (the default), drop-in ball condyles, or the clip and axle. */
+  hingeJoint?: "ball" | "dropin" | "axle";
   /** Build 62: a bevel round the foot of the base for the build plate; on when left out. */
   bevel?: boolean;
   /** Build 60: the protrusion path, degrees (HINGE_CONDYLE_ANGLES); 0 or left out for a plain hinge. */
@@ -685,7 +687,7 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
     };
     const upperY = frontAt("upper"), lowerY = frontAt("lower");
     const stop = options.incisalStop !== false && Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY } : null;
-    const motion = { condyle: options.condyle ?? 0, pinRaise: options.pinRaise ?? 0, table: options.incisalTable ?? "flat" } as const;
+    const motion = { condyle: options.condyle ?? 0, pinRaise: options.pinRaise ?? 0, table: options.incisalTable ?? "flat", joint: options.hingeJoint ?? "ball" } as const;
     const backOf = (role: "upper" | "lower") => {
       let most = -Infinity;
       built.forEach(({ arch, built: b }) => { if (arch.role === role) (role === "upper" ? b.footprint.map(mirrorRing) : b.footprint).forEach((ring) => ring.forEach(([, y]) => { most = Math.max(most, y); })); });

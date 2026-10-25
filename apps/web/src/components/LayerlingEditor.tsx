@@ -127,7 +127,7 @@ import { addFreehandStroke } from "@/lib/freehandStroke";
 import { placeCustomShape } from "@/lib/customShapePackage";
 import { buildReadyPart } from "@/lib/readyPartsBuild";
 import { mouseEarsPart, type ReadyPart } from "@/lib/readyParts";
-import { hingeFitTestParts } from "@/lib/hingeFitTest";
+import { ballFitTestParts, hingeFitTestParts } from "@/lib/hingeFitTest";
 import { MOUSE_EARS_EVENT, type MouseEarsRequest } from "./workplane/MouseEarsCard";
 import { CUT_CONNECTOR_LIMITS, DEFAULT_CUT_CONNECTORS, normalizeCutConnectors, type CutConnectorOptions } from "@/lib/cutConnectors";
 import { NO_SPLIT_ROTATION, modelSplitPlane, snapSplitPositionToVertices, splitOrientationForNormal, splitAxisFromLabel, splitAxisLabel, splitRotationAxes, type SplitRotation } from "@/lib/modelSplit";
@@ -15194,7 +15194,10 @@ export function LayerlingEditor({
             const origin = placementWorkplaneRef.current.origin;
             const edge = shapesRef.current.filter((shape) => !shape.hidden).reduce((least, shape) => Math.min(least, shape.z - Math.max(shape.width, shape.depth) / 2), Infinity);
             const at = Number.isFinite(edge) ? { ...origin, z: edge - 24 } : undefined;
-            void insertReadyParts(hingeFitTestParts({ strip: t("hingeTest.strip"), clip: t("hingeTest.clip") }), at ? { at } : {});
+            // Build 63: the test for the joint chosen - ball condyles unless the clip and axle is.
+            const joint = dentalStudio?.options.hingeJoint ?? "ball";
+            const parts = joint === "axle" ? hingeFitTestParts({ strip: t("hingeTest.strip"), clip: t("hingeTest.clip") }) : ballFitTestParts({ strip: t("hingeTest.ballStrip"), clip: t("hingeTest.ballClip") }, joint);
+            void insertReadyParts(parts, at ? { at } : {});
           }}
           onCancel={() => { stopDentalTrim(); setDentalStudio((current) => (current?.stage === "making" || current?.stage === "trimming" ? current : null)); }}
         />

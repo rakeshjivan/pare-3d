@@ -369,6 +369,7 @@ export function DentalStudioPanel({
             </label>
             {options.hinge ? (
               <div className="dental-hinge-options">
+                {choice(t("dental.hingeJoint"), options.hingeJoint ?? "ball", [["ball", t("dental.hingeJointBall")], ["dropin", t("dental.hingeJointDropIn")], ["axle", t("dental.hingeJointAxle")]], (hingeJoint) => onOptionsChange({ hingeJoint }), t("dental.hingeJointHint"))}
                 {/* Fork (build 58): how tight the hinge turns; build 60: and a test to find it. */}
                 <label className="dental-label-field" title={t("dental.hingeFitHint")}>
                   <span>{t("dental.hingeFit")}</span>
