@@ -1181,8 +1181,17 @@ function tapeShapeTopologyKey(shape: WorkplaneShape): string {
     mesh: [positions.length, positionSample],
     brep: [brep.length, brepSample],
     treatments: shape.edgeTreatments,
-    children: shape.groupedShapes?.map((child) => [child.id, tapeShapeTopologyKey(child)]),
-  });
+  }) + nestedSignatures(shape.groupedShapes, (child) => [child.id], tapeShapeTopologyKey);
+}
+
+/**
+ * The signatures of a group's parts, appended to the group's own as they are. They used to be put into the group's
+ * JSON as strings, and every level of nesting then escaped the quotes of the level below it again: a group nested
+ * 19 deep (a Tinkercad import) made a signature of 346 MB and the tab ran out of memory (#683).
+ */
+function nestedSignatures(children: WorkplaneShape[] | undefined, own: (child: WorkplaneShape) => unknown[], signature: (child: WorkplaneShape) => string): string {
+  if (!children?.length) return "";
+  return `[${children.map((child) => `${JSON.stringify(own(child))}${signature(child)}`).join(",")}]`;
 }
 
 function shapeResourceId(value: object | null | undefined) {
@@ -1235,8 +1244,7 @@ function shapeMaterialSignature(shape: WorkplaneShape): string {
     cadEdges: shapeResourceId(shape.cadDisplayEdges),
     cadEdgesVersion: shape.cadDisplayEdgesVersion ?? 0,
     cadEdgeDimensions: shape.cadDisplayEdges?.length ? [shapeWidth(shape), shapeDepth(shape), shape.height] : null,
-    groupedMaterials: shape.groupedShapes?.map((child) => [child.id, child.hidden, shapeMaterialSignature(groupChildAppearance(shape, child))]),
-  });
+  }) + nestedSignatures(shape.groupedShapes, (child) => [child.id, child.hidden], (child) => shapeMaterialSignature(groupChildAppearance(shape, child)));
 }
 
 /**
@@ -1267,16 +1275,11 @@ function shapeGeometrySignature(shape: WorkplaneShape): string {
       height: shape.height,
       taper,
       deform,
-      children: shape.groupedShapes.map((child) => [
-        child.id,
-        child.hidden,
-        shapeWidth(child),
-        shapeDepth(child),
-        child.height,
-        shapeTransformSignature(child),
-        shapeGeometrySignature(child),
-      ]),
-    });
+    }) + nestedSignatures(
+      shape.groupedShapes,
+      (child) => [child.id, child.hidden, shapeWidth(child), shapeDepth(child), child.height, shapeTransformSignature(child)],
+      shapeGeometrySignature,
+    );
   }
 
   if (shape.importedMesh) {
