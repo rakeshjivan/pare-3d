@@ -2784,6 +2784,8 @@ export const MESSAGES_EN = {
   "workspace.doubleClickOpensSketch": "Double-click opens the sketch",
   "workspace.doubleClickOpensGroup": "Double-click opens a group or bundle",
   "workspace.selectBeforeMoving": "Select before moving",
+  "workspace.pasteCentered": "Paste in the middle and drop",
+  "workspace.pasteCenteredHint": "A paste sets the parts in the middle of the workplane and drops them onto it, together, instead of where they came from. Useful for parts copied from other programs, which can land far from the plate.",
   "workspace.frameByDirection": "The direction of the frame decides",
   "workspace.frameByDirectionHint": "A frame dragged to the right selects only what lies completely inside it, one dragged to the left everything it touches (drawn dashed), as in SketchUp",
   "workspace.objectSnap": "Snap to other shapes while moving",

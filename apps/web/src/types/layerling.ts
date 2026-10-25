@@ -395,6 +395,8 @@ export type WorkplaneWorkspaceSettings = {
   selectBeforeMove: boolean;
   /** The selection frame takes only what it encloses when dragged to the right, what it touches when dragged to the left (#430). */
   frameByDirection: boolean;
+  /** Pasted parts are set in the middle of the workplane and dropped onto it, instead of where they came from (#876). */
+  pasteCentered: boolean;
   /** A double click on a sketch body opens its sketch; on a group or bundle, opens it for editing (#150). */
   doubleClickOpensSketch: boolean;
   doubleClickOpensGroup: boolean;

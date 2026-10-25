@@ -2746,6 +2746,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "workspace.doubleClickOpensSketch": "Dvojklik otevře náčrt",
   "workspace.doubleClickOpensGroup": "Dvojklik otevře sloučení nebo seskupení",
   "workspace.selectBeforeMoving": "Před posunem vyžadovat výběr",
+  "workspace.pasteCentered": "Vložit doprostřed a položit",
+  "workspace.pasteCenteredHint": "Při vložení se díly společně umístí doprostřed pracovní roviny a položí na ni, místo aby zůstaly tam, odkud přišly. Užitečné pro díly zkopírované z jiných programů, které mohou skončit daleko od podložky.",
   "workspace.frameByDirection": "Směr rámečku rozhoduje",
   "workspace.frameByDirectionHint": "Rámeček tažený doprava vybere jen to, co leží celé uvnitř, tažený doleva vše, čeho se dotkne (kreslí se čárkovaně), jako v SketchUpu",
   "workspace.objectSnap": "Při posunu přichytávat k jiným tvarům",

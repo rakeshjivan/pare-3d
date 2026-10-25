@@ -2782,6 +2782,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "workspace.startViewStandard": "Standard",
   "workspace.startViewSaved": "Startansicht gesichert: Neue Entwürfe öffnen so, und die Ausgangsansicht kehrt hierher zurück",
   "workspace.selectBeforeMoving": "Erst auswählen, dann verschieben",
+  "workspace.pasteCentered": "Einfügen in der Mitte und abgesetzt",
+  "workspace.pasteCenteredHint": "Beim Einfügen kommen die Teile zusammen in die Mitte der Arbeitsebene und werden darauf abgesetzt, statt an der Stelle, von der sie kamen. Nützlich für Teile aus anderen Programmen, die weit weg von der Platte landen können.",
   "workspace.frameByDirection": "Ziehrichtung des Auswahlrahmens zählt",
   "workspace.frameByDirectionHint": "Ein Rahmen nach rechts gezogen wählt nur, was ganz darin liegt, nach links gezogen alles, was er berührt (gestrichelt gezeichnet), wie in SketchUp",
   "workspace.doubleClickOpensSketch": "Doppelklick öffnet die Skizze",

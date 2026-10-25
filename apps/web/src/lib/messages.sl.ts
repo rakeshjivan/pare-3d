@@ -2114,6 +2114,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "workspace.startViewStandard": "Privzeto",
   "workspace.startViewSaved": "Začetni pogled shranjen: novi osnutki se odprejo tako in Domov se vrne sem",
   "workspace.selectBeforeMoving": "Izberi pred premikanjem",
+  "workspace.pasteCentered": "Prilepi na sredino in spusti",
+  "workspace.pasteCenteredHint": "Ob lepljenju se deli skupaj postavijo na sredino delovne ravnine in spustijo nanjo, namesto da ostanejo tam, od koder so prišli. Uporabno za dele, kopirane iz drugih programov, ki lahko pristanejo daleč od plošče.",
   "workspace.frameByDirection": "Smer okvirja odloča",
   "workspace.frameByDirectionHint": "Okvir, povlečen v desno, izbere samo tisto, kar leži v celoti znotraj njega, povlečen v levo vse, česar se dotakne (nariše se črtkano), kot v SketchUpu",
   "workspace.objectSnap": "Pripni na druge oblike med premikanjem",

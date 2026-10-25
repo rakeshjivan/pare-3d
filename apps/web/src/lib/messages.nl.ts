@@ -2754,6 +2754,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "workspace.doubleClickOpensSketch": "Dubbelklik opent de schets",
   "workspace.doubleClickOpensGroup": "Dubbelklik opent een groep of bundel",
   "workspace.selectBeforeMoving": "Eerst selecteren, dan verplaatsen",
+  "workspace.pasteCentered": "Plakken in het midden en neerzetten",
+  "workspace.pasteCenteredHint": "Bij het plakken komen de delen samen in het midden van het werkvlak en worden erop neergezet, in plaats van op de plek waar ze vandaan kwamen. Handig voor delen uit andere programma's, die ver van het bouwplateau kunnen belanden.",
   "workspace.frameByDirection": "De richting van het kader beslist",
   "workspace.frameByDirectionHint": "Een kader dat naar rechts wordt getrokken selecteert alleen wat er helemaal in ligt, naar links alles wat het raakt (gestippeld getekend), zoals in SketchUp",
   "workspace.objectSnap": "Bij verplaatsen uitlijnen op andere vormen",
