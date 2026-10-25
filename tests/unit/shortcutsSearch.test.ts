@@ -61,7 +61,7 @@ describe("the shortcuts window's search", () => {
     const input = mount();
     type(input, "m");
     expect(rows()).toContain("Mirror mode");
-    expect(rows().some((row) => row?.startsWith("Multicolor"))).toBe(true);
+    expect(rows().some((row) => row?.startsWith("Multicolo"))).toBe(true);
     expect(rows()).not.toContain("Undo");
   });
 

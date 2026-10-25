@@ -1,6 +1,6 @@
 import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
 import { beforeAll, describe, expect, it } from "vitest";
-import { shapeGeometrySignature, tapeShapeTopologyKey } from "@/components/workplane/viewportShapeObjects";
+import { shapeGeometrySignature, tapeShapeTopologyKey } from "@/components/WorkplaneViewport";
 import { cadModifierGridfinityForShape } from "@/lib/cadProfileExtrusion";
 import { editorHistoryEntry } from "@/lib/editorHistory";
 import { meshForShape } from "@/lib/editorMeshCore";

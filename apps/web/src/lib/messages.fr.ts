@@ -835,6 +835,7 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "shortcuts.dropToWorkplane": "Déposez la sélection sur le plan de travail",
   "shortcuts.nudge": "Se déplacer d'un pas de grille lorsque la vue est tournée",
   "shortcuts.nudgeCoarse": "Se déplacer de cinq étapes de grille",
+  "shortcuts.nudgeFine": "Se déplacer d'un cinquième d'étape de grille",
   "shortcuts.raise": "Augmenter ou diminuer la sélection",
   "shortcuts.rotate": "Rotation de 45°",
   "shortcuts.intersect": "Intersect: keep only where the selected shapes overlap",

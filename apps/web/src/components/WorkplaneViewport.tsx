@@ -1004,7 +1004,7 @@ function syncMoveDimensionOverlay(
 }
 
 
-function tapeShapeTopologyKey(shape: WorkplaneShape): string {
+export function tapeShapeTopologyKey(shape: WorkplaneShape): string {
   const positions = shape.importedMesh?.positions ?? [];
   const positionSample = positions.length > 0
     ? Array.from({ length: Math.min(12, positions.length) }, (_, index) => positions[Math.floor(index * (positions.length - 1) / Math.max(1, Math.min(12, positions.length) - 1))]?.toFixed(4) ?? "0").join(",")
@@ -1268,7 +1268,7 @@ function polygonSidesForShape(shape: WorkplaneShape) {
   return roundSideCount(shape.sides, shapeWidth(shape), shapeDepth(shape));
 }
 
-function shapeGeometrySignature(shape: WorkplaneShape): string {
+export function shapeGeometrySignature(shape: WorkplaneShape): string {
   const taper = !shapeSupportsTaper(shape.kind) || !shapeHasTaper(shape)
     ? null
     : { ...shapeTaperDimensions(shape), baseWidth: shapeWidth(shape), baseDepth: shapeDepth(shape) };

@@ -694,6 +694,7 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "shortcuts.dropToWorkplane": "Spusti izbor na delovno ravnino",
   "shortcuts.nudge": "Premik za en korak mreže, glede na zavrten pogled",
   "shortcuts.nudgeCoarse": "Premik za pet korakov mreže",
+  "shortcuts.nudgeFine": "Premik za petino koraka mreže",
   "shortcuts.raise": "Dvigni ali spusti izbor",
   "shortcuts.rotate": "Zavrti za 45°",
   "shortcuts.intersect": "Intersect: keep only where the selected shapes overlap",
