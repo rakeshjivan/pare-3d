@@ -4734,10 +4734,35 @@ export function WorkplaneViewport({
       }
       return out;
     };
+    // The preview of a design (the cards of the overview, the server copy) shows all its bodies, framed, from the side
+    // the view looks from: not the screen as it stands, which is a close-up or a speck on the plate, depending on how far
+    // in or out the work was done. The camera is put back at once; the screen is not shown in between.
     window.layerlingCaptureCanvasAsync = () => {
+      const bounds = selectionBounds(state, [...state.shapeRecords.keys()].filter((id) => state.shapeRecords.get(id)?.object.visible));
+      const saved = bounds
+        ? { position: state.camera.position.clone(), target: state.controls.target.clone(), up: state.camera.up.clone(), zoom: state.camera.zoom, reach: state.focusReach, turn: state.cameraTurn }
+        : null;
+      if (bounds) {
+        frameBounds(state, bounds);
+        fitCameraDepthRange(state.camera, state.controls.target);
+      }
       state.camera.updateMatrixWorld();
       renderFrame(state);
-      return thumbnailPngDataUrl(state.renderer.domElement);
+      const picture = thumbnailPngDataUrl(state.renderer.domElement);
+      if (saved) {
+        state.camera.position.copy(saved.position);
+        state.controls.target.copy(saved.target);
+        state.camera.up.copy(saved.up);
+        state.camera.zoom = saved.zoom;
+        state.focusReach = saved.reach;
+        state.cameraTurn = saved.turn;
+        state.camera.lookAt(saved.target);
+        state.camera.updateProjectionMatrix();
+        fitCameraDepthRange(state.camera, state.controls.target);
+        state.camera.updateMatrixWorld();
+        state.needsRender = true;
+      }
+      return picture;
     };
     window.layerlingOrbitView = (azimuthDegrees, polarDegrees) => { state.cameraTurn = null; orbitViewBy(state, azimuthDegrees, polarDegrees); state.needsRender = true; };
     window.layerlingPanView = (rightFraction, upFraction) => { state.cameraTurn = null; panViewBy(state, rightFraction, upFraction); state.needsRender = true; };
