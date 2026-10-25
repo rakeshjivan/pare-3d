@@ -37,6 +37,11 @@ export type ArraySettings = {
   /** Fork: a grid - columns along X, rows to the back (Y). */
   columns?: number;
   rows?: number;
+  /**
+   * Group the pieces into one object when the pattern is created. Left out, it follows the count: off for a few pieces,
+   * on above ARRAY_AUTO_GROUP_ABOVE. Once the person ticks or unticks the box, their choice stays.
+   */
+  groupCopies?: boolean;
 };
 
 export const GRID_MAX_SIDE = 20;
@@ -82,6 +87,14 @@ export function arrayOffsets(settings: ArraySettings, size: { x: number; y: numb
   const count = clampArrayCount(settings.count);
   for (let index = 1; index < count; index += 1) offsets.push(rowOffset({ spacingX: step.x, spacingY: step.y, spacingZ: step.z }, index));
   return offsets;
+}
+
+/** A pattern of more pieces than this is grouped unless the person says otherwise. */
+export const ARRAY_AUTO_GROUP_ABOVE = 5;
+
+/** Whether creating the pattern also groups its pieces: the person's choice, or by count while there is none. */
+export function arrayGroupsCopies(settings: Pick<ArraySettings, "count" | "groupCopies">) {
+  return settings.groupCopies ?? settings.count > ARRAY_AUTO_GROUP_ABOVE;
 }
 
 /**

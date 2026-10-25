@@ -1427,6 +1427,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "array.helpRowGap": "Copies in a line with the same gap between each, edge to edge, whatever the part's size.",
   "array.helpGrid": "Copies in columns and rows, with the gap (or centre spacing) between them.",
   "array.count": "Počet včetně originálu",
+  "array.groupCopies": "Seskupit kopie",
   "array.spacingX": "Rozteč X",
   "array.spacingY": "Rozteč Y",
   "array.spacingZ": "Rozteč Z (výška)",

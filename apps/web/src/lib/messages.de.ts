@@ -1380,6 +1380,7 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "array.helpRowGap": "Kopien in einer Linie mit gleicher Lücke dazwischen, Kante an Kante, gleich wie groß das Teil ist.",
   "array.helpGrid": "Kopien in Spalten und Reihen, mit der Lücke (oder dem Mittenabstand) dazwischen.",
   "array.count": "Anzahl (mit Original)",
+  "array.groupCopies": "Kopien gruppieren",
   "array.spacingX": "Abstand X",
   "array.spacingY": "Abstand Y",
   "array.spacingZ": "Abstand Z (Höhe)",

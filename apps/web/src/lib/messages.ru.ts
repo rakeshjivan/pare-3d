@@ -1356,6 +1356,7 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "array.helpRowGap": "Copies in a line with the same gap between each, edge to edge, whatever the part's size.",
   "array.helpGrid": "Copies in columns and rows, with the gap (or centre spacing) between them.",
   "array.count": "Количество (с оригиналом)",
+  "array.groupCopies": "Сгруппировать копии",
   "array.spacingX": "Шаг по X",
   "array.spacingY": "Шаг по Y",
   "array.spacingZ": "Шаг по Z (высота)",

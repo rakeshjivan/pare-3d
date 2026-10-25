@@ -7,7 +7,7 @@ import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { MoreOptions } from "@/components/workplane/MoreOptions";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
-import { ARRAY_MAX_COUNT, ARRAY_MIN_COUNT, GRID_MAX_SIDE, type ArrayDirection, type ArrayMode, type ArraySettings } from "@/lib/shapeArray";
+import { ARRAY_MAX_COUNT, ARRAY_MIN_COUNT, arrayGroupsCopies, GRID_MAX_SIDE, type ArrayDirection, type ArrayMode, type ArraySettings } from "@/lib/shapeArray";
 import type { WorkplaneWorkspaceSettings } from "@/types/layerling";
 
 const ARRAY_MODES: readonly ArrayMode[] = ["row", "grid", "circle"];
@@ -85,6 +85,11 @@ export function ArrayPanel({
           ))}
         </div>
       </div>
+
+      <label className="edge-modifier-check">
+        <input type="checkbox" checked={arrayGroupsCopies(settings)} onChange={(event) => onChange({ groupCopies: event.currentTarget.checked })} />
+        <span>{t("array.groupCopies")}</span>
+      </label>
 
       {settings.mode !== "grid" ? (
         <EdgeModifierSlider

@@ -1380,6 +1380,7 @@ export const MESSAGES_EN = {
   "array.helpRowGap": "Copies in a line with the same gap between each, edge to edge, whatever the part's size.",
   "array.helpGrid": "Copies in columns and rows, with the gap (or centre spacing) between them.",
   "array.count": "Count (with original)",
+  "array.groupCopies": "Group the copies",
   "array.spacingX": "Spacing X",
   "array.spacingY": "Spacing Y",
   "array.spacingZ": "Spacing Z (height)",

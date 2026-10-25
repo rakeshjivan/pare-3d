@@ -1348,6 +1348,7 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "array.helpRowGap": "Copies in a line with the same gap between each, edge to edge, whatever the part's size.",
   "array.helpGrid": "Copies in columns and rows, with the gap (or centre spacing) between them.",
   "array.count": "Compter (avec original)",
+  "array.groupCopies": "Grouper les copies",
   "array.spacingX": "Espacement X",
   "array.spacingY": "Espacement Y",
   "array.spacingZ": "Espacement Z (hauteur)",
