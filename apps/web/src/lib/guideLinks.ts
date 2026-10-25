@@ -25,6 +25,8 @@ export const GUIDE_CHAPTERS = {
   ai: { de: "ki-mit-mcp", en: "ai-with-mcp", nl: "ai-met-mcp", ru: "ai-with-mcp", cs: "ai-with-mcp", sl: "ai-z-mcp", hu: "ai-with-mcp" },
   tablet: { de: "tablet-und-touch", en: "tablet-and-touch", nl: "tablet-en-touch", ru: "tablet-and-touch", cs: "tablet-and-touch", sl: "tablica-in-dotik", hu: "tablet-and-touch" },
   offline: { de: "offline-und-installieren", en: "offline-and-install", nl: "offline-en-installeren", ru: "offline-and-install", cs: "offline-and-install", sl: "offline-in-namestitev", hu: "offline-and-install" },
+  // Fork (build 64): Dental Studio has a chapter of its own (English only, as the guide is).
+  dental: { en: "dental-studio" },
 } as const satisfies Record<string, { en: string } & Partial<Record<Language, string>>>;
 
 export type GuideChapter = keyof typeof GUIDE_CHAPTERS;
@@ -106,7 +108,7 @@ export const GUIDE_SECTIONS = {
   meshRound: { chapter: "files", en: "rounding-a-mesh" },
   // Fork (build 55).
   texture: { chapter: "files", en: "surface-textures" },
-  dentalModel: { chapter: "files", en: "dental-models-from-a-scan" },
+  dentalModel: { chapter: "dental", en: "the-short-way" },
   surfaceText: { chapter: "text", en: "text-on-any-surface" },
   parameters: { chapter: "measuring", en: "parameters-named-sizes" },
   draft: { chapter: "edges", en: "draft-angle" },

@@ -4,6 +4,20 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 65,
+    items: [
+      "Fixed: when the two heels of a horseshoe model ended at different places, the articulator's bar at the back could miss the shorter one, leaving that side of the hinge loose. The bar now reaches each heel of each model.",
+      "Every model is now checked to be one piece before it is handed over; if any part of the hinge or the incisal stop came out loose, Dental Studio says so instead of letting it go to the printer.",
+    ],
+  },
+  {
+    build: 64,
+    items: [
+      "Dental Studio shows the model's height in one place: a small picture of the teeth (always kept), the gum below them and the base, with the size of each and the whole model's height. Gum below the teeth and the base are set right there, for both arches at once, instead of under Adjust the settings.",
+      "Dental Studio has its own chapter in the guide, step by step with pictures: the short way, each of the four steps, the model height, the articulator and its joints, and what Pare 3D always does. The question mark in the panel opens it.",
+    ],
+  },
+  {
     build: 63,
     items: [
       "Ball condyles: the printed articulator's joint is now a 10 mm ball on the lower, behind each last molar like a condyle, seated in a cup on the upper. A ball in a cup centres itself, so the hinge neither slides from side to side nor rocks. Two tongues either side of each cup, freed by slits, bend to let the ball in and hold it just under its widest point - they bend rather than the resin stretching, so it suits brittle model resins. The clip and axle stays as a choice (Joint, in step 4).",

@@ -219,7 +219,8 @@ async function run(language, port) {
     },
     async shot(name, clip) {
       const options = { format: "webp", quality: 82 };
-      if (clip) options.clip = { ...clip, scale: 1 };
+      // Fork (build 64): a clip may reach below the window (a tall panel); capture past it then.
+      if (clip) { options.clip = { ...clip, scale: 1 }; options.captureBeyondViewport = true; }
       const result = await send("Page.captureScreenshot", options);
       writeFileSync(join(imageDirectory, `${name}.webp`), Buffer.from(result.data, "base64"));
       console.log(`  ${language}/${name}.webp`);

@@ -685,3 +685,27 @@ describe("Build 63: drop-in ball condyles", () => {
     [parts.upper, parts.lower].forEach((s) => s.delete());
   });
 });
+
+describe("Build 65: the hinge reaches both heels of a horseshoe", () => {
+  let runtime: ManifoldToplevel;
+  beforeAll(async () => {
+    runtime = await manifoldModule();
+    runtime.setup();
+  });
+  it("joins a heel that stops 8 mm short of the other to the hinge bar", async () => {
+    const { hingeParts } = await import("@/lib/dentalBase");
+    // A lower horseshoe's two heels: the left reaches y = 25, the right only y = 17.
+    const left = runtime.Manifold.cube([8, 40, 6]).translate([-28, -15, -20]);
+    const right = runtime.Manifold.cube([8, 32, 6]).translate([20, -15, -20]);
+    const front = runtime.Manifold.cube([56, 8, 6]).translate([-28, -23, -20]);
+    const base = runtime.Manifold.union([left, right, front]);
+    const pieces = (solid: typeof base) => { const list = solid.decompose(); const n = list.length; list.forEach((p) => p.delete()); return n; };
+    for (const joint of ["ball", "dropin", "axle"] as const) {
+      const parts = hingeParts(runtime, 25, -28, 28, 20, -20, 0.1, null, { joint }, { upper: 25, lower: [{ x: -24, y: 25 }, { x: 24, y: 17 }] });
+      const joined = runtime.Manifold.union(base, parts.lower);
+      expect(pieces(joined)).toBe(1);
+      [joined, parts.upper, parts.lower].forEach((s) => s.delete());
+    }
+    [left, right, front, base].forEach((s) => s.delete());
+  });
+});

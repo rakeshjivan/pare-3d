@@ -108,7 +108,7 @@ const SMOOTH_ROUNDS: Record<DentalSmooth, number> = { off: 0, low: 3, high: 10 }
 
 export type DentalPart = { id: string; role: DentalRole; positions: Float32Array; height: number; volume: number };
 /** `surface`: per part, the share of the scan's surface kept above each depth (mm below the occlusal plane). */
-export type DentalStudioResult = { parts: DentalPart[]; worn: number; keptDepth: number[]; voxel: number | null; warnings: string[]; surface: Array<Record<number, number>>; /** Build 60: how far the printed articulator opens, degrees. */ opening?: number };
+export type DentalStudioResult = { parts: DentalPart[]; worn: number; keptDepth: number[]; voxel: number | null; warnings: string[]; surface: Array<Record<number, number>>; /** Build 60: how far the printed articulator opens, degrees. */ opening?: number; /** Build 65: the solid pieces each part is made of - 1 when it holds together. */ pieces?: number[] };
 
 /** Whether a mesh looks like a raw scan: an open surface with one long open edge. */
 export function looksLikeDentalScan(positions: ArrayLike<number>): boolean {
@@ -688,12 +688,21 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
     const upperY = frontAt("upper"), lowerY = frontAt("lower");
     const stop = options.incisalStop !== false && Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY } : null;
     const motion = { condyle: options.condyle ?? 0, pinRaise: options.pinRaise ?? 0, table: options.incisalTable ?? "flat", joint: options.hingeJoint ?? "ball" } as const;
-    const backOf = (role: "upper" | "lower") => {
-      let most = -Infinity;
-      built.forEach(({ arch, built: b }) => { if (arch.role === role) (role === "upper" ? b.footprint.map(mirrorRing) : b.footprint).forEach((ring) => ring.forEach(([, y]) => { most = Math.max(most, y); })); });
-      return most;
+    // Build 65: each model's heels - its rearmost point either side of the middle - so the hinge's
+    // bar reaches both, however unevenly a horseshoe's two ends stop.
+    const mid = (xMin + xMax) / 2;
+    const heelsOf = (role: "upper" | "lower") => {
+      const best: Array<{ x: number; y: number } | null> = [null, null];
+      built.forEach(({ arch, built: b }) => {
+        if (arch.role !== role) return;
+        (role === "upper" ? b.footprint.map(mirrorRing) : b.footprint).forEach((ring) => ring.forEach(([x, y]) => {
+          const side = x < mid ? 0 : 1;
+          if (!best[side] || y > best[side]!.y) best[side] = { x, y };
+        }));
+      });
+      return best.filter((heel): heel is { x: number; y: number } => heel !== null);
     };
-    const parts = hingeParts(runtime, back, xMin, xMax, depth, -depth, options.hingeFit ?? HINGE_CLEARANCE, stop, motion, { upper: backOf("upper"), lower: backOf("lower") });
+    const parts = hingeParts(runtime, back, xMin, xMax, depth, -depth, options.hingeFit ?? HINGE_CLEARANCE, stop, motion, { upper: heelsOf("upper"), lower: heelsOf("lower") });
     solids = built.map(({ arch }, i) => {
       const joined = runtime.Manifold.union(solids[i], arch.role === "upper" ? parts.upper : parts.lower);
       toFree.push(solids[i]);
@@ -707,12 +716,20 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
   }
   // Lay out: base down on the plate, the upper turned over beside the lower; or upper on lower.
   const out: DentalPart[] = [];
+  const pieces: number[] = [];
   let offsetX = 0;
   built.forEach(({ arch }, i) => {
     let solid = solids[i];
     // Build 62: no loose flecks of scan to float in the vat.
     const clean = withoutDebris(runtime, solid);
     if (clean.solid !== solid) { toFree.push(solid); solid = clean.solid; }
+    // Build 65: a model must be one piece - a part of the hinge or the stop standing free of its
+    // base would print loose. Counted, and said.
+    const split = solid.decompose();
+    const loose = split.filter((piece) => piece.volume() > 0).length;
+    split.forEach((piece) => piece.delete());
+    pieces.push(loose);
+    if (loose > 1 && !warnings.includes("loose")) warnings.push("loose");
     // The model's own height, as built (the scan's highest point may have been trimmed away).
     const own = solid.boundingBox();
     if (!pair || options.layout === "print") {
@@ -751,5 +768,6 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
     voxel,
     warnings,
     ...(opening !== undefined ? { opening } : {}),
+    pieces,
   };
 }

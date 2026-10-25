@@ -38,7 +38,79 @@ async function sampleParts(ctx) {
   return { box, cylinder };
 }
 
+
+/**
+ * Fork (build 64): Dental Studio needs real scans, which never go into the repository (they are
+ * people's mouths). Give them for a run: PARE_GUIDE_DENTAL_SCANS="/path/upper.stl;/path/lower.stl".
+ * Without it the dental pictures are left as they are.
+ */
+const DENTAL_SCANS = (process.env.PARE_GUIDE_DENTAL_SCANS ?? "").split(";").filter(Boolean);
+
+/** The rectangle of the first element matching `selector`, for ctx.shot's clip. */
+async function rectOf(ctx, selector, last = false) {
+  return ctx.evaluate(`(() => { const all = document.querySelectorAll(${JSON.stringify(selector)}); const el = ${last ? "all[all.length - 1]" : "all[0]"}; if (!el) return null; el.scrollIntoView({ block: "nearest" }); const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })()`);
+}
+
+async function openDentalStudioWithScans(ctx) {
+  await freshEditor(ctx);
+  // The toolbar's Dental Studio button (its title is longer than the name, so click it by its tool).
+  await ctx.clickSelector('[data-layerling-tool="dentalModel"]');
+  await ctx.wait(800);
+  // Into the panel's own import, as a person choosing the files would.
+  const { root } = await ctx.send("DOM.getDocument", { depth: -1 });
+  const { nodeIds } = await ctx.send("DOM.querySelectorAll", { nodeId: root.nodeId, selector: "input[type=file][multiple]" });
+  for (const nodeId of nodeIds) {
+    const { node } = await ctx.send("DOM.describeNode", { nodeId });
+    const accept = (node.attributes ?? []).join(" ");
+    if (accept.includes(".ply")) { await ctx.send("DOM.setFileInputFiles", { nodeId, files: DENTAL_SCANS }); break; }
+  }
+  for (let i = 0; i < 240; i += 1) {
+    const ready = await ctx.evaluate(`Boolean(document.querySelector(".dental-studio-panel .dental-slot-info")) && !document.querySelector(".dental-studio-panel .edge-modifier-spinner")`);
+    if (ready) break;
+    await ctx.wait(1000);
+  }
+  await ctx.click(ctx.t("camera.home"));
+  await ctx.wait(1500);
+}
+
 export const scenes = {
+  async "dental-studio"(ctx) {
+    if (DENTAL_SCANS.length < 2) { console.log("  dental-studio: skipped - set PARE_GUIDE_DENTAL_SCANS"); return; }
+    await openDentalStudioWithScans(ctx);
+    await ctx.evaluate(`document.querySelector(".dental-studio-panel").style.maxHeight = "none"; true`);
+    await ctx.wait(400);
+    const panelRect = await rectOf(ctx, ".dental-studio-panel");
+    await ctx.shot("dental-studio-steps", panelRect);
+    await ctx.shot("dental-model-height", await rectOf(ctx, ".dental-height-box"));
+    // Fixing the teeth by hand, on the lower, seen from the occlusal side.
+    await ctx.evaluate(`document.querySelector(".dental-studio-panel").style.maxHeight = ""; true`);
+    await ctx.click(ctx.t("dental.marginManual"));
+    await ctx.click(ctx.t("dental.lower"));
+    await ctx.click(ctx.t("dental.area.paint"));
+    for (let i = 0; i < 240; i += 1) {
+      if (!(await ctx.evaluate(`Boolean(document.querySelector(".dental-studio-panel .edge-modifier-spinner"))`))) break;
+      await ctx.wait(1000);
+    }
+    await ctx.click(ctx.t("dental.view.occlusal"));
+    await ctx.wait(3000);
+    await ctx.shot("dental-fix-by-hand");
+    await ctx.click(ctx.t("dental.marginAuto"));
+    // Ortho models on the articulator.
+    await ctx.click(ctx.t("dental.ortho"), "button", true);
+    await ctx.click(ctx.t("dental.hinge"), "label");
+    await ctx.evaluate(`document.querySelector(".dental-studio-panel").style.maxHeight = "none"; true`);
+    await ctx.wait(400);
+    await ctx.shot("dental-articulator", await rectOf(ctx, ".dental-studio-panel section", true));
+    await ctx.click(ctx.t("dental.applyPair"));
+    for (let i = 0; i < 600; i += 1) {
+      if (!(await ctx.evaluate(`Boolean(document.querySelector(".dental-studio-panel"))`))) break;
+      await ctx.wait(1000);
+    }
+    await ctx.click(ctx.t("camera.home"));
+    await quiet(ctx);
+    await ctx.shot("dental-articulated-models");
+  },
+
   async "start-page"(ctx) {
     await ctx.goto("/", 5000);
     await ctx.shot("start-page");

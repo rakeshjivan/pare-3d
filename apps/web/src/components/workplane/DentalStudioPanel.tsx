@@ -132,6 +132,10 @@ export function DentalStudioPanel({
   const keep = following ? Math.max(minKeep, Math.min(straight, minKeep + (options.gum ?? 3))) : straight;
   // Floor to the tallest tooth.
   const height = keep + options.base + (analysis ? Math.max(...analysis.arches.map((arch) => arch.above)) : 0);
+  // Build 64: the height in its three parts - the teeth (to the deepest a tooth reaches, never cut),
+  // the gum kept below them, and the base.
+  const teethHeight = (analysis ? Math.max(...analysis.arches.map((arch) => arch.above)) : 0) + minKeep;
+  const gumHeight = Math.max(0, keep - minKeep);
   const ready = Boolean(analysis) && !busy && Boolean(slots.upper || slots.lower);
   const archInfo = (slot: "upper" | "lower") => {
     const id = slots[slot];
@@ -277,6 +281,49 @@ export function DentalStudioPanel({
           ))}
         </div>
         <p className="dental-summary" data-testid="dental-summary">{t("dental.summary", { base: baseName(options.baseStyle), inside: insideName, height: height.toFixed(1) })}</p>
+        {/* Build 64: the model's height in one place, as it stacks up - the teeth (never cut), the gum
+            kept below them, and the base - with a picture of the three and their sizes. Both arches. */}
+        <div className="dental-height-box" role="group" aria-label={t("dental.heightTitle")}>
+          <svg className="dental-height-figure" viewBox="0 0 64 120" aria-hidden="true">
+            {(() => {
+              const total = Math.max(1, teethHeight + gumHeight + options.base);
+              const scale = 108 / total;
+              const tH = teethHeight * scale, gH = gumHeight * scale, bH = options.base * scale;
+              return (
+                <>
+                  <path className="teeth" d={`M8 ${6 + tH} L8 10 Q14 2 20 10 Q26 2 32 10 Q38 2 44 10 Q50 2 56 10 L56 ${6 + tH} Z`} />
+                  <rect className="gum" x="6" y={6 + tH} width="52" height={Math.max(0.5, gH)} />
+                  <rect className="base" x="2" y={6 + tH + gH} width="60" height={Math.max(0.5, bH)} />
+                </>
+              );
+            })()}
+          </svg>
+          <div className="dental-height-rows">
+            <p className="dental-height-row teeth"><span>{t("dental.heightTeeth")}</span><strong>{`${teethHeight.toFixed(1)} mm`}</strong></p>
+            <EdgeModifierSlider
+              label={t("dental.gumHeight")}
+              value={gumHeight}
+              min={following ? 0.5 : 0}
+              max={following ? 10 : Math.max(0.1, maxKeep - minKeep)}
+              step={0.1}
+              coarse={{ step: 0.5, max: following ? 10 : Math.max(0.5, maxKeep - minKeep) }}
+              workspace={workspace}
+              length
+              disabled={busy || !analysis}
+              onChange={(value) => onOptionsChange(following ? { gum: value } : { keep: minKeep + value })}
+            />
+            <EdgeModifierSlider label={t(options.baseStyle === "ortho" ? "dental.orthoHeight" : "dental.base")} value={options.base} min={DENTAL_MIN_BASE} max={DENTAL_MAX_BASE} step={0.5} coarse={{ step: 0.5, max: 20 }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ base: value })} />
+            {options.baseStyle !== "ortho" ? (
+              <div className="shell-opening-options dental-base-presets" role="radiogroup" aria-label={t("dental.basePresets")} title={t("dental.basePresetsHint")}>
+                {[3, 5, 10, 15].map((value) => (
+                  <button key={value} type="button" role="radio" aria-checked={Math.abs(options.base - value) < 1e-6} className={Math.abs(options.base - value) < 1e-6 ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ base: value })}>{`${value} mm`}</button>
+                ))}
+              </div>
+            ) : null}
+            <p className="dental-height-row total"><span>{t("dental.heightTotal")}</span><strong>{`${height.toFixed(1)} mm`}</strong></p>
+          </div>
+        </div>
+        <p className="blend-hint">{t("dental.gumHeightHint")}</p>
         <label className="dental-label-field">
           <span>{t("dental.label")}</span>
           <input type="text" maxLength={24} value={options.label} placeholder={t("dental.labelPlaceholder")} disabled={busy} onChange={(event) => onOptionsChange({ label: event.currentTarget.value })} />
@@ -289,17 +336,6 @@ export function DentalStudioPanel({
           <div className="dental-advanced">
             <h4 className="dental-group">{t("dental.groupBase")}</h4>
             {choice(t("dental.baseStyle"), options.baseStyle, [["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")]], (baseStyle) => onOptionsChange({ baseStyle }), undefined, false)}
-            <EdgeModifierSlider label={t(options.baseStyle === "ortho" ? "dental.orthoHeight" : "dental.base")} value={options.base} min={DENTAL_MIN_BASE} max={DENTAL_MAX_BASE} step={0.5} coarse={{ step: 0.5, max: 20 }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ base: value })} />
-            {options.baseStyle !== "ortho" ? (
-              <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.basePresets")} title={t("dental.basePresetsHint")}>
-                <span className="edge-modifier-label">{t("dental.basePresets")}</span>
-                <div className="shell-opening-options">
-                  {[3, 5, 10, 15].map((value) => (
-                    <button key={value} type="button" role="radio" aria-checked={Math.abs(options.base - value) < 1e-6} className={Math.abs(options.base - value) < 1e-6 ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ base: value })}>{`${value} mm`}</button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
             {options.baseStyle !== "articulator" ? (
               <label className="edge-modifier-check" title={t("dental.bevelHint")}>
                 <input type="checkbox" checked={options.bevel !== false} disabled={busy} onChange={(event) => onOptionsChange({ bevel: event.currentTarget.checked })} />
@@ -326,19 +362,6 @@ export function DentalStudioPanel({
               <input type="checkbox" checked={following} disabled={busy} onChange={(event) => onOptionsChange({ gum: event.currentTarget.checked ? 3 : null })} />
               <span>{t("dental.gumFollow")}</span>
             </label>
-            {following ? (
-              <EdgeModifierSlider label={t("dental.gum")} value={options.gum ?? 3} min={0.5} max={10} step={0.1} coarse={{ step: 0.5, max: 10 }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ gum: value })} />
-            ) : (
-              <>
-                <label className="edge-modifier-check">
-                  <input type="checkbox" checked={options.keep === null} disabled={busy} onChange={(event) => onOptionsChange({ keep: event.currentTarget.checked ? null : maxKeep })} />
-                  <span>{t("dental.keepAll")}</span>
-                </label>
-                {options.keep !== null ? (
-                  <EdgeModifierSlider label={t("dental.keep")} value={keep} min={minKeep} max={maxKeep} step={0.1} coarse={{ step: 0.5, max: maxKeep }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ keep: value })} />
-                ) : null}
-              </>
-            )}
             {choice(t("dental.smooth"), options.smooth ?? "low", [["off", t("dental.smooth.off")], ["low", t("dental.smooth.low")], ["high", t("dental.smooth.high")]], (smooth) => onOptionsChange({ smooth }))}
 
             <h4 className="dental-group">{t("dental.inside")}</h4>

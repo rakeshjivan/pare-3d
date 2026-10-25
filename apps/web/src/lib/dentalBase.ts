@@ -650,6 +650,9 @@ const box = (runtime: ManifoldRuntime, x0: number, x1: number, y0: number, y1: n
 const axleAlongX = (runtime: ManifoldRuntime, radius: number, x0: number, x1: number, y: number, z: number) =>
   runtime.Manifold.cylinder(x1 - x0, radius, radius, 64).rotate([0, 90, 0]).translate([x0, y, z]);
 
+/** Build 65: the rearmost point of a model's base on one side of the midline, in the pair's frame. */
+export type HingeHeel = { x: number; y: number };
+
 /** Where the incisal pin goes: its x, and the front of each model's base there (the pair's frame). */
 export type HingeFront = { x: number; upperY: number; lowerY: number };
 
@@ -728,7 +731,7 @@ const prismAlongX = (runtime: ManifoldRuntime, ring: Ring, x0: number, x1: numbe
  * - Build 60: `motion` adds a protrusion path, a raised pin and a sloped guide table (HingeMotion).
  * A bar along the back of each base joins its parts to it, reaching into that base's own back (`backs`).
  */
-export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number, xMax: number, floorUpper: number, floorLower: number, clearance = HINGE_CLEARANCE, front: HingeFront | null = null, motion: HingeMotion = {}, backs: { upper: number; lower: number } | null = null) {
+export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number, xMax: number, floorUpper: number, floorLower: number, clearance = HINGE_CLEARANCE, front: HingeFront | null = null, motion: HingeMotion = {}, backs: { upper: number | HingeHeel[]; lower: number | HingeHeel[] } | null = null) {
   const r = HINGE_AXLE_RADIUS, bore = r + Math.max(0.05, clearance);
   const angle = Math.max(0, Math.min(60, motion.condyle ?? 0)) * deg;
   const path = angle > 0 ? HINGE_PATH_LENGTH : 0;
@@ -758,8 +761,20 @@ export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number,
   const clipBottom = dz - (bore + 1.8);
   // Build 61: each bar reaches 4 mm into its own model's back, wherever that is - a shorter arch's
   // base ends in front of the other's, and a bar measured from the longer one would miss it.
-  const lowerParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, Math.min(back, backs?.lower ?? back) - 4, yBack, floorLower, floorLower + 4))];
-  const upperParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, Math.min(back, backs?.upper ?? back) - 4, yBack, floorUpper - 4, floorUpper))];
+  const backOf = (value: number | HingeHeel[] | undefined) => (Array.isArray(value) ? Math.max(...value.map((heel) => heel.y)) : value ?? back);
+  // The bar reaches across every heel too, so a strut to a heel always lands on it.
+  const spanOf = (value: number | HingeHeel[] | undefined): [number, number] => (Array.isArray(value) && value.length
+    ? [Math.min(cx - half, ...value.map((heel) => heel.x - 4)), Math.max(cx + half, ...value.map((heel) => heel.x + 4))]
+    : [cx - half, cx + half]);
+  const [lx0, lx1] = spanOf(backs?.lower), [ux0, ux1] = spanOf(backs?.upper);
+  const lowerParts: ManifoldSolid[] = [keep(box(runtime, lx0, lx1, Math.min(back, backOf(backs?.lower)) - 4, yBack, floorLower, floorLower + 4))];
+  const upperParts: ManifoldSolid[] = [keep(box(runtime, ux0, ux1, Math.min(back, backOf(backs?.upper)) - 4, yBack, floorUpper - 4, floorUpper))];
+  // Build 65: a strut from the bar to each heel of its own model - the two heels of a horseshoe seldom
+  // end level, and a bar placed by the longer one left the shorter heel standing free of it.
+  for (const [heels, parts, z0, z1] of [[backs?.lower, lowerParts, floorLower, floorLower + 4], [backs?.upper, upperParts, floorUpper - 4, floorUpper]] as const) {
+    if (!Array.isArray(heels)) continue;
+    for (const heel of heels) parts.push(keep(box(runtime, heel.x - 4, heel.x + 4, heel.y - 4, yBack, z0, z1)));
+  }
   const cuts: ManifoldSolid[] = [];
   for (const c of centres) {
     if (ball) {
