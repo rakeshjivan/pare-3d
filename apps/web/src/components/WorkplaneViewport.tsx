@@ -155,7 +155,7 @@ import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, MeasurementAc
 import { referencePoints } from "@/lib/workplaneNotes";
 import { pivotKeptAhead, ZOOM_PIVOT_REACH_MM, pivotHeightRange, pivotPlateReach } from "@/lib/zoomPivot";
 import { pointerReach } from "@/lib/pointerReach";
-import { measurementMiddle, nearestReferenceOnScreen, type ReferencePosition } from "@/lib/referencePoints";
+import { boxSnapSpots, measurementMiddle, nearestReferenceOnScreen, type ReferencePosition } from "@/lib/referencePoints";
 import { planarFaceTriangles, type PivotPoint } from "@/lib/rotationPivot";
 import { OVERHANG_PLATE_TOLERANCE, overhangDownwardLimit } from "@/lib/overhangLimits";
 import { directionIsOwnShapeAxis, rotatedGeometryShapePatch, rotationPatchFromQuaternion as sharedRotationPatchFromQuaternion, signedDegrees } from "@/lib/geometryRotation";
@@ -7051,6 +7051,33 @@ export function WorkplaneViewport({
     capturePointer(event.currentTarget, event.pointerId);
   }, [selectTapeCandidate]);
 
+  /**
+   * Where a dragged reference point snaps (#799): to a corner of a body's box, the middle of one of its edges
+   * or faces, a real corner of its mesh or another point - the nearest within reach on the screen - and
+   * otherwise onto an edge line near the pointer. Null when nothing is that close: the point then stays
+   * under the pointer.
+   */
+  const snapDraggedPoint = useCallback((clientX: number, clientY: number, noteId: string): ReferencePosition | null => {
+    const state = threeRef.current;
+    if (!state) return null;
+    const rect = state.renderer.domElement.getBoundingClientRect();
+    const visible = shapesRef.current.filter((shape) => !shape.hidden && !isNonSolidShape(shape));
+    const spots = visible.flatMap((shape) => boxSnapSpots(shapeBoxCornersWorld(shape)));
+    const tape = visible.length ? pickModelTapeCandidate(state, visible.map((shape) => shape.id), clientX, clientY) : null;
+    if (tape?.attachment?.kind === "vertex") spots.push({ x: tape.x, y: tape.y, z: tape.z });
+    referencePoints(notesRef.current).forEach((point) => {
+      if (point.id !== noteId) spots.push({ x: point.x, y: point.y, z: point.z });
+    });
+    const nearest = nearestReferenceOnScreen(
+      spots,
+      (point) => projectToScreen(new THREE.Vector3(point.x, point.y, point.z), state),
+      { x: clientX - rect.left, y: clientY - rect.top },
+      pointerReach(10),
+    );
+    if (nearest) return nearest;
+    return tape?.attachment?.kind === "edge" ? { x: tape.x, y: tape.y, z: tape.z } : null;
+  }, []);
+
   const handleNotePinPointerMove = useCallback((event: ReactPointerEvent<HTMLButtonElement>, noteId: string) => {
     const drag = noteDragRef.current;
     if (!drag || drag.noteId !== noteId || drag.pointerId !== event.pointerId) return;
@@ -7058,10 +7085,15 @@ export function WorkplaneViewport({
     const anchor = resolveNoteAnchor(event.clientX, event.clientY);
     if (!anchor) return;
     drag.moved = true;
-    // A reference point goes where it is dropped and never sticks to a body.
+    // A reference point goes where it is dropped and never sticks to a body; on the way it snaps, Alt held lets it go free.
     const isPoint = notesRef.current.find((candidate) => candidate.id === noteId)?.kind === "point";
-    onNoteUpdate?.(noteId, isPoint ? { x: anchor.x, y: anchor.y, z: anchor.z } : { x: anchor.x, y: anchor.y, z: anchor.z, anchor: anchor.anchor }, true);
-  }, [onNoteUpdate, resolveNoteAnchor]);
+    if (isPoint) {
+      const snapped = event.altKey ? null : snapDraggedPoint(event.clientX, event.clientY, noteId);
+      onNoteUpdate?.(noteId, snapped ?? { x: anchor.x, y: anchor.y, z: anchor.z }, true);
+      return;
+    }
+    onNoteUpdate?.(noteId, { x: anchor.x, y: anchor.y, z: anchor.z, anchor: anchor.anchor }, true);
+  }, [onNoteUpdate, resolveNoteAnchor, snapDraggedPoint]);
 
   const handleNotePinPointerUp = useCallback((event: ReactPointerEvent<HTMLButtonElement>, noteId: string) => {
     const drag = noteDragRef.current;
