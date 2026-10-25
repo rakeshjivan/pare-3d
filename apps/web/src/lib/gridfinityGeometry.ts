@@ -121,6 +121,11 @@ export const MAX_GRIDFINITY_UNITS = 6;
 export const MAX_GRIDFINITY_HEIGHT_UNITS = 20;
 /** The most padding on a side of a baseplate: 42 mm would be room for another unit of grid. */
 export const MAX_GRIDFINITY_PADDING = GRIDFINITY_GRID - 1;
+/** How much smaller than the drawer a baseplate fitted to it is, so that it drops in. */
+export const GRIDFINITY_DRAWER_CLEARANCE = 0.5;
+/** The smallest and largest drawer one baseplate fits: 1 unit, or 6 units and 41 mm each side. */
+export const MIN_GRIDFINITY_DRAWER = MIN_GRIDFINITY_UNITS * GRIDFINITY_GRID + GRIDFINITY_DRAWER_CLEARANCE;
+export const MAX_GRIDFINITY_DRAWER = MAX_GRIDFINITY_UNITS * GRIDFINITY_GRID + 2 * MAX_GRIDFINITY_PADDING + GRIDFINITY_DRAWER_CLEARANCE;
 export const DEFAULT_GRIDFINITY_TYPE: GridfinityType = "bin";
 export const DEFAULT_GRIDFINITY_UNITS = { x: 2, z: 1, y: 3 };
 export const DEFAULT_GRIDFINITY_LIP = true;
@@ -261,7 +266,8 @@ export function gridfinityUnits(shape: GridfinityShapeFields) {
 
 /** The size of a bin or baseplate of so many units; a bin on the half-size grid counts units of 21 mm, and a baseplate's box takes its padding in. */
 export function gridfinitySize(type: GridfinityType, count: { x: number; z: number; y: number }, lip = true, pitch = GRIDFINITY_GRID, padding = NO_GRIDFINITY_PADDING) {
-  if (type === "baseplate") return { width: count.x * GRIDFINITY_GRID + padding.left + padding.right, depth: count.z * GRIDFINITY_GRID + padding.back + padding.front, height: GRIDFINITY_BASEPLATE_HEIGHT };
+  // To 0.01 mm, as the padding is stored, so 252 + 22.98 + 22.97 is 297.95.
+  if (type === "baseplate") return { width: Math.round((count.x * GRIDFINITY_GRID + padding.left + padding.right) * 100) / 100, depth: Math.round((count.z * GRIDFINITY_GRID + padding.back + padding.front) * 100) / 100, height: GRIDFINITY_BASEPLATE_HEIGHT };
   return {
     width: count.x * pitch - 2 * GRIDFINITY_CLEARANCE,
     depth: count.z * pitch - 2 * GRIDFINITY_CLEARANCE,
@@ -334,6 +340,32 @@ export function gridfinityPaddingPatch(shape: GridfinityShapeFields, next: Parti
   const fields = Object.fromEntries((Object.keys(next) as GridfinityWall[]).map((wall) => [GRIDFINITY_PADDING_KEYS[wall], normalizeGridfinityPadding(next[wall])])) as Partial<Record<(typeof GRIDFINITY_PADDING_KEYS)[GridfinityWall], number>>;
   const { width, depth } = gridfinitySize("baseplate", gridfinityUnits(shape), false, GRIDFINITY_GRID, gridfinityPadding({ ...shape, ...fields }));
   return { ...fields, width, depth };
+}
+
+/** The drawer a baseplate fills (#455): its size and the 0.5 mm it leaves. */
+export function gridfinityDrawerSize(shape: GridfinityShapeFields) {
+  return { width: Math.round((shape.width + GRIDFINITY_DRAWER_CLEARANCE) * 100) / 100, depth: Math.round(((shape.depth ?? shape.width) + GRIDFINITY_DRAWER_CLEARANCE) * 100) / 100 };
+}
+
+/**
+ * What fitting a baseplate to a drawer's inside writes on one axis: as many
+ * units as fit, up to 6, and the rest split evenly into the two paddings of that
+ * axis, up to 41 mm a side. A drawer that one plate cannot fill gets what it can;
+ * the other axis is left as it is.
+ */
+export function gridfinityDrawerPatch(shape: GridfinityShapeFields, axis: "x" | "z", drawer: number) {
+  const [first, second] = axis === "x" ? (["left", "right"] as const) : (["back", "front"] as const);
+  // In whole hundredths, as the padding is stored, so the units and the rest are read alike.
+  const unit = GRIDFINITY_GRID * 100;
+  const inside = Math.round((drawer - GRIDFINITY_DRAWER_CLEARANCE) * 100);
+  const count = clamp(Math.floor(inside / unit), MIN_GRIDFINITY_UNITS, MAX_GRIDFINITY_UNITS);
+  const rest = Math.max(0, inside - count * unit);
+  const most = MAX_GRIDFINITY_PADDING * 100;
+  // An odd hundredth goes to the first side.
+  const half = Math.ceil(rest / 2);
+  const sides = { [GRIDFINITY_PADDING_KEYS[first]]: Math.min(most, half) / 100, [GRIDFINITY_PADDING_KEYS[second]]: Math.min(most, rest - half) / 100 } as Partial<Record<(typeof GRIDFINITY_PADDING_KEYS)[GridfinityWall], number>>;
+  const { width, depth } = gridfinitySize("baseplate", { ...gridfinityUnits(shape), [axis]: count }, false, GRIDFINITY_GRID, gridfinityPadding({ ...shape, ...sides }));
+  return { ...sides, width, depth };
 }
 
 /** Everything the body is built from, in the shape's own frame: x across, z deep, y up from 0, centred on x and z. */

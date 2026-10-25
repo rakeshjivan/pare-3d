@@ -36,6 +36,8 @@ import {
   gridfinityDividerPositionPatch,
   gridfinityDividerPositions,
   gridfinityDividerThickness,
+  gridfinityDrawerPatch,
+  gridfinityDrawerSize,
   gridfinityFloorFits,
   gridfinityFloorHeight,
   gridfinityFloorMaxHeight,
@@ -2207,6 +2209,10 @@ describe("gridfinity baseplate padding", { timeout: 60_000 }, () => {
     expect(gridfinityFootprintPatch(plate({ width: 130, depth: 58.2, ...pad(0, 16.2, 0, 14.2) }))).toEqual({ width: 140.2, depth: 58.2, height: 5 });
   });
 
+  it("keeps a padded size to hundredths, as the padding is stored", () => {
+    expect(gridfinityFootprintPatch(plate({ width: 297.95, depth: 42, gridfinityPaddingLeft: 22.98, gridfinityPaddingRight: 22.97 }))).toEqual({ width: 297.95, depth: 42, height: 5 });
+  });
+
   it("keeps the units when only the padding changes, also by a side's whole 41 mm", () => {
     const six = plate({ width: 252, depth: 42 });
     expect(gridfinityPaddingPatch(six, { right: 41 })).toEqual({ gridfinityPaddingRight: 41, width: 293, depth: 42 });
@@ -2335,5 +2341,50 @@ describe("gridfinity baseplate padding", { timeout: 60_000 }, () => {
     // The default is 2 x 1 units: 84 x 42, and 30 mm on the right makes it 114 across, not 1 unit and 30 mm.
     expect(makeShapeFromAsset(asset, { x: 0, z: 0 }, { gridfinityType: "baseplate", gridfinityPaddingRight: 30, gridfinityPaddingFront: 41 })).toMatchObject({ width: 114, depth: 83 });
     expect(makeShapeFromAsset(asset, { x: 0, z: 0 }, { gridfinityType: "baseplate", gridfinityPaddingRight: 30, width: 114 })).toMatchObject({ width: 114 });
+  });
+});
+
+describe("gridfinity baseplate fitted to a drawer", () => {
+  const plate = (fields: Record<string, unknown> = {}) => ({ width: 252, depth: 252, height: 5, gridfinityType: "baseplate" as const, ...fields });
+
+  it("shows the drawer a baseplate fills: its size and 0.5 mm", () => {
+    expect(gridfinityDrawerSize(plate())).toEqual({ width: 252.5, depth: 252.5 });
+    expect(gridfinityDrawerSize(plate({ width: 291.6, gridfinityPaddingLeft: 19.8, gridfinityPaddingRight: 19.8 }))).toEqual({ width: 292.1, depth: 252.5 });
+  });
+
+  it("takes as many units as fit and splits the rest evenly, 0.5 mm smaller than the drawer", () => {
+    // 292.1 mm: 6 units and 39.6 mm, 19.8 each side.
+    expect(gridfinityDrawerPatch(plate(), "x", 292.1)).toEqual({ gridfinityPaddingLeft: 19.8, gridfinityPaddingRight: 19.8, width: 291.6, depth: 252 });
+    // 230 mm: 5 units and 19.5 mm, 9.75 each side.
+    expect(gridfinityDrawerPatch(plate(), "z", 230)).toEqual({ gridfinityPaddingBack: 9.75, gridfinityPaddingFront: 9.75, width: 252, depth: 229.5 });
+    // 250 mm: 5.94 units fit, so 5 and 39.5 mm, never 6 and a plate wider than the drawer.
+    expect(gridfinityDrawerPatch(plate(), "x", 250)).toEqual({ gridfinityPaddingLeft: 19.75, gridfinityPaddingRight: 19.75, width: 249.5, depth: 252 });
+    // An odd hundredth goes to the first side.
+    expect(gridfinityDrawerPatch(plate(), "x", 230.05)).toEqual({ gridfinityPaddingLeft: 9.78, gridfinityPaddingRight: 9.77, width: 229.55, depth: 252 });
+    // 298.45 mm: the size is whole hundredths, not 297.95000000000005.
+    expect(gridfinityDrawerPatch(plate(), "x", 298.45)).toEqual({ gridfinityPaddingLeft: 22.98, gridfinityPaddingRight: 22.97, width: 297.95, depth: 252 });
+    // A drawer of whole units and 0.5 mm takes no padding, also typed to a thousandth below that.
+    expect(gridfinityDrawerPatch(plate(), "z", 84.497)).toEqual({ gridfinityPaddingBack: 0, gridfinityPaddingFront: 0, width: 252, depth: 84 });
+    expect(gridfinityDrawerPatch(plate(), "x", 168.5)).toEqual({ gridfinityPaddingLeft: 0, gridfinityPaddingRight: 0, width: 168, depth: 252 });
+  });
+
+  it("splits the rest evenly whatever padding the plate had before", () => {
+    expect(gridfinityDrawerPatch(plate({ width: 259.1, gridfinityPaddingRight: 7.1 }), "x", 260)).toEqual({ gridfinityPaddingLeft: 3.75, gridfinityPaddingRight: 3.75, width: 259.5, depth: 252 });
+    expect(gridfinityDrawerPatch(plate({ width: 272, gridfinityPaddingLeft: 5, gridfinityPaddingRight: 15 }), "x", 292.5)).toEqual({ gridfinityPaddingLeft: 20, gridfinityPaddingRight: 20, width: 292, depth: 252 });
+    // 298.45 mm: 6 units and 45.95 mm, 22.98 and 22.97.
+    expect(gridfinityDrawerPatch(plate({ width: 259.1, gridfinityPaddingRight: 7.1 }), "x", 298.45)).toEqual({ gridfinityPaddingLeft: 22.98, gridfinityPaddingRight: 22.97, width: 297.95, depth: 252 });
+  });
+
+  it("fills what one baseplate can of a larger drawer, 6 units and 41 mm each side, and gives a smaller one 1 unit", () => {
+    expect(gridfinityDrawerPatch(plate(), "x", 500)).toEqual({ gridfinityPaddingLeft: 41, gridfinityPaddingRight: 41, width: 334, depth: 252 });
+    expect(gridfinityDrawerPatch(plate(), "z", 30)).toEqual({ gridfinityPaddingBack: 0, gridfinityPaddingFront: 0, width: 252, depth: 42 });
+  });
+
+  it("changes only the axis given, and the plate built from it fills the drawer", () => {
+    const section = plate({ depth: 260.1, gridfinityPaddingBack: 8.1 });
+    const fitted = { ...section, ...gridfinityDrawerPatch(section, "x", 292.1) };
+    expect(fitted).toMatchObject({ depth: 260.1, gridfinityPaddingBack: 8.1, width: 291.6 });
+    expect(gridfinityUnits(fitted)).toEqual({ x: 6, z: 6, y: 1 });
+    expect(gridfinityDrawerSize(fitted)).toEqual({ width: 292.1, depth: 260.6 });
   });
 });

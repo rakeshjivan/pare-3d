@@ -11,7 +11,8 @@ import type { WorkplaneShape } from "@/types/layerling";
 
 /**
  * A Gridfinity baseplate's padding in its settings (#455): a row for each side on a baseplate and
- * none on a bin, and a change of padding writes the plate's size with it, keeping the units.
+ * none on a bin, and a change of padding writes the plate's size with it, keeping the units. The
+ * drawer rows show the drawer a baseplate fills and fit it to one typed in.
  */
 beforeAll(() => {
   // jsdom lays nothing out; the panel only scrolls itself back to the top.
@@ -62,9 +63,9 @@ describe("a Gridfinity baseplate's padding in its settings", () => {
     expect(rowNamed(panel, "Padding on the right")!.querySelector<HTMLInputElement>("input:not([type=range])")!.value).toContain("14.2");
   });
 
-  it("has no padding rows on a bin, which keeps the setting", () => {
+  it("has no padding or drawer rows on a bin, which keeps the setting", () => {
     const panel = mount({ gridfinityType: "bin", gridfinityPaddingRight: 14.2 });
-    sides.forEach((side) => expect(rowNamed(panel, side), side).toBeUndefined());
+    [...sides, "Drawer width", "Drawer depth"].forEach((row) => expect(rowNamed(panel, row), row).toBeUndefined());
   });
 
   it("writes the plate's size with a new padding, keeping its six units", () => {
@@ -73,5 +74,24 @@ describe("a Gridfinity baseplate's padding in its settings", () => {
     type(rowNamed(panel, "Padding on the right")!.querySelector<HTMLInputElement>("input:not([type=range])")!, "41");
     expect(updates).toHaveLength(1);
     expect(updates[0]).toMatchObject({ gridfinityPaddingRight: 41, width: 293, depth: 42 });
+  });
+
+  it("shows the drawer a baseplate fills, and fits it to a drawer typed in, in one change", () => {
+    const updates: Partial<WorkplaneShape>[] = [];
+    const panel = mount(plate, (patch) => updates.push(patch));
+    expect(rowNamed(panel, "Drawer width")!.querySelector<HTMLInputElement>("input:not([type=range])")!.value).toContain("252.5");
+    // 292.1 mm: 6 units and 19.8 mm each side, the plate 0.5 mm narrower than the drawer.
+    type(rowNamed(panel, "Drawer width")!.querySelector<HTMLInputElement>("input:not([type=range])")!, "292.1");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ gridfinityPaddingLeft: 19.8, gridfinityPaddingRight: 19.8, width: 291.6, depth: 42, size: 291.6 });
+  });
+
+  it("fits the depth to a drawer typed into Drawer depth, leaving the width", () => {
+    const updates: Partial<WorkplaneShape>[] = [];
+    const panel = mount(plate, (patch) => updates.push(patch));
+    // 230 mm: 5 units and 9.75 mm at the back and the front.
+    type(rowNamed(panel, "Drawer depth")!.querySelector<HTMLInputElement>("input:not([type=range])")!, "230");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ gridfinityPaddingBack: 9.75, gridfinityPaddingFront: 9.75, depth: 229.5, width: 252 });
   });
 });
