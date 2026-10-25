@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 62,
+    items: [
+      "Dental Studio bevels the bottom edge of the base (0.8 mm at 45 degrees), as 3Shape does, so a scraper gets under the model and it comes off the build plate without chipping. Bevel the bottom edge, under Adjust the settings > Base, turns it off.",
+      "Models are cleaned of scan debris before they are handed over: loose flecks under 5 mm³ that would float in the resin vat, and tiny bubbles sealed inside the model that would trap liquid resin. Real hollows stay.",
+      "The articulator's protrusion path now starts at 10 degrees, the same 10 to 45 degree range as Medit's.",
+      "Tighter hinge: clips are 14 mm long (they were 9.6), so they cannot rock on the axle, and the room along the axle is the fit itself (it was 0.2 mm each side), so they cannot slide from side to side. The standard fit is 0.10 mm, with 0.05 and 0.075 mm offered for printers that can hold them; the hinge fit test prints 0.05 to 0.2 mm."
+    ],
+  },
+  {
     build: 61,
     items: [
       "Dental Studio makes models about 40% faster - a study model pair that took 39 seconds now takes about 23 - and the scans are checked faster as the panel opens. The models come out exactly the same, point for point: only the bookkeeping behind them changed (joining corners, checking the teeth are kept, and the final clean-up for the file).",

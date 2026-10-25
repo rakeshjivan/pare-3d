@@ -300,6 +300,12 @@ export function DentalStudioPanel({
                 </div>
               </div>
             ) : null}
+            {options.baseStyle !== "articulator" ? (
+              <label className="edge-modifier-check" title={t("dental.bevelHint")}>
+                <input type="checkbox" checked={options.bevel !== false} disabled={busy} onChange={(event) => onOptionsChange({ bevel: event.currentTarget.checked })} />
+                <span>{t("dental.bevel")}</span>
+              </label>
+            ) : null}
             {options.baseStyle === "clean" || options.baseStyle === "articulator" ? (
               <>
                 {options.baseStyle === "clean" ? (
@@ -367,7 +373,7 @@ export function DentalStudioPanel({
                 <label className="dental-label-field" title={t("dental.hingeFitHint")}>
                   <span>{t("dental.hingeFit")}</span>
                   <select value={options.hingeFit ?? HINGE_CLEARANCE} disabled={busy} onChange={(event) => { const fit = Number(event.currentTarget.value); saveMyHingeFit(fit); onOptionsChange({ hingeFit: fit }); }}>
-                    {HINGE_FITS.map((fit) => <option key={fit} value={fit}>{t(fit === HINGE_CLEARANCE ? "dental.hingeFitDefault" : "dental.hingeFitOption", { fit: fit.toFixed(2) })}</option>)}
+                    {HINGE_FITS.map((fit) => <option key={fit} value={fit}>{t(fit === HINGE_CLEARANCE ? "dental.hingeFitDefault" : "dental.hingeFitOption", { fit: String(fit) })}</option>)}
                   </select>
                 </label>
                 {onHingeTest ? (

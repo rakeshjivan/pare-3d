@@ -526,3 +526,77 @@ describe("Build 61: a slim incisal pin, each half joined to its own base", () =>
     [parts.upper, parts.lower].forEach((s) => s.delete());
   });
 });
+
+describe("Build 62: a bevel round the foot, no debris, and a 10 degree path", () => {
+  let runtime: ManifoldToplevel;
+  beforeAll(async () => {
+    runtime = await manifoldModule();
+    runtime.setup();
+  });
+  it("cuts a 45-degree bevel 0.8 mm up and in round the outline's foot, and nothing above it", async () => {
+    const { bevelCutter, BASE_BEVEL } = await import("@/lib/dentalBase");
+    const ring: Array<[number, number]> = [[-20, -10], [20, -10], [20, 10], [-20, 10]];
+    const block = runtime.Manifold.cube([40, 20, 10]).translate([-20, -10, 0]);
+    const cutter = bevelCutter(runtime, [ring], 0)!;
+    const cut = runtime.Manifold.difference(block, cutter);
+    const width = (z: number) => {
+      const s = runtime.Manifold.intersection(cut, runtime.Manifold.cube([60, 1, 0.02]).translate([-30, -0.5, z]));
+      const b = s.boundingBox(); s.delete();
+      return b.max[0] - b.min[0];
+    };
+    expect(width(0.02)).toBeCloseTo(40 - 2 * BASE_BEVEL, 0);
+    expect(width(0.45)).toBeGreaterThan(width(0.02));
+    expect(width(1.2)).toBeCloseTo(40, 5);
+    [block, cutter, cut].forEach((s) => s.delete());
+  });
+
+  it("drops a loose fleck and fills a sealed bubble, but keeps a real hollow and a second real piece", async () => {
+    const { withoutDebris } = await import("@/lib/dentalBase");
+    const body = runtime.Manifold.cube([30, 30, 20]);
+    const hollow = runtime.Manifold.cube([10, 10, 10]).translate([3, 3, 3]);
+    const bubble = runtime.Manifold.cube([0.5, 0.5, 0.5]).translate([25, 25, 15]);
+    const shelled = runtime.Manifold.difference(runtime.Manifold.difference(body, hollow), bubble);
+    const fleck = runtime.Manifold.cube([1, 1, 1]).translate([50, 0, 0]);
+    const other = runtime.Manifold.cube([5, 5, 5]).translate([0, 50, 0]);
+    const all = runtime.Manifold.compose([shelled, fleck, other]);
+    const { solid, dropped } = withoutDebris(runtime, all);
+    expect(dropped).toBe(2);
+    expect(solid.volume()).toBeCloseTo(30 * 30 * 20 - 1000 + 125, 3);
+    [body, hollow, bubble, shelled, fleck, other, all, solid].forEach((s) => s.delete());
+  });
+
+  it("offers a 10 degree protrusion path, as Medit's articulator does", async () => {
+    const { HINGE_CONDYLE_ANGLES } = await import("@/lib/dentalBase");
+    expect(HINGE_CONDYLE_ANGLES).toContain(10);
+    expect(HINGE_CONDYLE_ANGLES).toContain(45);
+  });
+});
+
+describe("Build 62: longer clips, end play the fit itself", () => {
+  let runtime: ManifoldToplevel;
+  beforeAll(async () => {
+    runtime = await manifoldModule();
+    runtime.setup();
+  });
+  it("makes each clip 14 mm long with only the fit between it and its posts", async () => {
+    const { hingeParts, HINGE_CLEARANCE } = await import("@/lib/dentalBase");
+    expect(HINGE_CLEARANCE).toBe(0.1);
+    for (const fit of [0.05, 0.1, 0.2]) {
+      const parts = hingeParts(runtime, 25, -25, 25, 20, -20, fit);
+      // Level with the axle's top, behind it: the clip on the upper, the posts on the lower.
+      const at = (solid: typeof parts.upper) => {
+        const s = runtime.Manifold.intersection(solid, runtime.Manifold.cube([60, 0.4, 0.4]).translate([-30, parts.axleY + 3, 1]));
+        const polys = s.slice(1.2).toPolygons() as Array<Array<[number, number]>>;
+        s.delete();
+        return polys.map((ring) => [Math.min(...ring.map(([x]) => x)), Math.max(...ring.map(([x]) => x))]).sort((a, b) => a[0] - b[0]);
+      };
+      const clips = at(parts.upper), posts = at(parts.lower);
+      expect(clips).toHaveLength(2);
+      expect(clips[0][1] - clips[0][0]).toBeCloseTo(14, 3);
+      // The gap from the left clip's left end to the post outside it.
+      const gap = clips[0][0] - posts[0][1];
+      expect(gap).toBeCloseTo(fit, 3);
+      [parts.upper, parts.lower].forEach((s) => s.delete());
+    }
+  });
+});

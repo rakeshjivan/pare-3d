@@ -1,5 +1,5 @@
 import { libraryShapeAssets, makeShapeFromAsset } from "@/lib/shapeCatalog";
-import { HINGE_AXLE_RADIUS, HINGE_FITS } from "@/lib/dentalBase";
+import { HINGE_AXLE_RADIUS, HINGE_CLIP_HALF, HINGE_FITS, HINGE_POST_WIDTH, HINGE_TEST_FITS } from "@/lib/dentalBase";
 import type { ReadyPart } from "@/lib/readyParts";
 import type { WorkplaneShape } from "@/types/layerling";
 
@@ -17,11 +17,11 @@ const STORAGE_KEY = "pare3d.myHingeFit";
 const PLATE = 3;
 /** The axle's centre above the bed, mm: 6 mm over the plate - room under the clip and over the posts. */
 const AXLE = PLATE + 6;
-const CLIP_HALF = 4.8;
-const END_PLAY = 0.2;
-const POST_WIDTH = 4.5;
+// Build 62: the models' bearing as it is now - a 14 mm clip, with the fit as room along the axle too.
+const CLIP_HALF = HINGE_CLIP_HALF;
+const POST_WIDTH = HINGE_POST_WIDTH;
 const SNAP = 0.8;
-const SPACING = 22;
+const SPACING = 26;
 
 function asset(id: string) {
   const found = libraryShapeAssets.find((entry) => entry.id === id);
@@ -40,22 +40,23 @@ function axle(x: number, z: number, elevation: number, radius: number, length: n
 }
 
 function label(text: string, x: number, z: number) {
-  const shape = makeShapeFromAsset(asset("text"), { x, z, elevation: PLATE - 0.6 }, { text, width: 9, depth: 3.5, height: 1.6 });
+  const shape = makeShapeFromAsset(asset("text"), { x, z, elevation: PLATE - 0.6 }, { text, width: 11, depth: 3.5, height: 1.6 });
   return { ...shape, text, hole: true };
 }
 
-const fitText = (fit: number) => fit.toFixed(2).replace(/0$/, "");
+const fitText = (fit: number) => String(fit);
 
 export function hingeFitTestParts(names: { strip: string; clip: string }): ReadyPart[] {
   const r = HINGE_AXLE_RADIUS;
-  const postIn = CLIP_HALF + END_PLAY, postOut = postIn + POST_WIDTH;
-  const count = HINGE_FITS.length;
+  const count = HINGE_TEST_FITS.length;
   const length = SPACING * count + 2;
   const centre = (index: number) => -length / 2 + 1 + SPACING / 2 + index * SPACING;
   // The strip: posts 8 mm deep either side of each clip's place, the axle across them.
   const strip: WorkplaneShape[] = [{ ...box(0, 1.5, 0, length, 17, PLATE), name: names.strip, color: "#4f7fa8" }];
-  HINGE_FITS.forEach((fit, index) => {
+  HINGE_TEST_FITS.forEach((fit, index) => {
     const c = centre(index);
+    // Each axle's posts stand the fit clear of its own clip's ends.
+    const postIn = CLIP_HALF + fit, postOut = postIn + POST_WIDTH;
     const postHeight = AXLE + r + 2.5 - PLATE;
     for (const side of [-1, 1]) {
       strip.push({ ...box(c + side * (postIn + postOut) / 2, 0, PLATE, POST_WIDTH, 8, postHeight), name: `${names.strip} post`, color: "#4f7fa8" });
@@ -65,7 +66,7 @@ export function hingeFitTestParts(names: { strip: string; clip: string }): Ready
   });
   const parts: ReadyPart[] = [{ name: names.strip, shapes: strip, group: true }];
   // The clips, a row in front of the strip, each with the fit cut into its tab.
-  HINGE_FITS.forEach((fit, index) => {
+  HINGE_TEST_FITS.forEach((fit, index) => {
     const c = centre(index);
     const bore = r + fit;
     const z = 22;
@@ -75,7 +76,7 @@ export function hingeFitTestParts(names: { strip: string; clip: string }): Ready
       name,
       group: true,
       shapes: [
-        { ...box(c, z - 2, 0, 14, 14, PLATE), name, color: "#f08a24" },
+        { ...box(c, z - 2, 0, 18, 14, PLATE), name, color: "#f08a24" },
         { ...box(c, z, PLATE, CLIP_HALF * 2, 8, top - PLATE), name, color: "#f08a24" },
         { ...axle(c, z, AXLE, bore, CLIP_HALF * 2 + 2), name: `${name} bore`, hole: true },
         { ...box(c, z, AXLE, CLIP_HALF * 2 + 2, 2 * r - SNAP, top - AXLE + 1), name: `${name} opening`, hole: true },

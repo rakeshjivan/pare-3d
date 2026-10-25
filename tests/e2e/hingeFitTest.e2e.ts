@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 (globalThis as unknown as { window: unknown }).window = { location: { href: pathToFileURL(resolve("apps/web/public") + "/").href } };
 import { buildReadyPart } from "@/lib/readyPartsBuild";
 import { hingeFitTestParts } from "@/lib/hingeFitTest";
-import { HINGE_FITS } from "@/lib/dentalBase";
+import { HINGE_TEST_FITS as HINGE_FITS } from "@/lib/dentalBase";
 import { loadTextFonts } from "@/lib/textFonts";
 import type { WorkplaneShape } from "@/types/layerling";
 
@@ -51,13 +51,13 @@ describe("hinge fit test (build 60)", () => {
     // The axles lie along x between the posts: across each clip's place the strip is the plate
     // and a 2 mm round axle 9 mm up, nothing else.
     for (let index = 0; index < HINGE_FITS.length; index += 1) {
-      const cut = section(strip, b.min[0] + 12 + index * 22).map(([y, z]) => [y - b.min[1], z] as const).filter(([y]) => y > 3.2);
+      const cut = section(strip, b.min[0] + 14 + index * 26).map(([y, z]) => [y - b.min[1], z] as const).filter(([y]) => y > 3.2);
       expect(cut.length).toBeGreaterThan(20);
       const zs = cut.map(([, z]) => z);
       const middle = (Math.min(...zs) + Math.max(...zs)) / 2;
       for (const [y, z] of cut) expect(Math.hypot(y - 9, z - middle)).toBeCloseTo(2, 1);
     }
-    // Each clip: a bore round its axle, wider with the fit, opening upwards.
+    // Each clip: a bore round its axle, wider with the fit, opening upwards; 14 mm long, its posts the fit clear of it.
     for (const [index, clip] of clips.entries()) {
       const fit = HINGE_FITS[index];
       const c = bounds(clip);

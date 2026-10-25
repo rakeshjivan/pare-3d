@@ -560,19 +560,89 @@ export function hollowCavity(runtime: ManifoldRuntime, positions: Float32Array, 
   return { solid, voxel: h, vents };
 }
 
+/** Build 62: the bevel round the bottom edge of a base, mm - it lets a scraper under it on the build plate. */
+export const BASE_BEVEL = 0.8;
+
+/**
+ * Build 62: what to cut away for a 45-degree bevel `size` mm up and in round the foot of a base whose
+ * outline is `footprint`, standing on z = `floor` - as 3Shape bevels its bases, so a model comes off
+ * the build plate without levering at a square edge. Built in `steps` layers of 0.1 mm, finer than a
+ * resin layer. Null when there is no outline.
+ */
+export function bevelCutter(runtime: ManifoldRuntime, footprint: Ring[], floor: number, size = BASE_BEVEL, steps = 8): ManifoldSolid | null {
+  if (!footprint.length || size <= 0) return null;
+  const section = new runtime.CrossSection(footprint, "EvenOdd");
+  const bounds = section.bounds();
+  const made: ManifoldSolid[] = [];
+  const outside = runtime.Manifold.cube([bounds.max[0] - bounds.min[0] + 20, bounds.max[1] - bounds.min[1] + 20, size / steps]).translate([bounds.min[0] - 10, bounds.min[1] - 10, 0]);
+  for (let k = 0; k < steps; k += 1) {
+    // Layer k (from the floor up) keeps the outline drawn in by what is left of the bevel there.
+    const inset = section.offset(-(size - ((k + 0.5) * size) / steps), "Round", 2, 48);
+    const kept = inset.extrude(size / steps);
+    const layer = runtime.Manifold.difference(outside, kept);
+    made.push(layer.translate([0, 0, floor - (k === 0 ? 0.01 : 0) + (k * size) / steps]));
+    layer.delete(); kept.delete(); inset.delete();
+  }
+  outside.delete(); section.delete();
+  const cutter = runtime.Manifold.union(made);
+  made.forEach((solid) => solid.delete());
+  return cutter;
+}
+
+/** Build 62: loose pieces smaller than this, mm³, are scan debris, not part of the model. */
+export const DEBRIS_VOLUME = 5;
+
+/**
+ * Build 62: the solid without debris - loose pieces, and bubbles sealed inside, of less than
+ * DEBRIS_VOLUME (a fleck of scan cut off, a pocket closed by the cut, a sliver of no thickness). On a
+ * resin printer a loose piece floats free in the vat, and a sealed bubble traps liquid resin. The
+ * model itself (the biggest piece), and any other piece or hollow of real size, stay. Returns `solid` itself
+ * when there is nothing to drop; otherwise a new solid, and `solid` is left to the caller.
+ */
+export function withoutDebris(runtime: ManifoldRuntime, solid: ManifoldSolid, minimum = DEBRIS_VOLUME): { solid: ManifoldSolid; dropped: number } {
+  const pieces = solid.decompose();
+  if (pieces.length < 2) { pieces.forEach((piece) => piece.delete()); return { solid, dropped: 0 }; }
+  const volumes = pieces.map((piece) => piece.volume());
+  const biggest = volumes.indexOf(Math.max(...volumes));
+  const keep = pieces.map((_, i) => i === biggest || Math.abs(volumes[i]) >= minimum);
+  const dropped = keep.filter((k) => !k).length;
+  if (!dropped) { pieces.forEach((piece) => piece.delete()); return { solid, dropped: 0 }; }
+  // The pieces kept, put together again, with the hollows kept cut back out of them (a hollow comes
+  // out of decompose as a shell facing inwards: turned the right way out, it is what to cut away).
+  const solids = pieces.filter((_, i) => keep[i] && volumes[i] > 0);
+  const hollows = pieces.filter((_, i) => keep[i] && volumes[i] < 0).map((piece) => {
+    const mesh = piece.getMesh();
+    const tri = mesh.triVerts;
+    for (let t = 0; t < tri.length; t += 3) { const b = tri[t + 1]; tri[t + 1] = tri[t + 2]; tri[t + 2] = b; }
+    return new runtime.Manifold(mesh);
+  });
+  const together = runtime.Manifold.compose(solids);
+  let cleaned = together;
+  if (hollows.length) {
+    const cut = runtime.Manifold.union(hollows);
+    cleaned = runtime.Manifold.difference(together, cut);
+    cut.delete(); together.delete();
+  }
+  hollows.forEach((hollow) => hollow.delete());
+  pieces.forEach((piece) => piece.delete());
+  return { solid: cleaned, dropped };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Hinge
 
 export const HINGE_AXLE_RADIUS = 2;
 /** The fit round the axle, mm (build 58): the default, and the choices the panel offers. */
-export const HINGE_CLEARANCE = 0.15;
-export const HINGE_FITS = [0.1, 0.15, 0.2, 0.25, 0.3] as const;
-/** Room along the axle between a clip and the posts either side of it, mm. */
-const HINGE_END_PLAY = 0.2;
+export const HINGE_CLEARANCE = 0.1;
+export const HINGE_FITS = [0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3] as const;
+/** Build 62: the fits the hinge fit test prints, one clip each (the tight end, where printers differ). */
+export const HINGE_TEST_FITS = [0.05, 0.075, 0.1, 0.15, 0.2] as const;
+/** Build 62: half the length of a clip along the axle, mm - 14 mm long, so the same fit lets it tilt half as much. */
+export const HINGE_CLIP_HALF = 7;
+/** Width of each post either side of a clip, mm. */
+export const HINGE_POST_WIDTH = 4.5;
 /** The opening the clip snaps over the axle through: this much narrower than the axle, mm. */
 const HINGE_SNAP = 0.8;
-/** Bearings this far apart or more go one behind each side's last molar; closer, one in the middle. */
-const HINGE_TWO_BEARINGS = 30;
 
 const box = (runtime: ManifoldRuntime, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number) =>
   runtime.Manifold.cube([x1 - x0, y1 - y0, z1 - z0]).translate([x0, y0, z0]);
@@ -583,8 +653,8 @@ const axleAlongX = (runtime: ManifoldRuntime, radius: number, x0: number, x1: nu
 /** Where the incisal pin goes: its x, and the front of each model's base there (the pair's frame). */
 export type HingeFront = { x: number; upperY: number; lowerY: number };
 
-/** Protrusion paths the hinge can offer (build 60), degrees below the occlusal plane; 0 is a plain hinge. */
-export const HINGE_CONDYLE_ANGLES = [0, 15, 20, 25, 30, 35, 40, 45] as const;
+/** Protrusion paths the hinge can offer (build 60; 10 degrees from build 62, as Medit's), degrees below the occlusal plane; 0 is a plain hinge. */
+export const HINGE_CONDYLE_ANGLES = [0, 10, 15, 20, 25, 30, 35, 40, 45] as const;
 /** How far the axle can slide along a protrusion path, mm: an incisor-to-incisor protrusion is 5 to 7 mm. */
 export const HINGE_PATH_LENGTH = 4;
 /** Openings the incisal pin can be raised by, mm (build 60). */
@@ -628,7 +698,7 @@ const prismAlongX = (runtime: ManifoldRuntime, ring: Ring, x0: number, x1: numbe
  *   on one axle line 6 mm behind `back` in the occlusal plane; a quadrant gets one. Each bearing is
  *   a pair of posts on the lower carrying the axle, and a clip on the upper between them that snaps
  *   over it. Two bearings far apart cannot rock the way one short one did.
- * - Fitted: `clearance` round the axle (0.15 mm by default), 0.2 mm along it, and an opening
+ * - Fitted: `clearance` round the axle (0.1 mm by default) and along it (build 62), and an opening
  *   0.8 mm narrower than the axle, so the clip holds the axle and only turns on it.
  * - An incisal stop at `front`: a pin down from the upper onto a table up from the lower, standing
  *   clear in front of the model and meeting in the occlusal plane, so the models close to the
@@ -645,13 +715,16 @@ export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number,
   const ay = hingeAxleY(back, motion);
   const known = Number.isFinite(xMin) && Number.isFinite(xMax);
   const cx = known ? (xMin + xMax) / 2 : 0;
-  const half = Math.max(14, known ? (xMax - xMin) / 2 : 14);
+  const half = Math.max(HINGE_CLIP_HALF + 0.3 + HINGE_POST_WIDTH, known ? (xMax - xMin) / 2 : 14);
   // Bearing centres: inside the ends of the back, or one in the middle.
-  const centres = half * 2 >= HINGE_TWO_BEARINGS + 19 ? [cx - half + 9.5, cx + half - 9.5] : [cx];
+  // Build 62: room along the axle either side of a clip is the fit itself (it was 0.2 mm), so the
+  // clip neither slides along the axle nor tilts more than round it.
+  const clipHalf = HINGE_CLIP_HALF;
+  const postIn = clipHalf + Math.max(0.05, clearance), postOut = postIn + HINGE_POST_WIDTH;
+  // Bearing centres: inside the ends of the back when two fit with room between them, else one in the middle.
+  const centres = half >= 2 * postOut + 1 ? [cx - half + postOut, cx + half - postOut] : [cx];
   const made: ManifoldSolid[] = [];
   const keep = <T extends ManifoldSolid>(solid: T) => { made.push(solid); return solid; };
-  const clipHalf = 4.8;
-  const postIn = clipHalf + HINGE_END_PLAY, postOut = postIn + 4.5;
   // The bearing block: 4 mm round the axle behind it, and round the whole slot in front.
   const yBack = ay + 4, yFront = back + 2;
   const clipBottom = dz - (bore + 1.8);

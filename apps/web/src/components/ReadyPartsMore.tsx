@@ -6,7 +6,7 @@ import { MmField } from "@/components/ReadyPartsSection";
 import { EnclosurePartIcon, FitTestPartIcon } from "@/components/readyPartIcons";
 import { FIT_TEST_CLEARANCES, fitTestParts, readMyPrintFit, saveMyPrintFit } from "@/lib/fitTest";
 import { hingeFitTestParts, readMyHingeFit, saveMyHingeFit } from "@/lib/hingeFitTest";
-import { HINGE_FITS } from "@/lib/dentalBase";
+import { HINGE_TEST_FITS } from "@/lib/dentalBase";
 import { DEFAULT_ENCLOSURE, enclosureParts, normalizeEnclosure, PORT_SIZES, type EnclosureOptions, type EnclosurePort, type EnclosureSide, type PortPreset } from "@/lib/enclosure";
 import { METRIC_SIZES, type MetricSize, type ReadyPart } from "@/lib/readyParts";
 
@@ -82,13 +82,13 @@ export function HingeFitTestCard({ onInsert }: { onInsert: Insert }) {
           </button>
           <div className="ready-part-fit" role="group" aria-label={t("hingeTest.which")}>
             <span>{t("hingeTest.which")}</span>
-            {HINGE_FITS.map((fit) => (
+            {HINGE_TEST_FITS.map((fit) => (
               <button type="button" key={fit} className={mine === fit ? "active" : ""} aria-pressed={mine === fit} onClick={() => { saveMyHingeFit(fit); setMine(fit); }}>
-                {fit.toFixed(2)}
+                {String(fit)}
               </button>
             ))}
           </div>
-          {mine !== null ? <p className="ready-part-note">{t("hingeTest.saved", { mm: mine.toFixed(2) })}</p> : null}
+          {mine !== null ? <p className="ready-part-note">{t("hingeTest.saved", { mm: String(mine) })}</p> : null}
         </div>
       ) : null}
     </>
