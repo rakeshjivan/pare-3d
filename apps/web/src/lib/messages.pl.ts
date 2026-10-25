@@ -806,6 +806,7 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "shortcuts.lock": "Zablokuj lub odblokuj zaznaczenie",
   "shortcuts.hide": "Ukryj zaznaczenie",
   "shortcuts.showHidden": "Pokaż wszystko, co ukryte",
+  "shortcuts.toggleNotes": "Pokaż lub ukryj notatki i punkty",
   "shortcuts.import": "Otwórz lub zamknij okno importu",
   "shortcuts.export": "Otwórz lub zamknij okno eksportu",
   "shortcuts.save": "Zapisz projekt do jego pliku",

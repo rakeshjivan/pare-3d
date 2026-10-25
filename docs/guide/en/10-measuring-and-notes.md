@@ -66,7 +66,7 @@ A note records what the geometry does not say: "This screw is 0.3 mm too tight",
 - Dragging the pin moves the note. A click on the pin folds the card away, only the small number stays; another click opens it again. A click into the text edits it.
 - While you write, [[Enter]] keeps the text and [[Esc]] puts it back to how it was before you started; [[Shift]]+[[Enter]] starts a new line.
 
-Notes are saved in the design, appear in no export and can be shown or hidden with {{ui:visibility.notes}} (in {{ui:editor.visibilityOptions}}, the arrow beside the eye icon).
+Notes are saved in the design, appear in no export and can be shown or hidden with {{ui:visibility.notes}} (in {{ui:editor.visibilityOptions}}, the arrow beside the eye icon) or with [[Shift]]+[[N]].
 
 ## Reference points
 
@@ -75,7 +75,7 @@ A reference point is a bare mark in space, like a pencil mark or a layout point 
 - Drag a point to move it, or click it to see its coordinates and type new ones; they use the unit you set. Each card can be dragged away by its title if it covers something, on its own: the others stay where they are, and a double-click on the title puts it back. The card you touched last stands in front of the others. **Delete all** in a card, or **Delete all reference points** in the right-click menu (of a body, or of an empty spot of the 3D view), deletes every point at once. {{ui:common.delete}} removes it.
 - The tape measure can mark a point too: {{ui:camera.tapeMarkMiddle}}, the crosshair button under a measurement, puts one in its middle, in the centre of a round hole for example. And it measures from a point: the tape snaps to reference points like to corners.
 - When you drag a shape, its edges and its centre snap to a point, like they snap to other shapes ({{ui:workspace.objectSnap}}). The framing square snaps to points too.
-- Points are saved in the design, appear in no export, and are shown or hidden together with the notes by {{ui:visibility.notes}}.
+- Points are saved in the design, appear in no export, and are shown or hidden together with the notes by {{ui:visibility.notes}} ([[Shift]]+[[N]]).
 - An AI can mark, list and remove them with `layerling_add_reference_points`, `layerling_list_reference_points` and `layerling_remove_reference_points`.
 
 ## Parameters: named sizes

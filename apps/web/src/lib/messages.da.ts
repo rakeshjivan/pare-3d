@@ -799,6 +799,7 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "shortcuts.lock": "Lås eller lås op for markeringen",
   "shortcuts.hide": "Skjul markeringen",
   "shortcuts.showHidden": "Vis alt skjult",
+  "shortcuts.toggleNotes": "Vis eller skjul noter og punkter",
   "shortcuts.import": "Åbn eller luk importdialogen",
   "shortcuts.export": "Åbn eller luk eksportdialogen",
   "shortcuts.save": "Gem designet i dets fil",

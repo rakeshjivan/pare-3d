@@ -13968,6 +13968,14 @@ export function LayerlingEditor({
         return;
       }
 
+      // Shift+N shows or hides the notes and reference points, as the Visibility menu does; N alone
+      // is the note tool. Ctrl+N stays the browser's new window.
+      if (!shortcut && key === "n" && event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        toggleNotesVisible();
+        return;
+      }
+
       if (shortcut && (key === "o" || key === "O") && event.shiftKey) {
         event.preventDefault();
         setOutlinerOpen((open) => !open);
@@ -14076,6 +14084,7 @@ export function LayerlingEditor({
     copySketchSelectionToClipboard,
     noteMode,
     toggleNoteTool,
+    toggleNotesVisible,
     cutSelected,
     cutSketchSelection,
     deleteSelected,

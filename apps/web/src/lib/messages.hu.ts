@@ -778,6 +778,7 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "shortcuts.lock": "A kijelölés zárolása vagy feloldása",
   "shortcuts.hide": "A kijelölés elrejtése",
   "shortcuts.showHidden": "Minden elrejtett megjelenítése",
+  "shortcuts.toggleNotes": "Jegyzetek és pontok mutatása vagy elrejtése",
   "shortcuts.import": "Az importálási ablak megnyitása vagy bezárása",
   "shortcuts.export": "Az exportálási ablak megnyitása vagy bezárása",
   "shortcuts.save": "A terv mentése a fájljába",

@@ -811,6 +811,7 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "shortcuts.lock": "Заблокировать или разблокировать выделение",
   "shortcuts.hide": "Скрыть выделение",
   "shortcuts.showHidden": "Показать всё скрытое",
+  "shortcuts.toggleNotes": "Показать или скрыть заметки и точки",
   "shortcuts.import": "Открыть окно импорта",
   "shortcuts.export": "Открыть окно экспорта",
   "shortcuts.save": "Сохранить проект в файл",

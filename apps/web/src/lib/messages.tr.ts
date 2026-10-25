@@ -787,6 +787,7 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "shortcuts.lock": "Seçimi kilitle veya kilidini aç",
   "shortcuts.hide": "Seçimi gizle",
   "shortcuts.showHidden": "Gizlenen her şeyi göster",
+  "shortcuts.toggleNotes": "Notları ve noktaları göster veya gizle",
   "shortcuts.import": "İçe aktarma penceresini aç veya kapat",
   "shortcuts.export": "Dışa aktarma penceresini aç veya kapat",
   "shortcuts.save": "Tasarımı dosyasına kaydet",

@@ -675,6 +675,7 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "shortcuts.lock": "Zakleni ali odkleni izbor",
   "shortcuts.hide": "Skrij izbor",
   "shortcuts.showHidden": "Pokaži vse skrito",
+  "shortcuts.toggleNotes": "Pokaži ali skrij opombe in točke",
   "shortcuts.import": "Odpri ali zapri pogovorno okno za uvoz",
   "shortcuts.export": "Odpri ali zapri pogovorno okno za izvoz",
   "shortcuts.outliner": "Pokaži ali skrij seznam objektov",

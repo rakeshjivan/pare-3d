@@ -823,6 +823,7 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "shortcuts.lock": "قفل أو إلغاء قفل التحديد",
   "shortcuts.hide": "إخفاء التحديد",
   "shortcuts.showHidden": "إظهار كل ما هو مخفي",
+  "shortcuts.toggleNotes": "إظهار الملاحظات والنقاط أو إخفاؤها",
   "shortcuts.import": "فتح أو إغلاق نافذة الاستيراد",
   "shortcuts.export": "فتح أو إغلاق نافذة التصدير",
   "shortcuts.save": "حفظ التصميم في ملفه",

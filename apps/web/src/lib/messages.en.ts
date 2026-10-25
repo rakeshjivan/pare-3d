@@ -832,6 +832,7 @@ export const MESSAGES_EN = {
   "shortcuts.lock": "Lock or unlock the selection",
   "shortcuts.hide": "Hide the selection",
   "shortcuts.showHidden": "Show everything hidden",
+  "shortcuts.toggleNotes": "Show or hide notes and points",
   "shortcuts.import": "Open or close the import dialog",
   "shortcuts.export": "Open or close the export dialog",
   "shortcuts.save": "Save the design into its file",

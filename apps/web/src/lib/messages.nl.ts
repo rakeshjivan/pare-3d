@@ -813,6 +813,7 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "shortcuts.lock": "Selectie vergrendelen of ontgrendelen",
   "shortcuts.hide": "Selectie verbergen",
   "shortcuts.showHidden": "Alles wat verborgen is tonen",
+  "shortcuts.toggleNotes": "Notities en punten tonen of verbergen",
   "shortcuts.import": "Importvenster openen of sluiten",
   "shortcuts.export": "Exportvenster openen of sluiten",
   "shortcuts.save": "Ontwerp opslaan in zijn bestand",

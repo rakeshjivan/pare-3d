@@ -778,6 +778,7 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "shortcuts.lock": "Blocca o sblocca la selezione",
   "shortcuts.hide": "Nascondi la selezione",
   "shortcuts.showHidden": "Mostra tutti gli elementi nascosti",
+  "shortcuts.toggleNotes": "Mostra o nascondi note e punti",
   "shortcuts.import": "Apri o chiudi la finestra di importazione",
   "shortcuts.export": "Apri o chiudi la finestra di esportazione",
   "shortcuts.save": "Salva il progetto nel relativo file",

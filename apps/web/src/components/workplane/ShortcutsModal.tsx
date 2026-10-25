@@ -77,6 +77,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { combos: ["Ctrl+L"], label: "shortcuts.lock" },
       { combos: ["Ctrl+H"], label: "shortcuts.hide" },
       { combos: ["Ctrl+Shift+H"], label: "shortcuts.showHidden" },
+      { combos: ["Shift+N"], label: "shortcuts.toggleNotes" },
       { combos: ["Ctrl+Shift+O"], label: "shortcuts.outliner" },
     ],
   },

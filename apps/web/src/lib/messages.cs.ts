@@ -893,6 +893,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "shortcuts.lock": "Zamknout nebo odemknout výběr",
   "shortcuts.hide": "Skrýt výběr",
   "shortcuts.showHidden": "Zobrazit všechny skryté objekty",
+  "shortcuts.toggleNotes": "Zobrazit nebo skrýt poznámky a body",
   "shortcuts.import": "Otevřít nebo zavřít import",
   "shortcuts.export": "Otevřít nebo zavřít export",
   "shortcuts.save": "Uložit projekt do souboru",

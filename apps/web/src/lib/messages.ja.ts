@@ -805,6 +805,7 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "shortcuts.lock": "選択をロックまたはロック解除",
   "shortcuts.hide": "選択を非表示",
   "shortcuts.showHidden": "非表示のものをすべて表示",
+  "shortcuts.toggleNotes": "メモと点の表示/非表示",
   "shortcuts.import": "読み込みダイアログを開く、または閉じる",
   "shortcuts.export": "エクスポートダイアログを開く、または閉じる",
   "shortcuts.save": "デザインをそのファイルに保存",
