@@ -1,5 +1,6 @@
 import type { ThreadProfile, WorkplaneShape } from "@/types/layerling";
 import { isThreadProfile } from "@/lib/threadProfiles";
+import { GRIDFINITY_PADDING_KEYS, gridfinityPaddingPatch, gridfinityShapePatch, normalizeGridfinityType, type GridfinityWall } from "@/lib/gridfinityGeometry";
 import { normalizeThreadProfile, THREAD_SIZES, threadProfileForSize, threadSettings, threadSizeById, threadSizeFor } from "@/lib/threadGeometry";
 
 /**
@@ -37,7 +38,7 @@ export const MCP_SHAPE_SETTING_KEYS = [
   "hingeKnuckles", "hingePinDiameter", "hingeLeafThickness", "hingeClearance", "hingePinless", "hingeAngle",
   "gridfinityType", "gridfinityLip", "gridfinityMagnets", "gridfinityHalfGrid",
   "gridfinityLabelBack", "gridfinityLabelFront", "gridfinityLabelLeft", "gridfinityLabelRight", "gridfinityLabelBackWidth", "gridfinityLabelBackLength", "gridfinityLabelBackOffset", "gridfinityLabelFrontWidth", "gridfinityLabelFrontLength", "gridfinityLabelFrontOffset", "gridfinityLabelLeftWidth", "gridfinityLabelLeftLength", "gridfinityLabelLeftOffset", "gridfinityLabelRightWidth", "gridfinityLabelRightLength", "gridfinityLabelRightOffset", "gridfinityLabelCorner", "gridfinityLabelCornerSize",
-  "gridfinityScoopBack", "gridfinityScoopFront", "gridfinityScoopLeft", "gridfinityScoopRight", "gridfinityScoopRadius", "gridfinityFloorHeight", "gridfinityOpenBack", "gridfinityOpenFront", "gridfinityOpenLeft", "gridfinityOpenRight",
+  "gridfinityScoopBack", "gridfinityScoopFront", "gridfinityScoopLeft", "gridfinityScoopRight", "gridfinityScoopRadius", "gridfinityFloorHeight", "gridfinityOpenBack", "gridfinityOpenFront", "gridfinityOpenLeft", "gridfinityOpenRight", "gridfinityPaddingBack", "gridfinityPaddingFront", "gridfinityPaddingLeft", "gridfinityPaddingRight",
   "gridfinityCompartmentsX", "gridfinityCompartmentsZ", "gridfinityDividerThickness", "gridfinityDividerPositionsX", "gridfinityDividerPositionsZ", "gridfinityCompartmentLabels",
   "knurlPattern", "knurlCount", "knurlDepth", "knurlAngle", "knurlChamfer",
   "dovetailNeckWidth", "dovetailClearance",
@@ -91,6 +92,29 @@ export function mcpThreadSizeName(shape: Pick<WorkplaneShape, "kind" | "threadDi
 }
 
 export const MCP_GRIDFINITY_LIST_KEYS = ["gridfinityCompartmentsX", "gridfinityCompartmentsZ", "gridfinityDividerPositionsX", "gridfinityDividerPositionsZ", "gridfinityCompartmentLabels"] as const;
+
+/**
+ * What an update writes for a Gridfinity part given a padding, or changing type
+ * with one stored (#455): the box of the same units on each axis whose size is not
+ * given, as gridfinityPaddingPatch writes it. Read as a bin, a padded baseplate's
+ * box could gain a unit, so only the box comes from a change of type; the height
+ * and the lip stay as given. A padding that is no number is left as it was.
+ */
+export function mcpGridfinityPaddingPatch(target: WorkplaneShape, patch: Partial<WorkplaneShape>, params: Record<string, unknown>): Partial<WorkplaneShape> {
+  if (target.kind !== "gridfinity") return {};
+  const number = (value: unknown) => typeof value === "number" && Number.isFinite(value);
+  const given = (Object.keys(GRIDFINITY_PADDING_KEYS) as GridfinityWall[]).filter((wall) => number(params[GRIDFINITY_PADDING_KEYS[wall]]));
+  const type = normalizeGridfinityType(patch.gridfinityType ?? target.gridfinityType);
+  const retype = type !== normalizeGridfinityType(target.gridfinityType) && (given.length > 0 || Object.values(GRIDFINITY_PADDING_KEYS).some((key) => target[key] !== undefined));
+  if (!given.length && !retype) return {};
+  const retyped = retype ? gridfinityShapePatch(target, { type }) : undefined;
+  const box = retyped ? { width: retyped.width, depth: retyped.depth } : {};
+  const sized: Partial<WorkplaneShape> = type === "baseplate" ? { ...box, ...gridfinityPaddingPatch({ ...target, ...box, gridfinityType: type }, Object.fromEntries(given.map((wall) => [wall, params[GRIDFINITY_PADDING_KEYS[wall]]]))) } : box;
+  // A size given is the whole plate on its own axis.
+  if (number(params.width)) delete sized.width;
+  if (number(params.depth)) delete sized.depth;
+  return sized;
+}
 
 /**
  * A Gridfinity bin's lists as lists, also when they come as the text layerling_read_scene gives them, read as

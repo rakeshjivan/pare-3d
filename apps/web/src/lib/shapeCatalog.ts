@@ -146,7 +146,7 @@ import {
   normalizeHingeLeafThickness,
   normalizeHingePinDiameter,
 } from "@/lib/hingeGeometry";
-import { DEFAULT_GRIDFINITY_LIP, DEFAULT_GRIDFINITY_MAGNETS, DEFAULT_GRIDFINITY_TYPE, DEFAULT_GRIDFINITY_UNITS, gridfinityFootprintPatch, gridfinitySize, normalizeGridfinityType } from "@/lib/gridfinityGeometry";
+import { DEFAULT_GRIDFINITY_LIP, DEFAULT_GRIDFINITY_MAGNETS, DEFAULT_GRIDFINITY_TYPE, DEFAULT_GRIDFINITY_UNITS, gridfinityFootprintPatch, gridfinityPadding, gridfinitySize, normalizeGridfinityType } from "@/lib/gridfinityGeometry";
 import {
   DEFAULT_KNURL_ANGLE,
   DEFAULT_KNURL_CHAMFER,
@@ -694,6 +694,10 @@ export function sceneShape(shape: Partial<WorkplaneShape> & Pick<WorkplaneShape,
     gridfinityOpenFront: shape.gridfinityOpenFront,
     gridfinityOpenLeft: shape.gridfinityOpenLeft,
     gridfinityOpenRight: shape.gridfinityOpenRight,
+    gridfinityPaddingBack: shape.gridfinityPaddingBack,
+    gridfinityPaddingFront: shape.gridfinityPaddingFront,
+    gridfinityPaddingLeft: shape.gridfinityPaddingLeft,
+    gridfinityPaddingRight: shape.gridfinityPaddingRight,
     gridfinityCompartmentsX: shape.gridfinityCompartmentsX,
     gridfinityCompartmentsZ: shape.gridfinityCompartmentsZ,
     gridfinityDividerThickness: shape.gridfinityDividerThickness,
@@ -839,13 +843,22 @@ export function makeShapeFromAsset(
   }) : null;
   const loftFootprint = loftMeasures ? loftFrameSize(loftMeasures) : null;
   // A Gridfinity bin or baseplate is whole grid units: an asked-for size is rounded to them.
-  const gridfinityFootprint = asset.kind === "gridfinity" ? gridfinityFootprintPatch({
-    width: customization.width ?? defaults.width,
-    depth: customization.depth ?? defaults.depth,
-    height: customization.height ?? defaults.height,
+  // A baseplate's padding without an asked-for size is added to the default one, so it keeps its units (#455).
+  const gridfinityPaddingFields = {
     gridfinityType: customization.gridfinityType,
+    gridfinityPaddingBack: customization.gridfinityPaddingBack,
+    gridfinityPaddingFront: customization.gridfinityPaddingFront,
+    gridfinityPaddingLeft: customization.gridfinityPaddingLeft,
+    gridfinityPaddingRight: customization.gridfinityPaddingRight,
+  };
+  const gridfinityPaddingSize = gridfinityPadding(gridfinityPaddingFields);
+  const gridfinityFootprint = asset.kind === "gridfinity" ? gridfinityFootprintPatch({
+    width: customization.width ?? defaults.width + gridfinityPaddingSize.left + gridfinityPaddingSize.right,
+    depth: customization.depth ?? defaults.depth + gridfinityPaddingSize.back + gridfinityPaddingSize.front,
+    height: customization.height ?? defaults.height,
     gridfinityLip: customization.gridfinityLip,
     gridfinityHalfGrid: customization.gridfinityHalfGrid,
+    ...gridfinityPaddingFields,
   }) : null;
   // New gears get involute teeth (#201); their size follows the module, so other teeth keep module 2.
   const gearType = asset.kind === "gear" ? normalizeGearType(customization.gearType ?? DEFAULT_GEAR_TYPE) : undefined;
@@ -986,6 +999,10 @@ export function makeShapeFromAsset(
     gridfinityOpenFront: asset.kind === "gridfinity" ? customization.gridfinityOpenFront : undefined,
     gridfinityOpenLeft: asset.kind === "gridfinity" ? customization.gridfinityOpenLeft : undefined,
     gridfinityOpenRight: asset.kind === "gridfinity" ? customization.gridfinityOpenRight : undefined,
+    gridfinityPaddingBack: asset.kind === "gridfinity" ? customization.gridfinityPaddingBack : undefined,
+    gridfinityPaddingFront: asset.kind === "gridfinity" ? customization.gridfinityPaddingFront : undefined,
+    gridfinityPaddingLeft: asset.kind === "gridfinity" ? customization.gridfinityPaddingLeft : undefined,
+    gridfinityPaddingRight: asset.kind === "gridfinity" ? customization.gridfinityPaddingRight : undefined,
     gridfinityCompartmentsX: asset.kind === "gridfinity" ? customization.gridfinityCompartmentsX : undefined,
     gridfinityCompartmentsZ: asset.kind === "gridfinity" ? customization.gridfinityCompartmentsZ : undefined,
     gridfinityDividerThickness: asset.kind === "gridfinity" ? customization.gridfinityDividerThickness : undefined,

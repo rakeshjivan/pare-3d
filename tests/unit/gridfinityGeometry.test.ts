@@ -6,7 +6,7 @@ import { meshForShape } from "@/lib/editorMeshCore";
 import { mcpShapeSummary } from "@/lib/editorMcpSummary";
 import { exportLylProject, importLylProject } from "@/lib/lylProject";
 import { rememberManifoldRuntime } from "@/lib/manifoldHandle";
-import { mcpGridfinityListParams } from "@/lib/mcpShapeSettings";
+import { mcpGridfinityListParams, mcpGridfinityPaddingPatch } from "@/lib/mcpShapeSettings";
 import { makeShapeFromAsset, sceneShape, toolbarShapeAssets } from "@/lib/shapeCatalog";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeShapeCustomizations } from "@/lib/workplaneSettings";
 import { shapeDefaultsFromShape } from "@/lib/shapeDefaults";
@@ -49,6 +49,8 @@ import {
   gridfinityLabelPieces,
   gridfinityListPatch,
   gridfinityOpenFits,
+  gridfinityPadding,
+  gridfinityPaddingPatch,
   gridfinityPlan,
   gridfinityScoopFits,
   gridfinityScoopMaxRadius,
@@ -2184,5 +2186,154 @@ describe("gridfinity open sides", { timeout: 60_000 }, () => {
     // fillet at the back, 34 along each side, and the two back corners of pi r³ / 12.
     const fillet = 2.8 ** 2 * (1 - Math.PI / 4);
     expect(gridfinityCompartmentFloorBound(gridfinityPlan(row), gridfinityCompartmentPieces(row)!)).toBeCloseTo(3 * (88.8 * fillet + (Math.PI * 2.8 ** 3) / 6), 6);
+  });
+});
+
+describe("gridfinity baseplate padding", { timeout: 60_000 }, () => {
+  /** Each side's padding, as the field it sets. */
+  const pad = (back: number, front: number, left: number, right: number) => ({ gridfinityPaddingBack: back, gridfinityPaddingFront: front, gridfinityPaddingLeft: left, gridfinityPaddingRight: right });
+  /** A baseplate of x by z units with these paddings, its box the grid and the padding together. */
+  const padded = (x: number, z: number, back: number, front: number, left: number, right: number) => plate({ width: x * 42 + left + right, depth: z * 42 + back + front, ...pad(back, front, left, right) });
+
+  it("is the baseplate it was with no padding on any side", () => {
+    expect(gridfinityTriangles(plate(pad(0, 0, 0, 0)))).toStrictEqual(gridfinityTriangles(plate()));
+    expect(gridfinityPlan(plate(pad(0, 0, 0, 0)))).toStrictEqual(gridfinityPlan(plate()));
+  });
+
+  it("reads the units from the size less the padding, and keeps the padding through a drag", () => {
+    expect(gridfinityUnits(padded(2, 1, 0, 16.2, 0, 14.2))).toEqual({ x: 2, z: 1, y: 1 });
+    expect(gridfinityUnits(padded(6, 6, 41, 0, 0, 41))).toEqual({ x: 6, z: 6, y: 1 });
+    // A drag to 130 mm across reads (130 - 14.2) / 42 = 2.76, three units, and the box takes the padding back on.
+    expect(gridfinityFootprintPatch(plate({ width: 130, depth: 58.2, ...pad(0, 16.2, 0, 14.2) }))).toEqual({ width: 140.2, depth: 58.2, height: 5 });
+  });
+
+  it("keeps the units when only the padding changes, also by a side's whole 41 mm", () => {
+    const six = plate({ width: 252, depth: 42 });
+    expect(gridfinityPaddingPatch(six, { right: 41 })).toEqual({ gridfinityPaddingRight: 41, width: 293, depth: 42 });
+    expect(gridfinityPaddingPatch(six, { front: 41, back: 3.5 })).toEqual({ gridfinityPaddingFront: 41, gridfinityPaddingBack: 3.5, width: 252, depth: 86.5 });
+    expect(gridfinityPaddingPatch(padded(6, 1, 0, 0, 0, 41), { right: 0 })).toEqual({ gridfinityPaddingRight: 0, width: 252, depth: 42 });
+    // Less than nothing is none, more than 41 mm is 41: 42 mm would be room for another unit of grid. It is kept to 0.01 mm.
+    expect(gridfinityPaddingPatch(six, { left: -3, right: 50 })).toEqual({ gridfinityPaddingLeft: 0, gridfinityPaddingRight: 41, width: 293, depth: 42 });
+    expect(gridfinityPaddingPatch(six, { left: 0.004, right: 14.237 })).toEqual({ gridfinityPaddingLeft: 0, gridfinityPaddingRight: 14.24, width: 266.24, depth: 42 });
+  });
+
+  it("pads a baseplate only: a bin keeps its settings and is built as before", () => {
+    const fields = pad(5, 5, 5, 5);
+    expect(gridfinityPadding(bin(fields))).toEqual({ back: 0, front: 0, left: 0, right: 0 });
+    expect(gridfinityPadding(plate(fields))).toEqual({ back: 5, front: 5, left: 5, right: 5 });
+    expect(gridfinityTriangles(bin(fields))).toStrictEqual(gridfinityTriangles(bin()));
+    expect(gridfinityFootprintPatch(bin(fields))).toEqual(gridfinityFootprintPatch(bin()));
+    // Turned into a baseplate, the padding it kept comes back with it.
+    expect(gridfinityShapePatch(bin(fields), { type: "baseplate" })).toMatchObject({ gridfinityType: "baseplate", width: 94, depth: 52, height: 5 });
+    expect(gridfinityShapePatch(padded(2, 1, 5, 5, 5, 5), { x: 3 })).toMatchObject({ width: 136, depth: 52 });
+    // A baseplate keeping a half-size grid setting is read on the 21 mm grid as a bin less its padding: 2 units stay 4 cells.
+    expect(gridfinityShapePatch(padded(2, 1, 0, 0, 41, 0), { type: "bin", halfGrid: true })).toMatchObject({ width: 83.5, depth: 41.5 });
+  });
+
+  it("moves the grid away from the padded sides: right is +x, front is +z", () => {
+    const { cells, size } = gridfinityPlan(padded(2, 1, 0, 16.2, 0, 14.2));
+    expect(size).toEqual({ width: 98.2, depth: 58.2, height: 5 });
+    expect(cells.map(({ x, z }) => [Number(x.toFixed(9)), Number(z.toFixed(9))])).toEqual([[-28.1, -8.1], [13.9, -8.1]]);
+    // The ridge between the two sockets, 2.15 mm either side of the grid line at the plate's middle height, moves with it.
+    const ridge = crossings(gridfinityTriangles(padded(2, 1, 0, 16.2, 0, 14.2)), 2, -7.6).filter((x) => Math.abs(x + 7.1) < 5);
+    expect(ridge.map((x) => Number(x.toFixed(6)))).toEqual([-9.25, -4.95]);
+  });
+
+  it("is closed, wound outwards and one piece with any sides padded, its padding a solid 5 mm border with the outer corners rounded as before", () => {
+    const area = (w: number, d: number) => w * d - (4 - Math.PI) * 16;
+    for (const [x, z] of [[1, 1], [2, 1], [3, 2]]) {
+      const base = signedVolume(gridfinityTriangles(padded(x, z, 0, 0, 0, 0)));
+      for (let k = 1; k < 16; k += 1) {
+        for (const amount of [0.01, 2, 4, 14.2, 41]) {
+          const p = [0, 1, 2, 3].map((i) => (k & (1 << i) ? amount : 0)) as [number, number, number, number];
+          const shape = padded(x, z, ...p);
+          const triangles = gridfinityTriangles(shape);
+          const context = JSON.stringify({ x, z, p });
+          expect(edgeProblems(triangles), context).toBe(0);
+          expect(components(triangles), context).toBe(1);
+          const w = x * 42 + p[2] + p[3];
+          const d = z * 42 + p[0] + p[1];
+          // The border adds the plate's 5 mm over the area the padding adds; the corners keep their 4 mm rounding.
+          expect(signedVolume(triangles), context).toBeCloseTo(base + 5 * (area(w, d) - area(x * 42, z * 42)), 4);
+          const { min, max } = bounds(triangles);
+          [min[0] + w / 2, max[0] - w / 2, min[2] + d / 2, max[2] - d / 2, min[1], max[1] - 5].forEach((v) => expect(Math.abs(v), context).toBeLessThan(1e-9));
+        }
+      }
+    }
+  });
+
+  it("keeps the padding through a saved project and everywhere a shape's settings go", async () => {
+    const settings = pad(3, 16.2, 7.5, 14.2);
+    const shape = canonicalizeShape({ ...binShape({ gridfinityType: "baseplate", width: 84 + 7.5 + 14.2, depth: 42 + 3 + 16.2, height: 5 }), ...settings });
+    expect(shape).toMatchObject({ ...settings, width: 105.7, depth: 61.2 });
+    Object.keys(settings).forEach((key) => expect(workplaneShapesEqual(shape, { ...shape, [key]: 1 }), key).toBe(false));
+    const save = (shapes: WorkplaneShape[]) => exportLylProject({
+      projectId: "padded",
+      projectName: "Padded",
+      createdAt: 1_700_000_000_000,
+      modifiedAt: 1_700_000_100_000,
+      shapes,
+      history: [editorHistoryEntry(shapes, [])],
+      historyIndex: 0,
+      assets: [],
+      workspace: DEFAULT_WORKPLANE_WORKSPACE,
+      snapGrid: DEFAULT_SNAP_GRID,
+      placementElevation: 0,
+    });
+    const [loaded] = (await importLylProject(await save([shape]))).shapes;
+    expect(workplaneShapesEqual(loaded, shape)).toBe(true);
+    expect(sceneShape(shape)).toMatchObject(settings);
+    // The exact body is built at the padded size, as the mesh is.
+    expect(cadModifierGridfinityForShape(shape)).toMatchObject({ ...settings, width: 105.7, depth: 61.2 });
+    expect(normalizeShapeCustomizations({ gridfinity: settings }, {})).toMatchObject({ gridfinity: settings });
+    expect(shapeDefaultsFromShape(shape)).toMatchObject(settings);
+    const asset = toolbarShapeAssets.find((entry) => entry.kind === "gridfinity")!;
+    expect(makeShapeFromAsset(asset, { x: 0, z: 0 }, { ...settings, gridfinityType: "baseplate", width: 105.7, depth: 61.2 })).toMatchObject({ ...settings, width: 105.7, depth: 61.2 });
+    for (const key of Object.keys(settings)) {
+      await expect(importLylProject(await save([{ ...shape, [key]: "wide" } as unknown as WorkplaneShape])), key).rejects.toThrow(`${key} must be a finite number`);
+    }
+    // The mesh that booleans and exports use has the border: 5 mm over the area it adds.
+    const mesh = (fields: WorkplaneShape) => {
+      const { vertices, faces } = meshForShape(fields);
+      return signedVolume(faces.map((face) => face.map((i) => vertices[i]) as V[]));
+    };
+    const plain = canonicalizeShape(binShape({ gridfinityType: "baseplate", width: 84, depth: 42, height: 5 }));
+    expect(mesh(shape) - mesh(plain)).toBeCloseTo(5 * (105.7 * 61.2 - 84 * 42), 2);
+  });
+
+  it("keeps a padding the MCP gives within what a saved project takes", () => {
+    const shape = canonicalizeShape({ ...binShape({ gridfinityType: "baseplate", width: 84, depth: 42, height: 5 }), gridfinityPaddingLeft: -4, gridfinityPaddingRight: 99 });
+    expect(shape).toMatchObject({ gridfinityPaddingLeft: 0, gridfinityPaddingRight: 41 });
+  });
+
+  it("keeps the units through an MCP update with padding and no size, and the height and lip given with a change to a bin", () => {
+    const six = canonicalizeShape(binShape({ gridfinityType: "baseplate", width: 252, depth: 42, height: 5 }));
+    const update = (target: WorkplaneShape, params: Record<string, unknown>) => canonicalizeShape({ ...target, ...params, ...mcpGridfinityPaddingPatch(target, params as Partial<WorkplaneShape>, params) });
+    expect(update(six, { gridfinityPaddingRight: 41 })).toMatchObject({ width: 293, depth: 42 });
+    // A size given with it is read as the whole plate, on its own axis only: the other keeps its units.
+    expect(update(six, { gridfinityPaddingRight: 41, width: 252 })).toMatchObject({ width: 251 });
+    const deep = canonicalizeShape(binShape({ gridfinityType: "baseplate", width: 84, depth: 126, height: 5 }));
+    expect(update(deep, { gridfinityPaddingFront: 30, width: 126 })).toMatchObject({ width: 126, depth: 156 });
+    // A size that is no number is not given, as the update leaves it out.
+    expect(mcpGridfinityPaddingPatch(six, {}, { gridfinityPaddingRight: 41, width: null })).toMatchObject({ width: 293 });
+    // A padding that is no number is left as it was, and a move writes no size.
+    expect(mcpGridfinityPaddingPatch(update(deep, { gridfinityPaddingFront: 30 }), {}, { gridfinityPaddingFront: "wide" })).toEqual({});
+    expect(mcpGridfinityPaddingPatch(update(deep, { gridfinityPaddingFront: 30 }), {}, { x: 10 })).toEqual({});
+    const padded = update(six, { gridfinityPaddingRight: 41 });
+    // Turned into a bin it keeps its six units across, and the height and lip it is given, also with the padding set back to 0.
+    for (const target of [padded, update(padded, { gridfinityPaddingRight: 0 })]) {
+      expect(update(target, { gridfinityType: "bin", height: 46.4 })).toMatchObject({ width: 251.5, height: 46.4 });
+      expect(update(target, { gridfinityType: "bin", gridfinityLip: false, height: 42 })).toMatchObject({ width: 251.5, height: 42, gridfinityLip: false });
+    }
+    // A bin with padding stored turned into a baseplate takes it back, six units and 41 mm.
+    const bin = update(padded, { gridfinityType: "bin", height: 25.4 });
+    expect(update(bin, { gridfinityType: "baseplate" })).toMatchObject({ width: 293, height: 5 });
+  });
+
+  it("makes a new baseplate with padding and no size of the default units, the padding added on", () => {
+    const asset = toolbarShapeAssets.find((entry) => entry.kind === "gridfinity")!;
+    // The default is 2 x 1 units: 84 x 42, and 30 mm on the right makes it 114 across, not 1 unit and 30 mm.
+    expect(makeShapeFromAsset(asset, { x: 0, z: 0 }, { gridfinityType: "baseplate", gridfinityPaddingRight: 30, gridfinityPaddingFront: 41 })).toMatchObject({ width: 114, depth: 83 });
+    expect(makeShapeFromAsset(asset, { x: 0, z: 0 }, { gridfinityType: "baseplate", gridfinityPaddingRight: 30, width: 114 })).toMatchObject({ width: 114 });
   });
 });

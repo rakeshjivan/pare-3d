@@ -677,3 +677,37 @@ describe("exact Gridfinity bins with open sides", () => {
     }
   });
 });
+
+describe("exact Gridfinity baseplates with padding", () => {
+  /** A baseplate of x by z units with these paddings, its box the grid and the padding together. */
+  const padded = (x: number, z: number, back: number, front: number, left: number, right: number) => plate({ width: x * 42 + left + right, depth: z * 42 + back + front, gridfinityPaddingBack: back, gridfinityPaddingFront: front, gridfinityPaddingLeft: left, gridfinityPaddingRight: right });
+
+  it("builds a padded baseplate as one valid solid with the mesh's volume and box, on any sides", () => {
+    const base = Math.abs(cad.getVolume(gridfinityPartSolid(cad, plate())));
+    for (let k = 1; k < 16; k += 1) {
+      for (const amount of [0.01, 4, 14.2]) {
+        const p = [0, 1, 2, 3].map((i) => (k & (1 << i) ? amount : 0)) as [number, number, number, number];
+        const part = padded(2, 1, ...p);
+        const context = JSON.stringify(p);
+        const solid = gridfinityPartSolid(cad, part);
+        expect(cad.isValid(solid), context).toBe(true);
+        const exact = Math.abs(cad.getVolume(solid));
+        expect(Math.abs(exact - meshVolume(part)) / exact, context).toBeLessThan(0.002);
+        // The border is 5 mm over the area the padding adds; the corners keep their 4 mm rounding.
+        expect(exact - base, context).toBeCloseTo(5 * (part.width * part.depth - 84 * 42), 3);
+        const box = cad.getBoundingBox(solid);
+        const { min, max } = meshBounds(part);
+        [box.xmin - min[0], box.ymin - min[1], box.zmin - min[2], box.xmax - max[0], box.ymax - max[1], box.zmax - max[2]].forEach((d) => expect(Math.abs(d), context).toBeLessThan(0.01));
+      }
+    }
+  });
+
+  it("seats a bin in a socket of a padded baseplate 0.25 mm up, and 0.3 mm sideways they overlap", () => {
+    // 6 x 6 units padded 14.2 mm on the right and 16.2 at the front: the corner socket at the back left is at (-133.1 + 21, -134.1 + 21).
+    const p = gridfinityPartSolid(cad, padded(6, 6, 0, 16.2, 0, 14.2));
+    expect(cad.isValid(p)).toBe(true);
+    const seated = cad.translate(gridfinityPartSolid(cad, bin({ width: 41.5, depth: 41.5 })), -133.1 + 21, 0.25, -134.1 + 21);
+    expect(overlap(seated, p)).toBeLessThan(0.01);
+    expect(overlap(cad.translate(seated, 0.3, 0, 0), p)).toBeGreaterThan(1);
+  });
+});

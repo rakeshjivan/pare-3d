@@ -314,6 +314,10 @@ export type CadModifierGridfinityPart = {
   gridfinityOpenFront?: boolean;
   gridfinityOpenLeft?: boolean;
   gridfinityOpenRight?: boolean;
+  gridfinityPaddingBack?: number;
+  gridfinityPaddingFront?: number;
+  gridfinityPaddingLeft?: number;
+  gridfinityPaddingRight?: number;
   gridfinityCompartmentsX?: number;
   gridfinityCompartmentsZ?: number;
   gridfinityDividerThickness?: number;

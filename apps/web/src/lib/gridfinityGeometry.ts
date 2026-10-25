@@ -94,6 +94,13 @@ import type { GridfinityCompartmentLabel, GridfinityLabelCorner, GridfinityType,
  * outline far enough for their roundings to lie beyond it, and the pieces joined
  * to the walls beside an open side are cut off at the outline. A shelf or a
  * scoop set on an open side is not built.
+ *
+ * A baseplate can be padded on any side (#455), so that it fills a drawer that
+ * is not whole units: a solid border at its height outside the grid, which
+ * moves away from the padded sides. The box takes the padding in, and the units
+ * are read from it less the padding. The outer cells' flat top and bottom reach
+ * out to the padded outline, and a padded outer corner, whose rounding no longer
+ * meets the cell's, is filled between the two.
  */
 
 export const GRIDFINITY_GRID = 42;
@@ -112,6 +119,8 @@ export const GRIDFINITY_MAGNET_OFFSET = 13;
 export const MIN_GRIDFINITY_UNITS = 1;
 export const MAX_GRIDFINITY_UNITS = 6;
 export const MAX_GRIDFINITY_HEIGHT_UNITS = 20;
+/** The most padding on a side of a baseplate: 42 mm would be room for another unit of grid. */
+export const MAX_GRIDFINITY_PADDING = GRIDFINITY_GRID - 1;
 export const DEFAULT_GRIDFINITY_TYPE: GridfinityType = "bin";
 export const DEFAULT_GRIDFINITY_UNITS = { x: 2, z: 1, y: 3 };
 export const DEFAULT_GRIDFINITY_LIP = true;
@@ -197,6 +206,10 @@ export type GridfinityShapeFields = Pick<WorkplaneShape, "width" | "height"> & {
   gridfinityOpenFront?: boolean;
   gridfinityOpenLeft?: boolean;
   gridfinityOpenRight?: boolean;
+  gridfinityPaddingBack?: number;
+  gridfinityPaddingFront?: number;
+  gridfinityPaddingLeft?: number;
+  gridfinityPaddingRight?: number;
   gridfinityCompartmentsX?: number;
   gridfinityCompartmentsZ?: number;
   gridfinityDividerThickness?: number;
@@ -238,16 +251,17 @@ export function gridfinityUnits(shape: GridfinityShapeFields) {
   const margin = type === "bin" ? 2 * GRIDFINITY_CLEARANCE : 0;
   const pitch = gridfinityPitch(shape);
   const max = gridfinityMaxUnits(shape);
+  const padding = gridfinityPadding(shape);
   return {
-    x: units((shape.width + margin) / pitch, DEFAULT_GRIDFINITY_UNITS.x, max),
-    z: units(((shape.depth ?? shape.width) + margin) / pitch, DEFAULT_GRIDFINITY_UNITS.z, max),
+    x: units((shape.width + margin - padding.left - padding.right) / pitch, DEFAULT_GRIDFINITY_UNITS.x, max),
+    z: units(((shape.depth ?? shape.width) + margin - padding.back - padding.front) / pitch, DEFAULT_GRIDFINITY_UNITS.z, max),
     y: type === "bin" ? units((shape.height - GRIDFINITY_LIP_HEIGHT / 2) / GRIDFINITY_HEIGHT_UNIT, DEFAULT_GRIDFINITY_UNITS.y, MAX_GRIDFINITY_HEIGHT_UNITS) : 1,
   };
 }
 
-/** The size of a bin or baseplate of so many units; a bin on the half-size grid counts units of 21 mm. */
-export function gridfinitySize(type: GridfinityType, count: { x: number; z: number; y: number }, lip = true, pitch = GRIDFINITY_GRID) {
-  if (type === "baseplate") return { width: count.x * GRIDFINITY_GRID, depth: count.z * GRIDFINITY_GRID, height: GRIDFINITY_BASEPLATE_HEIGHT };
+/** The size of a bin or baseplate of so many units; a bin on the half-size grid counts units of 21 mm, and a baseplate's box takes its padding in. */
+export function gridfinitySize(type: GridfinityType, count: { x: number; z: number; y: number }, lip = true, pitch = GRIDFINITY_GRID, padding = NO_GRIDFINITY_PADDING) {
+  if (type === "baseplate") return { width: count.x * GRIDFINITY_GRID + padding.left + padding.right, depth: count.z * GRIDFINITY_GRID + padding.back + padding.front, height: GRIDFINITY_BASEPLATE_HEIGHT };
   return {
     width: count.x * pitch - 2 * GRIDFINITY_CLEARANCE,
     depth: count.z * pitch - 2 * GRIDFINITY_CLEARANCE,
@@ -261,7 +275,7 @@ export function gridfinitySize(type: GridfinityType, count: { x: number; z: numb
  * sits exactly on the body again.
  */
 export function gridfinityFootprintPatch(shape: GridfinityShapeFields) {
-  return gridfinitySize(normalizeGridfinityType(shape.gridfinityType), gridfinityUnits(shape), shape.gridfinityLip !== false, gridfinityPitch(shape));
+  return gridfinitySize(normalizeGridfinityType(shape.gridfinityType), gridfinityUnits(shape), shape.gridfinityLip !== false, gridfinityPitch(shape), gridfinityPadding(shape));
 }
 
 /**
@@ -284,13 +298,42 @@ export function gridfinityShapePatch(shape: GridfinityShapeFields, next: { type?
   // The current size read on the new grid as the new type, as canonicalizeShape reads a size given through the MCP.
   const margin = type === "bin" ? 2 * GRIDFINITY_CLEARANCE : 0;
   const regrid = pitch !== gridfinityPitch(shape);
+  // A padded baseplate's box is read less its padding.
+  const padding = gridfinityPadding(shape);
   const count = {
-    x: units(next.x ?? (regrid ? (shape.width + margin) / pitch : current.x), DEFAULT_GRIDFINITY_UNITS.x, max),
-    z: units(next.z ?? (regrid ? ((shape.depth ?? shape.width) + margin) / pitch : current.z), DEFAULT_GRIDFINITY_UNITS.z, max),
+    x: units(next.x ?? (regrid ? (shape.width + margin - padding.left - padding.right) / pitch : current.x), DEFAULT_GRIDFINITY_UNITS.x, max),
+    z: units(next.z ?? (regrid ? ((shape.depth ?? shape.width) + margin - padding.back - padding.front) / pitch : current.z), DEFAULT_GRIDFINITY_UNITS.z, max),
     y: units(next.y ?? (currentType === "bin" ? current.y : DEFAULT_GRIDFINITY_UNITS.y), DEFAULT_GRIDFINITY_UNITS.y, MAX_GRIDFINITY_HEIGHT_UNITS),
   };
-  const size = gridfinitySize(type, count, lip, pitch);
+  // A bin turned into a baseplate takes back the padding it kept.
+  const size = gridfinitySize(type, count, lip, pitch, gridfinityPadding({ ...shape, ...grid }));
   return { gridfinityType: type, gridfinityLip: lip, ...(next.halfGrid !== undefined ? { gridfinityHalfGrid: halfGrid } : {}), ...size };
+}
+
+/** Each side's padding on a baseplate (#455). */
+export const GRIDFINITY_PADDING_KEYS = { back: "gridfinityPaddingBack", front: "gridfinityPaddingFront", left: "gridfinityPaddingLeft", right: "gridfinityPaddingRight" } as const;
+const NO_GRIDFINITY_PADDING: Record<GridfinityWall, number> = { back: 0, front: 0, left: 0, right: 0 };
+
+/** A side's padding as stored: none for anything but a number, at most 41 mm, rounded to 0.01 mm. */
+export function normalizeGridfinityPadding(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? clamp(Math.round(value * 100) / 100, 0, MAX_GRIDFINITY_PADDING) : 0;
+}
+
+/** A baseplate's padding on each side (#455); a bin has none and keeps the settings it is given. */
+export function gridfinityPadding(shape: Pick<GridfinityShapeFields, "gridfinityType" | "gridfinityPaddingBack" | "gridfinityPaddingFront" | "gridfinityPaddingLeft" | "gridfinityPaddingRight">): Record<GridfinityWall, number> {
+  if (normalizeGridfinityType(shape.gridfinityType) !== "baseplate") return NO_GRIDFINITY_PADDING;
+  return { back: normalizeGridfinityPadding(shape.gridfinityPaddingBack), front: normalizeGridfinityPadding(shape.gridfinityPaddingFront), left: normalizeGridfinityPadding(shape.gridfinityPaddingLeft), right: normalizeGridfinityPadding(shape.gridfinityPaddingRight) };
+}
+
+/**
+ * What a change of padding writes to a baseplate: the paddings and the box
+ * they make with the same units. The box takes the padding in, so a new
+ * padding read against the old box would lose a unit once it passes half of one.
+ */
+export function gridfinityPaddingPatch(shape: GridfinityShapeFields, next: Partial<Record<GridfinityWall, unknown>>) {
+  const fields = Object.fromEntries((Object.keys(next) as GridfinityWall[]).map((wall) => [GRIDFINITY_PADDING_KEYS[wall], normalizeGridfinityPadding(next[wall])])) as Partial<Record<(typeof GRIDFINITY_PADDING_KEYS)[GridfinityWall], number>>;
+  const { width, depth } = gridfinitySize("baseplate", gridfinityUnits(shape), false, GRIDFINITY_GRID, gridfinityPadding({ ...shape, ...fields }));
+  return { ...fields, width, depth };
 }
 
 /** Everything the body is built from, in the shape's own frame: x across, z deep, y up from 0, centred on x and z. */
@@ -300,11 +343,14 @@ export function gridfinityPlan(shape: GridfinityShapeFields) {
   const lip = type === "bin" && shape.gridfinityLip !== false;
   const magnets = type === "bin" && Boolean(shape.gridfinityMagnets);
   const pitch = gridfinityPitch(shape);
-  const size = gridfinitySize(type, count, lip, pitch);
+  const padding = gridfinityPadding(shape);
+  const size = gridfinitySize(type, count, lip, pitch, padding);
+  // The grid moves away from the padded sides: its middle is half the difference off the box's.
+  const centre = { x: (padding.left - padding.right) / 2, z: (padding.back - padding.front) / 2 };
   const cells: Array<{ x: number; z: number; i: number; j: number }> = [];
   for (let i = 0; i < count.x; i += 1) {
     for (let j = 0; j < count.z; j += 1) {
-      cells.push({ i, j, x: (i - (count.x - 1) / 2) * pitch, z: (j - (count.z - 1) / 2) * pitch });
+      cells.push({ i, j, x: centre.x + (i - (count.x - 1) / 2) * pitch, z: centre.z + (j - (count.z - 1) / 2) * pitch });
     }
   }
   // On the half-size grid one hole a foot, towards its cell's corner on the 42 mm grid, as far from it as on a whole unit.
@@ -322,7 +368,7 @@ export function gridfinityPlan(shape: GridfinityShapeFields) {
   // A bin with a finger scoop has every inner floor edge rounded, and the scoop is the rounding made large on its wall.
   const scooped = scoopFits({ type, top, lip, floor }) && LABEL_WALLS.some((wall) => shape[GRIDFINITY_SCOOP_WALL_KEYS[wall]] === true && !open[wall]);
   const floorRounding = scooped ? SCOOP_FLOOR_ROUNDING : 0;
-  return { type, count, lip, magnets, halfGrid: pitch !== GRIDFINITY_GRID, pitch, size, cells, magnetHoles, top, floor, floorRounding, open };
+  return { type, count, lip, magnets, halfGrid: pitch !== GRIDFINITY_GRID, pitch, size, cells, magnetHoles, top, floor, floorRounding, open, padding, centre };
 }
 
 export type GridfinityPlan = ReturnType<typeof gridfinityPlan>;
@@ -1480,7 +1526,8 @@ export function gridfinityTriangles(shape: GridfinityShapeFields) {
    * cell's corner is the body's own rounded corner there is no point to fan
    * from: with `outer` (the body's outline in that cell) the strip between the
    * two arcs fills it, without it the arcs are the same and nothing is left.
-   * A body corner made square by an open side is fanned like any other.
+   * A body corner made square by an open side is fanned like any other, and
+   * one beside a padded side is filled by paddedCorner.
    */
   const ring = (inner: LoopPoint[], box: Box, y: number, up: 1 | -1, outer?: LoopPoint[]) => {
     const per = inner.length / 4;
@@ -1504,6 +1551,10 @@ export function gridfinityTriangles(shape: GridfinityShapeFields) {
       const sx = end.nx + next.nx > 0 ? 1 : -1;
       const sz = end.nz + next.nz > 0 ? 1 : -1;
       if (box.edge(sx, "x") && box.edge(sz, "z") && !plan.open[sx > 0 ? "right" : "left"] && !plan.open[sz > 0 ? "front" : "back"]) {
+        if (plan.padding[sx > 0 ? "right" : "left"] > 0 || plan.padding[sz > 0 ? "front" : "back"] > 0) {
+          paddedCorner(arc, project(end), project(next), y, up);
+          continue;
+        }
         if (!outer) continue;
         const outerArc = [outer[s * per + 1], ...outer.slice(s * per + 2, (s + 1) * per), outer[((s + 1) % 4) * per]];
         for (let k = 0; k + 1 < arc.length; k += 1) {
@@ -1520,6 +1571,22 @@ export function gridfinityTriangles(shape: GridfinityShapeFields) {
       for (let k = 0; k + 1 < fan.length; k += 1) push(at(cornerPoint, y), at(fan[k], y), at(fan[k + 1], y), want);
     }
   };
+  /**
+   * A body corner of a padded baseplate (#455), where the corner of the cell's
+   * rounded square no longer meets the body's: the flat face from where the
+   * square's sides meet the cell's box, along the body's outline round its
+   * rounded corner, and back round the square's arc.
+   */
+  const paddedCorner = (arc: LoopPoint[], from: { x: number; z: number }, to: { x: number; z: number }, y: number, up: 1 | -1) => {
+    const body = outline(0);
+    const same = (p: { x: number; z: number }, q: { x: number; z: number }) => Math.abs(p.x - q.x) < 1e-9 && Math.abs(p.z - q.z) < 1e-9;
+    const start = body.findIndex((p) => same(p, from));
+    const stop = body.findIndex((p) => same(p, to));
+    const along: Array<{ x: number; z: number }> = [];
+    for (let k = start; k !== stop; k = (k + 1) % body.length) along.push(body[k]);
+    along.push(body[stop]);
+    cap(distinctPoints([...along, ...[...arc].reverse()]), [], y, up);
+  };
   const circle = (c: { x: number; z: number }) => Array.from({ length: MAGNET_SIDES }, (_, k) => {
     const angle = (2 * Math.PI * k) / MAGNET_SIDES;
     return { x: c.x + (GRIDFINITY_MAGNET_DIAMETER / 2) * Math.cos(angle), z: c.z + (GRIDFINITY_MAGNET_DIAMETER / 2) * Math.sin(angle) };
@@ -1529,18 +1596,18 @@ export function gridfinityTriangles(shape: GridfinityShapeFields) {
   const half = (n: number) => (n * pitch) / 2;
   const cellHalf = plan.type === "bin" ? pitch / 2 - GRIDFINITY_CLEARANCE : pitch / 2;
   const radius = plan.type === "bin" ? GRIDFINITY_BIN_RADIUS : GRIDFINITY_BASEPLATE_RADIUS;
-  // Points on the long sides: every grid line inside, and where each foot or socket's corner begins.
-  const breaks = (n: number) => {
+  // Points on the long sides: every grid line inside, and where each foot or socket's corner begins; off the middle with the grid of a padded baseplate.
+  const breaks = (n: number, centre: number) => {
     const values: number[] = [];
     for (let i = 0; i < n; i += 1) {
-      const c = (i - (n - 1) / 2) * pitch;
+      const c = centre + (i - (n - 1) / 2) * pitch;
       values.push(c - cellHalf + radius, c + cellHalf - radius);
       if (i < n - 1) values.push(c + pitch / 2);
     }
     return values;
   };
-  const breaksX = breaks(count.x);
-  const breaksZ = breaks(count.z);
+  const breaksX = breaks(count.x, plan.centre.x);
+  const breaksZ = breaks(count.z, plan.centre.z);
   const outline = (inset: number) => roundedLoop(0, 0, size.width / 2, size.depth / 2, radius, inset, breaksX, breaksZ);
   const openOutline = (inset: number) => roundedLoop(0, 0, size.width / 2, size.depth / 2, radius, inset, breaksX, breaksZ, plan.open);
   const cellOf = (cell: (typeof cells)[number], inset: number) => roundedLoop(cell.x, cell.z, cellHalf, cellHalf, radius, inset);

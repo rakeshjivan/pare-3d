@@ -2,7 +2,7 @@ import { createLocalId } from "@/lib/localIds";
 import { repairClampedMeshBase } from "@/lib/importedMeshBase";
 import { fieldFormulasEqual } from "@/lib/fieldFormulas";
 import { threadFootprintPatch } from "@/lib/threadGeometry";
-import { gridfinityCompartmentLabelsEqual, gridfinityDividerPositionsEqual, gridfinityFootprintPatch } from "@/lib/gridfinityGeometry";
+import { GRIDFINITY_PADDING_KEYS, gridfinityCompartmentLabelsEqual, gridfinityDividerPositionsEqual, gridfinityFootprintPatch, normalizeGridfinityPadding } from "@/lib/gridfinityGeometry";
 import { MCP_SHAPE_SETTING_KEYS } from "@/lib/mcpShapeSettings";
 import { bentTubeSegmentsEqual } from "@/lib/bentTubeGeometry";
 import { qrSettingsEqual } from "@/lib/qrCode";
@@ -482,6 +482,8 @@ export function canonicalizeShape(unrepaired: WorkplaneShape): WorkplaneShape {
   }
   // A Gridfinity bin or baseplate is whole grid units, whatever set its box.
   if (shape.kind === "gridfinity") {
+    // Padding is stored as the geometry reads it, 0 to 41 mm, so a saved project opens again whatever gave it (#455).
+    for (const key of Object.values(GRIDFINITY_PADDING_KEYS)) if (typeof next[key] === "number") next[key] = normalizeGridfinityPadding(next[key]);
     const footprint = gridfinityFootprintPatch(next);
     Object.assign(next, footprint);
     next.size = resizedShapeSize(footprint.width, footprint.depth);
@@ -650,6 +652,10 @@ export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
     a.gridfinityOpenFront === b.gridfinityOpenFront &&
     a.gridfinityOpenLeft === b.gridfinityOpenLeft &&
     a.gridfinityOpenRight === b.gridfinityOpenRight &&
+    a.gridfinityPaddingBack === b.gridfinityPaddingBack &&
+    a.gridfinityPaddingFront === b.gridfinityPaddingFront &&
+    a.gridfinityPaddingLeft === b.gridfinityPaddingLeft &&
+    a.gridfinityPaddingRight === b.gridfinityPaddingRight &&
     a.gridfinityCompartmentsX === b.gridfinityCompartmentsX &&
     a.gridfinityCompartmentsZ === b.gridfinityCompartmentsZ &&
     a.gridfinityDividerThickness === b.gridfinityDividerThickness &&

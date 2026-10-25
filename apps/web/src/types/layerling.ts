@@ -235,6 +235,14 @@ export type ShapeCustomization = {
   gridfinityOpenLeft?: boolean;
   /** Gridfinity bin: no wall and no stacking lip along the right. */
   gridfinityOpenRight?: boolean;
+  /** Gridfinity baseplate: a solid border at the plate's height along the back, in mm, outside the grid and inside the box; missing is none, at most 41 (#455). */
+  gridfinityPaddingBack?: number;
+  /** Gridfinity baseplate: the border along the front. */
+  gridfinityPaddingFront?: number;
+  /** Gridfinity baseplate: the border along the left. */
+  gridfinityPaddingLeft?: number;
+  /** Gridfinity baseplate: the border along the right. */
+  gridfinityPaddingRight?: number;
   /** Gridfinity bin: compartments across, a whole number; missing is 1, a bin without dividers (#554). */
   gridfinityCompartmentsX?: number;
   /** Gridfinity bin: compartments deep, a whole number; missing is 1. */
@@ -854,6 +862,14 @@ export type WorkplaneShape = {
   gridfinityOpenLeft?: boolean;
   /** Gridfinity bin: no wall and no stacking lip along the right. */
   gridfinityOpenRight?: boolean;
+  /** Gridfinity baseplate: a solid border at the plate's height along the back, in mm, outside the grid and inside the box; missing is none, at most 41 (#455). */
+  gridfinityPaddingBack?: number;
+  /** Gridfinity baseplate: the border along the front. */
+  gridfinityPaddingFront?: number;
+  /** Gridfinity baseplate: the border along the left. */
+  gridfinityPaddingLeft?: number;
+  /** Gridfinity baseplate: the border along the right. */
+  gridfinityPaddingRight?: number;
   /** Gridfinity bin: compartments across, a whole number; missing is 1, a bin without dividers (#554). */
   gridfinityCompartmentsX?: number;
   /** Gridfinity bin: compartments deep, a whole number; missing is 1. */
