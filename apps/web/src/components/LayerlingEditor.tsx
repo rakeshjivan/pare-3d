@@ -248,7 +248,7 @@ import { getSectionBounds, sectionAxisLetter, sectionMeshInFrame, sectionPlaceme
 import { projectSectionPoint, SECTION_VIEW_FACE, sectionSvgDocument, sliceMeshContours } from "@/lib/sectionSvg";
 import type { AlignAxis, AlignTarget, GridSize, ParametricSource, ProjectAsset, ShapeAsset, ShapeCustomization, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, ShellEdges, ShellOpenings, ShellSide, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
 import { type Vec3, type MeshData, type ShapeUpdatePatch, MIN_SHAPE_DIMENSION, resetManifoldRuntime, cleanModelDimension, getManifoldRuntime, meshForShape, meshReachAlong, appendMeshData, formatTriangleCount, boundsForShapes, boundsForCuboids, meshAabb, boundsForPositions } from "@/lib/editorMeshCore";
-import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
+import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, withClosedHolesNote, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { meshPartCount } from "@/lib/meshPartCount";
 import { buildGroupedShapeOffThread, exportSolidVolumeOffThread, simplifyTrianglePositionsOffThread, splitShapesByPlaneOffThread, subscribeGeometryBusy, warmGeometryWorker } from "@/lib/geometryWorker";
 import { handleViewArrowKey } from "@/lib/viewArrowKeys";
@@ -6431,7 +6431,7 @@ export function LayerlingEditor({
       setNotice(t("status.splitFailed", { name: shape.name }));
       return;
     }
-    const { replacements, splitCount } = outcome;
+    const { replacements, splitCount, closedHoles } = outcome;
     if (splitCount === 0) {
       setSplitSession((current) => current ? { ...current, busy: false, error: t("split.error.movePlane") } : current);
       setNotice(t("status.splitMissed"));
@@ -6470,9 +6470,9 @@ export function LayerlingEditor({
     commitShapes(
       nextShapes,
       nextSelection,
-      outcome.connectorCount > 0
+      withClosedHolesNote(outcome.connectorCount > 0
         ? `${splitMessage}${/[.!?]$/.test(splitMessage) ? "" : "."} ${t(pins.length ? "connectors.addedDowels" : "connectors.addedPlugs", { count: outcome.connectorCount })}`
-        : splitMessage,
+        : splitMessage, closedHoles),
     );
   }, [commitShapes, splitConnectorPoints, splitConnectors, splitPlane, splitSession, splitTargetShapes]);
 
@@ -8732,7 +8732,7 @@ export function LayerlingEditor({
     commitShapes(
       [...shapesRef.current.filter((shape) => !selected.has(shape.id)), editableGroup],
       editableGroup.id,
-      result.openGapEdges ? t("status.cutLeftOpen", { count: result.openGapEdges }) : result.mergeWarning ?? t("status.groupedMany", { count: selectedShapes.length }),
+      result.openGapEdges ? t("status.cutLeftOpen", { count: result.openGapEdges }) : result.mergeWarning ?? withClosedHolesNote(t("status.groupedMany", { count: selectedShapes.length }), result.closedHoles),
     );
   }, [refuseLockedSelection, commitShapes, selectedIds, selectedShapes]);
 
@@ -11298,10 +11298,11 @@ export function LayerlingEditor({
           throw new Error(result.failureNotice);
         }
         const editableGroup = canonicalizeShape({ ...result.group, groupOperation: "group" });
-        commitShapes([...currentShapes().filter((shape) => !ids.has(shape.id)), editableGroup], editableGroup.id, result.mergeWarning ?? t("status.mcpGrouped", { count: groupable.length }));
+        commitShapes([...currentShapes().filter((shape) => !ids.has(shape.id)), editableGroup], editableGroup.id, result.mergeWarning ?? withClosedHolesNote(t("status.mcpGrouped", { count: groupable.length }), result.closedHoles));
+        const closedHoles = result.closedHoles ? { closedHoles: result.closedHoles } : {};
         return result.mergeWarning
-          ? { object: mcpShapeSummary(editableGroup), warning: result.mergeWarning }
-          : { object: mcpShapeSummary(editableGroup) };
+          ? { object: mcpShapeSummary(editableGroup), warning: result.mergeWarning, ...closedHoles }
+          : { object: mcpShapeSummary(editableGroup), ...closedHoles };
       }
 
       if (command.action === "bundle_objects") {
@@ -11534,8 +11535,8 @@ export function LayerlingEditor({
           throw new Error(result.failureNotice);
         }
         const editableGroup = canonicalizeShape({ ...result.group, groupOperation: "group" });
-        commitShapes([...remainingShapes, editableGroup], editableGroup.id, t("status.mcpBooleanCut"));
-        return { object: mcpShapeSummary(editableGroup) };
+        commitShapes([...remainingShapes, editableGroup], editableGroup.id, withClosedHolesNote(t("status.mcpBooleanCut"), result.closedHoles));
+        return result.closedHoles ? { object: mcpShapeSummary(editableGroup), closedHoles: result.closedHoles } : { object: mcpShapeSummary(editableGroup) };
       }
 
       if (command.action === "wrap_around_cylinder") {
@@ -11653,9 +11654,9 @@ export function LayerlingEditor({
         commitShapes(
           currentShapes().flatMap((shape) => outcome.replacements.get(shape.id) ?? [shape]),
           parts.map((shape) => shape.id),
-          outcome.splitCount === 1
+          withClosedHolesNote(outcome.splitCount === 1
             ? t("status.splitOne", { count: parts.length })
-            : t("status.splitMany", { count: outcome.splitCount, bodies: parts.length }),
+            : t("status.splitMany", { count: outcome.splitCount, bodies: parts.length }), outcome.closedHoles),
         );
         return {
           axis: splitAxisLabel(axis).toLowerCase(),
@@ -11664,6 +11665,7 @@ export function LayerlingEditor({
           min: plane.min,
           max: plane.max,
           splitIds: [...outcome.replacements.keys()],
+          ...(outcome.closedHoles ? { closedHoles: outcome.closedHoles } : {}),
           objects: parts.map(mcpShapeSummary),
         };
       }
