@@ -2394,6 +2394,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "prop.gridfinityPaddingLeft": "Pruh vlevo",
   "prop.gridfinityPaddingRight": "Pruh vpravo",
   "gridfinity.paddingHint": "Plný pruh vně mřížky, aby nosná deska vyplnila zásuvku, která nemá celý počet jednotek. Změna pruhu zachová jednotky a velikost desky se změní s ním.",
+  "prop.gridfinityCornerRadius": "Poloměr rohů",
+  "gridfinity.cornerRadiusHint": "Poloměr čtyř vnějších rohů desky: 4 mm, jak je kreslí specifikace Gridfinity, až po 0 pro pravoúhlé rohy, které zapadnou do rohů zásuvky. Lůžka si zaoblení ponechají, krabičky tedy sedí jako dřív.",
   "prop.gridfinityDrawerWidth": "Šířka zásuvky",
   "prop.gridfinityDrawerDepth": "Hloubka zásuvky",
   "gridfinity.drawerHint": "Vnitřní rozměr zásuvky; deska vyjde o 0,5 mm menší. Zásuvka větší než 334,5 mm nebo větší než tisková podložka potřebuje několik desek.",

@@ -269,7 +269,7 @@ function compartmentCutter(cad: OcctKernel, loft: ShapeHandle, pieces: Gridfinit
 
 function baseplateSolid(cad: OcctKernel, plan: GridfinityPlan) {
   const half = GRIDFINITY_GRID / 2;
-  const slab = prism(cad, plan.size.width / 2, plan.size.depth / 2, GRIDFINITY_BASEPLATE_RADIUS, 0, GRIDFINITY_BASEPLATE_HEIGHT);
+  const slab = prism(cad, plan.size.width / 2, plan.size.depth / 2, plan.cornerRadius, 0, GRIDFINITY_BASEPLATE_HEIGHT);
   const last = GRIDFINITY_SOCKET[GRIDFINITY_SOCKET.length - 1];
   const steps: GridfinityStep[] = [[GRIDFINITY_SOCKET[0][0], -PAST], ...GRIDFINITY_SOCKET, [last[0], last[1] + PAST]];
   const sockets = plan.cells.map((cell) => steppedSolid(cad, cell.x, cell.z, half, half, GRIDFINITY_BASEPLATE_RADIUS, steps));

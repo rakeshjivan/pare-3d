@@ -2378,6 +2378,8 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityPaddingLeft": "Кайма слева",
   "prop.gridfinityPaddingRight": "Кайма справа",
   "gridfinity.paddingHint": "Сплошная кайма снаружи сетки, чтобы базовая плита заполнила ящик, размер которого не кратен единицам. При её изменении число единиц сохраняется, а размер плиты меняется вместе с ней.",
+  "prop.gridfinityCornerRadius": "Радиус углов",
+  "gridfinity.cornerRadiusHint": "Радиус четырёх внешних углов плиты: 4 мм, как в спецификации Gridfinity, вплоть до 0 для прямых углов, которые встают в углы ящика. Гнёзда сохраняют своё скругление, так что контейнеры встают как прежде.",
   "prop.gridfinityDrawerWidth": "Ширина ящика",
   "prop.gridfinityDrawerDepth": "Глубина ящика",
   "gridfinity.drawerHint": "Внутренний размер ящика; плита выходит на 0,5 мм меньше. Для ящика больше 334,5 мм или больше печатного стола нужно несколько плит.",

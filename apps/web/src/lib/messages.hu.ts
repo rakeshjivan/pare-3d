@@ -2306,6 +2306,8 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityPaddingLeft": "Szegélysáv a bal oldalon",
   "prop.gridfinityPaddingRight": "Szegélysáv a jobb oldalon",
   "gridfinity.paddingHint": "Tömör sáv a rácson kívül, hogy az alapkeret kitöltse a fiókot, amely nem egész számú egység. Módosítása megtartja az egységeket, és vele együtt változik a keret mérete.",
+  "prop.gridfinityCornerRadius": "Sarokrádiusz",
+  "gridfinity.cornerRadiusHint": "A keret négy külső sarkának sugara: 4 mm, ahogy a Gridfinity-specifikáció rajzolja, egészen 0-ig a derékszögű sarkokhoz, amelyek a fiók sarkaiba illeszkednek. A fészkek megtartják a lekerekítésüket, így a rekeszek ugyanúgy illeszkednek, mint eddig.",
   "prop.gridfinityDrawerWidth": "Fiók szélessége",
   "prop.gridfinityDrawerDepth": "Fiók mélysége",
   "gridfinity.drawerHint": "A fiók belső mérete; a keret 0,5 mm-rel kisebb lesz. A 334,5 mm-nél vagy a tárgyasztalnál nagyobb fiókhoz több alapkeret kell.",

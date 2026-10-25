@@ -251,6 +251,8 @@ export type ShapeCustomization = {
   gridfinityPaddingLeft?: number;
   /** Gridfinity baseplate: the border along the right. */
   gridfinityPaddingRight?: number;
+  /** Gridfinity baseplate: the radius of its four outer corners in mm; missing is the specification's 4, at least 0 (square), at most 4; the sockets keep theirs (#856). */
+  gridfinityCornerRadius?: number;
   /** Gridfinity bin: compartments across, a whole number; missing is 1, a bin without dividers (#554). */
   gridfinityCompartmentsX?: number;
   /** Gridfinity bin: compartments deep, a whole number; missing is 1. */
@@ -898,6 +900,8 @@ export type WorkplaneShape = {
   gridfinityPaddingLeft?: number;
   /** Gridfinity baseplate: the border along the right. */
   gridfinityPaddingRight?: number;
+  /** Gridfinity baseplate: the radius of its four outer corners in mm; missing is the specification's 4, at least 0 (square), at most 4; the sockets keep theirs (#856). */
+  gridfinityCornerRadius?: number;
   /** Gridfinity bin: compartments across, a whole number; missing is 1, a bin without dividers (#554). */
   gridfinityCompartmentsX?: number;
   /** Gridfinity bin: compartments deep, a whole number; missing is 1. */

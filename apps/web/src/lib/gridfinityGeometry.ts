@@ -102,7 +102,9 @@ import type { GridfinityCompartmentLabel, GridfinityLabelCorner, GridfinityOpeni
  * moves away from the padded sides. The box takes the padding in, and the units
  * are read from it less the padding. The outer cells' flat top and bottom reach
  * out to the padded outline, and a padded outer corner, whose rounding no longer
- * meets the cell's, is filled between the two.
+ * meets the cell's, is filled between the two. A baseplate's outer corners can
+ * be rounded less than the specification's 4 mm, down to square (#856), filled
+ * the same way; the sockets keep their rounding, so bins fit as before.
  *
  * The lip's top can be chamfered (#780) as the edge tool would: the chamfer
  * takes its size off the outer wall and off the slope a stacked bin's feet rest
@@ -171,6 +173,8 @@ export const MIN_GRIDFINITY_SCOOP_RADIUS = 3.5;
 export const MIN_GRIDFINITY_FLOOR_HEIGHT = GRIDFINITY_FOOT_HEIGHT + GRIDFINITY_FLOOR;
 /** A floor this close under the highest the bin takes is raised onto it, so no sliver of wall is left between them. */
 const FLOOR_SNAP = 0.05;
+/** A baseplate's corner radius this close under the sockets' 4 mm is built as 4 (#856), so no sliver of flat face under 0.05 mm wide is left between the two roundings. */
+const CORNER_SNAP = 0.05;
 export const DEFAULT_GRIDFINITY_DIVIDER_THICKNESS = 1.2;
 export const MIN_GRIDFINITY_DIVIDER_THICKNESS = 0.8;
 export const MAX_GRIDFINITY_DIVIDER_THICKNESS = 3;
@@ -255,6 +259,7 @@ export type GridfinityShapeFields = Pick<WorkplaneShape, "width" | "height"> & {
   gridfinityPaddingFront?: number;
   gridfinityPaddingLeft?: number;
   gridfinityPaddingRight?: number;
+  gridfinityCornerRadius?: number;
   gridfinityCompartmentsX?: number;
   gridfinityCompartmentsZ?: number;
   gridfinityDividerThickness?: number;
@@ -464,7 +469,10 @@ export function gridfinityPlan(shape: GridfinityShapeFields) {
   // The notches' corners, seen from outside the wall: each takes as much of the size as it has room for (gridfinityOpeningCorners).
   const openingCorner: GridfinityLabelCorner = shape.gridfinityOpeningCorner === "chamfer" ? "chamfer" : DEFAULT_GRIDFINITY_LABEL_CORNER;
   const openingCornerSize = Math.round(clampLabel(shape.gridfinityOpeningCornerSize, 0, 0, MAX_GRIDFINITY_LABEL_CORNER_SIZE) * 100) / 100;
-  return { type, count, lip, magnets, halfGrid: pitch !== GRIDFINITY_GRID, pitch, size, cells, magnetHoles, top, floor, floorRounding, open, switched, notches, openingCorner, openingCornerSize, padding, centre, lipChamfer, wallThickness, innerRadius, solid, reach: gridfinityOpenReach(wallThickness) };
+  // The baseplate's outer corners (#856), to 0.01 mm; within CORNER_SNAP of 4 they are built as 4. A bin's stay 3.75.
+  const setRadius = Math.round(clampLabel(shape.gridfinityCornerRadius, GRIDFINITY_BASEPLATE_RADIUS, 0, GRIDFINITY_BASEPLATE_RADIUS) * 100) / 100;
+  const cornerRadius = type === "bin" ? GRIDFINITY_BIN_RADIUS : GRIDFINITY_BASEPLATE_RADIUS - setRadius < CORNER_SNAP ? GRIDFINITY_BASEPLATE_RADIUS : setRadius;
+  return { type, count, lip, magnets, halfGrid: pitch !== GRIDFINITY_GRID, pitch, size, cells, magnetHoles, top, floor, floorRounding, open, switched, notches, openingCorner, openingCornerSize, padding, centre, cornerRadius, lipChamfer, wallThickness, innerRadius, solid, reach: gridfinityOpenReach(wallThickness) };
 }
 
 /** A notch cut out of a side's wall, partly open (#455): from and to along the side (x across, z deep), its bottom's height. */
@@ -588,6 +596,11 @@ export function gridfinityFloorHeight(shape: GridfinityShapeFields) {
 /** The chamfer on the lip's top as it is built (#780): none without the lip, at most 1 mm, to 0.01 mm. */
 export function gridfinityLipChamfer(shape: GridfinityShapeFields) {
   return gridfinityPlan(shape).lipChamfer;
+}
+
+/** The radius of a baseplate's outer corners as it is built (#856): 4 mm unless it is set, from 0 (square) to 4, to 0.01 mm, and 4 within CORNER_SNAP of it. */
+export function gridfinityCornerRadius(shape: GridfinityShapeFields) {
+  return gridfinityPlan(shape).cornerRadius;
 }
 
 /** Whether the bin's floor can be raised at all: not in a bin of 1 height unit with the lip, whose support reaches the floor. */
@@ -2100,7 +2113,8 @@ export function gridfinityTriangles(shape: GridfinityShapeFields) {
    * from: with `outer` (the body's outline in that cell) the strip between the
    * two arcs fills it, without it the arcs are the same and nothing is left.
    * A body corner made square by an open side is fanned like any other, and
-   * one beside a padded side is filled by paddedCorner.
+   * one beside a padded side, or rounded less than the cell (#856), is filled
+   * by paddedCorner.
    */
   const ring = (inner: LoopPoint[], box: Box, y: number, up: 1 | -1, outer?: LoopPoint[]) => {
     const per = inner.length / 4;
@@ -2124,7 +2138,7 @@ export function gridfinityTriangles(shape: GridfinityShapeFields) {
       const sx = end.nx + next.nx > 0 ? 1 : -1;
       const sz = end.nz + next.nz > 0 ? 1 : -1;
       if (box.edge(sx, "x") && box.edge(sz, "z") && !plan.open[sx > 0 ? "right" : "left"] && !plan.open[sz > 0 ? "front" : "back"]) {
-        if (plan.padding[sx > 0 ? "right" : "left"] > 0 || plan.padding[sz > 0 ? "front" : "back"] > 0) {
+        if (plan.padding[sx > 0 ? "right" : "left"] > 0 || plan.padding[sz > 0 ? "front" : "back"] > 0 || plan.cornerRadius !== radius) {
           paddedCorner(arc, project(end), project(next), y, up);
           continue;
         }
@@ -2145,10 +2159,11 @@ export function gridfinityTriangles(shape: GridfinityShapeFields) {
     }
   };
   /**
-   * A body corner of a padded baseplate (#455), where the corner of the cell's
-   * rounded square no longer meets the body's: the flat face from where the
-   * square's sides meet the cell's box, along the body's outline round its
-   * rounded corner, and back round the square's arc.
+   * A body corner of a padded baseplate (#455), or of one whose corners are
+   * rounded less (#856), where the corner of the cell's rounded square no
+   * longer meets the body's: the flat face from where the square's sides meet
+   * the cell's box, along the body's outline round its corner, and back round
+   * the square's arc.
    */
   const paddedCorner = (arc: LoopPoint[], from: { x: number; z: number }, to: { x: number; z: number }, y: number, up: 1 | -1) => {
     const body = outline(0);
@@ -2181,8 +2196,8 @@ export function gridfinityTriangles(shape: GridfinityShapeFields) {
   };
   const breaksX = breaks(count.x, plan.centre.x);
   const breaksZ = breaks(count.z, plan.centre.z);
-  const outline = (inset: number) => roundedLoop(0, 0, size.width / 2, size.depth / 2, radius, inset, breaksX, breaksZ);
-  const openOutline = (inset: number) => roundedLoop(0, 0, size.width / 2, size.depth / 2, radius, inset, breaksX, breaksZ, plan.open);
+  const outline = (inset: number) => roundedLoop(0, 0, size.width / 2, size.depth / 2, plan.cornerRadius, inset, breaksX, breaksZ);
+  const openOutline = (inset: number) => roundedLoop(0, 0, size.width / 2, size.depth / 2, plan.cornerRadius, inset, breaksX, breaksZ, plan.open);
   const cellOf = (cell: (typeof cells)[number], inset: number) => roundedLoop(cell.x, cell.z, cellHalf, cellHalf, radius, inset);
   // A cell's box, cut back to the body's outline at the edge; edge() says whether a side is the body's own.
   const cellBox = (cell: (typeof cells)[number]): Box => ({

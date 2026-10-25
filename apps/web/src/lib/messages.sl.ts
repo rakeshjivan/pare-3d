@@ -1802,6 +1802,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityPaddingLeft": "Pas levo",
   "prop.gridfinityPaddingRight": "Pas desno",
   "gridfinity.paddingHint": "Poln pas zunaj mreže, da podstavek zapolni predal, ki ni celo število enot. Sprememba pasu ohrani enote, velikost podstavka pa se spremeni z njim.",
+  "prop.gridfinityCornerRadius": "Polmer vogalov",
+  "gridfinity.cornerRadiusHint": "Polmer štirih zunanjih vogalov podstavka: 4 mm, kot jih riše specifikacija Gridfinity, vse do 0 za pravokotne vogale, ki se prilegajo vogalom predala. Ležišča ohranijo svojo zaobljenost, zato posode sedijo kot prej.",
   "prop.gridfinityDrawerWidth": "Širina predala",
   "prop.gridfinityDrawerDepth": "Globina predala",
   "gridfinity.drawerHint": "Notranja mera predala; podstavek je 0,5 mm manjši. Predal, večji od 334,5 mm ali od tiskalne plošče, potrebuje več podstavkov.",

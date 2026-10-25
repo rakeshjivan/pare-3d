@@ -2415,6 +2415,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "prop.gridfinityPaddingLeft": "Ausgleich links",
   "prop.gridfinityPaddingRight": "Ausgleich rechts",
   "gridfinity.paddingHint": "Ein massiver Streifen außerhalb des Rasters, damit die Bodenplatte eine Schublade füllt, die keine ganze Zahl von Einheiten misst. Ändert er sich, bleiben die Einheiten, und die Größe der Platte ändert sich mit.",
+  "prop.gridfinityCornerRadius": "Eckenradius",
+  "gridfinity.cornerRadiusHint": "Der Radius der vier äußeren Ecken der Platte, von 4 mm, wie die Gridfinity-Spezifikation sie zeichnet, bis 0 für rechtwinklige Ecken, die in die Ecken einer Schublade passen. Die Mulden behalten ihre Rundung, die Behälter passen also wie bisher.",
   "prop.gridfinityDrawerWidth": "Schubladenbreite",
   "prop.gridfinityDrawerDepth": "Schubladentiefe",
   "gridfinity.drawerHint": "Das Innenmaß der Schublade; die Platte wird 0,5 mm kleiner. Eine Schublade größer als 334,5 mm oder als dein Druckbett braucht mehrere Bodenplatten.",

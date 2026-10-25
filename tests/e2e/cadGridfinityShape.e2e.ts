@@ -712,6 +712,39 @@ describe("exact Gridfinity baseplates with padding", () => {
   });
 });
 
+describe("exact Gridfinity baseplates with a corner radius", () => {
+  /** A baseplate of x by z units, its box the grid and these paddings together, its outer corners rounded by r. */
+  const cornered = (x: number, z: number, r: number, [back, front, left, right] = [0, 0, 0, 0]) => plate({ width: x * 42 + left + right, depth: z * 42 + back + front, gridfinityPaddingBack: back, gridfinityPaddingFront: front, gridfinityPaddingLeft: left, gridfinityPaddingRight: right, gridfinityCornerRadius: r });
+
+  it("builds a baseplate with any corner radius, padded or not, as one valid solid with the mesh's volume and box", () => {
+    for (const [x, z, p] of [[2, 1, [0, 0, 0, 0]], [1, 1, [0, 0, 0, 0]], [2, 1, [0, 16.2, 0, 14.2]], [1, 1, [5, 5, 5, 5]]] as const) {
+      const base = Math.abs(cad.getVolume(gridfinityPartSolid(cad, cornered(x, z, 4, [...p]))));
+      for (const r of [0, 0.5, 2, 3.9, 3.94, 4]) {
+        const part = cornered(x, z, r, [...p]);
+        const context = JSON.stringify({ x, z, p, r });
+        const solid = gridfinityPartSolid(cad, part);
+        expect(cad.isValid(solid), context).toBe(true);
+        expect(cad.isSolid(solid) ? 1 : cad.getSubShapes(solid, "solid").length, context).toBe(1);
+        const exact = Math.abs(cad.getVolume(solid));
+        expect(Math.abs(exact - meshVolume(part)) / exact, context).toBeLessThan(0.002);
+        // Each corner gains the plate's 5 mm over the area between its rounding and the specification's 4 mm one.
+        expect(exact - base, context).toBeCloseTo(4 * 5 * (16 - r * r) * (1 - Math.PI / 4), 3);
+        const box = cad.getBoundingBox(solid);
+        const { min, max } = meshBounds(part);
+        [box.xmin - min[0], box.ymin - min[1], box.zmin - min[2], box.xmax - max[0], box.ymax - max[1], box.zmax - max[2]].forEach((d) => expect(Math.abs(d), context).toBeLessThan(0.01));
+        expect(cad.getSubShapes(solid, "edge").filter((edge) => cad.getLength(edge) > 1e-9 && cad.getLength(edge) < 0.01), context).toHaveLength(0);
+      }
+    }
+  });
+
+  it("seats a bin in the corner socket of a square-cornered baseplate as before, 0.25 mm up", () => {
+    const p = gridfinityPartSolid(cad, cornered(2, 1, 0));
+    const seated = cad.translate(gridfinityPartSolid(cad, bin({ width: 41.5, depth: 41.5 })), -21, 0.25, 0);
+    expect(overlap(seated, p)).toBeLessThan(0.01);
+    expect(overlap(cad.translate(seated, 0.3, 0, 0), p)).toBeGreaterThan(1);
+  });
+});
+
 describe("exact Gridfinity bins with a set wall", () => {
   /** One valid solid with the mesh's volume and box. */
   const expectBuilt = (part: CadModifierGridfinityPart, tolerance = 0.002) => {

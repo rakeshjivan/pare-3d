@@ -33,6 +33,7 @@ import {
   gridfinityCompartmentMax,
   gridfinityCompartmentPieces,
   gridfinityCompartments,
+  gridfinityCornerRadius,
   gridfinityDividerBound,
   gridfinityDividerFits,
   gridfinityDividerLimits,
@@ -2361,6 +2362,85 @@ describe("gridfinity baseplate padding", { timeout: 60_000 }, () => {
     // The default is 2 x 1 units: 84 x 42, and 30 mm on the right makes it 114 across, not 1 unit and 30 mm.
     expect(makeShapeFromAsset(asset, { x: 0, z: 0 }, { gridfinityType: "baseplate", gridfinityPaddingRight: 30, gridfinityPaddingFront: 41 })).toMatchObject({ width: 114, depth: 83 });
     expect(makeShapeFromAsset(asset, { x: 0, z: 0 }, { gridfinityType: "baseplate", gridfinityPaddingRight: 30, width: 114 })).toMatchObject({ width: 114 });
+  });
+});
+
+describe("gridfinity baseplate corner radius", { timeout: 60_000 }, () => {
+  /** What the mesh's rounding of radius r takes off a square corner: the square less the fan of its eight steps. */
+  const cornerOff = (r: number) => r * r * (1 - 4 * Math.sin(Math.PI / 16));
+  const pad = (back: number, front: number, left: number, right: number) => ({ gridfinityPaddingBack: back, gridfinityPaddingFront: front, gridfinityPaddingLeft: left, gridfinityPaddingRight: right });
+
+  it("is the baseplate it was at 4 mm or unset, and a bin is built as before with it set", () => {
+    expect(gridfinityCornerRadius(plate())).toBe(4);
+    expect(gridfinityTriangles(plate({ gridfinityCornerRadius: 4 }))).toStrictEqual(gridfinityTriangles(plate()));
+    expect(gridfinityTriangles(bin({ gridfinityCornerRadius: 0 }))).toStrictEqual(gridfinityTriangles(bin()));
+    expect(gridfinityPlan(bin({ gridfinityCornerRadius: 0 }))).toStrictEqual(gridfinityPlan(bin()));
+  });
+
+  it("keeps the radius from 0 to 4 mm, to 0.01 mm, and builds one within 0.05 mm under the sockets' 4 mm as 4", () => {
+    for (const [value, built] of [[2.346, 2.35], [0, 0], [0.004, 0], [-1, 0], [7, 4], [Number.NaN, 4], ["wide", 4], [3.94, 3.94], [3.95, 4], [3.96, 4], [3.99, 4]] as const) {
+      expect(gridfinityCornerRadius(plate({ gridfinityCornerRadius: value })), `${value}`).toBe(built);
+    }
+  });
+
+  it("is closed, wound outwards and one piece at any radius, padded or not, the corners filled out to it and the box and sockets as before", () => {
+    for (const [x, z, p] of [[1, 1, [0, 0, 0, 0]], [2, 1, [0, 0, 0, 0]], [3, 2, [0, 0, 0, 0]], [2, 1, [0, 16.2, 0, 14.2]], [1, 1, [5, 5, 5, 5]], [2, 2, [0, 3, 0, 0]]] as const) {
+      const w = x * 42 + p[2] + p[3];
+      const d = z * 42 + p[0] + p[1];
+      const shape = (r: number) => plate({ width: w, depth: d, ...pad(...p), gridfinityCornerRadius: r });
+      const base = signedVolume(gridfinityTriangles(shape(4)));
+      for (const r of [0, 0.5, 2, 3.9, 4]) {
+        const triangles = gridfinityTriangles(shape(r));
+        const context = JSON.stringify({ x, z, p, r });
+        expect(edgeProblems(triangles), context).toBe(0);
+        expect(components(triangles), context).toBe(1);
+        // Each of the four corners gains the plate's 5 mm over what the smaller rounding no longer takes off.
+        expect(signedVolume(triangles), context).toBeCloseTo(base + 4 * 5 * (cornerOff(4) - cornerOff(r)), 6);
+        const { min, max } = bounds(triangles);
+        [min[0] + w / 2, max[0] - w / 2, min[2] + d / 2, max[2] - d / 2, min[1], max[1] - 5].forEach((v) => expect(Math.abs(v), context).toBeLessThan(1e-9));
+      }
+      // Square, the plate reaches its box's corners at the top and the bottom.
+      const square = gridfinityTriangles(shape(0)).flat();
+      for (const [cx, cz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        for (const y of [0, 5]) expect(square.some((v) => Math.abs(v[0] - (cx * w) / 2) < 1e-9 && Math.abs(v[1] - y) < 1e-9 && Math.abs(v[2] - (cz * d) / 2) < 1e-9), `${cx} ${y} ${cz}`).toBe(true);
+      }
+    }
+  });
+
+  it("keeps the radius through a saved project, the settings and the exact body, and refuses nonsense", async () => {
+    const settings = { gridfinityCornerRadius: 1.5 };
+    const shape = canonicalizeShape({ ...binShape({ gridfinityType: "baseplate", width: 84, depth: 42, height: 5 }), ...settings });
+    expect(shape).toMatchObject(settings);
+    expect(workplaneShapesEqual(shape, { ...shape, gridfinityCornerRadius: 2 })).toBe(false);
+    const save = (shapes: WorkplaneShape[]) => exportLylProject({
+      projectId: "corner",
+      projectName: "Corner",
+      createdAt: 1_700_000_000_000,
+      modifiedAt: 1_700_000_100_000,
+      shapes,
+      history: [editorHistoryEntry(shapes, [])],
+      historyIndex: 0,
+      assets: [],
+      workspace: DEFAULT_WORKPLANE_WORKSPACE,
+      snapGrid: DEFAULT_SNAP_GRID,
+      placementElevation: 0,
+    });
+    const [loaded] = (await importLylProject(await save([shape]))).shapes;
+    expect(workplaneShapesEqual(loaded, shape)).toBe(true);
+    expect(loaded).toMatchObject(settings);
+    expect(sceneShape(shape)).toMatchObject(settings);
+    expect(cadModifierGridfinityForShape(shape)).toMatchObject(settings);
+    expect(normalizeShapeCustomizations({ gridfinity: settings }, {})).toMatchObject({ gridfinity: settings });
+    expect(shapeDefaultsFromShape(shape)).toMatchObject(settings);
+    expect(mcpShapeSummary(shape).settings).toMatchObject(settings);
+    const asset = toolbarShapeAssets.find((entry) => entry.kind === "gridfinity")!;
+    expect(makeShapeFromAsset(asset, { x: 0, z: 0 }, { ...settings, gridfinityType: "baseplate" })).toMatchObject(settings);
+    await expect(importLylProject(await save([{ ...shape, gridfinityCornerRadius: "round" } as unknown as WorkplaneShape]))).rejects.toThrow("gridfinityCornerRadius must be a finite number");
+    await expect(importLylProject(await save([{ ...shape, gridfinityCornerRadius: -1 }]))).rejects.toThrow("gridfinityCornerRadius is outside the supported range");
+    // The mesh that booleans and exports use has the smaller corners: 5 mm over the area they add.
+    const meshVolume = (s: WorkplaneShape) => { const { vertices, faces } = meshForShape(s); return signedVolume(faces.map((face) => face.map((i) => vertices[i]) as V[])); };
+    const plain = canonicalizeShape(binShape({ gridfinityType: "baseplate", width: 84, depth: 42, height: 5 }));
+    expect(meshVolume(shape) - meshVolume(plain)).toBeCloseTo(4 * 5 * (cornerOff(4) - cornerOff(1.5)), 4);
   });
 });
 

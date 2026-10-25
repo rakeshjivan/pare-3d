@@ -2273,6 +2273,8 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityPaddingLeft": "Fascia a sinistra",
   "prop.gridfinityPaddingRight": "Fascia a destra",
   "gridfinity.paddingHint": "Una fascia piena fuori dalla griglia, perché la base a griglia riempia un cassetto che non misura un numero intero di unità. Cambiarla mantiene le unità e cambia con essa la misura della base.",
+  "prop.gridfinityCornerRadius": "Raggio degli angoli",
+  "gridfinity.cornerRadiusHint": "Il raggio dei quattro angoli esterni della base: 4 mm come li disegna la specifica Gridfinity, fino a 0 per angoli vivi che si adattano agli angoli di un cassetto. Gli alloggi mantengono il loro raccordo, quindi i contenitori si appoggiano come prima.",
   "prop.gridfinityDrawerWidth": "Larghezza del cassetto",
   "prop.gridfinityDrawerDepth": "Profondità del cassetto",
   "gridfinity.drawerHint": "L'interno del cassetto; la base viene 0,5 mm più piccola. Un cassetto più grande di 334,5 mm o del piano di stampa richiede più basi a griglia.",

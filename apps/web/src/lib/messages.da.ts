@@ -2276,6 +2276,8 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityPaddingLeft": "Stribe til venstre",
   "prop.gridfinityPaddingRight": "Stribe til højre",
   "gridfinity.paddingHint": "En massiv stribe uden for gitteret, så bundpladen fylder en skuffe, der ikke er et helt antal enheder. Ændres den, forbliver enhederne de samme, og pladens størrelse ændres med.",
+  "prop.gridfinityCornerRadius": "Hjørneradius",
+  "gridfinity.cornerRadiusHint": "Radius på pladens fire yderhjørner: 4 mm som Gridfinity-specifikationen tegner dem, ned til 0 for skarpe hjørner, der passer i en skuffes hjørner. Fordybningerne beholder deres afrunding, så bakkerne passer som før.",
   "prop.gridfinityDrawerWidth": "Skuffens bredde",
   "prop.gridfinityDrawerDepth": "Skuffens dybde",
   "gridfinity.drawerHint": "Skuffens indvendige mål; pladen bliver 0,5 mm mindre. En skuffe større end 334,5 mm eller end byggepladen kræver flere bundplader.",

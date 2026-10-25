@@ -320,6 +320,7 @@ export type CadModifierGridfinityPart = {
   gridfinityPaddingFront?: number;
   gridfinityPaddingLeft?: number;
   gridfinityPaddingRight?: number;
+  gridfinityCornerRadius?: number;
   gridfinityCompartmentsX?: number;
   gridfinityCompartmentsZ?: number;
   gridfinityDividerThickness?: number;

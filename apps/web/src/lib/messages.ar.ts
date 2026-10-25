@@ -2368,6 +2368,8 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityPaddingLeft": "حاشية من اليسار",
   "prop.gridfinityPaddingRight": "حاشية من اليمين",
   "gridfinity.paddingHint": "حاشية مصمتة خارج الشبكة، كي يملأ لوح الشبكة درجًا لا يساوي عددًا صحيحًا من الوحدات. تغييرها يُبقي عدد الوحدات ويغيّر مقاس اللوح معها.",
+  "prop.gridfinityCornerRadius": "نصف قطر الزوايا",
+  "gridfinity.cornerRadiusHint": "نصف قطر الزوايا الخارجية الأربع للوح: 4 مم كما ترسمها مواصفة Gridfinity، حتى 0 لزوايا قائمة تناسب زوايا الدرج. تحتفظ التجاويف باستدارتها، فتوضع العلب فيها كما من قبل.",
   "prop.gridfinityDrawerWidth": "عرض الدرج",
   "prop.gridfinityDrawerDepth": "عمق الدرج",
   "gridfinity.drawerHint": "المقاس الداخلي للدرج؛ يخرج اللوح أصغر بمقدار 0.5 مم. والدرج الأكبر من 334.5 مم أو من سرير الطباعة يحتاج إلى عدة ألواح.",

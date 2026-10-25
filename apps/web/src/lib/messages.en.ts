@@ -2415,6 +2415,8 @@ export const MESSAGES_EN = {
   "prop.gridfinityPaddingLeft": "Padding on the left",
   "prop.gridfinityPaddingRight": "Padding on the right",
   "gridfinity.paddingHint": "A solid border outside the grid, so the baseplate fills a drawer that is not a whole number of units. A change of padding keeps the units and changes the plate's size with it.",
+  "prop.gridfinityCornerRadius": "Corner radius",
+  "gridfinity.cornerRadiusHint": "The radius of the plate's four outer corners: 4 mm as the Gridfinity specification draws them, down to 0 for square corners that sit in a drawer's corners. The sockets keep their rounding, so bins fit as before.",
   "prop.gridfinityDrawerWidth": "Drawer width",
   "prop.gridfinityDrawerDepth": "Drawer depth",
   "gridfinity.drawerHint": "The inside of the drawer; the plate comes out 0.5 mm smaller. A drawer over 334.5 mm, or larger than your print bed, takes several baseplates.",
