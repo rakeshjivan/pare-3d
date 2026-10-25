@@ -157,6 +157,7 @@ import { pivotKeptAhead, ZOOM_PIVOT_REACH_MM, pivotHeightRange, pivotPlateReach 
 import { pointerReach } from "@/lib/pointerReach";
 import { boxSnapSpots, measurementMiddle, nearestReferenceOnScreen, type ReferencePosition } from "@/lib/referencePoints";
 import { planarFaceTriangles, type PivotPoint } from "@/lib/rotationPivot";
+import { roundFaceTriangles } from "@/lib/roundFaceAxis";
 import { OVERHANG_PLATE_TOLERANCE, overhangDownwardLimit } from "@/lib/overhangLimits";
 import { directionIsOwnShapeAxis, rotatedGeometryShapePatch, rotationPatchFromQuaternion as sharedRotationPatchFromQuaternion, signedDegrees } from "@/lib/geometryRotation";
 import type { CadModifierEdge } from "@/lib/cadModifierTypes";
@@ -170,7 +171,7 @@ import { useViewportKeyboardHooks } from "@/components/workplane/viewportKeyboar
 import { pullDistanceAlongNormal, snapPullDistance, typedPull } from "@/lib/facePull";
 
 type Vec3Like = { x: number; y: number; z: number };
-import { aimPickRay, firstShapeHit, pickLayFlatFace, pickRotationPivot, pickShapeAt, pickShapeIdAt, pointerRayFor, rayPointOnRotationPlane, RENDER_LAYER_SHAPES, splitAxisParameter, usePickOnlyPointer, type LayFlatPick, type PickOnlySelection } from "@/components/workplane/viewportPicking";
+import { aimPickRay, firstShapeHit, pickLayFlatFace, pickMateFace, pickRotationPivot, pickShapeAt, pickShapeIdAt, pointerRayFor, rayPointOnRotationPlane, RENDER_LAYER_SHAPES, splitAxisParameter, usePickOnlyPointer, type LayFlatPick, type PickOnlySelection } from "@/components/workplane/viewportPicking";
 export type { LayFlatPick } from "@/components/workplane/viewportPicking";
 import { fastEdgesGeometry } from "@/lib/fastEdgesGeometry";
 import { buildImportedMeshGeometry, computeImportedBoundsTree, putGeometryOnBase, takePreparedImportedMeshGeometry } from "@/lib/importedMeshDisplay";
@@ -440,7 +441,7 @@ type WorkplaneViewportProps = {
   onLayFlatPick?: (pick: LayFlatPick | null) => void;
   /** "Align faces" waiting for a click on a face of one of these bodies. */
   /** `marker: "point"` shows a small ring where the click lands instead of shading the face (text on a surface). */
-  mateFacePick?: { shapeIds: string[]; marker?: "face" | "point"; dragId?: string } | null;
+  mateFacePick?: { shapeIds: string[]; round?: boolean; marker?: "face" | "point"; dragId?: string } | null;
   onMateFacePick?: (pick: (LayFlatPick & { dragging?: boolean }) | null) => void;
   /** Fork (build 35): a double-click on text laid on a surface opens it for editing. */
   onEditSurfaceText?: () => void;
@@ -7939,7 +7940,7 @@ export function WorkplaneViewport({
 
       if (mateFacePickRef.current) {
         event.preventDefault();
-        const pick = pickLayFlatFace(state, event.clientX, event.clientY);
+        const pick = mateFacePickRef.current.round ? pickMateFace(state, event.clientX, event.clientY) : pickLayFlatFace(state, event.clientX, event.clientY);
         onMateFacePick?.(pick);
         // Fork (build 35): text being placed can be dragged across the part, as in Bambu Studio.
         if (pick && mateFacePickRef.current.marker === "point" && mateFacePickRef.current.dragId === pick.shapeId) {
@@ -8520,7 +8521,7 @@ export function WorkplaneViewport({
         return;
       }
       if (mateFacePickRef.current) {
-        syncLayFlatHover(threeRef.current, mateFacePickRef.current.shapeIds, resolvedThemeRef.current, event.clientX, event.clientY, mateFacePickRef.current.marker === "point");
+        syncLayFlatHover(threeRef.current, mateFacePickRef.current.shapeIds, resolvedThemeRef.current, event.clientX, event.clientY, mateFacePickRef.current.marker === "point", mateFacePickRef.current.round);
         return;
       }
       if (cadFacePickRef.current && threeRef.current) {
@@ -13380,6 +13381,7 @@ function syncLayFlatHover(
   clientX: number | null,
   clientY: number | null,
   pointMarker = false,
+  round = false,
 ) {
   if (!state) return;
   let layer = state.layFlatHoverLayer;
@@ -13439,7 +13441,7 @@ function syncLayFlatHover(
     return;
   }
 
-  const key = `${mesh.uuid}:${hit.faceIndex}:${theme}`;
+  const key = `${mesh.uuid}:${hit.faceIndex}:${theme}:${round}`;
   if (layer.userData.key === key) return;
 
   mesh.updateWorldMatrix(true, false);
@@ -13461,7 +13463,7 @@ function syncLayFlatHover(
       world[offset * 3 + 2] = corner.z;
     }
     positions = world;
-    triangles = planarFaceTriangles(world, hit.faceIndex)?.triangles ?? triangles;
+    triangles = (round ? roundFaceTriangles(world, hit.faceIndex) : planarFaceTriangles(world, hit.faceIndex))?.triangles ?? triangles;
   } else {
     const world = new Float64Array(9);
     for (let offset = 0; offset < 3; offset += 1) {
