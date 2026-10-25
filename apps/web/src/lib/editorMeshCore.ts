@@ -525,6 +525,7 @@ function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {
         gridfinityOpenFront: shape.gridfinityOpenFront,
         gridfinityOpenLeft: shape.gridfinityOpenLeft,
         gridfinityOpenRight: shape.gridfinityOpenRight,
+        gridfinityLipChamfer: shape.gridfinityLipChamfer,
         gridfinityPaddingBack: shape.gridfinityPaddingBack,
         gridfinityPaddingFront: shape.gridfinityPaddingFront,
         gridfinityPaddingLeft: shape.gridfinityPaddingLeft,

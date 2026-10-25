@@ -2253,6 +2253,8 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityUnitsZ": "Egység mélységben",
   "prop.gridfinityUnitsY": "Magassági egység",
   "prop.gridfinityLip": "Halmozóperem",
+  "prop.gridfinityLipChamfer": "Halmozóperem letörése",
+  "gridfinity.lipChamferHint": "Letöri a halmozóperem felső élét; 0-nál éles marad, ahogy a Gridfinity-specifikáció rajzolja.",
   "prop.gridfinityMagnets": "Mágneslyukak",
   "prop.gridfinityHalfGrid": "Fél rács (21 mm)",
   "gridfinity.halfGridHint": "A szélességi és mélységi egységek 21 mm-es cellákat számolnak, mindegyiknek saját lába van; négy áll az alapkeret egy fészkében.",

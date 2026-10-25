@@ -1753,6 +1753,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityUnitsZ": "Enot v globino",
   "prop.gridfinityUnitsY": "Višinskih enot",
   "prop.gridfinityLip": "Obroba za zlaganje",
+  "prop.gridfinityLipChamfer": "Posnetje obrobe",
+  "gridfinity.lipChamferHint": "Posname zgornji rob obrobe za zlaganje; pri 0 ostane oster, kot ga riše specifikacija Gridfinity.",
   "prop.gridfinityMagnets": "Luknje za magnete",
   "prop.gridfinityHalfGrid": "Polovična mreža (21 mm)",
   "gridfinity.halfGridHint": "Enote v širino in globino štejejo celice po 21 mm, vsako s svojo nogo; štiri stojijo v enem ležišču podstavka.",

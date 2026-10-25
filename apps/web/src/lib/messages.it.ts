@@ -2220,6 +2220,8 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityUnitsZ": "Unità in profondità",
   "prop.gridfinityUnitsY": "Unità di altezza",
   "prop.gridfinityLip": "Bordo di impilamento",
+  "prop.gridfinityLipChamfer": "Smusso del bordo di impilamento",
+  "gridfinity.lipChamferHint": "Smussa lo spigolo superiore del bordo di impilamento; a 0 resta vivo, come lo disegna la specifica Gridfinity.",
   "prop.gridfinityMagnets": "Fori per magneti",
   "prop.gridfinityHalfGrid": "Mezza griglia (21 mm)",
   "gridfinity.halfGridHint": "Le unità in larghezza e in profondità contano celle da 21 mm, ognuna con il proprio piede; quattro stanno in un alloggio della base a griglia.",

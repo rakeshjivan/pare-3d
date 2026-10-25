@@ -2264,6 +2264,8 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityUnitsZ": "Derinlikte birim",
   "prop.gridfinityUnitsY": "Yükseklikte birim",
   "prop.gridfinityLip": "İstifleme kenarı",
+  "prop.gridfinityLipChamfer": "İstifleme kenarı pahı",
+  "gridfinity.lipChamferHint": "İstifleme kenarının üst kenarına pah kırar; 0'da, Gridfinity şartnamesinin çizdiği gibi keskin kalır.",
   "prop.gridfinityMagnets": "Mıknatıs delikleri",
   "prop.gridfinityHalfGrid": "Yarım ızgara (21 mm)",
   "gridfinity.halfGridHint": "Genişlik ve derinlik birimleri 21 mm'lik hücreleri sayar, her birinin kendi ayağı vardır; dördü taban plakasının bir yuvasında durur.",

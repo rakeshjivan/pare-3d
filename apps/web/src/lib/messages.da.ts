@@ -2226,6 +2226,8 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityUnitsZ": "Enheder i dybden",
   "prop.gridfinityUnitsY": "Højdeenheder",
   "prop.gridfinityLip": "Stabelkrave",
+  "prop.gridfinityLipChamfer": "Fas på stabelkraven",
+  "gridfinity.lipChamferHint": "Faser stabelkravens øverste kant; ved 0 forbliver den skarp, som Gridfinity-specifikationen tegner den.",
   "prop.gridfinityMagnets": "Magnethuller",
   "prop.gridfinityHalfGrid": "Halvt gitter (21 mm)",
   "gridfinity.halfGridHint": "Enheder i bredden og dybden tæller celler på 21 mm, hver med sin egen fod; fire står i én fordybning i bundpladen.",

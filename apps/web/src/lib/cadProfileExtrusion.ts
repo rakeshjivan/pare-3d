@@ -1429,6 +1429,7 @@ export function cadModifierGridfinityForShape(shape: WorkplaneShape): CadModifie
     gridfinityOpenFront: shape.gridfinityOpenFront,
     gridfinityOpenLeft: shape.gridfinityOpenLeft,
     gridfinityOpenRight: shape.gridfinityOpenRight,
+    gridfinityLipChamfer: shape.gridfinityLipChamfer,
     gridfinityPaddingBack: shape.gridfinityPaddingBack,
     gridfinityPaddingFront: shape.gridfinityPaddingFront,
     gridfinityPaddingLeft: shape.gridfinityPaddingLeft,

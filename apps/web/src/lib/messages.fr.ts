@@ -2316,6 +2316,8 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityUnitsZ": "Unités en profondeur",
   "prop.gridfinityUnitsY": "Unités de hauteur",
   "prop.gridfinityLip": "Rebord d'empilage",
+  "prop.gridfinityLipChamfer": "Chanfrein du rebord",
+  "gridfinity.lipChamferHint": "Chanfreine l'arête supérieure du rebord d'empilage ; à 0, elle reste vive, comme la spécification Gridfinity la dessine.",
   "prop.gridfinityMagnets": "Trous pour aimants",
   "prop.gridfinityHalfGrid": "Demi-grille (21 mm)",
   "gridfinity.halfGridHint": "Les unités en largeur et en profondeur comptent des cellules de 21 mm, chacune avec son propre pied ; quatre se posent dans un logement du socle.",

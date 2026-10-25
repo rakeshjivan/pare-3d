@@ -2298,6 +2298,8 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityUnitsZ": "Jednostki w głąb",
   "prop.gridfinityUnitsY": "Jednostki wysokości",
   "prop.gridfinityLip": "Kołnierz piętrowania",
+  "prop.gridfinityLipChamfer": "Fazka kołnierza",
+  "gridfinity.lipChamferHint": "Fazuje górną krawędź kołnierza piętrowania; przy 0 pozostaje ostra, tak jak rysuje ją specyfikacja Gridfinity.",
   "prop.gridfinityMagnets": "Otwory na magnesy",
   "prop.gridfinityHalfGrid": "Siatka połówkowa (21 mm)",
   "gridfinity.halfGridHint": "Jednostki wszerz i w głąb liczą komórki po 21 mm, każdą z własną stopką; cztery stoją w jednym gnieździe podstawki.",

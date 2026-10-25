@@ -2342,6 +2342,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "prop.gridfinityUnitsZ": "Jednotek do hloubky",
   "prop.gridfinityUnitsY": "Výškových jednotek",
   "prop.gridfinityLip": "Stohovací okraj",
+  "prop.gridfinityLipChamfer": "Zkosení stohovacího okraje",
+  "gridfinity.lipChamferHint": "Zkosí horní hranu stohovacího okraje; při 0 zůstane ostrá, jak ji kreslí specifikace Gridfinity.",
   "prop.gridfinityMagnets": "Otvory pro magnety",
   "prop.gridfinityHalfGrid": "Poloviční mřížka (21 mm)",
   "gridfinity.halfGridHint": "Jednotky do šířky a do hloubky počítají buňky po 21 mm, každou s vlastní nožkou; čtyři stojí v jednom lůžku nosné desky.",

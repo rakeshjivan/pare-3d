@@ -235,6 +235,8 @@ export type ShapeCustomization = {
   gridfinityOpenLeft?: boolean;
   /** Gridfinity bin: no wall and no stacking lip along the right. */
   gridfinityOpenRight?: boolean;
+  /** Gridfinity bin with the lip: a chamfer on the lip's top in mm, down the outer wall and down the slope, as the edge tool's; missing is none, sharp as the specification draws it, at most 1 (#780). */
+  gridfinityLipChamfer?: number;
   /** Gridfinity baseplate: a solid border at the plate's height along the back, in mm, outside the grid and inside the box; missing is none, at most 41 (#455). */
   gridfinityPaddingBack?: number;
   /** Gridfinity baseplate: the border along the front. */
@@ -864,6 +866,8 @@ export type WorkplaneShape = {
   gridfinityOpenLeft?: boolean;
   /** Gridfinity bin: no wall and no stacking lip along the right. */
   gridfinityOpenRight?: boolean;
+  /** Gridfinity bin with the lip: a chamfer on the lip's top in mm, down the outer wall and down the slope, as the edge tool's; missing is none, sharp as the specification draws it, at most 1 (#780). */
+  gridfinityLipChamfer?: number;
   /** Gridfinity baseplate: a solid border at the plate's height along the back, in mm, outside the grid and inside the box; missing is none, at most 41 (#455). */
   gridfinityPaddingBack?: number;
   /** Gridfinity baseplate: the border along the front. */

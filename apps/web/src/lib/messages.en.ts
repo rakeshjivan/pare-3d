@@ -2361,6 +2361,8 @@ export const MESSAGES_EN = {
   "prop.gridfinityUnitsZ": "Units deep",
   "prop.gridfinityUnitsY": "Units high",
   "prop.gridfinityLip": "Stacking lip",
+  "prop.gridfinityLipChamfer": "Lip chamfer",
+  "gridfinity.lipChamferHint": "Chamfers the top edge of the stacking lip; 0 leaves it sharp, as the Gridfinity specification draws it.",
   "prop.gridfinityMagnets": "Magnet holes",
   "prop.gridfinityHalfGrid": "Half-size grid (21 mm)",
   "gridfinity.halfGridHint": "Units across and deep count cells of 21 mm, each with a foot of its own; four stand in one socket of a baseplate.",

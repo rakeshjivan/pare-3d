@@ -2315,6 +2315,8 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityUnitsZ": "وحدات في العمق",
   "prop.gridfinityUnitsY": "وحدات الارتفاع",
   "prop.gridfinityLip": "حافة التكديس",
+  "prop.gridfinityLipChamfer": "شطف حافة التكديس",
+  "gridfinity.lipChamferHint": "يشطف الحافة العلوية لحافة التكديس؛ عند 0 تبقى حادة كما ترسمها مواصفة Gridfinity.",
   "prop.gridfinityMagnets": "ثقوب المغناطيس",
   "prop.gridfinityHalfGrid": "نصف شبكة (21 مم)",
   "gridfinity.halfGridHint": "تحسب الوحدات في العرض والعمق خلايا من 21 مم، لكل منها قدم خاصة بها؛ وتقف أربع منها في تجويف واحد من لوح الشبكة.",

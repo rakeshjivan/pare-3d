@@ -2331,6 +2331,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "prop.gridfinityUnitsZ": "Eenheden diep",
   "prop.gridfinityUnitsY": "Eenheden hoog",
   "prop.gridfinityLip": "Stapellip",
+  "prop.gridfinityLipChamfer": "Afschuining stapellip",
+  "gridfinity.lipChamferHint": "Schuint de bovenrand van de stapellip af; bij 0 blijft hij scherp, zoals de Gridfinity-specificatie hem tekent.",
   "prop.gridfinityMagnets": "Magneetgaten",
   "prop.gridfinityHalfGrid": "Half raster (21 mm)",
   "gridfinity.halfGridHint": "Eenheden breed en diep tellen cellen van 21 mm, elk met een eigen voet; vier staan in één vak van een draagplaat.",

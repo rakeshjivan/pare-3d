@@ -2324,6 +2324,8 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "prop.gridfinityUnitsZ": "Ячеек по глубине",
   "prop.gridfinityUnitsY": "Единиц высоты",
   "prop.gridfinityLip": "Штабельный бортик",
+  "prop.gridfinityLipChamfer": "Фаска бортика",
+  "gridfinity.lipChamferHint": "Снимает фаску с верхней кромки штабельного бортика; при 0 кромка остаётся острой, как в спецификации Gridfinity.",
   "prop.gridfinityMagnets": "Отверстия под магниты",
   "prop.gridfinityHalfGrid": "Половинная сетка (21 мм)",
   "gridfinity.halfGridHint": "Ширина и глубина считаются в клетках по 21 мм, у каждой своя ножка; четыре встают в одно гнездо базовой плиты.",

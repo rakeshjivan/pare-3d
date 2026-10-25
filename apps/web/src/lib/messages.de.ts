@@ -2361,6 +2361,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "prop.gridfinityUnitsZ": "Einheiten tief",
   "prop.gridfinityUnitsY": "Einheiten hoch",
   "prop.gridfinityLip": "Stapelrand",
+  "prop.gridfinityLipChamfer": "Fase am Stapelrand",
+  "gridfinity.lipChamferHint": "Versieht die obere Kante des Stapelrands mit einer Fase; bei 0 bleibt sie scharf, wie die Gridfinity-Spezifikation sie zeichnet.",
   "prop.gridfinityMagnets": "Magnetlöcher",
   "prop.gridfinityHalfGrid": "Halbes Raster (21 mm)",
   "gridfinity.halfGridHint": "Einheiten breit und tief zählen Zellen von 21 mm, jede mit einem eigenen Fuß; vier stehen in einer Mulde der Bodenplatte.",
