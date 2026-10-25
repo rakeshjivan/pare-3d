@@ -646,6 +646,10 @@ export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
     a.gridfinityScoopRight === b.gridfinityScoopRight &&
     a.gridfinityScoopRadius === b.gridfinityScoopRadius &&
     a.gridfinityFloorHeight === b.gridfinityFloorHeight &&
+    a.gridfinityOpenBack === b.gridfinityOpenBack &&
+    a.gridfinityOpenFront === b.gridfinityOpenFront &&
+    a.gridfinityOpenLeft === b.gridfinityOpenLeft &&
+    a.gridfinityOpenRight === b.gridfinityOpenRight &&
     a.gridfinityCompartmentsX === b.gridfinityCompartmentsX &&
     a.gridfinityCompartmentsZ === b.gridfinityCompartmentsZ &&
     a.gridfinityDividerThickness === b.gridfinityDividerThickness &&

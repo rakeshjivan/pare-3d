@@ -186,6 +186,7 @@ import { MAX_KNURL_ANGLE, MIN_KNURL_ANGLE, MIN_KNURL_COUNT, MIN_KNURL_DEPTH, knu
 import {
   DEFAULT_GRIDFINITY_LABEL_CORNER,
   GRIDFINITY_LABEL_WALL_KEYS,
+  GRIDFINITY_OPEN_WALL_KEYS,
   GRIDFINITY_SCOOP_WALL_KEYS,
   MAX_GRIDFINITY_DIVIDER_THICKNESS,
   MAX_GRIDFINITY_HEIGHT_UNITS,
@@ -220,6 +221,7 @@ import {
   gridfinityLabelMaxWidth,
   gridfinityLabelWidth,
   gridfinityMaxUnits,
+  gridfinityOpenFits,
   gridfinityPlan,
   gridfinityScoopFits,
   gridfinityScoopMaxRadius,
@@ -1001,6 +1003,20 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
       const maxFloor = gridfinityFloorMaxHeight(fields);
       properties.push({ id: "gridfinityFloorHeight", label: t("prop.gridfinityFloorHeight"), value: gridfinityFloorHeight(fields), min: MIN_GRIDFINITY_FLOOR_HEIGHT, max: maxFloor, step: 0.05, hint: t("gridfinity.floorHeightHint"), onChange: (value) => onUpdate({ gridfinityFloorHeight: clamp(value, MIN_GRIDFINITY_FLOOR_HEIGHT, maxFloor) }) });
     }
+    const { open } = plan;
+    if (gridfinityOpenFits(fields)) {
+      // Open sides (#682): a switch for each side; an open side's shelf and scoop go with its wall.
+      const walls = [
+        { wall: "back", label: "prop.gridfinityOpenBack" },
+        { wall: "front", label: "prop.gridfinityOpenFront" },
+        { wall: "left", label: "prop.gridfinityOpenLeft" },
+        { wall: "right", label: "prop.gridfinityOpenRight" },
+      ] as const;
+      walls.forEach(({ wall, label }) => {
+        const key = GRIDFINITY_OPEN_WALL_KEYS[wall];
+        properties.push({ type: "toggle", id: key, label: t(label), value: shape[key] === true, onChange: (value) => onUpdate({ [key]: value }) });
+      });
+    }
     const compartments = gridfinityCompartments(fields);
     if (gridfinityLabelFits(fields)) {
       // Label shelves (#455): each wall's switch with its own width, length and position under it, then the corners they share.
@@ -1012,7 +1028,7 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
         { wall: "right", label: "prop.gridfinityLabelRight" },
       ] as const;
       walls.forEach(({ wall, label }) => {
-        if (compartments) return;
+        if (compartments || open[wall]) return;
         const keys = GRIDFINITY_LABEL_WALL_KEYS[wall];
         const { on } = keys;
         properties.push({ type: "toggle", id: on, label: t(label), value: shape[on] === true, onChange: (value) => onUpdate({ [on]: value }) });
@@ -1032,7 +1048,7 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
       });
       const shelves = compartments
         ? compartments.cells.some((cell) => gridfinityCompartmentLabel(fields, cell.column, cell.row))
-        : walls.some(({ wall }) => shape[GRIDFINITY_LABEL_WALL_KEYS[wall].on] === true);
+        : walls.some(({ wall }) => shape[GRIDFINITY_LABEL_WALL_KEYS[wall].on] === true && !open[wall]);
       if (shelves) {
         properties.push(
           {
@@ -1056,10 +1072,11 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
         { wall: "right", label: "prop.gridfinityScoopRight" },
       ] as const;
       walls.forEach(({ wall, label }) => {
+        if (open[wall]) return;
         const key = GRIDFINITY_SCOOP_WALL_KEYS[wall];
         properties.push({ type: "toggle", id: key, label: t(label), value: shape[key] === true, onChange: (value) => onUpdate({ [key]: value }) });
       });
-      if (walls.some(({ wall }) => shape[GRIDFINITY_SCOOP_WALL_KEYS[wall]] === true)) {
+      if (walls.some(({ wall }) => shape[GRIDFINITY_SCOOP_WALL_KEYS[wall]] === true && !open[wall])) {
         const max = Math.max(MIN_GRIDFINITY_SCOOP_RADIUS, gridfinityScoopMaxRadius(fields));
         properties.push({ id: "gridfinityScoopRadius", label: t("prop.gridfinityScoopRadius"), value: gridfinityScoopRadius(fields), min: MIN_GRIDFINITY_SCOOP_RADIUS, max, step: 0.5, hint: gridfinityScoopsLeftOut(fields) ? t("gridfinity.scoopsLeftOutHint") : undefined, onChange: (value) => onUpdate({ gridfinityScoopRadius: clamp(value, MIN_GRIDFINITY_SCOOP_RADIUS, max) }) });
       }
@@ -4055,6 +4072,7 @@ function GridfinityCompartmentsCard({
         label: t("prop.gridfinityCompartmentLabel"),
         value: stored?.side ?? "none",
         options: [{ value: "none", label: t("gridfinity.labelNone") }, ...sides.map(({ value, label }) => ({ value, label: t(label) }))],
+        hint: stored && cell.open[stored.side] ? t("gridfinity.compartmentLabelOpenHint") : undefined,
         onChange: (value) => {
           const side = GRIDFINITY_LABEL_SIDE_OPTIONS.find((option) => option.value === value)?.value;
           writeLabel(side ? { ...stored, column, row, side } : null);

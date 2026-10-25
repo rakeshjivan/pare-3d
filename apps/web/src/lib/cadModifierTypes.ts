@@ -310,6 +310,10 @@ export type CadModifierGridfinityPart = {
   gridfinityScoopRight?: boolean;
   gridfinityScoopRadius?: number;
   gridfinityFloorHeight?: number;
+  gridfinityOpenBack?: boolean;
+  gridfinityOpenFront?: boolean;
+  gridfinityOpenLeft?: boolean;
+  gridfinityOpenRight?: boolean;
   gridfinityCompartmentsX?: number;
   gridfinityCompartmentsZ?: number;
   gridfinityDividerThickness?: number;

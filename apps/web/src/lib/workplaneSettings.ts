@@ -409,6 +409,10 @@ export function normalizeShapeCustomizations(value: unknown, fallback: ShapeCust
       entry.gridfinityScoopRight = typeof source.gridfinityScoopRight === "boolean" ? source.gridfinityScoopRight : fallbackEntry?.gridfinityScoopRight;
       entry.gridfinityScoopRadius = optionalShapeNumber(source.gridfinityScoopRadius, fallbackEntry?.gridfinityScoopRadius, 0, MAX_CUSTOM_SHAPE_DIMENSION);
       entry.gridfinityFloorHeight = optionalShapeNumber(source.gridfinityFloorHeight, fallbackEntry?.gridfinityFloorHeight, 0, MAX_CUSTOM_SHAPE_DIMENSION);
+      entry.gridfinityOpenBack = typeof source.gridfinityOpenBack === "boolean" ? source.gridfinityOpenBack : fallbackEntry?.gridfinityOpenBack;
+      entry.gridfinityOpenFront = typeof source.gridfinityOpenFront === "boolean" ? source.gridfinityOpenFront : fallbackEntry?.gridfinityOpenFront;
+      entry.gridfinityOpenLeft = typeof source.gridfinityOpenLeft === "boolean" ? source.gridfinityOpenLeft : fallbackEntry?.gridfinityOpenLeft;
+      entry.gridfinityOpenRight = typeof source.gridfinityOpenRight === "boolean" ? source.gridfinityOpenRight : fallbackEntry?.gridfinityOpenRight;
       entry.gridfinityCompartmentsX = optionalShapeNumber(source.gridfinityCompartmentsX, fallbackEntry?.gridfinityCompartmentsX, 1, MAX_CUSTOM_SHAPE_DIMENSION, true);
       entry.gridfinityCompartmentsZ = optionalShapeNumber(source.gridfinityCompartmentsZ, fallbackEntry?.gridfinityCompartmentsZ, 1, MAX_CUSTOM_SHAPE_DIMENSION, true);
       entry.gridfinityDividerThickness = optionalShapeNumber(source.gridfinityDividerThickness, fallbackEntry?.gridfinityDividerThickness, 0, MAX_CUSTOM_SHAPE_DIMENSION);

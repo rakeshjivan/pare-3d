@@ -227,6 +227,14 @@ export type ShapeCustomization = {
   gridfinityScoopRadius?: number;
   /** Gridfinity bin: the floor's height inside in mm, measured from the underside; missing is 5.95, and at the highest the bin is solid up to the lip's support, or to the top without the lip. */
   gridfinityFloorHeight?: number;
+  /** Gridfinity bin: no wall and no stacking lip along the back above the floor; the walls beside it run out to the outline (#682). */
+  gridfinityOpenBack?: boolean;
+  /** Gridfinity bin: no wall and no stacking lip along the front. */
+  gridfinityOpenFront?: boolean;
+  /** Gridfinity bin: no wall and no stacking lip along the left. */
+  gridfinityOpenLeft?: boolean;
+  /** Gridfinity bin: no wall and no stacking lip along the right. */
+  gridfinityOpenRight?: boolean;
   /** Gridfinity bin: compartments across, a whole number; missing is 1, a bin without dividers (#554). */
   gridfinityCompartmentsX?: number;
   /** Gridfinity bin: compartments deep, a whole number; missing is 1. */
@@ -838,6 +846,14 @@ export type WorkplaneShape = {
   gridfinityScoopRadius?: number;
   /** Gridfinity bin: the floor's height inside in mm, measured from the underside; missing is 5.95, and at the highest the bin is solid up to the lip's support, or to the top without the lip. */
   gridfinityFloorHeight?: number;
+  /** Gridfinity bin: no wall and no stacking lip along the back above the floor; the walls beside it run out to the outline (#682). */
+  gridfinityOpenBack?: boolean;
+  /** Gridfinity bin: no wall and no stacking lip along the front. */
+  gridfinityOpenFront?: boolean;
+  /** Gridfinity bin: no wall and no stacking lip along the left. */
+  gridfinityOpenLeft?: boolean;
+  /** Gridfinity bin: no wall and no stacking lip along the right. */
+  gridfinityOpenRight?: boolean;
   /** Gridfinity bin: compartments across, a whole number; missing is 1, a bin without dividers (#554). */
   gridfinityCompartmentsX?: number;
   /** Gridfinity bin: compartments deep, a whole number; missing is 1. */
