@@ -140,7 +140,8 @@ import { InteractiveHelp } from "./InteractiveHelp";
 import { ShapeContextMenu, type ShapeContextMenuItem } from "./workplane/ShapeContextMenu";
 import { nextSelectionTransparency } from "@/lib/selectionTransparency";
 import { canonicalizeShape, cloneWorkplaneShapeTreeWithFreshIds, cleanNearZero, cleanRotationDegrees, isNonSolidShapeKind, meshYawDegrees, preservesEdgeTreatmentSize, shapeDepth, shapeHasShapeDeform, shapeTransformShouldRemainEditable, shapeWidth, shapeWithParametricSource, patchTouchesBodyParameters, withHoleMode, workplaneShapesEqual, shellNeedingRebuild, hollowStretchSincePicture } from "@/lib/workplaneShapes";
-import { workplaneCenteringOffset } from "@/lib/workplaneCentering";
+import { faceWorkplaneCenteringShift, workplaneCenteringOffset } from "@/lib/workplaneCentering";
+import { projectShapesExtent } from "@/components/workplane/ViewportOverlays";
 import { bakeCadMetadataForShapeTransform, cadBrepTransformForShape, cadModifierPrimitiveForAnalyticShape, cadModifierPrimitiveForBakedShape, importedStepPartForShape } from "@/lib/cadBakeMetadata";
 import { hasOneToOneCadComponentMapping } from "@/lib/cadModifierGroups";
 import { cadModifierGridfinityForShape, cadModifierHelicalGearForShape, cadModifierProfileForShape, cadModifierSpringForShape, cadModifierThreadForShape, cadProfileExpectation, cadProfileSegmentCount, textGlyphProfiles, withinExactProfileLimit } from "@/lib/cadProfileExtrusion";
@@ -8611,6 +8612,30 @@ export function LayerlingEditor({
     if (refuseLockedSelection()) return;
     const selected = new Set(selectedIds);
     const movable = shapes.filter((shape) => selected.has(shape.id));
+    const workplane = placementWorkplaneRef.current;
+    if (!placementWorkplaneIsBase(workplane)) {
+      // On a face the middle is the point picked with W, and the move runs along that face (#805).
+      const toVector = (value: { x: number; y: number; z: number }) => new THREE.Vector3(value.x, value.y, value.z);
+      const { min, max } = projectShapesExtent(movable, toVector(workplane.xAxis), toVector(workplane.normal), toVector(workplane.zAxis), toVector(workplane.origin));
+      const shift = faceWorkplaneCenteringShift({ minX: min.x, maxX: max.x, minZ: min.z, maxZ: max.z }, workplane.xAxis, workplane.zAxis);
+      if (!shift) {
+        setNotice(t("status.nothingMeasurable"));
+        return;
+      }
+      if (Math.hypot(shift.x, shift.y, shift.z) < 1e-6) {
+        setNotice(t("status.alreadyCentered"));
+        return;
+      }
+      const ids = new Set(movable.map((shape) => shape.id));
+      commitShapes(
+        shapes.map((shape) => (ids.has(shape.id)
+          ? { ...shape, x: cleanNearZero(shape.x + shift.x), z: cleanNearZero(shape.z + shift.z), elevation: cleanNearZero((shape.elevation ?? 0) + shift.y) }
+          : shape)),
+        selectedIds,
+        movable.length === 1 ? t("status.centeredOne") : t("status.centeredMany", { count: movable.length }),
+      );
+      return;
+    }
     const offset = workplaneCenteringOffset(boundsForShapes(movable));
     if (!offset) {
       setNotice(t("status.nothingMeasurable"));
