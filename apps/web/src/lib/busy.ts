@@ -9,9 +9,12 @@ const active = new Map<BusyKind, number>();
 
 function announce() {
   // Also used where there is no full browser (tests, workers): then there is nothing to tell.
-  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function" || typeof CustomEvent !== "function") return;
+  // Read through globalThis: Next writes `typeof window` as "object" in browser code, workers included,
+  // so a plain typeof check does not keep the geometry worker (build 67) from reaching for a window it lacks.
+  const page = (globalThis as { window?: Window }).window;
+  if (!page || typeof page.dispatchEvent !== "function" || typeof CustomEvent !== "function") return;
   const kinds = [...active.entries()].filter(([, count]) => count > 0).map(([kind]) => kind);
-  window.dispatchEvent(new CustomEvent(BUSY_EVENT, { detail: kinds }));
+  page.dispatchEvent(new CustomEvent(BUSY_EVENT, { detail: kinds }));
 }
 
 /** Marks a job of this kind as started; call the returned function when it ends (only once). */
