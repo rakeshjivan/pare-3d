@@ -1077,6 +1077,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "status.sketchUndo": "Skizze rückgängig gemacht",
   "status.edgeRemoveChanged": "Das Objekt hat sich beim Entfernen der Kantenbearbeitung geändert; versuche es erneut",
   "status.groupChanged": "Die Szene hat sich beim Gruppieren geändert; wähle die Objekte erneut aus",
+  "status.computing": "Wird berechnet … du kannst weiterarbeiten",
+  "status.computeTimedOut": "Die Berechnung hat zu lange gedauert und wurde abgebrochen. Versuche es mit weniger oder einfacheren Objekten",
   "status.intersectChanged": "Die Szene hat sich beim Bilden der Schnittmenge geändert; wähle die Objekte erneut aus",
   "status.noPrintableSurface": "Das gewählte Objekt hat keine druckbare Oberfläche",
   "status.onlyOnePart": "Das gewählte Objekt besteht nur aus einem zusammenhängenden Teil",

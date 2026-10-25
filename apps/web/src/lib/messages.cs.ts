@@ -1129,6 +1129,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "status.sketchUndo": "Akce v náčrtu byla vrácena",
   "status.edgeRemoveChanged": "Objekt se při odstraňování úpravy hrany změnil. Zkuste to znovu",
   "status.groupChanged": "Scéna se během sloučení změnila. Vyberte objekty a zkuste to znovu",
+  "status.computing": "Probíhá výpočet… můžete pracovat dál",
+  "status.computeTimedOut": "Výpočet trval příliš dlouho a byl zastaven. Zkuste méně nebo jednodušší objekty",
   "status.intersectChanged": "Scéna se během výpočtu průniku změnila. Vyberte objekty a zkuste to znovu",
   "status.noPrintableSurface": "Vybraný objekt nemá tisknutelný povrch",
   "status.onlyOnePart": "Vybraný objekt má pouze jednu souvislou část",

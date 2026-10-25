@@ -1058,6 +1058,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "status.sketchUndo": "Schets ongedaan gemaakt",
   "status.edgeRemoveChanged": "Het object is gewijzigd tijdens het verwijderen van de randbewerking; probeer het opnieuw",
   "status.groupChanged": "De scène is gewijzigd tijdens het groeperen; selecteer de objecten en probeer het opnieuw",
+  "status.computing": "Bezig met berekenen… je kunt doorwerken",
+  "status.computeTimedOut": "De berekening duurde te lang en is gestopt. Probeer minder of eenvoudigere objecten",
   "status.intersectChanged": "De scène is gewijzigd tijdens het doorsnijden; selecteer de objecten en probeer het opnieuw",
   "status.noPrintableSurface": "Het geselecteerde object heeft geen printbaar oppervlak",
   "status.onlyOnePart": "Het geselecteerde object heeft maar één samenhangend deel",

@@ -806,6 +806,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "status.sketchUndo": "Razveljavitev v skici",
   "status.edgeRemoveChanged": "Objekt se je spremenil med odstranjevanjem obdelave roba; poskusi znova",
   "status.groupChanged": "Prizor se je spremenil med združevanjem v skupino; izberi objekte in poskusi znova",
+  "status.computing": "Računam … lahko delaš naprej",
+  "status.computeTimedOut": "Izračun je trajal predolgo in je bil ustavljen. Poskusi z manj ali preprostejšimi objekti",
   "status.intersectChanged": "Prizor se je spremenil med izračunom preseka; izberi objekte in poskusi znova",
   "status.noPrintableSurface": "Izbrani objekt nima površine za tisk",
   "status.onlyOnePart": "Izbrani objekt ima samo en povezan del",

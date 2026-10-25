@@ -1047,6 +1047,8 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "status.sketchUndo": "Annuler l'esquisse",
   "status.edgeRemoveChanged": "L'objet a changé lors de la suppression de la fonction de bord ; réessaye",
   "status.groupChanged": "La scène a changé lors du regroupement ; sélectionnez les objets et réessayez",
+  "status.computing": "Calcul en cours… vous pouvez continuer à travailler",
+  "status.computeTimedOut": "Le calcul a pris trop de temps et a été arrêté. Essayez avec moins d'objets ou des objets plus simples",
   "status.intersectChanged": "La scène a changé en se croisant ; sélectionnez les objets et réessayez",
   "status.noPrintableSurface": "L'objet sélectionné n'a pas de surface imprimable",
   "status.onlyOnePart": "L'objet sélectionné n'a qu'une seule pièce connectée",

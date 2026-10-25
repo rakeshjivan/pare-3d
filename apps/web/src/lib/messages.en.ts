@@ -1077,6 +1077,8 @@ export const MESSAGES_EN = {
   "status.sketchUndo": "Sketch undo",
   "status.edgeRemoveChanged": "The object changed while removing the edge feature; try again",
   "status.groupChanged": "The scene changed while grouping; select the objects and try again",
+  "status.computing": "Calculating… you can keep working",
+  "status.computeTimedOut": "The calculation took too long and was stopped. Try fewer or simpler objects",
   "status.intersectChanged": "The scene changed while intersecting; select the objects and try again",
   "status.noPrintableSurface": "The selected object has no printable surface",
   "status.onlyOnePart": "The selected object has only one connected part",
