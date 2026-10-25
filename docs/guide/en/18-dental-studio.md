@@ -37,7 +37,7 @@ What you approve is protected: nothing inside the area is ever cut.
 
 ## Step 3 · {{ui:dental.step3}}
 
-Choose what the models are for; the line below the choices sums up what you will get (base, inside, height).
+Choose what the models are for - each choice shows its base from above - and the line below the choices sums up what you will get (base, inside, height).
 
 - **{{ui:dental.study}}:** on a **{{ui:dental.cleanBase}}** base, hollow with 2 mm walls and open underneath. The gum is kept as a band 3 mm deep below the teeth, cut along a smooth margin (the band's edge smoothed along the surface and the scan split exactly on it), and cut level; the base follows the scan as kept in a smooth, rounded outline - the line itself smoothed, so the wall turns gently - with straight walls and a flat floor, 3 mm under the cut, and never within 1 mm of a tooth. Half-round locator notches sit at the foot of the wall, front and sides. Models come out about 18-26 mm tall. It saves about a third of the resin; no resin is trapped and no drain holes are needed.
 - **{{ui:dental.ortho}}:** solid, on a base trimmed the orthodontic way - back square to the midline, heels and buccal sides angled, the upper's front pointed and the lower's rounded, 3 mm clear of the teeth, and symmetric about the midline as the ABO trims study models, so both sides match even on a lopsided arch. A pair is placed in occlusion. Quadrants get a square block instead.
@@ -63,11 +63,11 @@ Type a **{{ui:dental.label}}** (a patient code or a date) to engrave it on the b
 
 ### {{ui:dental.more}}
 
-**{{ui:dental.more}}** holds the rest of what each choice sets, in three groups. *{{ui:dental.groupBase}}*: the base's shape ({{ui:dental.cleanBase}}, {{ui:dental.follow}}, {{ui:dental.plate}} or {{ui:dental.orthoBase}}), **{{ui:dental.bevel}}** (a 0.8 mm bevel round the foot so the model comes off the build plate easily; on unless you turn it off), {{ui:dental.notches}} and a **{{ui:dental.tieBar}}** (a bar joining the back ends of a full arch at the floor so it cannot spread while it prints; cut it off afterwards). *{{ui:dental.groupScan}}*: **{{ui:dental.gumFollow}}** - a band of gum all round the teeth and nothing more, so the palate and the floor of the mouth go and the model is a horseshoe (its depth is then the {{ui:dental.gumHeight}} slider) - and **{{ui:dental.smooth}}** (smoothing the ragged edge where the scan stops, never the teeth). *{{ui:dental.inside}}*: solid or hollow (open underneath, or closed with vent holes), the {{ui:dental.wall}} and **{{ui:dental.infill}}** ({{ui:dental.infillNone}}, a {{ui:dental.infillBase}} 6 mm high, or a full {{ui:dental.infillFull}}).
+**{{ui:dental.more}}** holds the rest of what each choice sets, in three groups. *{{ui:dental.groupBase}}*: the base's shape, each with a picture of it from above ({{ui:dental.cleanBase}}, {{ui:dental.follow}}, {{ui:dental.plate}}, {{ui:dental.orthoBase}} or {{ui:dental.articulatorBase}}), **{{ui:dental.bevel}}** (a 0.8 mm bevel round the foot so the model comes off the build plate easily; on unless you turn it off), {{ui:dental.notches}} and a **{{ui:dental.tieBar}}** (a bar joining the back ends of a full arch at the floor so it cannot spread while it prints; cut it off afterwards). *{{ui:dental.groupScan}}*: **{{ui:dental.gumFollow}}** - a band of gum all round the teeth and nothing more, so the palate and the floor of the mouth go and the model is a horseshoe (its depth is then the {{ui:dental.gumHeight}} slider) - and **{{ui:dental.smooth}}** (smoothing the ragged edge where the scan stops, never the teeth). *{{ui:dental.inside}}*: solid or hollow (open underneath, or closed with vent holes), the {{ui:dental.wall}} and **{{ui:dental.infill}}** ({{ui:dental.infillNone}}, a {{ui:dental.infillBase}} 6 mm high, or a full {{ui:dental.infillFull}}).
 
 ## Step 4 · {{ui:dental.step4}}
 
-With an upper and a lower, **{{ui:dental.hinge}}** joins the pair at the back so the printed models open and close on the bite.
+With an upper and a lower, **{{ui:dental.hinge}}** joins the pair at the back so the printed models open and close on the bite. A side view of the articulator above its settings follows them as you change them: the joint, the protrusion path at its angle, the incisal pin and its table. Each joint has a picture of it in section.
 
 ![The Articulator step: the joint choice, hinge fit and its test, the protrusion path, the incisal stop with its pin and table, and how the models are placed.](shot:dental-articulator)
 

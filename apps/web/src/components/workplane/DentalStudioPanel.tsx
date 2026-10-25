@@ -8,6 +8,7 @@ import { useState } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
+import { ArticulatorPicture, BaseStylePicture, JointPicture } from "@/components/workplane/DentalPictures";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import {
@@ -275,6 +276,8 @@ export function DentalStudioPanel({
             ["crown", t("dental.crown"), t("dental.crownHint")],
           ] as const).map(([value, label, hint]) => (
             <button key={value} type="button" role="radio" aria-checked={preset === value} className={preset === value ? "active" : ""} disabled={busy} onClick={() => onPresetChange(value)}>
+              {/* Build 66: the base each choice makes, from above. */}
+              <BaseStylePicture style={({ study: "clean", ortho: "ortho", aligner: "follow", crown: "plate" } as const)[value]} />
               <strong>{label}</strong>
               <span>{hint}</span>
             </button>
@@ -335,7 +338,15 @@ export function DentalStudioPanel({
         {advanced ? (
           <div className="dental-advanced">
             <h4 className="dental-group">{t("dental.groupBase")}</h4>
-            {choice(t("dental.baseStyle"), options.baseStyle, [["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")]], (baseStyle) => onOptionsChange({ baseStyle }), undefined, false)}
+            {/* Build 66: each base as it looks from above. */}
+            <div className="dental-picture-tiles" role="radiogroup" aria-label={t("dental.baseStyle")}>
+              {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")], ["articulator", t("dental.articulatorBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
+                <button key={value} type="button" role="radio" aria-checked={options.baseStyle === value} className={options.baseStyle === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ baseStyle: value })}>
+                  <BaseStylePicture style={value} />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
             {options.baseStyle !== "articulator" ? (
               <label className="edge-modifier-check" title={t("dental.bevelHint")}>
                 <input type="checkbox" checked={options.bevel !== false} disabled={busy} onChange={(event) => onOptionsChange({ bevel: event.currentTarget.checked })} />
@@ -392,7 +403,18 @@ export function DentalStudioPanel({
             </label>
             {options.hinge ? (
               <div className="dental-hinge-options">
-                {choice(t("dental.hingeJoint"), options.hingeJoint ?? "ball", [["ball", t("dental.hingeJointBall")], ["dropin", t("dental.hingeJointDropIn")], ["axle", t("dental.hingeJointAxle")]], (hingeJoint) => onOptionsChange({ hingeJoint }), t("dental.hingeJointHint"))}
+                {/* Build 66: the articulator from the side, drawn from the settings below as they change. */}
+                <ArticulatorPicture joint={options.hingeJoint ?? "ball"} condyle={options.condyle ?? 0} stop={options.incisalStop !== false} pinRaise={options.incisalStop !== false ? options.pinRaise ?? 0 : 0} table={options.incisalTable ?? "flat"} />
+                <span className="edge-modifier-label">{t("dental.hingeJoint")}</span>
+                <div className="dental-picture-tiles joints" role="radiogroup" aria-label={t("dental.hingeJoint")} title={t("dental.hingeJointHint")}>
+                  {([["ball", t("dental.hingeJointBall")], ["dropin", t("dental.hingeJointDropIn")], ["axle", t("dental.hingeJointAxle")]] as const).map(([value, label]) => (
+                    <button key={value} type="button" role="radio" aria-checked={(options.hingeJoint ?? "ball") === value} className={(options.hingeJoint ?? "ball") === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ hingeJoint: value })}>
+                      <JointPicture joint={value} />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="blend-hint">{t("dental.hingeJointHint")}</p>
                 {/* Fork (build 58): how tight the hinge turns; build 60: and a test to find it. */}
                 <label className="dental-label-field" title={t("dental.hingeFitHint")}>
                   <span>{t("dental.hingeFit")}</span>

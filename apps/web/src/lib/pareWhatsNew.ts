@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 66,
+    items: [
+      "Dental Studio shows what each choice makes before you make it: the four model choices and every base (Clean, Follows the scan, With a plate, Orthodontic and Articulator plate - now offered under Adjust the settings too) have a small picture of the base from above.",
+      "The Articulator step has a side view of the articulator that follows its settings - the joint behind the molars, the protrusion path drawn at its angle, the incisal pin raised and its table flat or sloped - and each joint (ball snap-in, ball drop-in, clip and axle) has a picture of it in section.",
+    ],
+  },
+  {
     build: 65,
     items: [
       "Fixed: when the two heels of a horseshoe model ended at different places, the articulator's bar at the back could miss the shorter one, leaving that side of the hinge loose. The bar now reaches each heel of each model.",
