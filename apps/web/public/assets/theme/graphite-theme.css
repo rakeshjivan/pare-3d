@@ -6452,88 +6452,6 @@ html[data-theme="dark"]:where([data-palette="graphite"]) .grid-settings {
   color: #888888;
 }
 
-:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-intro {
-  color: #595959;
-}
-
-:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-group h3 {
-  color: #3e3e3e;
-  border-bottom: 1px solid #e8e8e8;
-}
-
-:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-row dt {
-  color: #4f4f4f;
-}
-
-:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-plus,
-:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-or {
-  color: #7f7f7f;
-}
-
-:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-row kbd {
-  color: #464646;
-  background: #f2f2f2;
-  border: 1px solid #cecece;
-}
-
-html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-intro,
-html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-row dt {
-  color: #b9b9b9;
-}
-
-html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-group h3 {
-  color: #e3e3e3;
-  border-bottom-color: #3e3e3e;
-}
-
-html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-row kbd {
-  color: #e7e7e7;
-  background: #2a2a2a;
-  border-color: #535353;
-}
-
-html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-plus,
-html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-or {
-  color: #787878;
-}
-
-@media print {
-  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts],
-  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] body {
-    background: #fff !important;
-    color: #000 !important;
-  }
-
-  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet {
-    color: #000;
-    background: #fff;
-  }
-
-  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-group h3 {
-    color: #000;
-    border-bottom: 0.3mm solid #000;
-  }
-
-  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-row {
-    border-bottom: 0.1mm solid #bbb;
-  }
-
-  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-row dt {
-    color: #000;
-  }
-
-  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-row kbd {
-    color: #000;
-    background: #fff;
-    border: 0.25mm solid #000;
-  }
-
-  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-plus,
-  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-or {
-    color: #000;
-  }
-}
-
 @media (max-width: 2081px) {
   :root:where([data-theme="dark"][data-palette="graphite"]) {
     --toolbar-icon-size: calc(37px * var(--toolbar-scale));
@@ -7868,6 +7786,133 @@ html[data-theme="dark"]:where([data-palette="graphite"]) .cube-face:focus-visibl
 
 html[data-theme="dark"]:where([data-palette="graphite"]) .cube-zone:hover {
   background: rgba(212, 134, 54, 0.34);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-search-icon {
+  color: #808080;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-search-input {
+  color: inherit;
+  background: #ffffff;
+  border: 1px solid #d8d8d8;
+  outline: none;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-search-input:focus {
+  border-color: #d46b08;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-search-clear {
+  color: #808080;
+  background: transparent;
+  border: none;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-search-clear:hover {
+  color: #404040;
+  background: #ebebeb;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-no-matches {
+  color: #808080;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-intro {
+  color: #595959;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-group h3 {
+  color: #3e3e3e;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-row dt {
+  color: #4f4f4f;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-plus,
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-or {
+  color: #7f7f7f;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .shortcuts-row kbd {
+  color: #464646;
+  background: #f2f2f2;
+  border: 1px solid #cecece;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-search-input {
+  color: #dddddd;
+  background: #202020;
+  border-color: #3d3d3d;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-search-input:focus {
+  border-color: #f6ad55;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-search-clear:hover {
+  color: #e7e7e7;
+  background: #323232;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-intro,
+html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-row dt {
+  color: #b9b9b9;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-group h3 {
+  color: #e3e3e3;
+  border-bottom-color: #3e3e3e;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-row kbd {
+  color: #e7e7e7;
+  background: #2a2a2a;
+  border-color: #535353;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-plus,
+html[data-theme="dark"]:where([data-palette="graphite"]) .shortcuts-or {
+  color: #787878;
+}
+
+@media print {
+  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts],
+  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet {
+    color: #000;
+    background: #fff;
+  }
+
+  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-group h3 {
+    color: #000;
+    border-bottom: 0.3mm solid #000;
+  }
+
+  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-row {
+    border-bottom: 0.1mm solid #bbb;
+  }
+
+  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-row dt {
+    color: #000;
+  }
+
+  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-row kbd {
+    color: #000;
+    background: #fff;
+    border: 0.25mm solid #000;
+  }
+
+  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-plus,
+  html:where([data-theme="dark"][data-palette="graphite"])[data-print-shortcuts] .shortcuts-print-sheet .shortcuts-or {
+    color: #000;
+  }
 }
 
 :where(html[data-theme="dark"][data-palette="graphite"]) .toolbar-section-tools,
