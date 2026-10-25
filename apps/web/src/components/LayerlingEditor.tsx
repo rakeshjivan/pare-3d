@@ -204,7 +204,7 @@ import {
 import { displayShapeName, iconTagAsset, qrCodeAsset, libraryShapeAssets, makeShapeFromAsset, nameTagAsset, shapeAssetLabel, toolbarShapeAssets } from "@/lib/shapeCatalog";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { exportMeshesToStl } from "@/lib/stlExport";
-import { exportMeshesTo3mfAsync, THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
+import { THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
 import { DEFAULT_TAPER_DIMENSION_MAX, readWorkspaceDefault, saveWorkspaceDefault, keyboardNudgeCoarseFactor, keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
 import { leaveGuardReleased } from "@/lib/leaveGuard";
@@ -252,7 +252,7 @@ import type { AlignAxis, AlignTarget, GridSize, ParametricSource, ProjectAsset, 
 import { type Vec3, type MeshData, type ShapeUpdatePatch, MIN_SHAPE_DIMENSION, resetManifoldRuntime, cleanModelDimension, getManifoldRuntime, meshForShape, meshReachAlong, appendMeshData, formatTriangleCount, boundsForShapes, boundsForCuboids, meshAabb, boundsForPositions } from "@/lib/editorMeshCore";
 import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, withClosedHolesNote, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { meshPartCount } from "@/lib/meshPartCount";
-import { buildGroupedShapeOffThread, exportSolidVolumeOffThread, simplifyTrianglePositionsOffThread, splitShapesByPlaneOffThread, subscribeGeometryBusy, warmGeometryWorker } from "@/lib/geometryWorker";
+import { buildGroupedShapeOffThread, exportMeshesTo3mfOffThread, exportSolidVolumeOffThread, simplifyTrianglePositionsOffThread, splitShapesByPlaneOffThread, subscribeGeometryBusy, warmGeometryWorker } from "@/lib/geometryWorker";
 import { handleViewArrowKey } from "@/lib/viewArrowKeys";
 import { escapeWasHandled } from "@/lib/escapeHandled";
 import { sketchEscapeAction } from "@/lib/sketchEscape";
@@ -12223,7 +12223,7 @@ export function LayerlingEditor({
             faceColors: partFaceColors(mesh, joined.quellen[index]),
           }));
           bytes = format === "3mf"
-            ? await exportMeshesTo3mfAsync(bodies, { title: projectName })
+            ? await exportMeshesTo3mfOffThread(bodies, { title: projectName })
             : new TextEncoder().encode(exportMeshesToObj(bodies));
         }
         let binary = "";
@@ -12810,7 +12810,7 @@ export function LayerlingEditor({
             const source = bodiesWritten[quellen[index]];
             return { ...mesh, name: source?.name || mesh.name, color: source?.color, faceColors: partFaceColors(mesh, quellen[index]) };
           });
-          const bytes = await exportMeshesTo3mfAsync(bodies, { title: exportName.trim() || projectName });
+          const bytes = await exportMeshesTo3mfOffThread(bodies, { title: exportName.trim() || projectName });
           const blob3mf = new Blob([bytes as BlobPart], { type: THREE_MF_MEDIA_TYPE });
           if (toBambu) bambuNote = await sendToBambuStudio(projectExportFileName(exportName, "3mf"), blob3mf, downloadBlobFile);
           else await downloadBlobFile(projectExportFileName(exportName, "3mf"), blob3mf);

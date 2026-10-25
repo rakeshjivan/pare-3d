@@ -595,7 +595,47 @@ function buildArch(
   return { solid: result, floor, top, footprint, worn: closed.worn, keptDepth: Number.isFinite(keptLow) ? -keptLow : keep, voxel, warnings, kept };
 }
 
-export async function makeDentalStudio(input: DentalStudioInput, options: DentalStudioOptions, given?: ManifoldRuntime): Promise<DentalStudioResult> {
+/**
+ * Build 68: one arch of a pair made on its own - in a second worker, beside the first - and handed
+ * over as its mesh. `makeDentalStudio` takes it with `remote`, so a pair takes about as long as its
+ * slower arch instead of both one after the other.
+ */
+export type DentalArchPart = Omit<Built, "solid"> & { mesh: { numProp: number; vertProperties: Float32Array; triVerts: Uint32Array; mergeFromVert?: Uint32Array; mergeToVert?: Uint32Array } };
+
+function archPartOf(built: Built): DentalArchPart {
+  const mesh = built.solid.getMesh();
+  const { solid, ...rest } = built;
+  void solid;
+  return {
+    ...rest,
+    mesh: {
+      numProp: mesh.numProp,
+      vertProperties: Float32Array.from(mesh.vertProperties),
+      triVerts: Uint32Array.from(mesh.triVerts),
+      ...(mesh.mergeFromVert?.length ? { mergeFromVert: Uint32Array.from(mesh.mergeFromVert), mergeToVert: Uint32Array.from(mesh.mergeToVert) } : {}),
+    },
+  };
+}
+
+function builtOf(runtime: ManifoldRuntime, part: DentalArchPart): Built {
+  const { mesh, ...rest } = part;
+  const solid = new runtime.Manifold(new runtime.Mesh({ numProp: mesh.numProp, vertProperties: mesh.vertProperties, triVerts: mesh.triVerts, ...(mesh.mergeFromVert ? { mergeFromVert: mesh.mergeFromVert, mergeToVert: mesh.mergeToVert } : {}) }));
+  return { ...rest, solid };
+}
+
+/** Build 68: only the arch at `index` of the pair, as makeDentalStudio would make it, as its mesh. */
+export async function makeDentalArchPart(input: DentalStudioInput, options: DentalStudioOptions, index: number, given?: ManifoldRuntime): Promise<DentalArchPart> {
+  let part: DentalArchPart | null = null;
+  await studio(input, options, given, { only: index, take: (made) => { part = made; } });
+  if (!part) throw new Error("No such arch");
+  return part;
+}
+
+export async function makeDentalStudio(input: DentalStudioInput, options: DentalStudioOptions, given?: ManifoldRuntime, remote?: { index: number; part: Promise<DentalArchPart> }): Promise<DentalStudioResult> {
+  return (await studio(input, options, given, { remote }))!;
+}
+
+async function studio(input: DentalStudioInput, options: DentalStudioOptions, given: ManifoldRuntime | undefined, mode: { only?: number; take?: (part: DentalArchPart) => void; remote?: { index: number; part: Promise<DentalArchPart> } }): Promise<DentalStudioResult | null> {
   const prep = prepared(input);
   // Build 53: an approved tooth area, carried from the scan's triangles to the cleaned scan's corners.
   const areaOn = (id: string, mesh: Mesh): Uint8Array | undefined => {
@@ -635,7 +675,14 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
     footprint = footprint.concat(teethFootprint(arch.clean.mesh, arch.frame, toCommon, Math.max(11, arch.teeth)));
   }
   const userLabel = options.label.trim();
-  const built = prep.arches.map((arch) => {
+  const built: Array<{ arch: (typeof prep.arches)[number]; built: Built }> = [];
+  for (const [index, arch] of prep.arches.entries()) {
+    if (mode.only !== undefined && index !== mode.only) continue;
+    if (mode.remote && mode.remote.index === index) {
+      // Made in the other worker; if that failed, made here after all.
+      const part = await mode.remote.part.catch(() => null);
+      if (part) { built.push({ arch, built: builtOf(runtime, part) }); continue; }
+    }
     let ortho: Ring | null = null;
     if (options.baseStyle === "ortho") {
       // A quadrant or sextant gets a block: square all round, 3 mm clear of the teeth.
@@ -644,8 +691,14 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
       ortho = arch.role === "upper" && shared ? mirrorRing(common) : common;
     }
     const line = userLabel ? (pair ? `${arch.role === "upper" ? "U" : "L"} ${userLabel}` : userLabel) : "";
-    return { arch, built: buildArch(runtime, arch, { ...options, base }, -depth, ortho, line, areaOn(arch.id, arch.clean.mesh)) };
-  });
+    const made = buildArch(runtime, arch, { ...options, base }, -depth, ortho, line, areaOn(arch.id, arch.clean.mesh));
+    if (mode.only !== undefined) {
+      mode.take?.(archPartOf(made));
+      made.solid.delete();
+      return null;
+    }
+    built.push({ arch, built: made });
+  }
   const warnings = [...new Set([...(apart ? ["apart"] : []), ...built.flatMap(({ built: b }) => b.warnings)])];
   const voxel = built.find(({ built: b }) => b.voxel !== null)?.built.voxel ?? null;
   const toFree: ManifoldSolid[] = [];

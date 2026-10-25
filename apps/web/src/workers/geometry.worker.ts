@@ -9,6 +9,8 @@ import { prepareImportedMeshDisplay } from "@/lib/importedMeshDisplay";
 import { simplifyTrianglePositions } from "@/lib/meshSimplify";
 import { importedShapesFromObj } from "@/lib/objImport";
 import { importedShapeFromStl } from "@/lib/stlImport";
+import { exportMeshesTo3mf } from "@/lib/threemfExport";
+import { unflattenThreeMfMeshes, type FlatThreeMfMesh } from "@/lib/threemfFlat";
 import { setLanguage } from "@/lib/i18n";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
 import type { WorkplaneShape } from "@/types/layerling";
@@ -51,6 +53,10 @@ self.onmessage = async (event: MessageEvent<GeometryWorkerRequest>) => {
     } else if (request.task === "simplify") {
       const { positions, target } = args as { positions: number[]; target: number };
       result = await simplifyTrianglePositions(positions, target);
+    } else if (request.task === "threemf") {
+      // Build 68: the whole 3MF - welding, the XML and the zip - is made here, not on the page.
+      const { meshes, metadata } = args as { meshes: FlatThreeMfMesh[]; metadata: { title?: string } };
+      result = exportMeshesTo3mf(unflattenThreeMfMeshes(meshes), metadata);
     } else if (request.task === "warm") {
       await getManifoldRuntime();
       result = null;

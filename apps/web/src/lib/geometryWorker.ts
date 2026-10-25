@@ -1,6 +1,8 @@
 import { buildsDiffer, BUILD_ID, isBuildMessage, reportWorkerBuild } from "@/lib/buildStamp";
 import { buildGroupedShapeFromSelection, exportSolidVolume, splitShapeIfCrossed, splitShapesByPlane, type ExportSolidVolume, type GroupBuildResult, type SplitShapesOutcome } from "@/lib/editorBooleans";
 import { packValue, packedTransfer, unpackValue } from "@/lib/geometryTransfer";
+import { exportMeshesTo3mfAsync, type ThreeMfExportMesh } from "@/lib/threemfExport";
+import { flattenThreeMfMeshes } from "@/lib/threemfFlat";
 import { resultMeshes, type GeometryTask, type GeometryWorkerRequest, type GeometryWorkerResponse } from "@/lib/geometryWorkerTypes";
 import { rememberPreparedDisplay } from "@/lib/importedMeshDisplay";
 import { getLanguage, t } from "@/lib/i18n";
@@ -297,4 +299,11 @@ export function simplifyTrianglePositionsOffThread(positions: ArrayLike<number>,
   return runGeometryTask("simplify", { positions: Array.isArray(positions) ? positions : Array.from(positions), target }, () => simplifyTrianglePositions(positions, target), () => {
     throw new Error(t("status.computeTimedOut"));
   }, signal, true);
+}
+
+/** Build 68: the 3MF made in the geometry worker (Send to Bambu Studio and 3MF export); on the page where no worker runs. */
+export function exportMeshesTo3mfOffThread(meshes: readonly ThreeMfExportMesh[], metadata: { title?: string } = {}): Promise<Uint8Array> {
+  return runGeometryTask<Uint8Array>("threemf", { meshes: flattenThreeMfMeshes(meshes), metadata }, () => exportMeshesTo3mfAsync(meshes, metadata), () => {
+    throw new Error(t("status.computeTimedOut"));
+  }, undefined, true);
 }

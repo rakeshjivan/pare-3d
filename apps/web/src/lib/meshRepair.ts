@@ -26,21 +26,37 @@ export const pendingMeshChecks = new Set<string>();
 
 export type Welded = { points: number[][]; triangles: number[][] };
 
-/** Corners at the same place joined; triangles that collapse to a line or point dropped. */
+/**
+ * Corners at the same place joined; triangles that collapse to a line or point dropped. Corners are
+ * the same when they round to the same 0.1 µm grid point. Build 68: the grid points are kept in a
+ * hash table of numbers instead of a Map of strings - the same result, several times faster on a
+ * 300,000-triangle scan, where it ran on every import.
+ */
 export function weldTriangles(positions: ArrayLike<number>): Welded {
-  const index = new Map<string, number>();
   const points: number[][] = [];
   const triangles: number[][] = [];
+  const cornerCount = Math.floor(positions.length / 3);
+  let size = 1024;
+  while (size < cornerCount * 2) size *= 2;
+  const mask = size - 1;
+  const slots = new Int32Array(size).fill(-1);
+  const keys: number[] = []; // three rounded coordinates per point
   const corner = (offset: number) => {
     const x = positions[offset], y = positions[offset + 1], z = positions[offset + 2];
-    const key = `${Math.round(x * WELD)},${Math.round(y * WELD)},${Math.round(z * WELD)}`;
-    let id = index.get(key);
-    if (id === undefined) {
-      id = points.length;
-      points.push([x, y, z]);
-      index.set(key, id);
+    const kx = Math.round(x * WELD), ky = Math.round(y * WELD), kz = Math.round(z * WELD);
+    let slot = (Math.imul(kx | 0, 73856093) ^ Math.imul(ky | 0, 19349663) ^ Math.imul(kz | 0, 83492791)) & mask;
+    for (;;) {
+      const id = slots[slot];
+      if (id === -1) {
+        const fresh = points.length;
+        points.push([x, y, z]);
+        keys.push(kx, ky, kz);
+        slots[slot] = fresh;
+        return fresh;
+      }
+      if (keys[id * 3] === kx && keys[id * 3 + 1] === ky && keys[id * 3 + 2] === kz) return id;
+      slot = (slot + 1) & mask;
     }
-    return id;
   };
   for (let offset = 0; offset + 8 < positions.length; offset += 9) {
     const a = corner(offset), b = corner(offset + 3), c = corner(offset + 6);
@@ -51,6 +67,21 @@ export function weldTriangles(positions: ArrayLike<number>): Welded {
 }
 
 const edgeKey = (a: number, b: number) => (a < b ? `${a}_${b}` : `${b}_${a}`);
+
+/** How many triangles use each edge, keyed by a number made of its two corners (smaller first). */
+function edgeUses(welded: Welded): Map<number, number> {
+  const span = welded.points.length + 1;
+  const uses = new Map<number, number>();
+  for (const [a, b, c] of welded.triangles) {
+    const k1 = a < b ? a * span + b : b * span + a;
+    const k2 = b < c ? b * span + c : c * span + b;
+    const k3 = c < a ? c * span + a : a * span + c;
+    uses.set(k1, (uses.get(k1) ?? 0) + 1);
+    uses.set(k2, (uses.get(k2) ?? 0) + 1);
+    uses.set(k3, (uses.get(k3) ?? 0) + 1);
+  }
+  return uses;
+}
 
 export type MeshHealth = {
   triangles: number;
@@ -66,57 +97,137 @@ export type MeshHealth = {
 };
 
 export function meshHealth(positions: ArrayLike<number>): MeshHealth {
-  const welded = weldTriangles(positions);
   const total = Math.floor(positions.length / 9);
-  const uses = new Map<string, number>();
-  for (const [a, b, c] of welded.triangles) {
-    for (const [p, q] of [[a, b], [b, c], [c, a]]) {
-      const key = edgeKey(p, q);
-      uses.set(key, (uses.get(key) ?? 0) + 1);
+  // Build 68: corners and edges counted in typed hash tables; the welded lists are only built when
+  // there are openings to trace.
+  const corners = weldCornerIds(positions);
+  const ids = corners.ids;
+  const span = corners.count + 1;
+  let size = 1024;
+  while (size < total * 3 * 2) size *= 2;
+  const mask = size - 1;
+  const edgeKeys = new Float64Array(size).fill(-1);
+  const edgeCounts = new Int32Array(size);
+  let kept = 0;
+  const add = (p: number, q: number) => {
+    const lo = p < q ? p : q, hi = p < q ? q : p;
+    const key = lo * span + hi;
+    let slot = (Math.imul(lo, 0x9e3779b1) ^ Math.imul(hi, 0x85ebca6b)) & mask;
+    for (;;) {
+      const at = edgeKeys[slot];
+      if (at === -1) { edgeKeys[slot] = key; edgeCounts[slot] = 1; return; }
+      if (at === key) { edgeCounts[slot] += 1; return; }
+      slot = (slot + 1) & mask;
     }
+  };
+  for (let t = 0; t < total; t += 1) {
+    const a = ids[t * 3], b = ids[t * 3 + 1], c = ids[t * 3 + 2];
+    if (a === b || b === c || a === c) continue;
+    kept += 1;
+    add(a, b); add(b, c); add(c, a);
   }
   let openEdges = 0, brokenEdges = 0;
-  for (const count of uses.values()) {
+  for (let slot = 0; slot < size; slot += 1) {
+    if (edgeKeys[slot] === -1) continue;
+    const count = edgeCounts[slot];
     if (count === 1) openEdges += 1;
     else if (count > 2) brokenEdges += 1;
   }
-  const openings = openEdges ? boundaryLoops(welded).length : 0;
+  const countOf = (p: number, q: number) => {
+    const lo = p < q ? p : q, hi = p < q ? q : p;
+    const key = lo * span + hi;
+    let slot = (Math.imul(lo, 0x9e3779b1) ^ Math.imul(hi, 0x85ebca6b)) & mask;
+    for (;;) {
+      const at = edgeKeys[slot];
+      if (at === -1) return 0;
+      if (at === key) return edgeCounts[slot];
+      slot = (slot + 1) & mask;
+    }
+  };
+  let openings = 0;
+  if (openEdges) {
+    // The open edges, each in the direction its triangle runs along it, traced into loops as boundaryLoops does.
+    const next = new Map<number, number[]>();
+    for (let t = 0; t < total; t += 1) {
+      const a = ids[t * 3], b = ids[t * 3 + 1], c = ids[t * 3 + 2];
+      if (a === b || b === c || a === c) continue;
+      for (const [p, q] of [[a, b], [b, c], [c, a]]) {
+        if (countOf(p, q) !== 1) continue;
+        const list = next.get(p) ?? [];
+        list.push(q);
+        next.set(p, list);
+      }
+    }
+    openings = traceLoops(next, span).length;
+  }
   return {
     triangles: total,
     openEdges,
     openings,
     brokenEdges,
-    degenerate: total - welded.triangles.length,
+    degenerate: total - kept,
     watertight: openEdges === 0 && brokenEdges === 0,
   };
 }
 
+/** Each corner's welded id (three per triangle), as weldTriangles numbers them, and how many there are. */
+function weldCornerIds(positions: ArrayLike<number>): { ids: Int32Array; count: number } {
+  const cornerCount = Math.floor(positions.length / 9) * 3;
+  const ids = new Int32Array(cornerCount);
+  let size = 1024;
+  while (size < cornerCount * 2) size *= 2;
+  const mask = size - 1;
+  const slots = new Int32Array(size).fill(-1);
+  const keys = new Float64Array(cornerCount * 3);
+  let count = 0;
+  for (let i = 0; i < cornerCount; i += 1) {
+    const kx = Math.round(positions[i * 3] * WELD), ky = Math.round(positions[i * 3 + 1] * WELD), kz = Math.round(positions[i * 3 + 2] * WELD);
+    let slot = (Math.imul(kx | 0, 73856093) ^ Math.imul(ky | 0, 19349663) ^ Math.imul(kz | 0, 83492791)) & mask;
+    for (;;) {
+      const id = slots[slot];
+      if (id === -1) {
+        keys[count * 3] = kx; keys[count * 3 + 1] = ky; keys[count * 3 + 2] = kz;
+        slots[slot] = count; ids[i] = count; count += 1;
+        break;
+      }
+      if (keys[id * 3] === kx && keys[id * 3 + 1] === ky && keys[id * 3 + 2] === kz) { ids[i] = id; break; }
+      slot = (slot + 1) & mask;
+    }
+  }
+  return { ids, count };
+}
+
 /** The loops of open edges, each in the direction its triangle runs along it. */
-function boundaryLoops({ triangles }: Welded): number[][] {
-  const count = new Map<string, number>();
-  for (const [a, b, c] of triangles) for (const [p, q] of [[a, b], [b, c], [c, a]]) count.set(edgeKey(p, q), (count.get(edgeKey(p, q)) ?? 0) + 1);
+function boundaryLoops(welded: Welded): number[][] {
+  const { triangles } = welded;
+  const count = edgeUses(welded);
+  const span = welded.points.length + 1;
   const next = new Map<number, number[]>();
   for (const [a, b, c] of triangles) {
     for (const [p, q] of [[a, b], [b, c], [c, a]]) {
-      if (count.get(edgeKey(p, q)) !== 1) continue;
+      if (count.get(p < q ? p * span + q : q * span + p) !== 1) continue;
       const list = next.get(p) ?? [];
       list.push(q);
       next.set(p, list);
     }
   }
+  return traceLoops(next, span);
+}
+
+function traceLoops(next: Map<number, number[]>, span: number): number[][] {
   const loops: number[][] = [];
-  const used = new Set<string>();
+  const used = new Set<number>();
   for (const [start, targets] of next) {
     for (const first of targets) {
-      if (used.has(`${start}>${first}`)) continue;
+      if (used.has(start * span + first)) continue;
       const loop = [start];
       let from = start, to = first;
       let guard = 0;
       while (guard++ < 1e6) {
-        used.add(`${from}>${to}`);
+        used.add(from * span + to);
         if (to === start) break;
         loop.push(to);
-        const options = (next.get(to) ?? []).filter((candidate) => !used.has(`${to}>${candidate}`));
+        const options = (next.get(to) ?? []).filter((candidate) => !used.has(to * span + candidate));
         if (!options.length) break;
         from = to;
         to = options[0];

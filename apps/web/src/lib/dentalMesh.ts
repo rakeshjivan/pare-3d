@@ -157,11 +157,11 @@ export function dropInverted(m: Mesh, spare?: Uint8Array): number {
  */
 export function boundaryLoops(m: Mesh): number[][] {
   const faces = m.f.length / 3;
-  const directed = new Map<number, number>();
+  // Build 68: a typed table, not a Map - this ran over every edge of the scan several times a model.
+  const directed = new KeyTable(faces * 2);
   for (let t = 0; t < faces; t += 1) for (let k = 0; k < 3; k += 1) {
     const a = m.f[t * 3 + k], b = m.f[t * 3 + ((k + 1) % 3)];
-    const key = edgeKey(a, b);
-    directed.set(key, (directed.get(key) ?? 0) + 1);
+    directed.add(edgeKey(a, b));
   }
   const next = new Map<number, number[]>();
   for (let t = 0; t < faces; t += 1) for (let k = 0; k < 3; k += 1) {
@@ -663,11 +663,21 @@ export function tidyForFile(soup: Float32Array): Float32Array {
   const edgeKey = (a: number, b: number) => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
   const edgeUse = new KeyTable(nt * 2);
   for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) edgeUse.add(edgeKey(tris[t * 3 + k], tris[t * 3 + ((k + 1) % 3)]));
-  const corners = new Map<number, number[]>();
-  for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) {
-    const v = tris[t * 3 + k];
-    const list = corners.get(v);
-    if (list) list.push(t); else corners.set(v, [t]);
+  // Build 68: the triangles round each corner in flat typed lists (and the corners in the order they
+  // are first met), not a Map of arrays - the same lists, without half a million little arrays.
+  const vertexCount = pts.length / 3;
+  const cornerStart = new Int32Array(vertexCount + 1);
+  const cornerOrder: number[] = [];
+  for (let i = 0; i < nt * 3; i += 1) {
+    const v = tris[i];
+    if (cornerStart[v + 1] === 0) cornerOrder.push(v);
+    cornerStart[v + 1] += 1;
+  }
+  for (let v = 0; v < vertexCount; v += 1) cornerStart[v + 1] += cornerStart[v];
+  const cornerList = new Int32Array(nt * 3);
+  {
+    const fill = cornerStart.slice(0, vertexCount);
+    for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) cornerList[fill[tris[t * 3 + k]]++] = t;
   }
   // Where an edge is used by more than two triangles, pair them as the solid does: each triangle with
   // the first one met turning from it into the material. Two parts touching along an edge each keep
@@ -719,39 +729,58 @@ export function tidyForFile(soup: Float32Array): Float32Array {
   });
   // At each corner, the triangles around it fall into fans joined by their shared edges.
   // One fan is a clean corner; more than one is a pinch, and each fan gets its own copy.
+  // Build 68: the fans are found by joining the corner's triangles that share an edge (the triangles
+  // using an edge from this corner are all in its list, so how many there are is the edge's use) -
+  // the same fans, numbered in the same order, without a lookup per edge.
   let next = pts.length / 3;
-  corners.forEach((list, v) => {
-    if (list.length < 3) return;
-    const fan = new Map<number, number>();
-    let fans = 0;
-    for (const start of list) {
-      if (fan.has(start)) continue;
-      const stack = [start];
-      fan.set(start, fans);
-      while (stack.length) {
-        const t = stack.pop()!;
-        for (let k = 0; k < 3; k += 1) {
-          const w = orig[t * 3 + k];
-          if (w === v) continue;
-          const key = edgeKey(v, w);
-          const use = edgeUse.get(key);
-          if (use === 2) {
-            for (const u of list) {
-              if (fan.has(u)) continue;
-              if (orig[u * 3] === w || orig[u * 3 + 1] === w || orig[u * 3 + 2] === w) { fan.set(u, fans); stack.push(u); }
-            }
-          } else if (use && use > 2) {
-            const u = partner.get(`${t}:${key}`);
-            if (u !== undefined && !fan.has(u)) { fan.set(u, fans); stack.push(u); }
+  let scratch = new Int32Array(64);
+  const root = (parent: Int32Array, i: number) => {
+    while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+    return i;
+  };
+  for (const v of cornerOrder) {
+    const begin = cornerStart[v], size = cornerStart[v + 1] - begin;
+    if (size < 3) continue;
+    if (scratch.length < size * 2) scratch = new Int32Array(size * 4);
+    const parent = scratch.subarray(0, size);
+    for (let i = 0; i < size; i += 1) parent[i] = i;
+    const join = (i: number, j: number) => {
+      const ri = root(parent, i), rj = root(parent, j);
+      if (ri !== rj) parent[Math.max(ri, rj)] = Math.min(ri, rj);
+    };
+    for (let i = 0; i < size; i += 1) {
+      const t = cornerList[begin + i];
+      for (let k = 0; k < 3; k += 1) {
+        const w = orig[t * 3 + k];
+        if (w === v) continue;
+        let use = 0;
+        for (let j = 0; j < size; j += 1) {
+          const u = cornerList[begin + j];
+          if (orig[u * 3] === w || orig[u * 3 + 1] === w || orig[u * 3 + 2] === w) use += 1;
+        }
+        if (use === 2) {
+          for (let j = 0; j < size; j += 1) {
+            const u = cornerList[begin + j];
+            if (u !== t && (orig[u * 3] === w || orig[u * 3 + 1] === w || orig[u * 3 + 2] === w)) join(i, j);
           }
+        } else if (use > 2) {
+          const u = partner.get(`${t}:${edgeKey(v, w)}`);
+          if (u !== undefined) for (let j = 0; j < size; j += 1) if (cornerList[begin + j] === u) join(i, j);
         }
       }
-      fans += 1;
     }
-    if (fans < 2) return;
+    // Fans numbered as they are first met along the corner's list.
+    const fanOf = scratch.subarray(size, size * 2);
+    let fans = 0;
+    for (let i = 0; i < size; i += 1) {
+      const r = root(parent, i);
+      fanOf[i] = r === i ? fans++ : fanOf[r];
+    }
+    if (fans < 2) continue;
     for (let f = 1; f < fans; f += 1) {
       let sx = 0, sy = 0, sz = 0, n = 0;
-      const mine = list.filter((t) => fan.get(t) === f);
+      const mine: number[] = [];
+      for (let i = 0; i < size; i += 1) if (fanOf[i] === f) mine.push(cornerList[begin + i]);
       for (const t of mine) for (let k = 0; k < 3; k += 1) {
         const w = orig[t * 3 + k];
         if (w === v) continue;
@@ -763,7 +792,7 @@ export function tidyForFile(soup: Float32Array): Float32Array {
       pts.push(pts[v * 3] + (dx / length) * 0.002, pts[v * 3 + 1] + (dy / length) * 0.002, pts[v * 3 + 2] + (dz / length) * 0.002);
       for (const t of mine) for (let k = 0; k < 3; k += 1) if (orig[t * 3 + k] === v) tris[t * 3 + k] = id;
     }
-  });
+  }
   // A split must never open the surface: where a copy left an edge with one triangle, the corners
   // of that edge go back to the corner they came from (and the pinch there stays as it was).
   const from = new Map<number, number>();

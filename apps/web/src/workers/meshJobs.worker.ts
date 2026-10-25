@@ -3,11 +3,32 @@
  * Fork (build 35): heavy mesh work off the page's own thread, so the window keeps answering - and
  * the spinner keeps turning - while a big scan is rounded (that can take half a minute).
  */
+import type { DentalArchPart } from "@/lib/dentalModel";
 import type { MeshJobRequest, MeshJobResponse } from "@/lib/meshJobs";
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
-scope.onmessage = async (event: MessageEvent<MeshJobRequest>) => {
+/** Build 68: arches made in the second worker, waited for by the job that puts the pair together. */
+const archParts = new Map<number, { resolve: (part: DentalArchPart) => void; reject: (error: Error) => void }>();
+const earlyParts = new Map<number, { part?: DentalArchPart; error?: string }>();
+function archPartFor(jobId: number): Promise<DentalArchPart> {
+  const early = earlyParts.get(jobId);
+  if (early) {
+    earlyParts.delete(jobId);
+    return early.part ? Promise.resolve(early.part) : Promise.reject(new Error(early.error ?? "no arch"));
+  }
+  return new Promise((resolve, reject) => archParts.set(jobId, { resolve, reject }));
+}
+
+scope.onmessage = async (event: MessageEvent<MeshJobRequest | { archPartFor: number; part?: DentalArchPart; error?: string }>) => {
+  if ("archPartFor" in event.data) {
+    const { archPartFor: jobId, part, error } = event.data;
+    const waiting = archParts.get(jobId);
+    if (!waiting) { earlyParts.set(jobId, { part, error }); return; }
+    archParts.delete(jobId);
+    if (part) waiting.resolve(part); else waiting.reject(new Error(error ?? "no arch"));
+    return;
+  }
   const job = event.data;
   // The mesh helpers find their wasm next to the page, as they do in the window.
   const holder = globalThis as unknown as { window?: { location: { href: string } } };
@@ -26,9 +47,18 @@ scope.onmessage = async (event: MessageEvent<MeshJobRequest>) => {
       scope.postMessage(reply);
     } else if (job.kind === "dentalStudio") {
       const { makeDentalStudio } = await import("@/lib/dentalModel");
-      const result = await makeDentalStudio(job.input, job.options);
+      const remote = job.remoteIndex !== undefined ? { index: job.remoteIndex, part: archPartFor(job.id) } : undefined;
+      const result = await makeDentalStudio(job.input, job.options, undefined, remote);
       const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalStudio", result };
       scope.postMessage(reply, result.parts.map((part) => part.positions.buffer));
+    } else if (job.kind === "dentalArch") {
+      const { makeDentalArchPart } = await import("@/lib/dentalModel");
+      const part = await makeDentalArchPart(job.input, job.options, job.index);
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalArch", part };
+      const buffers: ArrayBuffer[] = [part.mesh.vertProperties.buffer as ArrayBuffer, part.mesh.triVerts.buffer as ArrayBuffer];
+      if (part.mesh.mergeFromVert) buffers.push(part.mesh.mergeFromVert.buffer as ArrayBuffer);
+      if (part.mesh.mergeToVert) buffers.push(part.mesh.mergeToVert.buffer as ArrayBuffer);
+      scope.postMessage(reply, buffers);
     } else if (job.kind === "dentalTrim") {
       const { cutDentalScan } = await import("@/lib/dentalTrim");
       const trim = cutDentalScan(job.positions, job.side, job.mode, job.local);
