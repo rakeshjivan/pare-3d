@@ -60,8 +60,11 @@ import { faceComponents } from "@/lib/meshComponents";
 import { movedPointIds, solveSketchConstraints } from "@/lib/sketchConstraints";
 import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
-import { analyseDentalInBackground, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
+import { analyseDentalInBackground, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
 import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
+import { applyBrush, applyToSelection, averageEdge, brushChoice, smoothingPasses, cornerPositions, growChoice, soupFloat32, invertChoice, millimetresPerPixel, sculptMeshOf, soupOf, strokeWeights, withoutTriangles, type SculptMesh } from "@/lib/meshSculpt";
+import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
+import { MeshSculptPanel, type SculptSelectionAction, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
@@ -8942,6 +8945,193 @@ export function LayerlingEditor({
     if (meshRoundTool && !(selectedIds.length === 1 && selectedIds[0] === meshRoundTool.shapeId) && !meshRoundTool.busy) setMeshRoundTool(null);
   }, [meshRoundTool, selectedIds]);
 
+  // Build 69: Sculpt - brushes on a mesh, a brush-painted selection, and Remesh / Offset / Thicken.
+  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; chosen: number; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null } | null>(null);
+  const sculptState = useRef<{ shapeId: string; key: string; mesh: SculptMesh; chosen: Uint8Array; strokes: number; lastBrush: SculptTool | null; drawn?: Float32Array; undo: Float64Array[]; redo: Float64Array[] } | null>(null);
+  const flushSculptRef = useRef<() => void>(() => {});
+  const sculptPreviewDone = useRef<string | null>(null);
+  /** The welded copy of the part being sculpted - made again when the part changed some other way (undo, a move). */
+  const sculptMeshFor = (shape: WorkplaneShape) => {
+    const key = projectShapesFingerprint([shape]);
+    const known = sculptState.current;
+    if (known && known.shapeId === shape.id && known.key === key) return known;
+    const mesh = sculptMeshOf(worldTriangles(shape));
+    sculptState.current = { shapeId: shape.id, key, mesh, chosen: new Uint8Array(mesh.triangles.length / 3), strokes: 0, lastBrush: null, undo: [], redo: [] };
+    return sculptState.current;
+  };
+  const openSculpt = useCallback((shape: WorkplaneShape) => {
+    if (shape.locked || shape.hole || isNonSolidShapeKind(shape.kind)) { setNotice(t("sculpt.selectOne")); return; }
+    const state = sculptMeshFor(shape);
+    const triangles = state.mesh.triangles.length / 3;
+    if (triangles > 400_000) setNotice(t("sculpt.large", { count: triangles.toLocaleString() }));
+    setMeshRoundTool(null);
+    setSculptTool({ shapeId: shape.id, tool: "smooth", size: 30, strength: 0.5, chosen: state.chosen.reduce((a, b) => a + b, 0), remeshMode: "remesh", detail: defaultRemeshDetail(soupOf(state.mesh)), amount: 2, busy: false, error: null });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleSculpt = useCallback(() => {
+    if (sculptTool) { flushSculpt(); setSculptTool(null); return; }
+    if (refuseLockedSelection()) return;
+    const shape = selectedShapes.length === 1 ? selectedShapes[0] : null;
+    if (!shape) { setNotice(t("sculpt.selectOne")); return; }
+    openSculpt(shape);
+  }, [openSculpt, refuseLockedSelection, sculptTool, selectedShapes]);
+  /** Puts the sculpted mesh in place of the part, as one step of undo, and keeps the copy in step with it. */
+  const commitSculpt = (shape: WorkplaneShape, positions: number[], message: string, keepCopy: boolean) => {
+    const next = canonicalizeShape(shapeWithWorldPositions(shape, positions));
+    commitShapes(shapesRef.current.map((candidate) => (candidate.id === shape.id ? next : candidate)), next.id, message);
+    if (keepCopy && sculptState.current) sculptState.current.key = projectShapesFingerprint([next]);
+    else sculptState.current = null;
+    return next;
+  };
+  /** Strokes not yet in the part go in now, as one step of undo. */
+  const flushSculpt = () => {
+    const state = sculptState.current;
+    if (!state) return;
+    state.undo = [];
+    state.redo = [];
+    if (!state.strokes) return;
+    const shape = shapesRef.current.find((candidate) => candidate.id === state.shapeId);
+    const strokes = state.strokes;
+    state.strokes = 0;
+    if (!shape || projectShapesFingerprint([shape]) !== state.key) { window.layerlingSculptPreview?.(state.shapeId, null); return; }
+    const brush = t(`sculpt.tool.${state.lastBrush ?? "smooth"}` as "sculpt.tool.smooth");
+    commitSculpt(shape, soupOf(state.mesh), strokes > 1 ? t("sculpt.strokes", { count: strokes, brush }) : t("sculpt.stroke", { brush }), true);
+    // The working copy goes once the rebuilt part is drawn, so the old surface never shows in between.
+    sculptPreviewDone.current = state.shapeId;
+  };
+  flushSculptRef.current = flushSculpt;
+  const sculptTarget = () => {
+    const tool = sculptTool;
+    const shape = tool ? shapesRef.current.find((candidate) => candidate.id === tool.shapeId) : undefined;
+    return tool && shape ? { tool, shape, state: sculptMeshFor(shape) } : null;
+  };
+  const applySculptStroke = useCallback((points: TrimPoint[]) => {
+    const target = sculptTarget();
+    if (!target || !target.tool.tool || !window.layerlingProjectPoints || !window.layerlingCameraPosition) return;
+    const { tool, shape, state } = target;
+    const eye = window.layerlingCameraPosition();
+    if (tool.tool === "select" || tool.tool === "unselect") {
+      brushChoice(state.mesh, window.layerlingProjectPoints(cornerPositions(state.mesh)), eye, points, tool.size, state.chosen, tool.tool === "select");
+      setSculptTool((current) => current ? { ...current, chosen: state.chosen.reduce((a, b) => a + b, 0) } : current);
+      return;
+    }
+    const brush = tool.tool;
+    if (!brush) return;
+    const projected = window.layerlingProjectPoints(cornerPositions(state.mesh));
+    const weights = strokeWeights(state.mesh, projected, eye, points, tool.size, tool.strength);
+    if (!weights.some((w) => w > 0)) { setNotice(t("sculpt.nothing")); return; }
+    state.undo.push(state.mesh.points.slice());
+    if (state.undo.length > 40) state.undo.shift();
+    state.redo = [];
+    // Inflate and Deflate move up to a quarter of the brush's radius a stroke at full strength; Smooth
+    // evens out bumps up to the brush's size.
+    const radius = tool.size * millimetresPerPixel(state.mesh, projected, weights);
+    const step = radius * 0.25;
+    applyBrush(state.mesh, brush, weights, step, smoothingPasses(radius, averageEdge(state.mesh, weights), tool.strength));
+    // Build 69: the strokes change a working copy, drawn at once; the part itself is rebuilt once, when
+    // Sculpt is left (Done, another part, another tool). Ctrl+Z takes strokes back inside the session.
+    state.drawn = soupFloat32(state.mesh, state.drawn);
+    window.layerlingSculptPreview?.(shape.id, state.drawn, shape.color);
+    state.strokes += 1;
+    state.lastBrush = brush;
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  const applySculptSelection = useCallback((action: SculptSelectionAction) => {
+    flushSculpt();
+    const target = sculptTarget();
+    if (!target) return;
+    const { shape, state } = target;
+    const count = () => state.chosen.reduce((a, b) => a + b, 0);
+    if (action === "clear" || action === "invert" || action === "grow") {
+      state.chosen = action === "clear" ? new Uint8Array(state.chosen.length) : action === "invert" ? invertChoice(state.chosen) : growChoice(state.mesh, state.chosen);
+      setSculptTool((current) => current ? { ...current, chosen: count() } : current);
+      return;
+    }
+    if (!count()) return;
+    if (action === "delete") {
+      const removed = count();
+      const left = withoutTriangles(soupOf(state.mesh), state.chosen);
+      if (!left.length) return;
+      commitSculpt(shape, left, t("sculpt.deleted", { count: removed.toLocaleString() }), false);
+      setSculptTool((current) => current ? { ...current, chosen: 0 } : current);
+      return;
+    }
+    applyToSelection(state.mesh, state.chosen, action);
+    commitSculpt(shape, soupOf(state.mesh), t("sculpt.selectionDone", { action: t(`sculpt.selection.${action}`) }), true);
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  const applyRemesh = useCallback(() => {
+    flushSculpt();
+    const target = sculptTarget();
+    if (!target) return;
+    const { tool, shape, state } = target;
+    const fingerprint = projectShapesFingerprint([shape]);
+    setSculptTool({ ...tool, busy: true, error: null });
+    window.setTimeout(async () => {
+      try {
+        const result = await remeshInBackground(soupOf(state.mesh), { mode: tool.remeshMode, detail: tool.detail, amount: tool.amount });
+        const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
+        if (!current || projectShapesFingerprint([current]) !== fingerprint) throw new Error(t("sculpt.changed"));
+        const amount = tool.amount.toFixed(1);
+        const message = tool.remeshMode === "remesh" ? t("sculpt.remeshed", { triangles: result.triangles.toLocaleString(), voxel: result.voxel.toFixed(2) })
+          : tool.remeshMode === "offset" ? t("sculpt.offsetDone", { amount }) : t("sculpt.thickened", { amount });
+        commitSculpt(current, result.positions, message + (result.coarse ? t("sculpt.coarse", { voxel: result.voxel.toFixed(2) }) : ""), false);
+        setSculptTool((latest) => latest ? { ...latest, busy: false, chosen: 0 } : latest);
+      } catch (error) {
+        setSculptTool((latest) => latest ? { ...latest, busy: false, error: error instanceof Error ? localizedError(error.message) : String(error) } : latest);
+      }
+    }, 30);
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The tool belongs to its part: picking another closes it.
+  useEffect(() => {
+    if (sculptTool && !sculptTool.busy && !(selectedIds.length === 1 && selectedIds[0] === sculptTool.shapeId)) { flushSculptRef.current(); setSculptTool(null); }
+  }, [sculptTool, selectedIds]);
+  useEffect(() => { if (!sculptTool) sculptState.current = null; }, [sculptTool]);
+  const sculptOpen = Boolean(sculptTool);
+  useEffect(() => {
+    const id = sculptPreviewDone.current;
+    if (!id) return;
+    sculptPreviewDone.current = null;
+    // Two frames: one for the view to rebuild the part, one to draw it.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (!sculptState.current?.strokes) window.layerlingSculptPreview?.(id, null);
+    }));
+  }, [shapes]);
+  useEffect(() => { if (!sculptTool) window.layerlingSculptPreview?.("", null); }, [sculptTool]);
+  /** Ctrl+Z / Ctrl+Shift+Z inside a Sculpt session: the last stroke back (or again), on the working copy. */
+  const stepSculpt = (back: boolean) => {
+    const state = sculptState.current;
+    const from = back ? state?.undo : state?.redo;
+    if (!state || !from?.length) return false;
+    (back ? state.redo : state.undo).push(state.mesh.points.slice());
+    state.mesh.points = from.pop()!;
+    state.strokes += back ? -1 : 1;
+    state.drawn = soupFloat32(state.mesh, state.drawn);
+    const shape = shapesRef.current.find((candidate) => candidate.id === state.shapeId);
+    if (state.strokes <= 0 && !state.undo.length) { state.strokes = 0; window.layerlingSculptPreview?.(state.shapeId, null); }
+    else window.layerlingSculptPreview?.(state.shapeId, state.drawn, shape?.color);
+    setNotice(t(back ? "sculpt.undone" : "sculpt.redone"));
+    return true;
+  };
+  // While Sculpt is open: Ctrl+Z steps through its strokes; any other shortcut, or a click outside the
+  // panel and the view, puts the strokes into the part first (Save, Export and the rest see them).
+  useEffect(() => {
+    if (!sculptOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      // Ctrl (or Cmd) on its own comes first, before the letter: nothing to do yet.
+      if (key === "control" || key === "meta" || key === "shift" || key === "alt") return;
+      if ((key === "z" || key === "y") && stepSculpt(key === "z" && !event.shiftKey)) { event.preventDefault(); event.stopPropagation(); return; }
+      flushSculptRef.current();
+    };
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest?.(".mesh-sculpt-panel, .dental-brush-overlay, .workplane-plane")) return;
+      flushSculptRef.current();
+    };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("pointerdown", onPointer, true);
+    return () => { window.removeEventListener("keydown", onKey, true); window.removeEventListener("pointerdown", onPointer, true); };
+  }, [sculptOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fork (build 55): Texture - a pattern pressed into or raised out of one part's surface.
   const [textureTool, setTextureTool] = useState<{ shapeId: string; options: SurfaceTextureOptions; pictureName: string | null; busy: boolean; error: string | null } | null>(null);
   const toggleTexture = useCallback(() => {
@@ -9296,6 +9486,22 @@ export function LayerlingEditor({
     // Build 56: drawn again whenever the shapes change, so the tint turns and moves with its model.
   }, [dentalAreaManual, dentalAreaVersion, dentalHidden, dentalStudio?.stage, dentalStudio?.slots.upper, dentalStudio?.slots.lower, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => window.layerlingHighlight?.(null), []);
+  // Build 69: the triangles chosen with Sculpt's Select brush, tinted (after the dental tint, so it wins while Sculpt is open).
+  const sculptWasOpen = useRef(false);
+  useEffect(() => {
+    const state = sculptState.current;
+    if (!sculptTool || !state) {
+      if (sculptWasOpen.current) { sculptWasOpen.current = false; window.layerlingHighlight?.(null); setDentalAreaVersion((version) => version + 1); }
+      return;
+    }
+    sculptWasOpen.current = true;
+    if (!sculptTool.chosen) { window.layerlingHighlight?.(null); return; }
+    const world = state.drawn ?? soupFloat32(state.mesh);
+    const parts = new Float32Array(sculptTool.chosen * 9);
+    let at = 0;
+    for (let t = 0; t < state.chosen.length && at < parts.length; t += 1) if (state.chosen[t]) { for (let k = 0; k < 9; k += 1) parts[at + k] = world[t * 9 + k]; at += 9; }
+    window.layerlingHighlight?.(parts);
+  }, [sculptTool, shapes]);
   const chooseDentalAreaTool = useCallback((slot: "upper" | "lower", tool: DentalAreaTool | null) => {
     const state = dentalStudioRef.current;
     if (!tool || !state) { setDentalAreaTool(null); setDentalHidden([]); return; }
@@ -14393,6 +14599,7 @@ export function LayerlingEditor({
         { key: "deleteFace", label: t("editor.tool.deleteFace"), onSelect: () => startDeleteFaceTool("delete") },
         { key: "draft", label: t("draft.menu"), onSelect: startDraftTool },
         { key: "roundMesh", label: t("meshRound.menu"), onSelect: toggleMeshRound },
+        { key: "sculpt", label: t("sculpt.menu"), onSelect: toggleSculpt },
         { key: "texture", label: t("texture.menu"), onSelect: toggleTexture },
         { key: "surfaceText", label: t(selectedShapes.length === 1 && selectedShapes[0].surfaceText ? "surfaceText.editMenu" : "surfaceText.menu"), onSelect: toggleSurfaceText },
       );
@@ -14542,6 +14749,8 @@ export function LayerlingEditor({
           canRound: !selectionLocked && selectedShapes.length === 1 && !selectedShapes[0].hole && !isNonSolidShapeKind(selectedShapes[0].kind),
           roundActive: Boolean(meshRoundTool),
           onRound: toggleMeshRound,
+          sculptActive: Boolean(sculptTool),
+          onSculpt: toggleSculpt,
           textureActive: Boolean(textureTool),
           onTexture: toggleTexture,
           draftActive: deleteFaceTool?.mode === "draft",
@@ -15357,6 +15566,14 @@ export function LayerlingEditor({
           onAreaTool={chooseDentalAreaTool}
           onBrushSize={setDentalBrush}
           onResetArea={(slot) => { void ensureDentalAreas(slot); }}
+          onSculpt={(slot) => {
+            const id = dentalStudio.slots[slot];
+            const shape = id ? shapesRef.current.find((candidate) => candidate.id === id) : undefined;
+            if (!shape) return;
+            chooseDentalAreaTool(slot, null);
+            setSelectedIds([shape.id]);
+            openSculpt(shape);
+          }}
           onView={showDentalView}
           analysis={dentalStudio.analysis}
           preset={dentalStudio.preset}
@@ -15420,6 +15637,33 @@ export function LayerlingEditor({
           onApply={applyMeshRound}
           onCancel={() => setMeshRoundTool(null)}
         />
+      ) : null}
+      {sculptTool ? (
+        <MeshSculptPanel
+          targetName={displayShapeName(shapes.find((shape) => shape.id === sculptTool.shapeId) ?? ({ name: "" } as WorkplaneShape))}
+          tool={sculptTool.tool}
+          size={sculptTool.size}
+          strength={sculptTool.strength}
+          chosen={sculptTool.chosen}
+          remeshMode={sculptTool.remeshMode}
+          detail={sculptTool.detail}
+          amount={sculptTool.amount}
+          busy={sculptTool.busy}
+          error={sculptTool.error}
+          workspace={workspaceSettings}
+          onTool={(tool) => setSculptTool((current) => current ? { ...current, tool } : current)}
+          onSize={(size) => setSculptTool((current) => current ? { ...current, size: Math.max(4, Math.min(150, size)) } : current)}
+          onStrength={(strength) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.05, Math.min(1, strength)) } : current)}
+          onSelection={applySculptSelection}
+          onRemeshMode={(remeshMode) => setSculptTool((current) => current && !current.busy ? { ...current, remeshMode, amount: remeshMode === "thicken" ? Math.max(0.2, Math.abs(current.amount)) : current.amount, error: null } : current)}
+          onDetail={(detail) => setSculptTool((current) => current && !current.busy ? { ...current, detail: Math.max(0.05, Math.min(5, detail)), error: null } : current)}
+          onAmount={(amount) => setSculptTool((current) => current && !current.busy ? { ...current, amount: Math.max(current.remeshMode === "thicken" ? 0.2 : -10, Math.min(10, amount)), error: null } : current)}
+          onRemesh={applyRemesh}
+          onClose={() => { flushSculptRef.current(); setSculptTool(null); }}
+        />
+      ) : null}
+      {sculptTool?.tool && !sculptTool.busy ? (
+        <DentalBrushOverlay hint={t("sculpt.hint", { brush: t(`sculpt.tool.${sculptTool.tool}`) })} radius={sculptTool.size} erase={sculptTool.tool === "unselect"} onDone={applySculptStroke} onCancel={() => setSculptTool((current) => current ? { ...current, tool: null } : current)} />
       ) : null}
       {textureTool ? (
         <SurfaceTexturePanel

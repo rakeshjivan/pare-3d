@@ -106,6 +106,7 @@ export const GUIDE_SECTIONS = {
   hull: { chapter: "solids", en: "hull-wrapping-parts-in-one-body" },
   fitCheck: { chapter: "printing", en: "fit-check-overlaps-and-tight-gaps" },
   meshRound: { chapter: "files", en: "rounding-a-mesh" },
+  meshSculpt: { chapter: "files", en: "sculpting-a-mesh" },
   // Fork (build 55).
   texture: { chapter: "files", en: "surface-textures" },
   dentalModel: { chapter: "dental", en: "the-short-way" },

@@ -8,6 +8,7 @@ import type { DentalAnalysis, DentalArchPart, DentalStudioInput, DentalStudioOpt
 import type { DentalTrimMode, DentalTrimResult } from "@/lib/dentalTrim";
 import type { WorkplaneShape } from "@/types/layerling";
 import type { SurfaceTextureOptions, SurfaceTextureResult } from "@/lib/surfaceTexture";
+import type { RemeshOptions, RemeshResult } from "@/lib/meshRemesh";
 
 export type MeshJobRequest =
   | { id: number; base: string; kind: "round"; positions: Float32Array; radius: number; mode: MeshRoundMode }
@@ -17,7 +18,8 @@ export type MeshJobRequest =
   | { id: number; base: string; kind: "dentalArch"; input: DentalStudioInput; options: DentalStudioOptions; index: number }
   | { id: number; base: string; kind: "dentalTrim"; positions: Float32Array; side: Float32Array; mode: DentalTrimMode; local: Float32Array }
   | { id: number; base: string; kind: "dentalArea"; positions: Float32Array }
-  | { id: number; base: string; kind: "texture"; positions: Float32Array; options: SurfaceTextureOptions };
+  | { id: number; base: string; kind: "texture"; positions: Float32Array; options: SurfaceTextureOptions }
+  | { id: number; base: string; kind: "remesh"; positions: Float32Array; options: RemeshOptions };
 export type MeshJobResponse =
   | { id: number; ok: true; kind?: "round"; result: { positions: Float32Array; voxel: number; coarse: boolean } }
   | { id: number; ok: true; kind: "fit"; report: FitReport }
@@ -27,6 +29,7 @@ export type MeshJobResponse =
   | { id: number; ok: true; kind: "dentalTrim"; trim: DentalTrimResult }
   | { id: number; ok: true; kind: "dentalArea"; area: Uint8Array }
   | { id: number; ok: true; kind: "texture"; texture: SurfaceTextureResult }
+  | { id: number; ok: true; kind: "remesh"; remesh: { positions: Float32Array; voxel: number; coarse: boolean; triangles: number } }
   | { id: number; ok: false; error: string };
 
 let worker: Worker | null = null;
@@ -52,6 +55,7 @@ function meshWorker(): Worker | null {
       else if (reply.kind === "dentalTrim") waiting.resolve(reply.trim);
       else if (reply.kind === "dentalArea") waiting.resolve(reply.area);
       else if (reply.kind === "texture") waiting.resolve(reply.texture);
+      else if (reply.kind === "remesh") waiting.resolve({ ...reply.remesh, positions: Array.from(reply.remesh.positions) });
       else waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
     };
     worker.onerror = () => {
@@ -90,6 +94,26 @@ export async function roundMeshInBackground(positions: ArrayLike<number>, radius
     });
   } catch (error) {
     if (error instanceof Error && error.message === "worker-unavailable") return roundHere(positions, radius, mode);
+    throw error;
+  }
+}
+
+/** Build 69: Remesh, Offset or Thicken a part (world positions), in the worker when one runs. */
+export async function remeshInBackground(positions: ArrayLike<number>, options: RemeshOptions): Promise<RemeshResult> {
+  const here = async () => (await import("@/lib/meshRemesh")).remeshPositions(positions, options);
+  const target = meshWorker();
+  if (!target) return here();
+  const id = nextId;
+  nextId += 1;
+  const data = Float32Array.from(positions as ArrayLike<number>);
+  try {
+    return await new Promise<RemeshResult>((resolve, reject) => {
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      const request: MeshJobRequest = { id, base: new URL(".", window.location.href).href, kind: "remesh", positions: data, options };
+      target.postMessage(request, [data.buffer]);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "worker-unavailable") return here();
     throw error;
   }
 }

@@ -677,6 +677,8 @@ declare global {
     layerlingShowParts?: (ids: string[], direction: [number, number, number]) => boolean;
     /** Fork (build 53): draws triangles (world, a soup) over the scene as a tinted highlight; null clears it. */
     layerlingHighlight?: (triangles: Float32Array | null) => void;
+    /** Build 69: Sculpt's working copy of a part (world soup) drawn in its place while it is worked on; null puts the part back. */
+    layerlingSculptPreview?: (shapeId: string, triangles: Float32Array | null, color?: string) => void;
     /** Fork (build 53): where the camera is, in the world. */
     layerlingCameraPosition?: () => [number, number, number];
     layerlingCaptureCanvasAsync?: () => Promise<string>;
@@ -9243,6 +9245,67 @@ export function WorkplaneViewport({
     };
     return () => { delete window.layerlingShowParts; };
   }, [focusSelection]);
+  // Build 69: Sculpt draws its working copy instead of rebuilding the part after every stroke.
+  useEffect(() => {
+    let mesh: THREE.Mesh | null = null;
+    let hidden: THREE.Object3D[] = [];
+    const clear = () => {
+      const state = threeRef.current;
+      if (mesh && state) state.scene.remove(mesh);
+      mesh?.geometry.dispose();
+      (mesh?.material as THREE.Material | undefined)?.dispose();
+      mesh = null;
+      hidden.forEach((object) => { object.visible = true; });
+      hidden = [];
+      if (state) state.needsRender = true;
+    };
+    window.layerlingSculptPreview = (shapeId, triangles, color) => {
+      const state = threeRef.current;
+      if (!state || !triangles || !triangles.length) { clear(); return; }
+      if (mesh && mesh.userData.sculptOf === shapeId && (mesh.geometry.getAttribute("position") as THREE.BufferAttribute).count * 3 === triangles.length) {
+        const attribute = mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
+        (attribute.array as Float32Array).set(triangles);
+        attribute.needsUpdate = true;
+        mesh.geometry.computeVertexNormals();
+        mesh.geometry.computeBoundingSphere();
+      } else {
+        clear();
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.BufferAttribute(Float32Array.from(triangles), 3));
+        geometry.computeVertexNormals();
+        // Drawn with the part's own surface material, so the working copy looks just like the part.
+        let look: THREE.Material | null = null;
+        state.scene.traverse((object) => {
+          if (look || object.userData.shapeId !== shapeId || !(object as THREE.Mesh).isMesh) return;
+          const material = (object as THREE.Mesh).material;
+          const first = Array.isArray(material) ? material[0] : material;
+          if (first && (first as THREE.MeshStandardMaterial).isMaterial && !(first as THREE.Material).transparent) look = (first as THREE.Material).clone();
+        });
+        if (look && (look as THREE.MeshStandardMaterial).vertexColors) {
+          (look as THREE.MeshStandardMaterial).vertexColors = false;
+          if (color) (look as THREE.MeshStandardMaterial).color?.set(color);
+        }
+        mesh = new THREE.Mesh(geometry, look ?? new THREE.MeshStandardMaterial({ color: color ?? "#c9ced6", roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide }));
+        mesh.userData.sculptOf = shapeId;
+        state.scene.add(mesh);
+      }
+      // Also the part's objects drawn again since the last stroke (it is rebuilt when strokes pause).
+      const copy = mesh;
+      state.scene.traverse((object) => {
+        if (object !== copy && object.visible && object.userData.shapeId === shapeId) { object.visible = false; hidden.push(object); }
+      });
+      state.needsRender = true;
+    };
+    // For checks: whether the copy is drawn, and how many of the part's objects still show.
+    (window as unknown as { layerlingSculptPreviewInfo?: () => unknown }).layerlingSculptPreviewInfo = () => {
+      const state = threeRef.current;
+      const id = mesh?.userData.sculptOf as string | undefined;
+      let showing = 0;
+      if (state && id) state.scene.traverse((object) => { if (object !== mesh && object.userData.shapeId === id && object.visible) showing += 1; });
+      return { drawn: Boolean(mesh), inScene: Boolean(mesh?.parent), hidden: hidden.length, showing, triangles: mesh ? (mesh.geometry.getAttribute("position") as THREE.BufferAttribute).count / 3 : 0 };
+    };
+    return () => { clear(); delete window.layerlingSculptPreview; };
+  }, []);
   // Fork (build 53): Dental Studio's tooth area, tinted over the scan while it is being designated.
   useEffect(() => {
     let mesh: THREE.Mesh | null = null;

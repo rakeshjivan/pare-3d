@@ -68,6 +68,7 @@ export function DentalStudioPanel({
   onAreaTool,
   onBrushSize,
   onResetArea,
+  onSculpt,
   onView,
   analysis,
   preset,
@@ -99,6 +100,8 @@ export function DentalStudioPanel({
   onAreaTool: (slot: "upper" | "lower", tool: DentalAreaTool | null) => void;
   onBrushSize: (size: number) => void;
   onResetArea: (slot: "upper" | "lower") => void;
+  /** Build 69: opens Sculpt on that scan. */
+  onSculpt?: (slot: "upper" | "lower") => void;
   onView: (slot: "upper" | "lower", view: DentalView) => void;
   analysis: DentalAnalysis | null;
   preset: DentalPreset;
@@ -261,6 +264,7 @@ export function DentalStudioPanel({
         <EdgeModifierSlider label={t("dental.expand")} value={options.gum ?? 3} min={0.5} max={10} step={0.5} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ gum: value })} />
         <div className="dental-trim-buttons">
           <button type="button" disabled={busy || !slots[arch] || areaBusy} onClick={() => onResetArea(arch)}>{t("dental.areaReset")}</button>
+          {onSculpt ? <button type="button" disabled={busy || !slots[arch] || areaBusy} onClick={() => onSculpt(arch)}>{t("dental.sculpt")}</button> : null}
         </div>
         {areaBusy ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.areaFinding")}</p> : <p className="blend-hint">{t("dental.areaInfo")}</p>}
         </>) : null}

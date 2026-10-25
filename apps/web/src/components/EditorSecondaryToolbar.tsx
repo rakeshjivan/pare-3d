@@ -64,7 +64,7 @@ import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
 import { SaveStatus } from "./SaveStatus";
 import { CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
-import { Grip, MessageSquareText } from "lucide-react";
+import { Brush, Grip, MessageSquareText } from "lucide-react";
 import { PareBuildBadge } from "./PareVersionStatus";
 import { Signature } from "lucide-react";
 import { CommandPalette, type PaletteCommand } from "./workplane/CommandPalette";
@@ -446,7 +446,7 @@ export function SecondaryToolbar({
   onFaceTool: () => void;
   onBlendBodies: () => void;
   /** Fork (build 33): Hull, Fit check and Round a mesh. */
-  build33: { canHull: boolean; onHull: () => void; fitActive: boolean; onFitCheck: () => void; canRound: boolean; roundActive: boolean; onRound: () => void; textureActive: boolean; onTexture: () => void; textActive: boolean; onText: () => void; draftActive: boolean; onDraft: () => void };
+  build33: { canHull: boolean; onHull: () => void; fitActive: boolean; onFitCheck: () => void; canRound: boolean; roundActive: boolean; onRound: () => void; sculptActive: boolean; onSculpt: () => void; textureActive: boolean; onTexture: () => void; textActive: boolean; onText: () => void; draftActive: boolean; onDraft: () => void };
   blendBodiesActive: boolean;
   canBlendBodies: boolean;
   faceToolActive: boolean;
@@ -829,6 +829,8 @@ export function SecondaryToolbar({
     { id: "simplify", label: t("editor.tool.simplify"), icon: ToolbarSimplifyIcon, action: onSimplify, enabled: canSimplify, active: simplifyActive },
     { id: "cutBelowBed", label: t("cutBelowBed.command"), icon: Scissors, action: () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT)), enabled: true },
     { id: "roundMesh", label: t("meshRound.title"), icon: Squircle, action: build33.onRound, enabled: build33.canRound || build33.roundActive, active: build33.roundActive },
+    // Build 69: brushes, a painted selection, Remesh / Offset / Thicken.
+    { id: "sculpt", label: t("sculpt.title"), icon: Brush, action: build33.onSculpt, enabled: build33.canRound || build33.sculptActive, active: build33.sculptActive },
   ];
   // Fork (build 47): Dental Studio, in a toolbar section of its own.
   const dentalTools = [

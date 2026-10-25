@@ -1662,6 +1662,13 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 .dental-brush-overlay.erase polyline { stroke: rgba(31, 111, 235, 0.35); }
 .dental-brush-overlay.erase circle { stroke: #1f6feb; }
 .dental-area-tools { flex-wrap: wrap; }
+/* Build 69: the Sculpt panel - brushes and selection actions as small buttons, three to a row. */
+.mesh-sculpt-panel .dental-trim-mode, .mesh-sculpt-panel .dental-trim-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
+.mesh-sculpt-panel .dental-trim-mode button, .mesh-sculpt-panel .dental-trim-buttons button { padding: 6px 8px; border: 1px solid var(--border, #d4dae3); border-radius: 6px; background: transparent; color: inherit; font-size: 12px; cursor: pointer; }
+.mesh-sculpt-panel .dental-trim-mode button.active { border-color: var(--primary, #1f6feb); color: var(--primary, #1f6feb); background: rgba(31, 111, 235, 0.08); font-weight: 600; }
+.mesh-sculpt-panel button:disabled { opacity: 0.5; cursor: default; }
+.mesh-sculpt-panel .dental-section-divider { border-top: 1px solid var(--border, #d4dae3); margin: 10px 0 8px; }
+.mesh-sculpt-panel .sculpt-subtitle { display: block; font-size: 13px; margin-bottom: 6px; }
 
 /* Fork (build 55): the Texture panel's patterns, each with a small swatch drawn in CSS. */
 .surface-texture-patterns {

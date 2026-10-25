@@ -137,6 +137,14 @@ The fillet tool needs exact CAD geometry, so a dense imported mesh, a scan or a 
 
 For a part built in Pare 3D, the fillet tool gives exact, smoother results - use {{ui:meshRound.title}} where that tool cannot go.
 
+## Sculpting a mesh
+
+**{{ui:sculpt.title}}** shapes an imported mesh or a scan by hand, as in Meshmixer or Medit's editing tools. It is in the {{ui:editor.group.mesh}} menu and in the right-click menu as {{ui:sculpt.menu}}; in Dental Studio, {{ui:dental.marginManual}} has a {{ui:dental.sculpt}} button.
+
+- Pick a brush and drag over the part: {{ui:sculpt.tool.smooth}} evens out bumps and spikes, {{ui:sculpt.tool.flatten}} pulls the surface onto a flat plane, {{ui:sculpt.tool.inflate}} pushes it out and {{ui:sculpt.tool.deflate}} pushes it in. {{ui:sculpt.size}} is the brush on the screen; {{ui:sculpt.strength}} is how much one stroke moves.
+- Only the surface you can see is touched, not what is hidden behind it. Drag with the right or middle mouse button to turn the view between strokes; [[Ctrl]]+[[Z]] takes strokes back one at a time. The full-detail mesh changes as you stroke; the part itself is rebuilt once, when you press {{ui:sculpt.done}} (or pick another part or tool), and the strokes become one step of undo.
+- {{ui:sculpt.tool.select}} paints triangles orange and {{ui:sculpt.tool.unselect}} takes them off. The selected area can be deleted (to cut away a part of a scan), smoothed or flattened as a whole, grown by a ring, or inverted.
+
 ## Surface textures
 
 **{{ui:texture.title}}** in the Modify group presses a pattern into a part's surface, or raises it out of it - a grip on a handle, a stone or wood look, a picture of your own. Select one part, choose a pattern and set:

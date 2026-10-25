@@ -4,6 +4,12 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 69,
+    items: [
+      "New: Sculpt, for imported meshes and scans (Mesh menu, right-click, and Sculpt this scan in Dental Studio's Fix by hand). Brushes smooth, flatten, inflate and deflate the surface you see; the Select brush paints an area to delete, smooth or flatten in one go. Strokes show at once on the full-detail mesh, Ctrl+Z takes them back one at a time, and the part is rebuilt once when you press Done.",
+    ],
+  },
+  {
     build: 68,
     items: [
       "Dental Studio makes the upper and lower of a pair at the same time, in two background workers, instead of one after the other. On a computer with four or more cores an articulated pair comes out about a third sooner.",
