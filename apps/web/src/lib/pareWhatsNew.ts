@@ -4,6 +4,17 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 67,
+    items: [
+      "Big meshes no longer hold the editor up: grouping, cutting and splitting, reading STL and OBJ files, packing 3MF files (Send to Bambu Studio too), the print estimate and simplifying now run in the background, so the view keeps turning and the buttons keep answering while a large scan is worked on. Opening a project no longer starts hundreds of helpers at once.",
+      "An open mesh with small holes in it has them closed before it is cut, split or grouped, and you are told how many; deeply nested groups no longer run out of memory.",
+      "Placing and measuring: a new shape snaps to the middle of a face (hold Alt not to), Center on workplane works on a face, Align faces lines up holes on one axis, the right-click menu can select a body hidden behind another, a length typed in the tape measure moves the body, a stood-up ruler measures along itself, and Up and Down (Shift larger, Alt finer) change the number in a field.",
+      "Also new: Curve through points in a sketch, Alt and the lift arrow makes a copy upwards, a pattern can group its pieces, a multi-colour SVG comes in as one body per colour, a start view of your own (Settings), a search in the keyboard shortcuts, Shift+N shows or hides notes, and Paste in the middle.",
+      "Gridfinity: wall thickness, a chamfer on the stacking lip, sides opened fully or partly, and baseplates padded, fitted to a drawer and with rounded or square corners.",
+      "Safer when Pare 3D is hosted on a web server: the store folder refuses direct requests and every saved file is checked.",
+    ],
+  },
+  {
     build: 66,
     items: [
       "Dental Studio shows what each choice makes before you make it: the four model choices and every base (Clean, Follows the scan, With a plate, Orthodontic and Articulator plate - now offered under Adjust the settings too) have a small picture of the base from above.",
