@@ -4499,11 +4499,13 @@ function RangeProperty({
   const keepSelectedRef = useRef(false);
   const wheelHandlerRef = useRef<((event: WheelEvent) => void) | null>(null);
   // Up and Down in the focused field do the same as the wheel: one step, Shift a larger one, Alt a finer one (#749, MartinShake).
+  // In a size or position field Shift steps by the snap grid; with the grid off it stays ten steps.
   const stepFieldValue = (direction: 1 | -1, modifiers: { shift: boolean; ctrl: boolean; alt: boolean }) => {
     const base = wheelBaseStep(controlMin, controlMax, controlStep, unit === "in");
     const parsed = parseMeasurementInput(draft);
     const current = Number.isFinite(parsed) ? parsed : controlValue;
-    const turned = wheelNextValue(current, direction, base, modifiers);
+    const shiftStep = isLength && snapStepMm > 0 ? millimetersToDisplay(snapStepMm, workspace) : undefined;
+    const turned = wheelNextValue(current, direction, base, modifiers, shiftStep);
     // The wheel stops at the field's lower limit, also for the figure shown: it went on below it, into negative sizes, which the body
     // then kept at the limit and the field showed again as 0.01 only when it was left (#576, prmod3d).
     const next = freePosition ? turned : Math.max(turned, controlMin);
