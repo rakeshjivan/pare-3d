@@ -6,6 +6,7 @@ import { Heart, Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { LANGUAGE_INFO, t, type Language } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
+import { PARE_BUILD } from "@/lib/pareUpdate";
 import { SOURCE_CODE_URL, releaseNotesUrl, type AppUpdateInfo } from "@/lib/appUpdate";
 import { useAppUpdate } from "@/lib/useAppUpdate";
 import { SHOW_WHATS_NEW_EVENT } from "@/lib/useWhatsNew";
@@ -135,7 +136,8 @@ export function AppFooter({
       </div>
       <div className="dashboard-legal-group">
         <a href={SOURCE_CODE_URL} target="_blank" rel="noreferrer" title="Based on layerling (AGPL-3.0)">
-          Based on layerling &middot; Source (AGPL-3.0) &middot; v{version}
+          {/* Build 70: Pare 3D's own build number first; the layerling version it is based on after it. */}
+          {PARE_BUILD ? `Pare 3D build ${PARE_BUILD} · ` : ""}Based on layerling {version} &middot; Source (AGPL-3.0)
         </a>
       </div>
     </footer>

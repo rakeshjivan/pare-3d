@@ -8,6 +8,8 @@ export const OPEN_PARAMETERS_EVENT = "pare3d:parameters";
 export const MESH_CHECK_EVENT = "pare3d:mesh-check";
 export const FILL_HOLE_EVENT = "pare3d:fill-hole";
 export const DENTAL_MODEL_EVENT = "pare3d:dental-model";
+/** Build 70: set by "Dental models from scans" on the home page; the editor opens Dental Studio once. */
+export const OPEN_DENTAL_STUDIO_KEY = "pare3d.openDentalStudio";
 /** Fork (build 21): which library shapes are on show, so a new shape whose neighbour is missing still appears. */
 export const libraryShapeIds: ReadonlySet<string> = new Set(libraryShapeAssets.map((shape) => shape.id));
 

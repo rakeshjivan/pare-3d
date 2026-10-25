@@ -60,6 +60,27 @@ if ($wasm) {
 Stop-Process -Id $server.Id -Force
 Write-Host "::notice::PASS 1: the server serves the app"
 
+# 1b. Build 70: Send to a slicer finds PreForm and CHITUBOX where Windows installs them and opens them.
+$Pf = Join-Path $Root "programfiles"
+New-Item -ItemType Directory -Force -Path (Join-Path $Pf "Formlabs\PreForm"), (Join-Path $Pf "CHITUBOX Basic") | Out-Null
+Copy-Item "$env:SystemRoot\System32\whoami.exe" (Join-Path $Pf "Formlabs\PreForm\PreForm.exe")
+Copy-Item "$env:SystemRoot\System32\whoami.exe" (Join-Path $Pf "CHITUBOX Basic\CHITUBOX Basic.exe")
+Copy-Item "$env:SystemRoot\System32\whoami.exe" (Join-Path $Pf "Formlabs\PreForm\Uninstall PreForm.exe")
+$savedPf = $env:ProgramFiles
+$env:ProgramFiles = $Pf
+$env:PORT = "47292"
+$server = Start-Process -FilePath (Join-Path $App "bun.exe") -ArgumentList "`"$(Join-Path $App 'serve.mjs')`"" -WorkingDirectory $App -PassThru -WindowStyle Hidden
+Wait-For "server answers" 30 { (Get-Text "http://127.0.0.1:47292/__pare3d") -eq "pare3d" }
+$env:ProgramFiles = $savedPf
+$slicers = Get-Text "http://127.0.0.1:47292/__slicers" | ConvertFrom-Json
+Write-Host "installed slicers: $($slicers.installed -join ', ')"
+if (-not ($slicers.installed -contains "preform") -or -not ($slicers.installed -contains "chitubox")) { throw "Send to a slicer did not find PreForm and CHITUBOX" }
+$sent = Invoke-WebRequest -UseBasicParsing -Method Post -Headers @{ "x-pare3d-send" = "1" } -ContentType "application/octet-stream" -Body ([byte[]](1, 2, 3)) "http://127.0.0.1:47292/__send-to-slicer?app=preform&name=check.stl" | Select-Object -ExpandProperty Content | ConvertFrom-Json
+if (-not $sent.opened) { throw "PreForm was not opened: $($sent.error)" }
+if (-not (Test-Path $sent.path)) { throw "the file sent to PreForm was not saved" }
+Stop-Process -Id $server.Id -Force
+Write-Host "::notice::PASS 1b: Send to a slicer finds and opens PreForm and CHITUBOX"
+
 # 2. The updater: the installed copy pretends to be build 1, a stand-in for GitHub offers this build.
 $OldApp = Join-Path $Root "old"
 Copy-Item -Recurse $App $OldApp

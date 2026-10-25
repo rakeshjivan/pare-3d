@@ -91,7 +91,11 @@ export function SurfaceTextPanel({
           value={settings.text}
           maxLength={40}
           autoFocus
-          onKeyDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            // Letters stay in the field; Escape still puts the tool down (build 70: it was swallowed here).
+            event.stopPropagation();
+            if (event.key === "Escape") { event.preventDefault(); onCancel(); }
+          }}
           onChange={(event) => onChange({ text: event.currentTarget.value })}
         />
       </label>

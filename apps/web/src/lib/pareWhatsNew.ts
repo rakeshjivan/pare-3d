@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 70,
+    items: [
+      "Send to your slicer, not only Bambu Studio: the menu beside the Send button now picks OrcaSlicer or PrusaSlicer for filament, or PreForm (Formlabs), CHITUBOX or Lychee Slicer for resin. The button says where it sends, and a slicer that is not on this computer is marked. (An app installed before this build sends only to Bambu Studio - download it again once.)",
+      "Dental models from scans: a new tile on the home page opens a new design with Dental Studio ready to import the scans.",
+      "Dental Studio's Make models button is always on screen now; on a smaller window it was below the bottom edge.",
+      "The right-click menu scrolls on a short window instead of running off the bottom, Escape closes Text on a surface from its text box, command search (Ctrl+K) finds Dental Studio, Sculpt and sending by the words you would type (articulator, PreForm, resin...), sizes in the selection card are no longer cut off, and the footer shows Pare 3D's build number.",
+    ],
+  },
+  {
     build: 69,
     items: [
       "New: Sculpt, for imported meshes and scans (Mesh menu, right-click, and Sculpt this scan in Dental Studio's Fix by hand). Brushes smooth, flatten, inflate and deflate the surface you see; the Select brush paints an area to delete, smooth or flatten in one go. Strokes show at once on the full-detail mesh, Ctrl+Z takes them back one at a time, and the part is rebuilt once when you press Done.",

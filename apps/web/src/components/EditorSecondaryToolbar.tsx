@@ -64,12 +64,13 @@ import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
 import { SaveStatus } from "./SaveStatus";
 import { CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
-import { Brush, Grip, MessageSquareText } from "lucide-react";
+import { Brush, Grip, MessageSquareText, Printer } from "lucide-react";
 import { PareBuildBadge } from "./PareVersionStatus";
 import { Signature } from "lucide-react";
 import { CommandPalette, type PaletteCommand } from "./workplane/CommandPalette";
 import { COMMAND_KEYWORDS, SHAPE_KEYWORDS } from "@/lib/commandKeywords";
 import { BambuSendButton } from "@/components/BambuSendButton";
+import { readBambuFormat, readSlicer, SEND_TO_BAMBU_EVENT, slicerName } from "@/lib/bambuSend";
 import { ForkDraftIcon, ForkToothIcon } from "./forkToolbarIcons";
 import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon } from "@/components/forkToolbarIcons";
 import { Import, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, Type, Upload, Variable } from "lucide-react";
@@ -1016,6 +1017,9 @@ export function SecondaryToolbar({
       plain("mesh-check", t("meshCheck.command"), manageGroup, hasSelection, () => window.dispatchEvent(new Event(MESH_CHECK_EVENT))),
       plain("fill-hole", t("fillHole.command"), t("editor.group.modify"), hasSelection, () => window.dispatchEvent(new Event(FILL_HOLE_EVENT))),
       plain("dental-model", t("dental.title"), t("editor.group.modify"), true, () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), { icon: ForkToothIcon }),
+      // Build 70: the Mesh tools in the search too (Mesh check, Fill hole and Cut below are above).
+      ...meshTools.filter((tool) => tool.id === "sculpt" || tool.id === "simplify" || tool.id === "roundMesh").map((tool) => fromTool(tool, t("editor.group.mesh"))),
+      plain("send-slicer", t("slicer.sendTo", { app: slicerName(readSlicer()) }), manageGroup, true, () => window.dispatchEvent(new CustomEvent(SEND_TO_BAMBU_EVENT, { detail: { format: readBambuFormat() } })), { icon: Printer }),
       plain("settings", t("editor.workspaceSettings"), manageGroup, true, () => window.dispatchEvent(new Event("layerling:open-workspace-settings")), { icon: ToolbarSettingsIcon }),
       plain("mode-sketch", t("palette.switchSketch"), t("palette.group.mode"), true, () => selectToolbarMode("sketch")),
       ...helpCommands,

@@ -7,6 +7,11 @@
  */
 export const COMMAND_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
   copy: ["copy", "kopie", "kopieren"],
+  // Build 70: what dentists and people from other programs type for Pare 3D's own tools.
+  "dental-model": ["dental", "dental studio", "model builder", "articulator", "articulated", "hinge", "study model", "ortho", "aligner", "crown", "die", "intraoral", "scan", "ios", "medit", "3shape", "itero", "zahn", "zähne", "kiefer", "artikulator"],
+  sculpt: ["sculpt", "brush", "smooth", "flatten", "inflate", "deflate", "meshmixer", "zbrush", "sculptgl", "select triangles", "delete triangles", "modellieren", "glätten", "glaetten"],
+  roundMesh: ["round", "smooth edges", "round all", "radius", "abrunden"],
+  "send-slicer": ["send", "slicer", "print", "bambu", "bambu studio", "orca", "orcaslicer", "prusa", "prusaslicer", "preform", "formlabs", "chitubox", "lychee", "resin", "sla", "drucken", "harz"],
   paste: ["paste", "einfuegen", "einfügen"],
   duplicate: ["duplicate", "clone", "doppeln", "verdoppeln", "vervielfaeltigen"],
   delete: ["delete", "remove", "loeschen", "löschen", "entfernen", "weg"],

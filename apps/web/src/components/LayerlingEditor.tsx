@@ -165,7 +165,7 @@ import { carryShapePivot, heightPatchKeepingBase, shapePivotFromWorld, shapePivo
 import { createLocalId } from "@/lib/localIds";
 import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, trackOpenGroupLevels, type OpenGroupLevel } from "@/lib/openGroupParts";
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
-import { SEND_TO_BAMBU_EVENT, sendToBambuStudio, type BambuSendFormat } from "@/lib/bambuSend";
+import { readSlicer, SEND_TO_BAMBU_EVENT, sendToBambuStudio, slicerName, type BambuSendFormat } from "@/lib/bambuSend";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { useEditorNotice } from "@/components/workplane/useEditorNotice";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -274,7 +274,7 @@ const SURFACE_TEXT_PREVIEW_ID = "surface-text-preview";
 const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
 
 import { TopActionPanel, type DirectExportFormat, type LylExportTarget, type LylHistoryLimit, type SvgExportView, type TopPanel, type ViewImageOptions } from "@/components/EditorTopActionPanel";
-import { DENTAL_MODEL_EVENT, FILL_HOLE_EVENT, MESH_CHECK_EVENT, OPEN_PARAMETERS_EVENT, type ToolbarMode } from "@/lib/editorShared";
+import { DENTAL_MODEL_EVENT, OPEN_DENTAL_STUDIO_KEY, FILL_HOLE_EVENT, MESH_CHECK_EVENT, OPEN_PARAMETERS_EVENT, type ToolbarMode } from "@/lib/editorShared";
 import { SecondaryToolbar, type SketchShapeOptions } from "@/components/EditorSecondaryToolbar";
 import { SHARED_CLIPBOARD_STORAGE_KEY, readSharedClipboard, readSystemClipboard, writeSharedClipboard } from "@/lib/editorClipboard";
 import { downloadBlobFile, downloadTextFile, footprintSvg, imagePlateDimensions, prepareImportedImage, toSvg } from "@/lib/editorFiles";
@@ -9651,6 +9651,19 @@ export function LayerlingEditor({
     window.addEventListener(DENTAL_MODEL_EVENT, onOpen);
     return () => window.removeEventListener(DENTAL_MODEL_EVENT, onOpen);
   }, [openDentalModel]);
+  // Build 70: "Dental models from scans" on the home page opens a new design with Dental Studio open.
+  useEffect(() => {
+    let wanted = false;
+    try {
+      wanted = window.sessionStorage.getItem(OPEN_DENTAL_STUDIO_KEY) === "1";
+      if (wanted) window.sessionStorage.removeItem(OPEN_DENTAL_STUDIO_KEY);
+    } catch {
+      wanted = false;
+    }
+    if (!wanted) return;
+    const timer = window.setTimeout(() => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), 600);
+    return () => window.clearTimeout(timer);
+  }, []);
 
 
 
@@ -13291,7 +13304,7 @@ export function LayerlingEditor({
           return;
         }
       }
-      setNotice(t("bambu.preparing", { format: format.toUpperCase() }), true);
+      setNotice(t("slicer.preparing", { format: format.toUpperCase(), app: slicerName(readSlicer()) }), true);
       void exportDesignRef.current(format, projectNameForBambuRef.current, false, true);
     };
     const onCheck = () => setPrintCheck({ issues: runPrintCheck(), sending: null });

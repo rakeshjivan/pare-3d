@@ -43,7 +43,8 @@ export function ShapeContextMenu({ x, y, label, items, onClose }: {
     const menu = menuRef.current;
     if (!menu) return;
     const margin = 8;
-    const { width, height } = menu.getBoundingClientRect();
+    // Its layout size, not the drawn one: the opening animation starts it slightly scaled down (build 70).
+    const width = menu.offsetWidth, height = menu.offsetHeight;
     setPosition({
       left: Math.max(margin, Math.min(x, window.innerWidth - width - margin)),
       top: Math.max(margin, Math.min(y, window.innerHeight - height - margin)),
@@ -63,13 +64,17 @@ export function ShapeContextMenu({ x, y, label, items, onClose }: {
     };
     window.addEventListener("pointerdown", closeOutside, true);
     window.addEventListener("keydown", closeOnKey, true);
-    window.addEventListener("wheel", onClose, { passive: true });
+    // Build 70: a long menu scrolls in a short window; a wheel over it scrolls it instead of closing it.
+    const closeOnWheel = (event: WheelEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) onClose();
+    };
+    window.addEventListener("wheel", closeOnWheel, { passive: true });
     window.addEventListener("resize", onClose);
     window.addEventListener("blur", onClose);
     return () => {
       window.removeEventListener("pointerdown", closeOutside, true);
       window.removeEventListener("keydown", closeOnKey, true);
-      window.removeEventListener("wheel", onClose);
+      window.removeEventListener("wheel", closeOnWheel);
       window.removeEventListener("resize", onClose);
       window.removeEventListener("blur", onClose);
     };

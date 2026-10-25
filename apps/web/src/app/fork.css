@@ -295,6 +295,9 @@ html[data-theme="dark"] .empty-plate-hint { background: rgba(30, 30, 30, 0.92); 
 
 /* No hint over an open dialog. */
 html:has([aria-modal="true"]) .empty-plate-hint { display: none; }
+/* Build 70: nor over an open menu (the Send menu reached down over it). */
+html:has([role="menu"]) .empty-plate-hint { display: none; }
+html:has(.edge-modifier-panel) .empty-plate-hint { display: none; }
 
 /* Fork: Send to Bambu Studio. */
 .bambu-send {
@@ -324,6 +327,14 @@ html:has([aria-modal="true"]) .empty-plate-hint { display: none; }
   font-size: 11px !important;
 }
 .bambu-send button:hover { filter: brightness(1.08); }
+/* Build 70: which slicer, filament or resin. */
+.bambu-send-menu .bambu-send-heading { margin: 2px 6px 4px; font: 600 11px var(--font-ui); color: var(--muted, #66707c); text-transform: uppercase; letter-spacing: 0.04em; }
+.bambu-send-slicers { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 2px 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.bambu-send-slicer-group { display: flex; flex-direction: column; gap: 2px; }
+.bambu-send-kind { margin: 0 4px 2px; font: 600 11px var(--font-ui); color: var(--muted, #66707c); }
+.bambu-send-menu .bambu-send-slicer-group button { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 4px; padding: 5px 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--foreground, #1d2430); font: 500 12px var(--font-ui); text-align: left; cursor: pointer; }
+.bambu-send-menu .bambu-send-slicer-group button.active { border-color: var(--primary); color: var(--primary); background: rgba(31, 111, 235, 0.08); font-weight: 600; }
+.bambu-send-menu .bambu-send-slicer-group em { font-style: normal; font-size: 10px; color: var(--muted, #66707c); }
 .bambu-send-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -754,7 +765,8 @@ html[data-theme="dark"] .printer-picker { background: rgba(30, 30, 30, 0.92); }
 .toolbar-icon:disabled .fork-accent-line { stroke: currentColor; opacity: 0.4; }
 
 /* Fork: lithophane and Voronoi panels. */
-.lithophane-panel, .voronoi-panel { max-height: calc(100vh - 160px); overflow-y: auto; }
+/* Build 70: as tall as the window below the toolbar allows (the toolbar can be two rows), like every tool panel. */
+.lithophane-panel, .voronoi-panel { max-height: calc(100dvh - var(--editor-toolbar-height) - 28px); overflow-y: auto; }
 .lithophane-pick {
   display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
   padding: 9px; color: var(--primary); background: var(--subbar); border: 1px dashed var(--primary);
@@ -986,10 +998,10 @@ html[data-tool-names="on"] .secondary-toolbar .toolbar-icon.disabled .tool-label
 .selection-size-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .selection-size-field { display: flex; flex-direction: column; gap: 3px; font: 600 12px var(--font-ui); position: relative; }
 .selection-size-field input {
-  width: 100%; box-sizing: border-box; padding: 6px 26px 6px 8px; font: 700 14px var(--font-ui);
+  width: 100%; box-sizing: border-box; padding: 6px 22px 6px 6px; font: 700 13px var(--font-ui); font-variant-numeric: tabular-nums;
   color: inherit; background: var(--background, #fff); border: 1px solid var(--border); border-radius: 8px;
 }
-.selection-size-field small { position: absolute; right: 8px; bottom: 8px; font-size: 10px; opacity: 0.6; }
+.selection-size-field small { position: absolute; right: 6px; bottom: 8px; font-size: 10px; opacity: 0.6; }
 .selection-size-error { margin: 8px 0 0; color: #c0392b; font: 600 12px var(--font-ui); }
 
 /* Build 19: the one-time Fast mode suggestion. */
@@ -1595,7 +1607,8 @@ html[data-theme="dark"] .parameters-row input { background: #1a1f26; }
 }
 
 /* Build 47: Dental Studio panel. */
-.dental-studio-panel { width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 140px); overflow-y: auto; }
+/* Build 70: no taller than the window below the toolbar, so Make models (the sticky footer) is always on screen. */
+.dental-studio-panel { width: min(400px, calc(100vw - 32px)); max-height: calc(100dvh - var(--editor-toolbar-height) - 28px); overflow-y: auto; }
 .dental-studio-panel .edge-modifier-label { display: block; font-size: 12px; font-weight: 600; color: var(--muted-foreground, #5b6573); margin-bottom: 6px; }
 .dental-slots { display: grid; gap: 6px; margin: 4px 0 10px; position: relative; }
 .dental-slot label { display: grid; grid-template-columns: 78px 1fr; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
@@ -1756,3 +1769,6 @@ html[data-theme="dark"] .dental-studio-panel .dental-hinge-options select { back
 .dental-studio-panel .dental-picture-tiles button:disabled { opacity: 0.55; cursor: default; }
 .dental-presets button .dental-picture { width: 44px; margin-bottom: 2px; }
 html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { background: #1a1f26; }
+
+/* Build 70: the right-click menu never runs off the bottom of a short window; it scrolls. */
+.shape-context-menu { max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; }

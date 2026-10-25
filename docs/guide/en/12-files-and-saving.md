@@ -24,7 +24,7 @@ In the app, **Settings › Files** decides where Pare 3D saves on this computer:
 - **{{ui:files.exportsTitle}}:** the folder every export goes to. {{ui:files.change}} picks another, {{ui:files.show}} opens it, {{ui:files.useDownloads}} goes back to the Downloads folder. Switch on {{ui:files.askEachTime}} to choose the folder and name every time instead.
 - **{{ui:files.backupsTitle}}:** the folder the automatic backups go to.
 
-After an export, a small note says where the file went, with {{ui:files.showInFolder}} to open the folder. "Send to Bambu Studio" keeps its own copy in Documents › Pare 3D Exports. In a web browser, exports and backups go to the browser's download folder instead.
+After an export, a small note says where the file went, with {{ui:files.showInFolder}} to open the folder. "Send to" a slicer keeps its own copy in Documents › Pare 3D Exports. In a web browser, exports and backups go to the browser's download folder instead.
 
 ## Folders for your designs
 

@@ -92,7 +92,7 @@ Before you send a design to the printer, {{ui:printCheck.title}} looks it over f
 
 ## Sending to Bambu Studio
 
-**Send to Bambu Studio** in the title row exports the design and opens it in Bambu Studio in one step. The small menu beside it chooses the file type: **STL** (one merged body) or **3MF** (each part with its colour, for multicolour prints). The app keeps a copy in Documents › Pare 3D Exports. In a web browser the file is downloaded instead, and you open it in Bambu Studio yourself.
+**Send to Bambu Studio** in the title row exports the design and opens it in your slicer in one step. The small menu beside it chooses the slicer - for filament Bambu Studio, OrcaSlicer or PrusaSlicer, for resin PreForm (Formlabs), CHITUBOX or Lychee Slicer; the button then says "Send to" that slicer, and a slicer the app cannot find on this computer is marked "not found" - and the file type: **STL** (one merged body) or **3MF** (each part with its colour, for multicolour prints; the resin slicers read 3MF too). The app keeps a copy in Documents › Pare 3D Exports. In a web browser the file is downloaded instead, and you open it in the slicer yourself. An app installed before build 70 sends only to Bambu Studio; download the app again once for the others.
 
 Switch on {{ui:printCheck.menuItem}} in the same menu and {{ui:printCheck.title}} runs each time you send. If it finds something, you can fix it first or choose {{ui:printCheck.sendAnyway}}.
 

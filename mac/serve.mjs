@@ -2,7 +2,9 @@
 //  - Serves the static app from ./app.
 //  - /__pare3d answers "pare3d", so the launcher knows the server on the port is ours.
 //  - POST /__send-to-bambu saves an exported file in Documents/Pare 3D Exports and
-//    opens it in Bambu Studio.
+//    opens it in Bambu Studio. Runtime 6 (build 70): POST /__send-to-slicer?app=... does the same
+//    for OrcaSlicer, PrusaSlicer, PreForm, CHITUBOX and Lychee Slicer; GET /__slicers says which
+//    of them are installed.
 //  - Auto-update: newer app files published as a GitHub release are downloaded,
 //    checked and unpacked into the app's data folder, then served from there.
 //    /__pare3d/update tells the page what happened.
@@ -24,7 +26,9 @@ const port = Number(process.env.PORT || 47177);
 // 4 (build 29): /__pare3d/quit, and launchers replace a server older than themselves.
 // 5 (build 32): /__designs keeps the designs on disk. App files still work with 4 (they fall back
 // to the browser's storage), so the update manifest's minRuntime stays 4.
-const RUNTIME_VERSION = 5;
+// 6 (build 70): /__send-to-slicer and /__slicers. App files fall back to /__send-to-bambu (or a
+// download) on an older server, so minRuntime stays 4.
+const RUNTIME_VERSION = 6;
 const RELEASES_API = process.env.PARE3D_RELEASES_API || "https://api.github.com/repos/rakeshjivan/pare-3d/releases/latest";
 // Only for the automated tests: lets a local test server stand in for GitHub.
 const TEST_ORIGIN = process.env.PARE3D_TEST_ORIGIN || "";
@@ -120,29 +124,133 @@ async function exists(path) {
   }
 }
 
-async function openInBambuStudio(file) {
-  if (platform() === "darwin") {
-    for (const app of ["BambuStudio", "Bambu Studio"]) {
-      if (await run("/usr/bin/open", ["-a", app, file])) return { opened: true };
+/**
+ * The slicers a design can be sent to. mac: application names for `open -a`; win: the program's
+ * file name, looked for in the usual install folders; linux: commands on the PATH, then a Flatpak.
+ */
+const SLICERS = {
+  bambu: { name: "Bambu Studio", mac: ["BambuStudio", "Bambu Studio"], win: [/^bambu-studio\.exe$/i], linux: ["bambu-studio", "BambuStudio"], flatpak: "com.bambulab.BambuStudio" },
+  orca: { name: "OrcaSlicer", mac: ["OrcaSlicer"], win: [/^orca-slicer\.exe$/i], linux: ["orca-slicer", "OrcaSlicer"], flatpak: "io.github.softfever.OrcaSlicer" },
+  prusa: { name: "PrusaSlicer", mac: ["PrusaSlicer", "Original Prusa Drivers/PrusaSlicer"], win: [/^prusa-slicer\.exe$/i], linux: ["prusa-slicer", "PrusaSlicer"], flatpak: "com.prusa3d.PrusaSlicer" },
+  preform: { name: "PreForm", mac: ["PreForm"], win: [/^preform\.exe$/i], linux: [] },
+  chitubox: { name: "CHITUBOX", mac: ["CHITUBOX Basic", "CHITUBOX", "CHITUBOX Pro", "CHITUBOX_Basic"], win: [/^chitubox[\w ]*\.exe$/i], linux: ["chitubox", "CHITUBOX"] },
+  lychee: { name: "Lychee Slicer", mac: ["Lychee Slicer", "LycheeSlicer", "Lychee"], win: [/^lychee[\w ]*\.exe$/i], linux: ["lychee-slicer", "lycheeslicer", "lychee"] },
+};
+/** Programs with these words are an installer's helpers, never the slicer itself. */
+const NOT_THE_APP = /unins|uninstall|update|crash|helper|setup/i;
+
+/** The folders Windows programs are installed in. */
+function windowsProgramRoots() {
+  const roots = [process.env.ProgramFiles || "C:\\Program Files", process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "Programs")];
+  return [...new Set(roots)];
+}
+
+/** A program whose file name matches, up to three folders down from the roots (Formlabs\PreForm\PreForm.exe). */
+async function findProgram(roots, patterns, depth = 3) {
+  const visit = async (dir, left) => {
+    let entries = [];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return null;
     }
-    return { opened: false, error: "Bambu Studio not found" };
+    for (const entry of entries) {
+      if (entry.isFile() && patterns.some((pattern) => pattern.test(entry.name)) && !NOT_THE_APP.test(entry.name)) return join(dir, entry.name);
+    }
+    if (left <= 0) return null;
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const found = await visit(join(dir, entry.name), left - 1);
+      if (found) return found;
+    }
+    return null;
+  };
+  for (const root of roots) {
+    const found = await visit(root, depth);
+    if (found) return found;
   }
-  if (platform() === "win32") {
-    const candidates = [
-      join(process.env.ProgramFiles || "C:\\Program Files", "Bambu Studio", "bambu-studio.exe"),
-      join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "Programs", "Bambu Studio", "bambu-studio.exe"),
-    ];
-    for (const exe of candidates) {
-      if (await exists(exe)) {
-        // Started detached; Bambu Studio keeps running after this answers.
-        const child = spawn(exe, [file], { detached: true, stdio: "ignore" });
-        child.unref();
-        return { opened: true };
+  return null;
+}
+
+/** Only the slicers' own vendor folders are searched on Windows: quick, and nothing else is read. */
+const WINDOWS_FOLDERS = {
+  bambu: ["Bambu Studio", "BambuStudio"],
+  orca: ["OrcaSlicer"],
+  prusa: ["Prusa3D", "PrusaSlicer"],
+  preform: ["Formlabs", "PreForm"],
+  chitubox: ["CHITUBOX Basic", "CHITUBOX", "CHITUBOX_Basic", "CHITUBOX Pro", "CBD-Tech"],
+  lychee: ["Lychee Slicer", "Mango3D", "LycheeSlicer"],
+};
+
+async function onPath(command) {
+  for (const dir of (process.env.PATH || "").split(":")) {
+    if (dir && (await exists(join(dir, command)))) return join(dir, command);
+  }
+  return null;
+}
+
+/** How to start a slicer here, or null when it is not installed. */
+async function locateSlicer(id) {
+  const slicer = SLICERS[id];
+  if (!slicer) return null;
+  if (platform() === "darwin") {
+    for (const app of slicer.mac) {
+      for (const dir of ["/Applications", join(homedir(), "Applications")]) {
+        if (await exists(join(dir, `${app}.app`))) return { mac: join(dir, `${app}.app`) };
       }
     }
-    return { opened: false, error: "Bambu Studio not found" };
+    return null;
   }
-  return { opened: false, error: "not supported on this system" };
+  if (platform() === "win32") {
+    const roots = windowsProgramRoots().flatMap((root) => WINDOWS_FOLDERS[id].map((folder) => join(root, folder)));
+    const exe = await findProgram(roots, slicer.win, 2);
+    return exe ? { exe } : null;
+  }
+  for (const command of slicer.linux) {
+    const found = await onPath(command);
+    if (found) return { exe: found };
+  }
+  if (slicer.flatpak && (await run("flatpak", ["info", slicer.flatpak]))) return { flatpak: slicer.flatpak };
+  return null;
+}
+
+async function openInSlicer(id, file) {
+  const slicer = SLICERS[id];
+  if (!slicer) return { opened: false, error: "unknown slicer" };
+  const where = await locateSlicer(id);
+  if (platform() === "darwin") {
+    // `open -a` also finds apps kept elsewhere, so it is tried even when none was seen in Applications.
+    const names = where?.mac ? [where.mac, ...slicer.mac] : slicer.mac;
+    for (const app of names) {
+      if (await run("/usr/bin/open", ["-a", app, file])) return { opened: true };
+    }
+    return { opened: false, error: `${slicer.name} not found` };
+  }
+  if (!where) return { opened: false, error: `${slicer.name} not found` };
+  // Started detached; the slicer keeps running after this answers.
+  const [command, args] = where.flatpak ? ["flatpak", ["run", where.flatpak, file]] : [where.exe, [file]];
+  try {
+    const child = spawn(command, args, { detached: true, stdio: "ignore" });
+    child.on("error", () => {});
+    child.unref();
+    return { opened: true };
+  } catch (error) {
+    return { opened: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** Which slicers are installed, looked up at most once a minute. */
+let installedCache = { at: 0, ids: [] };
+async function installedSlicers() {
+  if (Date.now() - installedCache.at < 60_000) return installedCache.ids;
+  const ids = [];
+  for (const id of Object.keys(SLICERS)) if (await locateSlicer(id)) ids.push(id);
+  installedCache = { at: Date.now(), ids };
+  return ids;
+}
+
+async function openInBambuStudio(file) {
+  return openInSlicer("bambu", file);
 }
 
 function json(res, status, value) {
@@ -255,13 +363,17 @@ async function handleDesigns(req, res, url) {
   }
 }
 
-async function sendToBambu(req, res, url) {
+async function sendToBambu(req, res, url, slicerId = "bambu") {
   // Only the app's own page may use this: a custom header (which forces a CORS preflight that
   // this server never approves) and, when the browser names one, our own origin.
   const origin = req.headers.origin;
   const ownOrigins = [`http://localhost:${port}`, `http://127.0.0.1:${port}`];
   if (req.headers["x-pare3d-send"] !== "1" || (origin && !ownOrigins.includes(origin))) {
     json(res, 403, { error: "not allowed" });
+    return;
+  }
+  if (!SLICERS[slicerId]) {
+    json(res, 400, { error: "unknown slicer" });
     return;
   }
   const requested = basename(url.searchParams.get("name") || "Pare 3D design.stl");
@@ -276,7 +388,7 @@ async function sendToBambu(req, res, url) {
     await mkdir(EXPORT_DIR, { recursive: true });
     const file = join(EXPORT_DIR, name);
     await writeFile(file, body);
-    const result = await openInBambuStudio(file);
+    const result = await openInSlicer(slicerId, file);
     json(res, 200, { path: file, ...result });
   } catch (error) {
     json(res, 500, { error: error instanceof Error ? error.message : String(error) });
@@ -600,6 +712,15 @@ createServer(async (req, res) => {
   if (path === "/__send-to-bambu") {
     if (req.method === "POST") await sendToBambu(req, res, url);
     else json(res, 405, { error: "POST only" });
+    return;
+  }
+  if (path === "/__send-to-slicer") {
+    if (req.method === "POST") await sendToBambu(req, res, url, url.searchParams.get("app") || "bambu");
+    else json(res, 405, { error: "POST only" });
+    return;
+  }
+  if (path === "/__slicers") {
+    json(res, 200, { runtime: RUNTIME_VERSION, installed: await installedSlicers(), names: Object.fromEntries(Object.entries(SLICERS).map(([id, slicer]) => [id, slicer.name])) });
     return;
   }
   const file = await resolveFile(path);

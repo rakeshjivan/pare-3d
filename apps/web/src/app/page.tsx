@@ -74,6 +74,8 @@ import {
 import { dedupeProjectAssets } from "@/lib/projectAssets";
 import { hydrateProjectShapeState, reconcileLoadedProjectShapeCacheEntry, type ImportedMeshResource } from "@/lib/projectShapePersistence";
 import { ToolbarImportIcon } from "@/components/toolbarIcons";
+import { ForkToothIcon } from "@/components/forkToolbarIcons";
+import { OPEN_DENTAL_STUDIO_KEY } from "@/lib/editorShared";
 import { writeDesignView, writeSavedViews } from "@/lib/designView";
 import { useFileAccept } from "@/lib/fileAccept";
 import { lylFileAccessSupported, onLylFilesLaunched, pickFilesToImport, rememberLylFile, type LylFileHandle } from "@/lib/lylFileAccess";
@@ -3729,6 +3731,24 @@ function Dashboard({
                     <ToolbarImportIcon width={30} height={30} />
                   </span>
                   <span>{t("dashboard.importGeometry")}</span>
+                </button>
+                {/* Build 70: the dental way in - a new design with Dental Studio already open. */}
+                <button
+                  className="dashboard-action-tile"
+                  type="button"
+                  onClick={() => {
+                    try {
+                      window.sessionStorage.setItem(OPEN_DENTAL_STUDIO_KEY, "1");
+                    } catch {
+                      // Then the editor simply opens without it.
+                    }
+                    onCreate();
+                  }}
+                >
+                  <span className="dashboard-action-icon">
+                    <ForkToothIcon width={28} height={28} />
+                  </span>
+                  <span>{t("dashboard.dentalModels")}</span>
                 </button>
               </div>
               {dashboardNotice ? (
