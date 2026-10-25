@@ -34,7 +34,7 @@ import { canApplySketchCornerTreatment } from "@/lib/sketchFilletChamfer";
 import {
   SKETCH_POLYGON_DEFAULT_SIDES, SKETCH_STAR_DEFAULT_INNER_PERCENT, sketchPrimitiveGeometry
 } from "@/lib/sketchPrimitives";
-import { alignedSmoothHandles, cloneSketchProfile, orderedSketchPaths, sketchWithPointMode, withSegmentHandles, withSmoothSketchHandles } from "@/lib/sketchSmoothHandles";
+import { cloneSketchProfile, orderedSketchPaths, sketchWithPointMode, withSmoothSketchHandles } from "@/lib/sketchSmoothHandles";
 import { curveThroughPoints } from "@/lib/sketchCurveThroughPoints";
 import { changesLockedOutline, setSketchPointsLocked, sketchLockState } from "@/lib/sketchLock";
 import { curveSketchSegment, isSegmentCurved, straightenSketchSegment } from "@/lib/sketchSegmentCurve";
