@@ -4806,10 +4806,11 @@ export function LayerlingEditor({
     commitSketchProfile(next, t("status.sketchHandleAdjusted"), keyRunKey);
   }, [commitSketchProfile, sketchProfile]);
 
-  const setSketchPointMode = useCallback((id: string, mode: "corner" | "smooth" | "split") => {
-    let next = cloneSketchProfile(sketchProfile);
+  /** One point turned corner, smooth or split; null when the point is gone. */
+  const sketchWithPointMode = (profile: SketchProfile, id: string, mode: "corner" | "smooth" | "split"): SketchProfile | null => {
+    let next = cloneSketchProfile(profile);
     const point = next.points.find((entry) => entry.id === id);
-    if (!point) return;
+    if (!point) return null;
     point.mode = mode;
     if (mode === "corner") {
       point.handleIn = undefined;
@@ -4824,7 +4825,20 @@ export function LayerlingEditor({
       const updated = next.points.find((entry) => entry.id === id);
       if (updated) updated.mode = mode;
     }
+    return next;
+  };
+
+  const setSketchPointMode = useCallback((id: string, mode: "corner" | "smooth" | "split") => {
+    const next = sketchWithPointMode(sketchProfile, id, mode);
+    if (!next) return;
     commitSketchProfile(next, mode === "corner" ? t("status.sketchMadeCorner") : mode === "smooth" ? t("status.sketchMadeSmooth") : t("status.sketchHandlesSplit"));
+  }, [commitSketchProfile, sketchProfile]);
+
+  /** The keys 1 and 3 on a selection (#347): every selected point at once, one undo step. */
+  const setSketchPointsMode = useCallback((ids: string[], mode: "corner" | "smooth") => {
+    let next: SketchProfile | null = null;
+    for (const id of ids) next = sketchWithPointMode(next ?? sketchProfile, id, mode) ?? next;
+    if (next) commitSketchProfile(next, mode === "corner" ? t("status.sketchMadeCorner") : t("status.sketchMadeSmooth"));
   }, [commitSketchProfile, sketchProfile]);
 
   const curveSketchSegmentAction = useCallback((id: string) => {
@@ -14755,6 +14769,7 @@ export function LayerlingEditor({
             onEraseMany={eraseSketchMany}
             onInsertPoint={insertSketchPoint}
             onSetPointMode={setSketchPointMode}
+            onSetPointsMode={setSketchPointsMode}
             onCurveSegment={curveSketchSegmentAction}
             onCurveSegments={curveSketchSegmentsAction}
             onMirror={mirrorSketchSelectionAction}

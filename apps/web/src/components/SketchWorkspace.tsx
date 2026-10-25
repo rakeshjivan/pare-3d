@@ -48,6 +48,8 @@ export type { SketchPrimitive } from "@/lib/sketchPrimitives";
 export type SketchTool = "line" | "arc" | "bezier" | "smooth" | "freehand" | SketchPrimitive | "select" | "refine" | "erase" | "measure";
 /** The keys 1 to 4 and the drawing tool each picks, in the order of the tools on the left (#347). */
 export const SKETCH_TOOL_KEYS: Readonly<Record<string, SketchTool>> = { "1": "line", "2": "bezier", "3": "smooth", "4": "refine" };
+/** With the Select tool and something selected, the same keys change it instead (#347): 1 straight / corner, 2 curve, 3 smooth. */
+export const SKETCH_EDIT_KEYS: Readonly<Record<string, "straight" | "curve" | "smooth">> = { "1": "straight", "2": "curve", "3": "smooth" };
 export type { SketchSelection } from "@/lib/sketchSelection";
 export type SketchMeasurement = { start: SketchPoint; end: SketchPoint } | null;
 
@@ -106,6 +108,8 @@ type SketchWorkspaceProps = {
   /** Fork (build 36): sets the sketch's rules (lib/sketchConstraints); the editor solves the sketch to them. */
   onSetConstraints?: (constraints: SketchConstraint[], message: string, points?: SketchProfile["points"]) => void;
   onSetPointMode: (id: string, mode: "corner" | "smooth" | "split") => void;
+  /** Several points at once, one undo step: the keys 1 and 3 on a selection (#347). */
+  onSetPointsMode?: (ids: string[], mode: "corner" | "smooth") => void;
   /** Bends a straight side into a curve with handles, or makes a curved side straight again. */
   onCurveSegment?: (id: string) => void;
   /** Curve or straighten all the selected lines at once (#283). */
@@ -593,6 +597,7 @@ export function SketchWorkspace({
   onInsertPoint,
   onSetConstraints,
   onSetPointMode,
+  onSetPointsMode,
   onCurveSegment,
   onCurveSegments,
   onMirror,
@@ -1617,6 +1622,27 @@ export function SketchWorkspace({
     return true;
   }, [focusBounds, workspace.depth, workspace.width]);
 
+  // The keys 1 to 3 on a selection with the Select tool (#347). False when the selection has nothing to
+  // change this way, so the key goes on to pick the drawing tool.
+  const editSelectionByKey = (action: "straight" | "curve" | "smooth"): boolean => {
+    if (tool !== "select") return false;
+    const lineIds = selectedLines.map((segment) => segment.id);
+    if (action === "curve") {
+      if (!lineIds.length || !(onCurveSegments || onCurveSegment)) return false;
+      if (canCurveLines) (onCurveSegments ?? ((ids: string[]) => ids.forEach((id) => onCurveSegment?.(id))))(lineIds);
+      return true;
+    }
+    if (action === "straight" && lineIds.length && (onStraightenSegments || onStraightenSegment)) {
+      if (canStraightenLines) (onStraightenSegments ?? ((ids: string[]) => ids.forEach((id) => onStraightenSegment?.(id))))(lineIds);
+      return true;
+    }
+    if (!selectedCornerIds.length) return false;
+    if (onSetPointsMode) onSetPointsMode(selectedCornerIds, action === "smooth" ? "smooth" : "corner");
+    else if (selectedCornerIds.length === 1) onSetPointMode(selectedCornerIds[0], action === "smooth" ? "smooth" : "corner");
+    else return false;
+    return true;
+  };
+
   useEffect(() => {
     const syncShiftConstrain = (shiftKey: boolean) => {
       if (!lastPointerRef.current) return;
@@ -1677,6 +1703,8 @@ export function SketchWorkspace({
       } else if (event.key === "-" || event.key === "_") {
         event.preventDefault();
         zoomByButton(ZOOM_STEP_OUT);
+      } else if (!activePoint && !pointerAction && SKETCH_EDIT_KEYS[event.key] && editSelectionByKey(SKETCH_EDIT_KEYS[event.key])) {
+        event.preventDefault();
       } else if (onSelectTool && !activePoint && !pointerAction && SKETCH_TOOL_KEYS[event.key]) {
         // 1 to 4 pick the drawing tools, as in Tinkercad (#347). While a line is being drawn the digits
         // are its length (above), so they only come here when no line is in progress.
@@ -1730,7 +1758,8 @@ export function SketchWorkspace({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [activePoint, focusSelection, onMoveHandle, onSelectTool, onTransformPoints, onUpdateImage, pendingMeasurementStart, pointerAction, profile, resetView, selected, selectedHandle, snap, tool, workspace.depth, workspace.width]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- editSelectionByKey is rebuilt from the selection, which is listed
+  }, [activePoint, focusSelection, onMoveHandle, onSetPointMode, onSetPointsMode, onCurveSegment, onCurveSegments, onStraightenSegment, onStraightenSegments, selectedLines, selectedCornerIds, canCurveLines, canStraightenLines, onSelectTool, onTransformPoints, onUpdateImage, pendingMeasurementStart, pointerAction, profile, resetView, selected, selectedHandle, snap, tool, workspace.depth, workspace.width]);
 
   const beginEntityDrag = (event: ReactPointerEvent<SVGElement>, action: PointerAction) => {
     if (event.button !== 0) return;
@@ -3052,8 +3081,8 @@ export function SketchWorkspace({
             cornerDialogContent
           ) : (
             <>
-              <button type="button" title={t("sketch.makeCorner")} onClick={() => onSetPointMode(selectedPoint.id, "corner")}><CornerDownRight /><span>{t("sketch.corner")}</span></button>
-              <button type="button" title={t("sketch.makeSmooth")} onClick={() => onSetPointMode(selectedPoint.id, "smooth")}><Waves /><span>{t("sketch.smooth")}</span></button>
+              <button type="button" title={`${t("sketch.makeCorner")} (1)`} aria-keyshortcuts="1" onClick={() => onSetPointMode(selectedPoint.id, "corner")}><CornerDownRight /><span>{t("sketch.corner")}</span></button>
+              <button type="button" title={`${t("sketch.makeSmooth")} (3)`} aria-keyshortcuts="3" onClick={() => onSetPointMode(selectedPoint.id, "smooth")}><Waves /><span>{t("sketch.smooth")}</span></button>
               <button type="button" title={t("sketch.splitHandles")} onClick={() => onSetPointMode(selectedPoint.id, "split")}><Split /><span>{t("sketch.split")}</span></button>
               {canApplySketchCornerTreatment(displayProfile, selectedPoint.id) ? (
                 <>
@@ -3123,8 +3152,8 @@ export function SketchWorkspace({
               {manyCorners && manyLines ? <span className="sketch-point-divider" /> : null}
               {manyLines ? (
                 <>
-                  <button type="button" title={t("sketch.curveLineHint")} disabled={!canCurveLines} onClick={() => onCurveSegments?.(selectedLines.map((segment) => segment.id))}><Spline /><span>{t("sketch.curveLine")}</span></button>
-                  <button type="button" title={t("sketch.straightenLineHint")} disabled={!canStraightenLines} onClick={() => onStraightenSegments?.(selectedLines.map((segment) => segment.id))}><Minus /><span>{t("sketch.straightenLine")}</span></button>
+                  <button type="button" title={`${t("sketch.curveLineHint")} (2)`} aria-keyshortcuts="2" disabled={!canCurveLines} onClick={() => onCurveSegments?.(selectedLines.map((segment) => segment.id))}><Spline /><span>{t("sketch.curveLine")}</span></button>
+                  <button type="button" title={`${t("sketch.straightenLineHint")} (1)`} aria-keyshortcuts="1" disabled={!canStraightenLines} onClick={() => onStraightenSegments?.(selectedLines.map((segment) => segment.id))}><Minus /><span>{t("sketch.straightenLine")}</span></button>
                   {onSetConstraints && selectedLines.length === 2 ? (
                     <>
                       <span className="sketch-point-divider" />
@@ -3199,8 +3228,8 @@ export function SketchWorkspace({
       ) : null}
       {selectedSegment && tool === "select" && onCurveSegment && onStraightenSegment && !mirrorOpen ? (
         <div className="sketch-point-actions" aria-label={t("sketch.segmentActions")}>
-          <button type="button" title={t("sketch.curveLineHint")} disabled={selectedSegmentCurved} onClick={() => onCurveSegment(selectedSegment.id)}><Spline /><span>{t("sketch.curveLine")}</span></button>
-          <button type="button" title={t("sketch.straightenLineHint")} disabled={!selectedSegmentCurved && (selectedSegment.kind ?? "line") === "line"} onClick={() => onStraightenSegment(selectedSegment.id)}><Minus /><span>{t("sketch.straightenLine")}</span></button>
+          <button type="button" title={`${t("sketch.curveLineHint")} (2)`} aria-keyshortcuts="2" disabled={selectedSegmentCurved} onClick={() => onCurveSegment(selectedSegment.id)}><Spline /><span>{t("sketch.curveLine")}</span></button>
+          <button type="button" title={`${t("sketch.straightenLineHint")} (1)`} aria-keyshortcuts="1" disabled={!selectedSegmentCurved && (selectedSegment.kind ?? "line") === "line"} onClick={() => onStraightenSegment(selectedSegment.id)}><Minus /><span>{t("sketch.straightenLine")}</span></button>
           {onSetSegmentConstruction ? (
             <button
               type="button"

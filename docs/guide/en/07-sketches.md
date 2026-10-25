@@ -31,7 +31,7 @@ A body comes only from a **closed** outline.
 
 ![An L-shaped outline. At the selected corner point, top left, the lengths of the two lines are shown in millimetres, and the angle between them in degrees.](shot:sketch-outline)
 
-The keys [[1]] to [[4]] pick the drawing tools, in the order of the bar: {{ui:sketch.line}}, {{ui:sketch.bezier}}, {{ui:sketch.smooth}} and {{ui:sketch.refine}}. They work as long as no line is being drawn; while one is, the digits are its length (see below).
+The keys [[1]] to [[4]] pick the drawing tools, in the order of the bar: {{ui:sketch.line}}, {{ui:sketch.bezier}}, {{ui:sketch.smooth}} and {{ui:sketch.refine}}. They work as long as no line is being drawn; while one is, the digits are its length (see below). With the {{ui:sketch.select}} tool and lines or points selected, the same keys change them instead: [[1]] makes lines straight and points corners, [[2]] turns lines into curves and [[3]] makes points smooth. With nothing selected they pick the tool as before.
 
 ## Changing a drawing
 
