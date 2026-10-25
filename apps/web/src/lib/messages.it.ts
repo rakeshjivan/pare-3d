@@ -1482,6 +1482,8 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "contextMenu.paste": "Incolla",
   "contextMenu.selectAll": "Seleziona tutto",
   "contextMenu.selectMultiple": "Seleziona più elementi",
+  "contextMenu.selectOther": "Seleziona un altro…",
+  "contextMenu.selectOtherLabel": "Corpi sotto il puntatore",
   "status.selectMultipleStart": "Seleziona più elementi: tocca i corpi per aggiungerli o toglierli. Tocca uno spazio vuoto o premi Esc per terminare.",
   "status.selectMultipleEnd": "Selezione multipla terminata",
   "contextMenu.showHidden": "Mostra tutti gli elementi nascosti",

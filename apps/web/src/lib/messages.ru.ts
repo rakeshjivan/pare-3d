@@ -1563,6 +1563,8 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "contextMenu.paste": "Вставить",
   "contextMenu.selectAll": "Выделить всё",
   "contextMenu.selectMultiple": "Выбрать несколько",
+  "contextMenu.selectOther": "Выбрать другой…",
+  "contextMenu.selectOtherLabel": "Тела под указателем",
   "status.selectMultipleStart": "Выбор нескольких: касайтесь тел, чтобы добавить или убрать их. Коснитесь пустого места или нажмите Esc, чтобы закончить.",
   "status.selectMultipleEnd": "Выбор нескольких завершён",
   "contextMenu.showHidden": "Показать всё скрытое",

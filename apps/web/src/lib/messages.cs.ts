@@ -1598,6 +1598,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "contextMenu.paste": "Vložit",
   "contextMenu.selectAll": "Vybrat vše",
   "contextMenu.selectMultiple": "Vybrat více",
+  "contextMenu.selectOther": "Vybrat jiný…",
+  "contextMenu.selectOtherLabel": "Tělesa pod ukazatelem",
   "status.selectMultipleStart": "Výběr více těles: dotykem těleso přidáte nebo odeberete. Dotekem na prázdné místo nebo klávesou Esc výběr ukončíte.",
   "status.selectMultipleEnd": "Výběr více těles skončil",
   "contextMenu.showHidden": "Zobrazit všechny skryté objekty",

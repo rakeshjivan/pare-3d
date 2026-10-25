@@ -1215,6 +1215,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "contextMenu.paste": "Prilepi",
   "contextMenu.selectAll": "Izberi vse",
   "contextMenu.selectMultiple": "Izberi več",
+  "contextMenu.selectOther": "Izberi drugega…",
+  "contextMenu.selectOtherLabel": "Telesa pod kazalcem",
   "status.selectMultipleStart": "Izbira več teles: dotakni se teles, da jih dodaš ali odstraniš. Dotakni se praznega prostora ali pritisni Esc za konec.",
   "status.selectMultipleEnd": "Izbira več teles končana",
   "contextMenu.showHidden": "Pokaži vse skrito",

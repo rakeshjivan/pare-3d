@@ -14254,10 +14254,16 @@ export function LayerlingEditor({
    * sucht oder nur als Kuerzel kennt, gleich am Objekt. Sie wirken auf die
    * Auswahl - der Viewport hat den angeklickten Koerper schon ausgewaehlt.
    */
-  const [shapeContextMenu, setShapeContextMenu] = useState<{ x: number; y: number; onShape: boolean } | null>(null);
-  const closeShapeContextMenu = useCallback(() => setShapeContextMenu(null), []);
-  const openShapeContextMenu = useCallback((request: { shapeId: string | null; clientX: number; clientY: number }) => {
-    setShapeContextMenu({ x: request.clientX, y: request.clientY, onShape: Boolean(request.shapeId) });
+  // `stack`: every body under the pointer, front to back; `listing`: the menu shows them for "Select other" (#804).
+  const [shapeContextMenu, setShapeContextMenu] = useState<{ x: number; y: number; onShape: boolean; stack: string[]; listing?: boolean } | null>(null);
+  const [menuHighlightIds, setMenuHighlightIds] = useState<string[]>([]);
+  const closeShapeContextMenu = useCallback(() => {
+    setShapeContextMenu(null);
+    setMenuHighlightIds([]);
+  }, []);
+  const openShapeContextMenu = useCallback((request: { shapeId: string | null; clientX: number; clientY: number; stackIds: string[] }) => {
+    setShapeContextMenu({ x: request.clientX, y: request.clientY, onShape: Boolean(request.shapeId), stack: request.stackIds });
+    setMenuHighlightIds([]);
   }, []);
   // Locking (Ctrl+L, the outliner, the inspector) while a tool is open puts the tool down,
   // so nothing it would apply can still reach the locked shape.
@@ -14322,11 +14328,29 @@ export function LayerlingEditor({
 
   const shapeContextMenuItems = (): ShapeContextMenuItem[] => {
     if (!shapeContextMenu) return [];
+    // The bodies under the pointer, front to back: a row marks its body through what stands in front, a click selects it,
+    // with Shift adds it (#804).
+    const stack = shapeContextMenu.stack
+      .map((id) => shapes.find((shape) => shape.id === id))
+      .filter((shape): shape is WorkplaneShape => Boolean(shape));
+    if (shapeContextMenu.listing) {
+      return stack.map((shape) => ({
+        key: `other-${shape.id}`,
+        label: displayShapeName(shape),
+        color: shape.color,
+        onHover: (active: boolean) => setMenuHighlightIds((current) => active ? [shape.id] : current.filter((id) => id !== shape.id)),
+        onSelect: ({ shift }: { shift: boolean }) => selectShape(shape.id, shift ? "toggle" : "replace"),
+      }));
+    }
+    const selectOther: ShapeContextMenuItem[] = stack.length > 1
+      ? [{ key: "selectOther", label: t("contextMenu.selectOther"), keepOpen: true, onSelect: () => setShapeContextMenu((current) => current ? { ...current, listing: true } : current) }]
+      : [];
     if (!shapeContextMenu.onShape || !hasSelection) {
       const items: ShapeContextMenuItem[] = [
         { key: "paste", label: t("contextMenu.paste"), shortcut: "Ctrl+V", onSelect: () => void pasteShape() },
         { key: "selectAll", label: t("contextMenu.selectAll"), shortcut: "Ctrl+A", onSelect: selectAllVisible },
         { key: "selectMultiple", label: t("contextMenu.selectMultiple"), onSelect: startMultiSelect },
+        ...selectOther,
       ];
       // Fork (build 53): with nothing chosen, cut every part below the workplane.
       if (shapes.some((shape) => !shape.hole && !shape.hidden && !shape.locked && !isNonSolidShapeKind(shape.kind))) items.push({ key: "cutBelow", label: t("contextMenu.cutBelow"), separated: true, onSelect: () => void cutPartsBelowBed([]) });
@@ -14341,6 +14365,7 @@ export function LayerlingEditor({
       { key: "duplicate", label: t("common.duplicate"), shortcut: "Ctrl+D", onSelect: duplicateSelected },
       { key: "copy", label: t("editor.tool.copy"), shortcut: "Ctrl+C", onSelect: copySelected },
       { key: "selectMultiple", label: t("contextMenu.selectMultiple"), onSelect: startMultiSelect },
+      ...selectOther,
     ];
     if (!selectionLocked) {
       items.push(allHoles
@@ -14814,6 +14839,7 @@ export function LayerlingEditor({
           onMirrorSelection={mirrorSelectionAcross}
           onSelectShape={selectShape}
           onShapeContextMenu={historyViewState ? undefined : openShapeContextMenu}
+          highlightIds={menuHighlightIds}
           onSetPlacementWorkplane={setViewportPlacementWorkplane}
           onToggleWorkplaneTool={activateWorkplaneTool}
           onInteractionActiveChange={updateProjectInteractionActive}
@@ -14933,7 +14959,7 @@ export function LayerlingEditor({
         <ShapeContextMenu
           x={shapeContextMenu.x}
           y={shapeContextMenu.y}
-          label={t("contextMenu.label")}
+          label={shapeContextMenu.listing ? t("contextMenu.selectOtherLabel") : t("contextMenu.label")}
           items={shapeContextMenuItems()}
           onClose={closeShapeContextMenu}
         />

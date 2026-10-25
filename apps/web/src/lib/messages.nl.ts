@@ -1570,6 +1570,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "contextMenu.paste": "Plakken",
   "contextMenu.selectAll": "Alles selecteren",
   "contextMenu.selectMultiple": "Meerdere selecteren",
+  "contextMenu.selectOther": "Ander selecteren…",
+  "contextMenu.selectOtherLabel": "Lichamen onder de aanwijzer",
   "status.selectMultipleStart": "Meerdere selecteren: tik op lichamen om ze toe te voegen of weg te halen. Tik op een lege plek of druk op Esc om te stoppen.",
   "status.selectMultipleEnd": "Meerdere selecteren beëindigd",
   "contextMenu.showHidden": "Alle verborgen vormen tonen",

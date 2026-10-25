@@ -1589,6 +1589,8 @@ export const MESSAGES_EN = {
   "contextMenu.paste": "Paste",
   "contextMenu.selectAll": "Select all",
   "contextMenu.selectMultiple": "Select multiple",
+  "contextMenu.selectOther": "Select other…",
+  "contextMenu.selectOtherLabel": "Bodies under the pointer",
   "status.selectMultipleStart": "Select multiple: tap bodies to add or remove them. Tap empty space or press Esc to finish.",
   "status.selectMultipleEnd": "Select multiple finished",
   "contextMenu.showHidden": "Show all hidden",

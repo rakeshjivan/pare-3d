@@ -1526,6 +1526,8 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "contextMenu.paste": "Yapıştır",
   "contextMenu.selectAll": "Tümünü seç",
   "contextMenu.selectMultiple": "Çoklu seç",
+  "contextMenu.selectOther": "Başkasını seç…",
+  "contextMenu.selectOtherLabel": "İşaretçinin altındaki cisimler",
   "status.selectMultipleStart": "Çoklu seç: eklemek veya çıkarmak için gövdelere dokun. Bitirmek için boş alana dokun veya Esc'ye bas.",
   "status.selectMultipleEnd": "Çoklu seçim bitti",
   "contextMenu.showHidden": "Tüm gizlileri göster",

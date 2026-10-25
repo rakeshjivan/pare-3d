@@ -1589,6 +1589,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "contextMenu.paste": "Einfügen",
   "contextMenu.selectAll": "Alle auswählen",
   "contextMenu.selectMultiple": "Mehrere auswählen",
+  "contextMenu.selectOther": "Anderes auswählen…",
+  "contextMenu.selectOtherLabel": "Körper unter dem Zeiger",
   "status.selectMultipleStart": "Mehrere auswählen: Tippe auf Körper, um sie hinzuzunehmen oder wegzunehmen. Tippe auf die leere Fläche oder drücke Esc zum Beenden.",
   "status.selectMultipleEnd": "Mehrfachauswahl beendet",
   "contextMenu.showHidden": "Alle einblenden",

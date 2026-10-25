@@ -1515,6 +1515,8 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "contextMenu.paste": "Beillesztés",
   "contextMenu.selectAll": "Az összes kijelölése",
   "contextMenu.selectMultiple": "Több kijelölése",
+  "contextMenu.selectOther": "Másik kijelölése…",
+  "contextMenu.selectOtherLabel": "Testek a mutató alatt",
   "status.selectMultipleStart": "Több kijelölése: érintsd meg a testeket a hozzáadáshoz vagy elvételhez. Érints meg egy üres helyet, vagy nyomd meg az Esc-et a befejezéshez.",
   "status.selectMultipleEnd": "A többes kijelölés véget ért",
   "contextMenu.showHidden": "Minden elrejtett megjelenítése",
