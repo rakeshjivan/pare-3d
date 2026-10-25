@@ -448,6 +448,9 @@ export function WorkspaceSettingsModal({
   onMoveDimensionsEnabledChange,
   onOriginDimensionsEnabledChange,
   onStartInPerspectiveChange,
+  hasStartView,
+  onSaveStartView,
+  onResetStartView,
   onMakeDefault,
   onClose,
 }: {
@@ -463,6 +466,10 @@ export function WorkspaceSettingsModal({
   onMoveDimensionsEnabledChange: (enabled: boolean) => void;
   onOriginDimensionsEnabledChange: (enabled: boolean) => void;
   onStartInPerspectiveChange: (perspective: boolean) => void;
+  /** Whether a start view of the user's own is set (#853). */
+  hasStartView: boolean;
+  onSaveStartView: () => void;
+  onResetStartView: () => void;
   onMakeDefault: () => void;
   onClose: () => void;
 }) {
@@ -927,6 +934,18 @@ export function WorkspaceSettingsModal({
                     checked={startInPerspective}
                     onChange={onStartInPerspectiveChange}
                   />
+                  <div className="workspace-reset-row" data-help={t("workspace.startViewHint")}>
+                    <span>{t("workspace.startView")}</span>
+                    <div className="property-defaults-actions">
+                      <button type="button" title={t("workspace.startViewHint")} onClick={onSaveStartView}>
+                        {t("workspace.startViewUseCurrent")}
+                      </button>
+                      <button type="button" disabled={!hasStartView} onClick={onResetStartView}>
+                        <RotateCcw size={14} />
+                        <span>{t("workspace.startViewStandard")}</span>
+                      </button>
+                    </div>
+                  </div>
                   <WorkspaceToggle
                     label={t("workspace.selectBeforeMoving")}
                     checked={workspace.selectBeforeMove}

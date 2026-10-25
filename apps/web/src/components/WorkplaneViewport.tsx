@@ -79,7 +79,7 @@ import { wheelBaseStep, wheelNextValue } from "@/lib/wheelValueStep";
 import { createLatestRunner, type LatestRunner } from "@/lib/latestRunner";
 import { manifoldRevision, onManifoldReady } from "@/lib/manifoldHandle";
 import { customFontRevision, onCustomFontsChanged } from "@/lib/textFonts";
-import { readSavedViews, SAVED_VIEW_KEYS, savedViewForKey } from "@/lib/designView";
+import { readSavedViews, readStartView, SAVED_VIEW_KEYS, savedViewForKey, writeStartView, type DesignView } from "@/lib/designView";
 import { CAMERA_MAX_DISTANCE, fitCameraDepthRange, rememberCameraView, useDesignViews } from "@/components/workplane/cameraViews";
 import { DIMENSION_FORMULA_FIELDS, formulaMatchesMillimeters, formulaToRemember, withFieldFormula } from "@/lib/fieldFormulas";
 import { displayToMillimeters, formatLengthMm, lengthDisplayUnit, millimetersToDisplay, parseLengthMm, parseMeasurementInput, resolveLengthMm, setLengthUnit } from "@/lib/measurementUnits";
@@ -687,7 +687,7 @@ declare global {
     /** "Hide workplane" in the camera bar for MCP: sets it when given, returns whether the plate is shown. */
     layerlingWorkplaneDisplay?: (visible?: boolean) => { visible: boolean };
     /** The four saved views (keys 7, 8, 9, 0) for MCP: saves or shows one when asked, returns which keys hold a view. */
-    layerlingSavedViews?: (request?: { save?: number; show?: number }) => { keys: { key: string; saved: boolean }[]; shown?: boolean };
+    layerlingSavedViews?: (request?: { save?: number; show?: number; startView?: "save" | "reset" }) => { keys: { key: string; saved: boolean }[]; shown?: boolean; startView: boolean };
   }
 }
 
@@ -3659,6 +3659,7 @@ export function WorkplaneViewport({
   const [originDimensionOverlay, setOriginDimensionOverlay] = useState<OriginDimensionOverlayData | null>(null);
   const [originDimensionsEnabled, setOriginDimensionsEnabled] = useState(false);
   const [startInPerspective, setStartInPerspective] = useState(true);
+  const [hasStartView, setHasStartView] = useState(() => readStartView() !== null);
   const [sectionViewOpen, setSectionViewOpen] = useState(false);
   const [sectionSettings, setSectionSettings] = useState<SectionPlaneSettings>(DEFAULT_SECTION_SETTINGS);
   const sectionSettingsRef = useRef(sectionSettings);
@@ -5095,18 +5096,39 @@ export function WorkplaneViewport({
     threeRef, projectIdRef, viewCubeRef, designViewRestoredRef, orthographicView, setOrthographicView, toggleCameraProjection, syncViewCube, onNotice,
   });
 
+  // The view new designs open in and Home goes back to (#853), for every design of this browser.
+  const saveStartView = useCallback(() => {
+    const state = threeRef.current;
+    if (!state) return false;
+    writeStartView(startViewOf(state));
+    setHasStartView(readStartView() !== null);
+    onNotice?.(t("workspace.startViewSaved"));
+    return true;
+  }, [onNotice]);
+
+  const resetStartView = useCallback(() => {
+    writeStartView(null);
+    setHasStartView(false);
+  }, []);
+
   // The same keys for MCP (layerling_saved_view), through the functions the keys use.
   useEffect(() => {
     window.layerlingSavedViews = (request = {}) => {
       if (request.save !== undefined && !saveView(request.save)) throw new Error("The view is not ready yet");
       const shown = request.show !== undefined ? showSavedView(request.show) : undefined;
+      if (request.startView === "save" && !saveStartView()) throw new Error("The view is not ready yet");
+      if (request.startView === "reset") resetStartView();
       const views = readSavedViews(projectIdRef.current);
-      return { keys: SAVED_VIEW_KEYS.map((key, slot) => ({ key, saved: Boolean(views[slot]) })), ...(shown !== undefined ? { shown } : {}) };
+      return {
+        keys: SAVED_VIEW_KEYS.map((key, slot) => ({ key, saved: Boolean(views[slot]) })),
+        ...(shown !== undefined ? { shown } : {}),
+        startView: readStartView() !== null,
+      };
     };
     return () => {
       delete window.layerlingSavedViews;
     };
-  }, [saveView, showSavedView]);
+  }, [saveView, showSavedView, saveStartView, resetStartView]);
 
   useEffect(() => {
     const state = threeRef.current;
@@ -10648,6 +10670,9 @@ export function WorkplaneViewport({
           onMoveDimensionsEnabledChange={changeMoveDimensionsEnabled}
           onOriginDimensionsEnabledChange={changeOriginDimensionsEnabled}
           onStartInPerspectiveChange={changeStartInPerspective}
+          hasStartView={hasStartView}
+          onSaveStartView={saveStartView}
+          onResetStartView={resetStartView}
           onMakeDefault={makeWorkspaceDefault}
           onClose={() => setSettingsOpen(false)}
         />
@@ -11073,22 +11098,48 @@ function animateCamera(state: ThreeState, change: () => void, onFrame?: () => vo
   cameraAnimations.set(state, requestAnimationFrame(step));
 }
 
+/**
+ * The view as it is now, to start new designs in and to go Home to (#853), kept as the normal camera
+ * would show it: the flat view's zoom becomes the distance that shows as much.
+ */
+function startViewOf(state: ThreeState): DesignView {
+  const target = state.controls.target.clone();
+  const offset = state.camera.position.clone().sub(target);
+  const direction = offset.lengthSq() > 0 ? offset.normalize() : CAMERA_HOME.clone().sub(CAMERA_TARGET).normalize();
+  const distance = state.camera instanceof THREE.OrthographicCamera
+    ? (state.camera.top - state.camera.bottom) / 2 / Math.max(state.camera.zoom, 1e-6) / Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV / 2))
+    : state.camera.position.distanceTo(target);
+  const position = target.clone().add(direction.multiplyScalar(clamp(distance, CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE)));
+  return {
+    orthographic: false,
+    position: position.toArray() as [number, number, number],
+    target: target.toArray() as [number, number, number],
+    up: state.camera.up.toArray() as [number, number, number],
+    zoom: 1,
+  };
+}
+
+/** Home: the start view the user chose (#853), else the standard one. */
 function resetCamera(state: ThreeState) {
   state.cameraTurn = null;
   state.focusReach = null;
-  state.camera.up.set(0, 1, 0);
-  state.camera.position.copy(CAMERA_HOME);
-  state.controls.target.copy(CAMERA_TARGET);
+  const start = readStartView();
+  const home = start ? new THREE.Vector3().fromArray(start.position) : CAMERA_HOME;
+  const target = start ? new THREE.Vector3().fromArray(start.target) : CAMERA_TARGET;
+  if (start) state.camera.up.fromArray(start.up);
+  else state.camera.up.set(0, 1, 0);
+  state.camera.position.copy(home);
+  state.controls.target.copy(target);
   if (state.camera instanceof THREE.OrthographicCamera) {
     state.camera.zoom = 1;
-    const distance = CAMERA_HOME.distanceTo(CAMERA_TARGET);
+    const distance = home.distanceTo(target);
     const halfHeight = distance * Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV / 2));
     const canvas = state.renderer.domElement;
     updateOrthographicFrustum(state.camera, canvas.clientWidth / Math.max(1, canvas.clientHeight), halfHeight);
   } else {
     state.camera.zoom = 1;
   }
-  state.camera.lookAt(CAMERA_TARGET);
+  state.camera.lookAt(target);
   state.camera.updateProjectionMatrix();
   state.controls.update();
 }
