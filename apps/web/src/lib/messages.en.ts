@@ -194,7 +194,7 @@ export const MESSAGES_EN = {
   "welcome.morePrintersTitle": "Ready to print",
   "welcome.morePrintersBody": "around 220 printers with their build plate; Pare 3D warns when something reaches past the plate or is too tall, marks overhangs that would need supports and estimates weight and filament on export.",
   "welcome.moreImportTitle": "Import",
-  "welcome.moreImportBody": "STL, OBJ and 3MF with their colours, STEP and SVG, plus images as a reference - and parts from other Pare 3D designs straight into the open one. An SVG comes in as a sketch: an area, a stroke outside or inside, or a silhouette without its holes, say for a cookie cutter. An SVG pattern or lettering can be wrapped around a cylinder, raised or engraved.",
+  "welcome.moreImportBody": "STL, OBJ, 3MF and SVG with their colours, STEP, plus images as a reference - and parts from other Pare 3D designs straight into the open one. An SVG comes in as a sketch: an area, a stroke outside or inside, or a silhouette without its holes, say for a cookie cutter. An SVG pattern or lettering can be wrapped around a cylinder, raised or engraved.",
   "installHint.title": "Install Pare 3D as an app",
   "installHint.body": "As an app, Pare 3D starts faster, works without internet, has its own icon and window, and does not have to be loaded again each time. You lose nothing: your designs stay as they are, and Pare 3D still tells you when a new version is out.",
   "installHint.install": "Install now",
