@@ -34,7 +34,7 @@ import { canApplySketchCornerTreatment } from "@/lib/sketchFilletChamfer";
 import {
   SKETCH_POLYGON_DEFAULT_SIDES, SKETCH_STAR_DEFAULT_INNER_PERCENT, sketchPrimitiveGeometry
 } from "@/lib/sketchPrimitives";
-import { cloneSketchProfile, orderedSketchPaths, withSegmentHandles, withSmoothSketchHandles } from "@/lib/sketchSmoothHandles";
+import { alignedSmoothHandles, cloneSketchProfile, orderedSketchPaths, withSegmentHandles, withSmoothSketchHandles } from "@/lib/sketchSmoothHandles";
 import { changesLockedOutline, setSketchPointsLocked, sketchLockState } from "@/lib/sketchLock";
 import { curveSketchSegment, isSegmentCurved, straightenSketchSegment } from "@/lib/sketchSegmentCurve";
 import { chordHandles, withBezierHandles, withBezierStartHandle } from "@/lib/sketchBezierHandles";
@@ -4820,7 +4820,12 @@ export function LayerlingEditor({
       next.segments = next.segments.map((segment) => segment.startId === id || segment.endId === id ? { ...segment, kind: "bezier" } : segment);
       // The point's own handles along its neighbours; the segments around it then need the handle at
       // their other end too, or they would stay straight.
-      if (!point.handleIn || !point.handleOut) next = withSmoothSketchHandles(next, new Set([id]));
+      // A point that already has two handles keeps their lengths; as a smooth point they are lined up (#347).
+      const aligned = mode === "smooth" ? alignedSmoothHandles(point) : null;
+      if (aligned) {
+        point.handleIn = aligned.handleIn;
+        point.handleOut = aligned.handleOut;
+      } else if (!point.handleIn || !point.handleOut || mode === "smooth") next = withSmoothSketchHandles(next, new Set([id]));
       next = withSegmentHandles(next, new Set(next.segments.filter((segment) => segment.startId === id || segment.endId === id).map((segment) => segment.id)));
       const updated = next.points.find((entry) => entry.id === id);
       if (updated) updated.mode = mode;
