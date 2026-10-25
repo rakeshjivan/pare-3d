@@ -934,9 +934,16 @@ export async function planCutConnectors(
 
 export type CutConnectorPlan = { points: [number, number, number][]; invalid: [number, number, number][]; tooSmall: boolean };
 
+/** The cut of one target, or `missed` when the plane does not go through it. */
+export async function splitShapeIfCrossed(shape: WorkplaneShape, plane: Pick<ModelSplitPlane, "axis" | "normal" | "position">) {
+  if (!splitPlaneIntersectsPoints(meshForShape(shape).vertices, plane.normal, plane.position)) return { missed: true as const };
+  return splitShapeByPlane(shape, plane);
+}
+
 /**
  * Splits every target the plane crosses; `stillCurrent` is asked after each one. `splitOne` makes
- * each cut, off the page in the editor (lib/geometryWorker.ts).
+ * each cut, off the page in the editor (lib/geometryWorker.ts), the test whether the plane crosses
+ * included: for a large import that test builds its whole mesh.
  */
 export async function splitShapesByPlane(
   targets: readonly WorkplaneShape[],
@@ -945,7 +952,7 @@ export async function splitShapesByPlane(
   connectors?: CutConnectorOptions,
   /** Manual placement: the points the user clicked, in scene coordinates. */
   manualPoints: readonly [number, number, number][] = [],
-  splitOne: typeof splitShapeByPlane = splitShapeByPlane,
+  splitOne: typeof splitShapeIfCrossed = splitShapeIfCrossed,
 ): Promise<SplitShapesOutcome> {
   const replacements = new Map<string, WorkplaneShape[]>();
   let splitCount = 0;
@@ -960,8 +967,10 @@ export async function splitShapesByPlane(
   }
   const used = new Set<number>();
   for (const shape of targets) {
-    if (!splitPlaneIntersectsPoints(meshForShape(shape).vertices, plane.normal, plane.position)) continue;
-    const result = connectors && connectors.type !== "none" ? await splitShapeByPlane(shape, plane, connectors, planePoints) : await splitOne(shape, plane);
+    const connected = connectors && connectors.type !== "none";
+    if (connected && !splitPlaneIntersectsPoints(meshForShape(shape).vertices, plane.normal, plane.position)) continue;
+    const result = connected ? await splitShapeByPlane(shape, plane, connectors, planePoints) : await splitOne(shape, plane);
+    if ("missed" in result) continue;
     if (!stillCurrent()) return { status: "stale" };
     if (!result.parts) return { status: "failed", shape, error: result.error ?? t("split.error.failedDefault") };
     replacements.set(shape.id, result.parts);

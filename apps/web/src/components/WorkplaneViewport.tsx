@@ -172,6 +172,7 @@ import { pullDistanceAlongNormal, snapPullDistance, typedPull } from "@/lib/face
 type Vec3Like = { x: number; y: number; z: number };
 import { aimPickRay, firstShapeHit, pickLayFlatFace, pickRotationPivot, pickShapeAt, pickShapeIdAt, pointerRayFor, rayPointOnRotationPlane, RENDER_LAYER_SHAPES, splitAxisParameter, usePickOnlyPointer, type LayFlatPick, type PickOnlySelection } from "@/components/workplane/viewportPicking";
 export type { LayFlatPick } from "@/components/workplane/viewportPicking";
+import { fastEdgesGeometry } from "@/lib/fastEdgesGeometry";
 import { RENDER_LAYER_HELPERS, sharedOverlayLineMaterial, sharedShapeGeometryCache, sharedEdgesGeometryCache, sharedShapeMaterialCache, type PointCardOffset, type ShapeRenderRecord, type ThreeState, type MoveDimensionSession, type NoteOverlayState, type TapePoint, type TapeAttachment, type TapeEdgeAttachment, type TapeModel, type TapeOverlayState, type TapeCandidate, type RotationHandleSide, type RotationHandleSides, type DragItem, quaternionForShape, projectToScreen, syncMoveDimensionWorldLines, syncTransformGuideWorldLines, tapeShapeDimensions, tapePointWorld, tapeEdgeWorldPoints, tapeSegmentWorldPoints, syncTapeOverlay, syncNoteOverlay, NoteOverlay, TapeOverlay, type RulerDimensionOverlayItem, type RulerDimensionOverlayState, syncRulerDimensionOverlay, RulerDimensionOverlay, type CornerRulerInstance, type CornerRulerOverlayState, syncCornerRulerToolOverlay, CornerRulerToolOverlay, syncOriginDimensionWorldLines, shapeCenter, shapeLocalExtents, projectShapeExtent, projectShapesExtent, type OriginDimensionFrame, setObjectRenderLayer, freezeStaticObjectMatrices, formatMeasure, findShapeObject, trimSharedShapeGeometryCache, releaseSharedShapeGeometry, trimSharedShapeMaterialCache, releaseSharedShapeMaterials, disposeMaterialResource, disposeChildren, disposeObject } from "@/components/workplane/ViewportOverlays";
 
 const WORKPLANE_WIDTH = 200;
@@ -2424,7 +2425,7 @@ function placementFeatureSnap(
   if ((geometry.index?.count ?? geometry.getAttribute("position").count) > 600_000) return null;
   let edges = surface.userData.placementFeatureEdges as { geometry: THREE.BufferGeometry; positions: Float32Array } | undefined;
   if (!edges || edges.geometry !== geometry) {
-    const edgeGeometry = new THREE.EdgesGeometry(geometry, 25);
+    const edgeGeometry = fastEdgesGeometry(geometry, 25);
     edges = { geometry, positions: Float32Array.from(edgeGeometry.getAttribute("position").array as ArrayLike<number>) };
     edgeGeometry.dispose();
     surface.userData.placementFeatureEdges = edges;
@@ -14899,7 +14900,7 @@ function getEdgesGeometry(shape: WorkplaneShape, geometry: THREE.BufferGeometry,
     return cached;
   }
 
-  const edges = new THREE.EdgesGeometry(geometry, threshold);
+  const edges = fastEdgesGeometry(geometry, threshold);
   edges.userData.cached = true;
   cache.set(threshold, edges);
   return edges;

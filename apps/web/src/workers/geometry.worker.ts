@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { buildMessage } from "@/lib/buildStamp";
-import { buildGroupedShapeFromSelection, splitShapeByPlane } from "@/lib/editorBooleans";
+import { buildGroupedShapeFromSelection, splitShapeIfCrossed } from "@/lib/editorBooleans";
 import { getManifoldRuntime, setManifoldAssetBase } from "@/lib/editorMeshCore";
 import { packValue, packedTransfer, unpackValue } from "@/lib/geometryTransfer";
 import type { GeometryWorkerRequest, GeometryWorkerResponse } from "@/lib/geometryWorkerTypes";
@@ -34,7 +34,7 @@ self.onmessage = async (event: MessageEvent<GeometryWorkerRequest>) => {
       result = await buildGroupedShapeFromSelection(selected, triangleLimit);
     } else if (request.task === "split") {
       const { shape, plane } = args as { shape: WorkplaneShape; plane: Pick<ModelSplitPlane, "axis" | "normal" | "position"> };
-      result = await splitShapeByPlane(shape, plane);
+      result = await splitShapeIfCrossed(shape, plane);
     } else if (request.task === "warm") {
       await getManifoldRuntime();
       result = null;

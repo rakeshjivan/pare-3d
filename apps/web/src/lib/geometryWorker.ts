@@ -1,5 +1,5 @@
 import { buildsDiffer, BUILD_ID, isBuildMessage, reportWorkerBuild } from "@/lib/buildStamp";
-import { buildGroupedShapeFromSelection, splitShapeByPlane, splitShapesByPlane, type GroupBuildResult, type SplitShapesOutcome } from "@/lib/editorBooleans";
+import { buildGroupedShapeFromSelection, splitShapeIfCrossed, splitShapesByPlane, type GroupBuildResult, type SplitShapesOutcome } from "@/lib/editorBooleans";
 import { packValue, packedTransfer, unpackValue } from "@/lib/geometryTransfer";
 import type { GeometryTask, GeometryWorkerRequest, GeometryWorkerResponse } from "@/lib/geometryWorkerTypes";
 import { getLanguage, t } from "@/lib/i18n";
@@ -231,9 +231,9 @@ export function buildGroupedShapeOffThread(selected: WorkplaneShape[], triangleL
 type SplitPlane = Pick<ModelSplitPlane, "axis" | "normal" | "position">;
 
 function splitShapeOffThread(shape: WorkplaneShape, plane: SplitPlane, signal?: AbortSignal) {
-  const onPage = () => splitShapeByPlane(shape, plane);
+  const onPage = () => splitShapeIfCrossed(shape, plane);
   if (containsText([shape])) return onPage();
-  return runGeometryTask<Awaited<ReturnType<typeof splitShapeByPlane>>>("split", { shape, plane }, onPage, () => ({ parts: null, error: t("status.computeTimedOut") }), signal);
+  return runGeometryTask<Awaited<ReturnType<typeof splitShapeIfCrossed>>>("split", { shape, plane }, onPage, () => ({ parts: null, error: t("status.computeTimedOut") }), signal);
 }
 
 /** splitShapesByPlane (lib/editorBooleans.ts) with each cut made off the page. */

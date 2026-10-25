@@ -129,6 +129,71 @@ runs (the build stamp covers a worker from another build, not one replaced mid-r
 memory a large cut now takes twice (page and worker each hold the mesh while it runs). Workers do
 not raise the memory limit of a tab (#683).
 
+## Step 2: a pool of workers - measured, not built
+
+A single cut cannot be shared between workers; a pool only helps when several cuts wait at the
+same time. In the editor that is Split through several objects (the honeycomb conversion is the
+other loop). A prototype ran up to `hardwareConcurrency - 1` workers (3 here, at most 4) and
+started the cuts of a split together. Measured against the same code with one worker, median of
+3 runs, actions `split-four` and `split-four-warm` (the second after a split of four small boxes,
+so every worker has started):
+
+| Split four imported 100k spheres | 1 worker | 3 workers |
+| --- | ---: | ---: |
+| Duration, workers cold | 3,816 ms | 2,717 ms |
+| Duration, workers warm | 3,675 ms | 2,634 ms |
+| Main thread blocked, cold | 1,257 ms | 1,964 ms |
+| Main thread blocked, warm | 1,418 ms | 1,338 ms |
+| Longest input delay, cold / warm | 1,166 / 1,311 ms | 1,219 / 1,251 ms |
+
+The pool saves about a second, 28 %, on this one action, and nothing on a single cut. It does not
+make the editor freeze less: the longest freeze, about 1.1 s, is the page handling the eight
+halves after the answer (see step 1), and while the extra workers start the main thread is blocked
+longer. Each further worker also holds its own Manifold and its copy of the meshes (not
+measured). Not worth it for now; the time after the answer is the larger lever.
+
+## Step 3: what the page does after the answer
+
+CPU profiles of the cuts after step 1 (`--profile`) showed where the remaining freeze goes. Three
+pieces are now quicker, each with the same result as before:
+
+- **Edge lines** (`lib/fastEdgesGeometry.ts`): THREE.EdgesGeometry builds a text key for every
+  corner and edge; the same algorithm with numbers gives the same lines in the same order
+  (tests/unit/fastEdgesGeometry.test.ts compares them with three.js) and took 82 instead of 439 ms
+  for a 99,000-triangle sphere in the unit test. Splitting four 100k spheres spent 590 ms of the main thread
+  in it.
+- **Counting the parts for "Separate parts"** (`lib/meshPartCount.ts`): the same count as the parts
+  the button makes (tests/unit/meshPartCount.test.ts checks it against the editor's own way), with
+  a number table and union-find instead of a text key per corner. It runs whenever a large mesh is
+  selected. Separating itself is unchanged.
+- **Whether the split plane crosses an object**: the test builds the object's whole mesh; it now
+  runs in the worker with the cut (`splitShapeIfCrossed`), 320 ms of main thread for four 100k
+  spheres before.
+
+| Action | Longest block, step 1 → now | Input delay, step 1 → now |
+| --- | ---: | ---: |
+| Group 60 boxes with 20 cylinder holes | 103 → 78 ms | 104 → 89 ms |
+| Group 40 cylinders with 20 sphere holes | 164 → 111 ms | 173 → 135 ms |
+| Cut a cylinder out of an imported 200k sphere | 476 → 385 ms | 574 → 410 ms |
+| Group two overlapping imported 100k spheres | 283 → 212 ms | 362 → 251 ms |
+| Split an imported 300k sphere in two | 436 → 458 ms | 508 → 535 ms |
+| Split four imported 100k spheres | 1,166 → 745 ms | 1,269 → 846 ms |
+
+The single 300k split does not change: its halves are above the size whose edges are drawn. Its
+profile shows what is left there, all of it the view of the two new meshes:
+
+- building their geometry for the view (getImportedMeshCache in WorkplaneViewport.tsx: number list
+  to Float32Array, normals, moving it onto the plate) - about 520 ms;
+- the raycasting index (three-mesh-bvh) - about 150 ms;
+- unpacking the worker's answer - about 140 ms;
+- building a shape's mesh (meshForShape) once more on the page - about 160 ms.
+
+The first two could be built in the worker as well (three.js and three-mesh-bvh run there); the
+same work happens on import and when a .lyl opens, so that is the next lever.
+
+Checked: unit and e2e tests; in the browser, the same cut, split and grouping give byte-identical
+STL exports as with step 1, with the worker and with its file blocked.
+
 ## Still on the main thread
 
 Not profiled yet, so without a cause:

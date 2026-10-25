@@ -247,6 +247,7 @@ import { projectSectionPoint, SECTION_VIEW_FACE, sectionSvgDocument, sliceMeshCo
 import type { AlignAxis, AlignTarget, GridSize, ParametricSource, ProjectAsset, ShapeAsset, ShapeCustomization, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, ShellEdges, ShellOpenings, ShellSide, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
 import { type Vec3, type MeshData, type ShapeUpdatePatch, MIN_SHAPE_DIMENSION, resetManifoldRuntime, cleanModelDimension, getManifoldRuntime, meshForShape, meshReachAlong, appendMeshData, formatTriangleCount, boundsForShapes, boundsForCuboids, meshAabb, boundsForPositions } from "@/lib/editorMeshCore";
 import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, exportSolidVolume, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
+import { meshPartCount } from "@/lib/meshPartCount";
 import { buildGroupedShapeOffThread, splitShapesByPlaneOffThread, subscribeGeometryBusy, warmGeometryWorker } from "@/lib/geometryWorker";
 import { handleViewArrowKey } from "@/lib/viewArrowKeys";
 import { escapeWasHandled } from "@/lib/escapeHandled";
@@ -1737,14 +1738,14 @@ function separablePartCount(shape: WorkplaneShape) {
     const key = JSON.stringify(form);
     const known = partCountsByForm.get(key);
     if (known !== undefined) return known;
-    const count = meshFaceComponents(readOnlyMesh(shape)).length;
+    const count = meshPartCount(readOnlyMesh(shape), SEPARATE_PARTS_VERTEX_TOLERANCE);
     partCountsByForm.set(key, count);
     if (partCountsByForm.size > 200) partCountsByForm.delete(partCountsByForm.keys().next().value as string);
     return count;
   }
   const cached = importedPartCounts.get(shape.importedMesh);
   if (cached !== undefined) return cached;
-  const count = meshFaceComponents(readOnlyMesh(shape)).length;
+  const count = meshPartCount(readOnlyMesh(shape), SEPARATE_PARTS_VERTEX_TOLERANCE);
   importedPartCounts.set(shape.importedMesh, count);
   return count;
 }

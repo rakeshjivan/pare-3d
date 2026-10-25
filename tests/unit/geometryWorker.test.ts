@@ -12,7 +12,7 @@ vi.mock("@/lib/editorBooleans", () => ({
     page.calls += 1;
     return { group: { id: "made-on-the-page" }, consumed: false, failureNotice: "" };
   },
-  splitShapeByPlane: async () => ({ parts: null, error: "page" }),
+  splitShapeIfCrossed: async () => ({ parts: null, error: "page" }),
   splitShapesByPlane: async () => ({ status: "done", replacements: new Map(), splitCount: 0 }),
 }));
 
