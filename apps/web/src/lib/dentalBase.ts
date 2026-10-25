@@ -582,6 +582,43 @@ const axleAlongX = (runtime: ManifoldRuntime, radius: number, x0: number, x1: nu
 
 export type HingeFront = { y: number; x: number };
 
+/** Protrusion paths the hinge can offer (build 60), degrees below the occlusal plane; 0 is a plain hinge. */
+export const HINGE_CONDYLE_ANGLES = [0, 15, 20, 25, 30, 35, 40, 45] as const;
+/** How far the axle can slide along a protrusion path, mm: an incisor-to-incisor protrusion is 5 to 7 mm. */
+export const HINGE_PATH_LENGTH = 4;
+/** Openings the incisal pin can be raised by, mm (build 60). */
+export const INCISAL_PIN_RAISES = [0, 0.5, 1, 2, 3] as const;
+/** The incisal guide table's slope, degrees (build 60): the average anterior guidance. */
+export const INCISAL_TABLE_ANGLE = 30;
+
+/**
+ * Build 60: how the printed articulator moves beyond opening and closing.
+ * - `condyle`: the protrusion path, degrees below the occlusal plane (0, the default: a hinge only).
+ *   The clip's bore becomes a slot running forward and down at that angle, so the lower can slide
+ *   forward along it the way the condyle runs down the eminence; the bearings still hold it square.
+ * - `pinRaise`: the incisal pin raised this much, mm, so the models rest that much open at the front.
+ * - `table`: "guide" slopes the lower's incisal table up towards the back at INCISAL_TABLE_ANGLE, so
+ *   the models part as the lower slides forward, as anterior guidance parts the teeth; "flat" stays level.
+ */
+export type HingeMotion = { condyle?: number; pinRaise?: number; table?: "flat" | "guide" };
+
+/** Where the axle runs, in the pair's frame, for a hinge whose models' backs are at `back`. */
+export function hingeAxleY(back: number, motion: HingeMotion = {}) {
+  const angle = (motion.condyle ?? 0) * deg;
+  return back + 6 + (angle > 0 ? HINGE_PATH_LENGTH * Math.cos(angle) : 0);
+}
+
+/** A prism along x from x0 to x1 whose cross-section is `ring` in (y, z). */
+const prismAlongX = (runtime: ManifoldRuntime, ring: Ring, x0: number, x1: number) => {
+  const section = new runtime.CrossSection([ring], "Positive");
+  const solid = section.extrude(x1 - x0);
+  section.delete();
+  // (X, Y, Z) of the extrusion -> (x, y, z) = (Z + x0, X, Y): a rotation, so the solid stays the right way out.
+  const moved = solid.transform([0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, x0, 0, 0, 1] as unknown as Parameters<ManifoldSolid["transform"]>[0]);
+  solid.delete();
+  return moved;
+};
+
 /**
  * The hinge in the pair's frame (occlusal plane z = 0, back +y), built the way printable
  * articulators are (build 58, after Medit's xSNAP and 3Shape's articulators):
@@ -592,14 +629,19 @@ export type HingeFront = { y: number; x: number };
  *   over it. Two bearings far apart cannot rock the way one short one did.
  * - Fitted: `clearance` round the axle (0.15 mm by default), 0.2 mm along it, and an opening
  *   0.8 mm narrower than the axle, so the clip holds the axle and only turns on it.
- * - An incisal stop at `front`: a post down from the upper onto one up from the lower, standing
+ * - An incisal stop at `front`: a pin down from the upper onto a table up from the lower, standing
  *   clear in front of the model and meeting in the occlusal plane, so the models close to the
  *   scanned bite every time and the stop, not the teeth, takes the load.
+ * - Build 60: `motion` adds a protrusion path, a raised pin and a sloped guide table (HingeMotion).
  * A bar along the back of each base joins its parts to it.
  */
-export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number, xMax: number, floorUpper: number, floorLower: number, clearance = HINGE_CLEARANCE, front: HingeFront | null = null) {
+export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number, xMax: number, floorUpper: number, floorLower: number, clearance = HINGE_CLEARANCE, front: HingeFront | null = null, motion: HingeMotion = {}) {
   const r = HINGE_AXLE_RADIUS, bore = r + Math.max(0.05, clearance);
-  const ay = back + 6;
+  const angle = Math.max(0, Math.min(60, motion.condyle ?? 0)) * deg;
+  const path = angle > 0 ? HINGE_PATH_LENGTH : 0;
+  // The slot runs forward and down from the axle's place in the bite.
+  const dy = -path * Math.cos(angle), dz = -path * Math.sin(angle);
+  const ay = hingeAxleY(back, motion);
   const known = Number.isFinite(xMin) && Number.isFinite(xMax);
   const cx = known ? (xMin + xMax) / 2 : 0;
   const half = Math.max(14, known ? (xMax - xMin) / 2 : 14);
@@ -609,39 +651,81 @@ export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number,
   const keep = <T extends ManifoldSolid>(solid: T) => { made.push(solid); return solid; };
   const clipHalf = 4.8;
   const postIn = clipHalf + HINGE_END_PLAY, postOut = postIn + 4.5;
-  const lowerParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, back - 4, back + 10, floorLower, floorLower + 4))];
-  const upperParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, back - 4, back + 10, floorUpper - 4, floorUpper))];
+  // The bearing block: 4 mm round the axle behind it, and round the whole slot in front.
+  const yBack = ay + 4, yFront = back + 2;
+  const clipBottom = dz - (bore + 1.8);
+  const lowerParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, back - 4, yBack, floorLower, floorLower + 4))];
+  const upperParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, back - 4, yBack, floorUpper - 4, floorUpper))];
   const cuts: ManifoldSolid[] = [];
   for (const c of centres) {
     lowerParts.push(
-      keep(box(runtime, c - postOut, c - postIn, back + 2, back + 10, floorLower, r + 2.5)),
-      keep(box(runtime, c + postIn, c + postOut, back + 2, back + 10, floorLower, r + 2.5)),
+      keep(box(runtime, c - postOut, c - postIn, yFront, yBack, floorLower, r + 2.5)),
+      keep(box(runtime, c + postIn, c + postOut, yFront, yBack, floorLower, r + 2.5)),
       keep(axleAlongX(runtime, r, c - postOut, c + postOut, ay, 0)),
     );
-    upperParts.push(keep(box(runtime, c - clipHalf, c + clipHalf, back + 2, back + 10, -(bore + 1.8), floorUpper)));
-    cuts.push(
-      keep(axleAlongX(runtime, bore, c - clipHalf - 1, c + clipHalf + 1, ay, 0)),
-      keep(box(runtime, c - clipHalf - 1, c + clipHalf + 1, ay - (r - HINGE_SNAP / 2), ay + (r - HINGE_SNAP / 2), -(bore + 3), 0)),
-    );
+    upperParts.push(keep(box(runtime, c - clipHalf, c + clipHalf, yFront, yBack, clipBottom, floorUpper)));
+    const bores = keep(axleAlongX(runtime, bore, c - clipHalf - 1, c + clipHalf + 1, ay, 0));
+    if (path > 0) {
+      const end = keep(axleAlongX(runtime, bore, c - clipHalf - 1, c + clipHalf + 1, ay + dy, dz));
+      cuts.push(keep(runtime.Manifold.hull([bores, end])));
+    } else cuts.push(bores);
+    // The way in for the axle, under its place in the bite.
+    cuts.push(keep(box(runtime, c - clipHalf - 1, c + clipHalf + 1, ay - (r - HINGE_SNAP / 2), ay + (r - HINGE_SNAP / 2), clipBottom - 1, 0)));
   }
   if (front) {
     // The stop: 6 mm posts standing clear in front of the model (2 to 8 mm out), meeting in the
-    // occlusal plane, each joined to its base only through the base's bottom 4 mm - never near the teeth.
+    // occlusal plane - or `pinRaise` above it - each joined to its base only through the base's
+    // bottom 4 mm, never near the teeth.
     const y0 = front.y - 8, y1 = front.y - 2;
-    lowerParts.push(
-      keep(box(runtime, front.x - 3, front.x + 3, y0, y1, floorLower, 0)),
-      keep(box(runtime, front.x - 3, front.x + 3, y0, front.y + 3, floorLower, floorLower + 4)),
-    );
-    upperParts.push(
-      keep(box(runtime, front.x - 3, front.x + 3, y0, y1, 0, floorUpper)),
-      keep(box(runtime, front.x - 3, front.x + 3, y0, front.y + 3, floorUpper - 4, floorUpper)),
-    );
+    const raise = Math.max(0, Math.min(5, motion.pinRaise ?? 0));
+    const x0 = front.x - 3, x1 = front.x + 3;
+    if (motion.table === "guide") {
+      // The table rises towards the back; the pin's tip is its front edge, its underside cut back
+      // steeper than the table so only the tip touches as it rides up.
+      const rise = Math.tan(INCISAL_TABLE_ANGLE * deg), relief = Math.tan((INCISAL_TABLE_ANGLE + 8) * deg);
+      lowerParts.push(keep(prismAlongX(runtime, [[y0, floorLower], [y1, floorLower], [y1, raise + (y1 - y0) * rise], [y0, raise]], x0, x1)));
+      upperParts.push(keep(prismAlongX(runtime, [[y0, raise], [y1, raise + (y1 - y0) * relief], [y1, floorUpper], [y0, floorUpper]], x0, x1)));
+    } else {
+      lowerParts.push(keep(box(runtime, x0, x1, y0, y1, floorLower, raise)));
+      upperParts.push(keep(box(runtime, x0, x1, y0, y1, raise, floorUpper)));
+    }
+    lowerParts.push(keep(box(runtime, x0, x1, y0, front.y + 3, floorLower, floorLower + 4)));
+    upperParts.push(keep(box(runtime, x0, x1, y0, front.y + 3, floorUpper - 4, floorUpper)));
   }
   const lower = runtime.Manifold.union(lowerParts);
   const joined = keep(runtime.Manifold.union(upperParts));
   const upper = runtime.Manifold.difference(joined, runtime.Manifold.union(cuts));
   made.forEach((solid) => solid.delete());
-  return { upper, lower };
+  return { upper, lower, axleY: ay };
+}
+
+/**
+ * Build 60: how far a printed articulator opens, degrees - the upper turned up about the axle
+ * (y = `axleY`, z = 0) until it meets the lower. Checked every 5 degrees up to `limit`.
+ */
+export function hingeOpening(runtime: ManifoldRuntime, upper: ManifoldSolid, lower: ManifoldSolid, axleY: number, limit = 90): number {
+  const meets = (degrees: number) => {
+    const turned = upper.translate([0, -axleY, 0]).rotate([-degrees, 0, 0]);
+    const placed = turned.translate([0, axleY, 0]);
+    turned.delete();
+    const overlap = runtime.Manifold.intersection(placed, lower);
+    const volume = overlap.volume();
+    overlap.delete();
+    placed.delete();
+    return volume > 0.5;
+  };
+  // Coarse first, then to the nearest 5 degrees.
+  let open = 0;
+  for (const step of [30, 60, 90]) {
+    if (step > limit) break;
+    if (meets(step)) break;
+    open = step;
+  }
+  for (let a = open + 5; a <= Math.min(limit, open + 25); a += 5) {
+    if (meets(a)) break;
+    open = a;
+  }
+  return open;
 }
 
 // ---------------------------------------------------------------------------------------------

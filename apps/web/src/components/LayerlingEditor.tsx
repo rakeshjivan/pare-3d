@@ -127,6 +127,7 @@ import { addFreehandStroke } from "@/lib/freehandStroke";
 import { placeCustomShape } from "@/lib/customShapePackage";
 import { buildReadyPart } from "@/lib/readyPartsBuild";
 import { mouseEarsPart, type ReadyPart } from "@/lib/readyParts";
+import { hingeFitTestParts } from "@/lib/hingeFitTest";
 import { MOUSE_EARS_EVENT, type MouseEarsRequest } from "./workplane/MouseEarsCard";
 import { CUT_CONNECTOR_LIMITS, DEFAULT_CUT_CONNECTORS, normalizeCutConnectors, type CutConnectorOptions } from "@/lib/cutConnectors";
 import { NO_SPLIT_ROTATION, modelSplitPlane, snapSplitPositionToVertices, splitOrientationForNormal, splitAxisFromLabel, splitAxisLabel, splitRotationAxes, type SplitRotation } from "@/lib/modelSplit";
@@ -9297,7 +9298,9 @@ export function LayerlingEditor({
         const kind = t(state.options.inside === "solid" ? "dental.doneSolid" : state.options.inside === "open" ? "dental.doneHollow" : "dental.doneClosed", { wall: state.options.wall.toFixed(1) });
         commitShapes(next, [...made.keys()], t(result.parts.length > 1 ? "dental.donePair" : "dental.done", { height: heights, kind }));
         setMeshCheck(null);
-        const notes = result.warnings.map((warning) => t(({ edge: "dental.warn.edge", vents: "dental.warn.vents", apart: "dental.warn.apart", teeth: "dental.warn.teeth" } as const)[warning as "edge"] ?? "dental.warn.label"));
+        const notes = result.warnings.map((warning) => t(({ edge: "dental.warn.edge", vents: "dental.warn.vents", apart: "dental.warn.apart", teeth: "dental.warn.teeth", opening: "dental.warn.opening" } as const)[warning as "edge"] ?? "dental.warn.label"));
+        // Build 60: how far the printed articulator opens.
+        if (result.opening !== undefined && result.opening >= 30) notes.push(t(result.opening >= 90 ? "dental.opensFully" : "dental.opens", { angle: result.opening }));
         if (notes.length) setNotice(`${t(result.parts.length > 1 ? "dental.donePair" : "dental.done", { height: heights, kind })} ${notes.join(" ")}`);
         setDentalStudio(null);
       } catch (error) {
@@ -15185,6 +15188,14 @@ export function LayerlingEditor({
           onAdvancedChange={(advanced) => setDentalStudio((current) => current ? { ...current, advanced } : current)}
           onApply={applyDentalStudio}
           onImport={() => fileInputRef.current?.click()}
+          onHingeTest={() => {
+            // In front of what is on the plate (the scans), not on top of it: the test is 112 x 34 mm,
+            // so on most plates it fits beside a pair this way.
+            const origin = placementWorkplaneRef.current.origin;
+            const edge = shapesRef.current.filter((shape) => !shape.hidden).reduce((least, shape) => Math.min(least, shape.z - Math.max(shape.width, shape.depth) / 2), Infinity);
+            const at = Number.isFinite(edge) ? { ...origin, z: edge - 24 } : undefined;
+            void insertReadyParts(hingeFitTestParts({ strip: t("hingeTest.strip"), clip: t("hingeTest.clip") }), at ? { at } : {});
+          }}
           onCancel={() => { stopDentalTrim(); setDentalStudio((current) => (current?.stage === "making" || current?.stage === "trimming" ? current : null)); }}
         />
       ) : null}

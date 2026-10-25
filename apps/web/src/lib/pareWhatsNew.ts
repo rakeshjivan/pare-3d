@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 60,
+    items: [
+      "Hinge fit test: Dental Studio's articulator bearing printed small, once for each fit (0.1 to 0.3 mm). Snap each clip onto its axle, pick the tightest that turns without play, and Dental Studio uses that fit from then on. It is under Ready-made parts, and one click away from Hinge fit in Dental Studio.",
+      "Protrusion path: the printed articulator can let the lower slide forward along a condylar path, 15 to 45 degrees below the occlusal plane, to check protrusive contacts. Off by default, so the hinge stays a plain hinge with no play.",
+      "Incisal pin: raise it 0.5 to 3 mm to hold the models open at the front, and choose a flat table or a 30-degree guide table that parts the models as the lower slides forward.",
+      "After making an articulated pair, Dental Studio says how far it opens, and warns if the models would meet before 30 degrees.",
+    ],
+  },
+  {
     build: 59,
     items: [
       "Dental Studio is laid out as four numbered steps - Add the scans, Check the teeth, Choose the model, Articulator - each with one line saying what to do, a tick when it is done, and a line above the button saying what comes next.",

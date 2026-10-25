@@ -424,3 +424,74 @@ describe("Build 58: the hinge sits on two wide bearings, fits close and stops at
     [tight.upper, tight.lower, loose.upper, loose.lower].forEach((s) => s.delete());
   });
 });
+
+describe("Build 60: protrusion path, incisal pin and guide table, opening check", () => {
+  let runtime: ManifoldToplevel;
+  beforeAll(async () => {
+    runtime = await manifoldModule();
+    runtime.setup();
+  });
+  /** Whether `solid` has material in a 0.4 mm cube round (x, y, z). */
+  const filled = (solid: { volume: () => number }, x: number, y: number, z: number) => {
+    const probe = runtime.Manifold.cube([0.4, 0.4, 0.4], true).translate([x, y, z]);
+    const piece = runtime.Manifold.intersection(solid as never, probe);
+    const v = piece.volume();
+    piece.delete(); probe.delete();
+    return v > 0.03;
+  };
+  it("opens the clip into a slot along the condylar path, and keeps a plain hinge a round bore", async () => {
+    const { hingeParts, hingeAxleY, HINGE_PATH_LENGTH } = await import("@/lib/dentalBase");
+    const plain = hingeParts(runtime, 25, -25, 25, 20, -20);
+    const path = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, null, { condyle: 30 });
+    const ay = hingeAxleY(25, { condyle: 30 });
+    expect(path.axleY).toBeCloseTo(ay, 6);
+    expect(plain.axleY).toBeCloseTo(31, 6);
+    // The far end of the path, in the upper's clip: open with the path, solid without it.
+    const c = -25 + 9.5;
+    const ey = ay - HINGE_PATH_LENGTH * Math.cos(Math.PI / 6), ez = -HINGE_PATH_LENGTH * Math.sin(Math.PI / 6);
+    expect(filled(path.upper, c, ey, ez)).toBe(false);
+    expect(filled(plain.upper, c, plain.axleY - HINGE_PATH_LENGTH * Math.cos(Math.PI / 6), ez)).toBe(true);
+    // Still a clip round the slot: material under it and the halves never overlap.
+    expect(filled(path.upper, c, ey, ez - 2.15 - 1)).toBe(true);
+    const overlap = runtime.Manifold.intersection(path.upper, path.lower);
+    expect(overlap.volume()).toBeLessThan(0.01);
+    overlap.delete();
+    [plain.upper, plain.lower, path.upper, path.lower].forEach((s) => s.delete());
+  });
+
+  it("raises the incisal pin and slopes the guide table up towards the back", async () => {
+    const { hingeParts } = await import("@/lib/dentalBase");
+    const raised = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { y: -30, x: 0 }, { pinRaise: 2 });
+    const guide = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { y: -30, x: 0 }, { table: "guide" });
+    const top = (solid: typeof raised.lower, y: number) => {
+      const piece = runtime.Manifold.intersection(solid, runtime.Manifold.cube([2, 0.4, 60]).translate([-1, y - 0.2, -30]));
+      const b = piece.boundingBox();
+      piece.delete();
+      return b;
+    };
+    // The pin meets the table 2 mm up.
+    expect(top(raised.lower, -35).max[2]).toBeCloseTo(2, 4);
+    expect(top(raised.upper, -35).min[2]).toBeCloseTo(2, 4);
+    // The table: level with the bite at its front edge, 30 degrees up towards the back.
+    expect(top(guide.lower, -37.6).max[2]).toBeLessThan(0.5);
+    expect(top(guide.lower, -32.4).max[2]).toBeGreaterThan(2.5);
+    // The pin touches only at its front edge: clear of the table everywhere behind it.
+    const overlap = runtime.Manifold.intersection(guide.upper, guide.lower);
+    expect(overlap.volume()).toBeLessThan(0.01);
+    overlap.delete();
+    [raised.upper, raised.lower, guide.upper, guide.lower].forEach((s) => s.delete());
+  });
+
+  it("finds how far the hinge opens before the parts meet", async () => {
+    const { hingeParts, hingeOpening } = await import("@/lib/dentalBase");
+    const parts = hingeParts(runtime, 25, -25, 25, 20, -20);
+    expect(hingeOpening(runtime, parts.upper, parts.lower, parts.axleY)).toBe(90);
+    // A wall behind the axle on the lower, standing up into the way of the upper's back bar as it turns down.
+    const wall = runtime.Manifold.cube([50, 2, 40]).translate([-25, parts.axleY + 6, -20]);
+    const blocked = runtime.Manifold.union(parts.lower, wall);
+    const angle = hingeOpening(runtime, parts.upper, blocked, parts.axleY);
+    expect(angle).toBeGreaterThan(0);
+    expect(angle).toBeLessThan(90);
+    [parts.upper, parts.lower, wall, blocked].forEach((s) => s.delete());
+  });
+});

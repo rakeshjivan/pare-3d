@@ -1708,3 +1708,11 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 .swatch-picture { background: linear-gradient(135deg, #5f6a76 0 35%, #c3cbd3 35% 65%, #8c97a3 65%); }
 .surface-texture-picture { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
 .surface-texture-picture button { display: inline-flex; align-items: center; gap: 6px; }
+/* Build 60: the articulator's settings, and the hinge fit test link. */
+.dental-studio-panel .dental-hinge-options { display: grid; gap: 6px; margin: 0 0 8px 22px; }
+.dental-studio-panel .dental-hinge-options .dental-label-field { grid-template-columns: 110px 1fr; margin: 0; }
+.dental-studio-panel .dental-hinge-options select { min-width: 0; padding: 4px 6px; border: 1px solid var(--border, #d4dae3); border-radius: 6px; background: var(--background, #fff); color: inherit; font-size: 12.5px; }
+.dental-studio-panel .dental-hinge-test { margin: 0; }
+.dental-studio-panel .link-button { padding: 0; border: none; background: none; color: var(--primary, #1662b3); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.dental-studio-panel .link-button:disabled { opacity: 0.5; cursor: default; }
+html[data-theme="dark"] .dental-studio-panel .dental-hinge-options select { background: #1a1f26; }

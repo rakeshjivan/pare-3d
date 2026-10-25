@@ -1,6 +1,7 @@
 "use client";
 
-import { HINGE_CLEARANCE, HINGE_FITS } from "@/lib/dentalBase";
+import { HINGE_CLEARANCE, HINGE_CONDYLE_ANGLES, HINGE_FITS, INCISAL_PIN_RAISES } from "@/lib/dentalBase";
+import { readMyHingeFit, saveMyHingeFit } from "@/lib/hingeFitTest";
 
 import { ArrowLeftRight, Check, ChevronDown, LoaderCircle, Upload, X } from "lucide-react";
 import { useState } from "react";
@@ -81,6 +82,7 @@ export function DentalStudioPanel({
   onAdvancedChange,
   onApply,
   onImport,
+  onHingeTest,
   onCancel,
 }: {
   parts: DentalPartChoice[];
@@ -111,6 +113,8 @@ export function DentalStudioPanel({
   onAdvancedChange: (open: boolean) => void;
   onApply: () => void;
   onImport: () => void;
+  /** Build 60: put the hinge fit test in the design. */
+  onHingeTest?: () => void;
   onCancel: () => void;
 }) {
   useLanguage();
@@ -349,23 +353,52 @@ export function DentalStudioPanel({
         {pair ? (
           <>
             <label className="edge-modifier-check dental-hinge-check" title={t("dental.hingeHint")}>
-              <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => onOptionsChange({ hinge: event.currentTarget.checked })} />
+              <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => {
+                const on = event.currentTarget.checked;
+                // Build 60: the fit found with the hinge fit test, once there is one.
+                const mine = readMyHingeFit();
+                onOptionsChange({ hinge: on, ...(on && options.hingeFit === undefined && mine !== null ? { hingeFit: mine } : {}) });
+              }} />
               <span>{t("dental.hinge")}</span>
             </label>
             {options.hinge ? (
-              <>
-                {/* Fork (build 58): how tight the hinge turns, and the stop that sets the bite. */}
+              <div className="dental-hinge-options">
+                {/* Fork (build 58): how tight the hinge turns; build 60: and a test to find it. */}
                 <label className="dental-label-field" title={t("dental.hingeFitHint")}>
                   <span>{t("dental.hingeFit")}</span>
-                  <select value={options.hingeFit ?? HINGE_CLEARANCE} disabled={busy} onChange={(event) => onOptionsChange({ hingeFit: Number(event.currentTarget.value) })}>
+                  <select value={options.hingeFit ?? HINGE_CLEARANCE} disabled={busy} onChange={(event) => { const fit = Number(event.currentTarget.value); saveMyHingeFit(fit); onOptionsChange({ hingeFit: fit }); }}>
                     {HINGE_FITS.map((fit) => <option key={fit} value={fit}>{t(fit === HINGE_CLEARANCE ? "dental.hingeFitDefault" : "dental.hingeFitOption", { fit: fit.toFixed(2) })}</option>)}
                   </select>
                 </label>
+                {onHingeTest ? (
+                  <p className="blend-hint dental-hinge-test">
+                    {t("dental.hingeTestHint")}{" "}
+                    <button type="button" className="link-button" disabled={busy} onClick={onHingeTest}>{t("dental.hingeTest")}</button>
+                  </p>
+                ) : null}
+                <label className="dental-label-field" title={t("dental.condyleHint")}>
+                  <span>{t("dental.condyle")}</span>
+                  <select value={options.condyle ?? 0} disabled={busy} onChange={(event) => onOptionsChange({ condyle: Number(event.currentTarget.value) })}>
+                    {HINGE_CONDYLE_ANGLES.map((angle) => <option key={angle} value={angle}>{angle === 0 ? t("dental.condyleOff") : t("dental.condyleOption", { angle })}</option>)}
+                  </select>
+                </label>
+                {(options.condyle ?? 0) > 0 ? <p className="blend-hint">{t("dental.condyleHint")}</p> : null}
                 <label className="edge-modifier-check" title={t("dental.incisalStopHint")}>
                   <input type="checkbox" checked={options.incisalStop !== false} disabled={busy} onChange={(event) => onOptionsChange({ incisalStop: event.currentTarget.checked })} />
                   <span>{t("dental.incisalStop")}</span>
                 </label>
-              </>
+                {options.incisalStop !== false ? (
+                  <>
+                    <label className="dental-label-field" title={t("dental.pinRaiseHint")}>
+                      <span>{t("dental.pinRaise")}</span>
+                      <select value={options.pinRaise ?? 0} disabled={busy} onChange={(event) => onOptionsChange({ pinRaise: Number(event.currentTarget.value) })}>
+                        {INCISAL_PIN_RAISES.map((mm) => <option key={mm} value={mm}>{mm === 0 ? t("dental.pinRaiseZero") : t("dental.pinRaiseOption", { mm })}</option>)}
+                      </select>
+                    </label>
+                    {choice(t("dental.incisalTable"), options.incisalTable ?? "flat", [["flat", t("dental.incisalTableFlat")], ["guide", t("dental.incisalTableGuide")]], (incisalTable) => onOptionsChange({ incisalTable }), t("dental.incisalTableHint"))}
+                  </>
+                ) : null}
+              </div>
             ) : null}
             {choice(t("dental.layout"), options.layout, [["print", t("dental.layoutPrint")], ["occlusion", t("dental.layoutOcclusion")]], (layout) => onOptionsChange({ layout }))}
           </>

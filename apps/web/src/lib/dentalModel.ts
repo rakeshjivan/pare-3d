@@ -16,7 +16,7 @@
 import * as THREE from "three";
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
 import { alignToBite, archFrame, canineWidth, cleanScan, frontOf, isPartialArch, marginUp, pairFrame, palateScore, type CleanArch, type CleanReport } from "@/lib/dentalArch";
-import { blockOutline, cleanOutline, closeToFloor, distanceFrom, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, hingeParts, HINGE_CLEARANCE, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
+import { blockOutline, cleanOutline, closeToFloor, distanceFrom, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, hingeOpening, hingeParts, HINGE_CLEARANCE, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
 import {
   applyMatrix, boundaryLoops, cloneMesh, convexHull, cutAlongField, cutBelow, dropFragments, smoothField, faceArea, loopLength, surfaceKept, pinchedEdges, PointGrid, solidPositions, toManifold, upwardness, weld,
@@ -71,6 +71,12 @@ export type DentalStudioOptions = {
   hingeFit?: number;
   /** Build 58: the stop at the front that sets the closed bite; on when left out. */
   incisalStop?: boolean;
+  /** Build 60: the protrusion path, degrees (HINGE_CONDYLE_ANGLES); 0 or left out for a plain hinge. */
+  condyle?: number;
+  /** Build 60: the incisal pin raised this much, mm (INCISAL_PIN_RAISES); 0 when left out. */
+  pinRaise?: number;
+  /** Build 60: a flat incisal table, or one sloped as a guide; flat when left out. */
+  incisalTable?: "flat" | "guide";
   /** A pair only: laid out base-down for printing, or upper on lower in occlusion. */
   layout: "print" | "occlusion";
   /** Engraved on the base; U or L goes in front for a pair. Empty for none. */
@@ -98,7 +104,7 @@ const SMOOTH_ROUNDS: Record<DentalSmooth, number> = { off: 0, low: 3, high: 10 }
 
 export type DentalPart = { id: string; role: DentalRole; positions: Float32Array; height: number; volume: number };
 /** `surface`: per part, the share of the scan's surface kept above each depth (mm below the occlusal plane). */
-export type DentalStudioResult = { parts: DentalPart[]; worn: number; keptDepth: number[]; voxel: number | null; warnings: string[]; surface: Array<Record<number, number>> };
+export type DentalStudioResult = { parts: DentalPart[]; worn: number; keptDepth: number[]; voxel: number | null; warnings: string[]; surface: Array<Record<number, number>>; /** Build 60: how far the printed articulator opens, degrees. */ opening?: number };
 
 /** Whether a mesh looks like a raw scan: an open surface with one long open edge. */
 export function looksLikeDentalScan(positions: ArrayLike<number>): boolean {
@@ -634,6 +640,7 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
   const warnings = [...new Set([...(apart ? ["apart"] : []), ...built.flatMap(({ built: b }) => b.warnings)])];
   const voxel = built.find(({ built: b }) => b.voxel !== null)?.built.voxel ?? null;
   const toFree: ManifoldSolid[] = [];
+  let opening: number | undefined;
   let solids = built.map(({ arch, built: b }) => {
     if (!pair || arch.role === "lower") return b.solid;
     const moved = transformSolid(b.solid, FLIP);
@@ -653,13 +660,18 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
     let fMin = Infinity, fMax = -Infinity;
     rings.forEach((ring) => ring.forEach(([x, y]) => { if (y < front + 4) { fMin = Math.min(fMin, x); fMax = Math.max(fMax, x); } }));
     const stop = options.incisalStop !== false && Number.isFinite(front) && Number.isFinite(fMin) ? { y: front, x: (fMin + fMax) / 2 } : null;
-    const parts = hingeParts(runtime, back, xMin, xMax, depth, -depth, options.hingeFit ?? HINGE_CLEARANCE, stop);
+    const motion = { condyle: options.condyle ?? 0, pinRaise: options.pinRaise ?? 0, table: options.incisalTable ?? "flat" } as const;
+    const parts = hingeParts(runtime, back, xMin, xMax, depth, -depth, options.hingeFit ?? HINGE_CLEARANCE, stop, motion);
     solids = built.map(({ arch }, i) => {
       const joined = runtime.Manifold.union(solids[i], arch.role === "upper" ? parts.upper : parts.lower);
       toFree.push(solids[i]);
       return joined;
     });
     toFree.push(parts.upper, parts.lower);
+    // Build 60: how far it opens, the whole models turned on the axle.
+    const upperIndex = built.findIndex(({ arch }) => arch.role === "upper");
+    opening = hingeOpening(runtime, solids[upperIndex], solids[1 - upperIndex], parts.axleY);
+    if (opening < 30) warnings.push("opening");
   }
   // Lay out: base down on the plate, the upper turned over beside the lower; or upper on lower.
   const out: DentalPart[] = [];
@@ -703,5 +715,6 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
     surface: built.map(({ built: b }) => b.kept),
     voxel,
     warnings,
+    ...(opening !== undefined ? { opening } : {}),
   };
 }

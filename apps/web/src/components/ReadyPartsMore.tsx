@@ -5,6 +5,8 @@ import { t } from "@/lib/i18n";
 import { MmField } from "@/components/ReadyPartsSection";
 import { EnclosurePartIcon, FitTestPartIcon } from "@/components/readyPartIcons";
 import { FIT_TEST_CLEARANCES, fitTestParts, readMyPrintFit, saveMyPrintFit } from "@/lib/fitTest";
+import { hingeFitTestParts, readMyHingeFit, saveMyHingeFit } from "@/lib/hingeFitTest";
+import { HINGE_FITS } from "@/lib/dentalBase";
 import { DEFAULT_ENCLOSURE, enclosureParts, normalizeEnclosure, PORT_SIZES, type EnclosureOptions, type EnclosurePort, type EnclosureSide, type PortPreset } from "@/lib/enclosure";
 import { METRIC_SIZES, type MetricSize, type ReadyPart } from "@/lib/readyParts";
 
@@ -50,6 +52,43 @@ export function FitTestCard({ onInsert }: { onInsert: Insert }) {
             ))}
           </div>
           {mine !== null ? <p className="ready-part-note">{t("fitTest.saved", { mm: String(mine) })}</p> : null}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/** Fork (build 60): the hinge fit test - the dental articulator's bearing, once for each fit. */
+export function HingeFitTestCard({ onInsert }: { onInsert: Insert }) {
+  const [open, setOpen] = useState(false);
+  const [mine, setMine] = useState<number | null>(() => (typeof window === "undefined" ? null : readMyHingeFit()));
+  return (
+    <>
+      <div className="ready-part ready-part-box" data-ready-part="hinge-test">
+        <FitTestPartIcon />
+        <div>
+          <strong>{t("hingeTest.title")}</strong>
+          <span>{t("hingeTest.hint")}</span>
+        </div>
+        <button type="button" className="ready-part-add" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? t("readyParts.hide") : t("readyParts.setUp")}
+        </button>
+      </div>
+      {open ? (
+        <div className="ready-part-form">
+          <p>{t("hingeTest.steps")}</p>
+          <button type="button" className="ready-part-make" onClick={() => onInsert(hingeFitTestParts({ strip: t("hingeTest.strip"), clip: t("hingeTest.clip") }))}>
+            {t("hingeTest.make")}
+          </button>
+          <div className="ready-part-fit" role="group" aria-label={t("hingeTest.which")}>
+            <span>{t("hingeTest.which")}</span>
+            {HINGE_FITS.map((fit) => (
+              <button type="button" key={fit} className={mine === fit ? "active" : ""} aria-pressed={mine === fit} onClick={() => { saveMyHingeFit(fit); setMine(fit); }}>
+                {fit.toFixed(2)}
+              </button>
+            ))}
+          </div>
+          {mine !== null ? <p className="ready-part-note">{t("hingeTest.saved", { mm: mine.toFixed(2) })}</p> : null}
         </div>
       ) : null}
     </>
