@@ -34,7 +34,8 @@ import { canApplySketchCornerTreatment } from "@/lib/sketchFilletChamfer";
 import {
   SKETCH_POLYGON_DEFAULT_SIDES, SKETCH_STAR_DEFAULT_INNER_PERCENT, sketchPrimitiveGeometry
 } from "@/lib/sketchPrimitives";
-import { alignedSmoothHandles, cloneSketchProfile, orderedSketchPaths, withSegmentHandles, withSmoothSketchHandles } from "@/lib/sketchSmoothHandles";
+import { alignedSmoothHandles, cloneSketchProfile, orderedSketchPaths, sketchWithPointMode, withSegmentHandles, withSmoothSketchHandles } from "@/lib/sketchSmoothHandles";
+import { curveThroughPoints } from "@/lib/sketchCurveThroughPoints";
 import { changesLockedOutline, setSketchPointsLocked, sketchLockState } from "@/lib/sketchLock";
 import { curveSketchSegment, isSegmentCurved, straightenSketchSegment } from "@/lib/sketchSegmentCurve";
 import { chordHandles, withBezierHandles, withBezierStartHandle } from "@/lib/sketchBezierHandles";
@@ -4806,33 +4807,6 @@ export function LayerlingEditor({
     commitSketchProfile(next, t("status.sketchHandleAdjusted"), keyRunKey);
   }, [commitSketchProfile, sketchProfile]);
 
-  /** One point turned corner, smooth or split; null when the point is gone. */
-  const sketchWithPointMode = (profile: SketchProfile, id: string, mode: "corner" | "smooth" | "split"): SketchProfile | null => {
-    let next = cloneSketchProfile(profile);
-    const point = next.points.find((entry) => entry.id === id);
-    if (!point) return null;
-    point.mode = mode;
-    if (mode === "corner") {
-      point.handleIn = undefined;
-      point.handleOut = undefined;
-      next.segments = next.segments.map((segment) => segment.startId === id || segment.endId === id ? { ...segment, kind: "line" } : segment);
-    } else {
-      next.segments = next.segments.map((segment) => segment.startId === id || segment.endId === id ? { ...segment, kind: "bezier" } : segment);
-      // The point's own handles along its neighbours; the segments around it then need the handle at
-      // their other end too, or they would stay straight.
-      // A point that already has two handles keeps their lengths; as a smooth point they are lined up (#347).
-      const aligned = mode === "smooth" ? alignedSmoothHandles(point) : null;
-      if (aligned) {
-        point.handleIn = aligned.handleIn;
-        point.handleOut = aligned.handleOut;
-      } else if (!point.handleIn || !point.handleOut || mode === "smooth") next = withSmoothSketchHandles(next, new Set([id]));
-      next = withSegmentHandles(next, new Set(next.segments.filter((segment) => segment.startId === id || segment.endId === id).map((segment) => segment.id)));
-      const updated = next.points.find((entry) => entry.id === id);
-      if (updated) updated.mode = mode;
-    }
-    return next;
-  };
-
   const setSketchPointMode = useCallback((id: string, mode: "corner" | "smooth" | "split") => {
     const next = sketchWithPointMode(sketchProfile, id, mode);
     if (!next) return;
@@ -4844,6 +4818,12 @@ export function LayerlingEditor({
     let next: SketchProfile | null = null;
     for (const id of ids) next = sketchWithPointMode(next ?? sketchProfile, id, mode) ?? next;
     if (next) commitSketchProfile(next, mode === "corner" ? t("status.sketchMadeCorner") : t("status.sketchMadeSmooth"));
+  }, [commitSketchProfile, sketchProfile]);
+
+  /** Curve through points: one flowing curve from the first selected point to the last, one undo step. */
+  const curveSketchThroughPointsAction = useCallback((ids: string[]) => {
+    const result = curveThroughPoints(sketchProfile, ids);
+    if (result) commitSketchProfile(result.profile, t("status.sketchCurveThroughPoints", { count: result.count }));
   }, [commitSketchProfile, sketchProfile]);
 
   const curveSketchSegmentAction = useCallback((id: string) => {
@@ -14775,6 +14755,7 @@ export function LayerlingEditor({
             onInsertPoint={insertSketchPoint}
             onSetPointMode={setSketchPointMode}
             onSetPointsMode={setSketchPointsMode}
+            onCurveThroughPoints={curveSketchThroughPointsAction}
             onCurveSegment={curveSketchSegmentAction}
             onCurveSegments={curveSketchSegmentsAction}
             onMirror={mirrorSketchSelectionAction}
