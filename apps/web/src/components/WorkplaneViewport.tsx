@@ -116,7 +116,7 @@ import { boundsInsideRect, marqueeMode } from "@/lib/marqueeSelection";
 import { canBeginShapeDrag, handleDimensionLimit, POSITION_TYPED_LIMIT, DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, effectiveViewSettings, viewPixelRatio, normalizeSnapGrid, normalizeWorkspaceSettings, orbitControlsZoomSpeed, readWorkspaceDefault, saveShapeDefaultsForNewDesigns, saveWorkspaceDefault, snapGridForUnits, snapGridStep as snapStep, workplaneSettingsFingerprint, workspaceForUnits, workspaceHydrationSyncDecision, zoomDistanceScale, ZOOM_STEP_IN, ZOOM_STEP_OUT } from "@/lib/workplaneSettings";
 import { withShapeDefaults } from "@/lib/shapeDefaults";
 import { workplaneGridBandWidths, AXIS_ARROW_COLORS, axisArrowLayout, DEFAULT_EDGE_LINE_COLOR, fillLightPosition, keyLightPosition, sceneLightLevels, shadowBlurRadius, workplaneGridLayout, workplaneGridLines, workplaneGridPalette, workplaneLabelLayout, workplaneThemePalette, WORKPLANE_LABEL_ASPECT, WORKPLANE_LINE_ELEVATION, type WorkplaneGridLayout } from "@/lib/workplaneGrid";
-import { cleanNearZero, deformsAboutOrigin, cleanRotationDegrees, isNonSolidShapeKind, mirroredAxisCount, mirrorSign, preservesEdgeTreatmentSize, proportionalResizeScale, resizedImportedCoordinates, resizedImportedMeshPositions, resizedShapeSize, shapeDepth, shapeExtrudeDeformAt, shapeHasExtrudeDeform, shapeHasShapeDeform, shapeHasTaper, shapeSupportsTaper, shapeTaperDimensions, shapeTaperScaleAt, shapeWidth, shapeWithParametricSource } from "@/lib/workplaneShapes";
+import { cleanNearZero, deformsAboutOrigin, cleanRotationDegrees, isNonSolidShape, isNonSolidShapeKind, mirroredAxisCount, mirrorSign, preservesEdgeTreatmentSize, proportionalResizeScale, resizedImportedCoordinates, resizedImportedMeshPositions, resizedShapeSize, shapeDepth, shapeExtrudeDeformAt, shapeHasExtrudeDeform, shapeHasShapeDeform, shapeHasTaper, shapeSupportsTaper, shapeTaperDimensions, shapeTaperScaleAt, shapeWidth, shapeWithParametricSource } from "@/lib/workplaneShapes";
 import { sphereTessellation } from "@/lib/sphereTessellation";
 import { torusTessellation } from "@/lib/torusTessellation";
 import type { LayerlingMcpViewFace } from "@/lib/layerlingMcpProtocol";
@@ -13056,6 +13056,43 @@ function drawnSurfaceBounds(mesh: THREE.Mesh) {
   const box = new THREE.Box3().expandByObject(mesh, true);
   drawnSurfaceBoundsCache.set(mesh, { key, box });
   return box;
+}
+
+/** The box around the bodies with these ids, or null when none of them is drawn. */
+function selectionBounds(state: Pick<ThreeState, "shapeRecords">, ids: readonly string[]) {
+  const bounds = new THREE.Box3();
+  ids.forEach((id) => {
+    const record = state.shapeRecords.get(id);
+    if (record) bounds.expandByObject(record.object);
+  });
+  return bounds.isEmpty() ? null : bounds;
+}
+
+/** Puts the camera on a box at once, from the side it looks from now (the preview picture). */
+function frameBounds(state: ThreeState, bounds: THREE.Box3) {
+  state.cameraTurn = null;
+  const center = bounds.getCenter(new THREE.Vector3());
+  const radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 0.5);
+  const canvas = state.renderer.domElement;
+  const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
+  const offset = state.camera.position.clone().sub(state.controls.target);
+  const direction = offset.lengthSq() > 0 ? offset.clone().normalize() : CAMERA_HOME.clone().sub(CAMERA_TARGET).normalize();
+  if (state.camera instanceof THREE.OrthographicCamera) {
+    const halfHeight = Math.max(0.001, (state.camera.top - state.camera.bottom) / 2);
+    const zoom = orthographicFramingZoom(radius, halfHeight, aspect);
+    const range = orthographicZoomRange(state.camera);
+    if (zoom) state.camera.zoom = clamp(zoom, range.min, range.max);
+    state.camera.position.copy(center).add(direction.multiplyScalar(clamp(offset.length(), CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE)));
+  } else {
+    const distance = clamp(perspectiveFramingDistance(radius, CAMERA_FOV, aspect), CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE);
+    state.camera.position.copy(center).add(direction.multiplyScalar(distance));
+  }
+  state.focusReach = bounds.clone();
+  state.controls.target.copy(center);
+  state.camera.lookAt(center);
+  state.camera.updateProjectionMatrix();
+  state.controls.update();
+  state.needsRender = true;
 }
 
 /** The box round the surfaces drawn for these shapes, in the world; null when none is drawn. */
