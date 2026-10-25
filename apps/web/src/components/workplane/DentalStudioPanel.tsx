@@ -2,7 +2,7 @@
 
 import { HINGE_CLEARANCE, HINGE_FITS } from "@/lib/dentalBase";
 
-import { ArrowLeftRight, Check, ChevronDown, LoaderCircle, Scissors, Upload, X } from "lucide-react";
+import { ArrowLeftRight, Check, ChevronDown, LoaderCircle, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
@@ -158,6 +158,35 @@ export function DentalStudioPanel({
       {info ? <p className="dental-slot-info">{info}</p> : null}
     </div>
   );
+  // Build 59: the next thing to do, said in one line above the button.
+  const nextStep = !slots.upper && !slots.lower
+    ? t("dental.next.import")
+    : stage === "analysing" ? t("dental.next.wait")
+    : stage === "making" ? null
+    : trimming || areaTool ? t("dental.next.editing")
+    : t("dental.next.ready", { button: t(pair ? "dental.applyPair" : "dental.apply") });
+  const scansDone = Boolean(analysis) && Boolean(slots.upper || slots.lower);
+  const baseName = (style: DentalBaseStyle) => t(style === "clean" ? "dental.cleanBase" : style === "follow" ? "dental.follow" : style === "plate" ? "dental.plate" : style === "ortho" ? "dental.orthoBase" : "dental.articulatorBase");
+  const insideName = t(options.inside === "solid" ? "dental.solid" : options.inside === "open" ? "dental.hollowOpen" : "dental.hollowClosed");
+  const step = (number: number, label: string, done: boolean, hint: string | null) => (
+    <div className="dental-step-head">
+      <span className={`dental-step-number ${done ? "done" : ""}`} aria-hidden="true">{done ? <Check size={12} strokeWidth={3} /> : number}</span>
+      <div>
+        <h3 className="dental-step">{label}</h3>
+        {hint ? <p className="dental-step-hint">{hint}</p> : null}
+      </div>
+    </div>
+  );
+  const choice = <T extends string>(label: string, value: T, choices: Array<[T, string]>, onPick: (value: T) => void, title?: string, showLabel = true) => (
+    <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={label} title={title}>
+      {showLabel ? <span className="edge-modifier-label">{label}</span> : null}
+      <div className="shell-opening-options">
+        {choices.map(([option, text]) => (
+          <button key={option} type="button" role="radio" aria-checked={value === option} className={value === option ? "active" : ""} disabled={busy} onClick={() => onPick(option)}>{text}</button>
+        ))}
+      </div>
+    </div>
+  );
   return (
     <MovableToolPanel className="edge-modifier-panel dental-studio-panel" ariaLabel={title}>
       {(handleProps) => (<>
@@ -171,19 +200,23 @@ export function DentalStudioPanel({
           <button type="button" aria-label={t("common.cancel")} onClick={onCancel}><X size={20} /></button>
         </div>
       </div>
-      <h3 className="dental-step">{t("dental.step1")}</h3>
-      <div className="dental-slots">
-        {parts.length === 0 ? <p className="dental-status" role="status">{t("dental.noScans")}</p> : null}
-        <button type="button" className="dental-import" disabled={stage === "making"} onClick={onImport}><Upload size={15} /> {t("dental.import")}</button>
-        {slotRow("upper", t("dental.upper"), archInfo("upper"))}
-        <button type="button" className="dental-swap" title={t("dental.swap")} aria-label={t("dental.swap")} disabled={busy || (!slots.upper && !slots.lower)} onClick={onSwap}><ArrowLeftRight size={15} /></button>
-        {slotRow("lower", t("dental.lower"), archInfo("lower"))}
-        {slotRow("bite", t("dental.bite"), null)}
-        {stage === "analysing" ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.analysing")}</p> : null}
-        {pairLine ? <p className={`dental-status ${pairLine.warn ? "warn" : ""}`} role="status">{pairLine.text}</p> : null}
-      </div>
-      <div className="dental-trim">
-        <h3 className="dental-step">{t("dental.step2")}</h3>
+
+      <section className="dental-section" aria-label={t("dental.step1")}>
+        {step(1, t("dental.step1"), scansDone, t("dental.step1Hint"))}
+        <div className="dental-slots">
+          {parts.length === 0 ? <p className="dental-status" role="status">{t("dental.noScans")}</p> : null}
+          <button type="button" className="dental-import" disabled={stage === "making"} onClick={onImport}><Upload size={15} /> {t("dental.import")}</button>
+          {slotRow("upper", t("dental.upper"), archInfo("upper"))}
+          <button type="button" className="dental-swap" title={t("dental.swap")} aria-label={t("dental.swap")} disabled={busy || (!slots.upper && !slots.lower)} onClick={onSwap}><ArrowLeftRight size={15} /></button>
+          {slotRow("lower", t("dental.lower"), archInfo("lower"))}
+          {slotRow("bite", t("dental.bite"), null)}
+          {stage === "analysing" ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.analysing")}</p> : null}
+          {pairLine ? <p className={`dental-status ${pairLine.warn ? "warn" : ""}`} role="status">{pairLine.text}</p> : null}
+        </div>
+      </section>
+
+      <section className="dental-section dental-trim" aria-label={t("dental.step2")}>
+        {step(2, t("dental.step2"), scansDone && (options.margin ?? "auto") === "auto", null)}
         <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.step2")}>
           {(["auto", "manual"] as const).map((value) => (
             <button key={value} type="button" role="radio" aria-checked={(options.margin ?? "auto") === value} className={(options.margin ?? "auto") === value ? "active" : ""} disabled={busy || Boolean(trimming)} onClick={() => onOptionsChange({ margin: value })}>
@@ -222,147 +255,126 @@ export function DentalStudioPanel({
         </div>
         {areaBusy ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.areaFinding")}</p> : <p className="blend-hint">{t("dental.areaInfo")}</p>}
         </>) : null}
-      </div>
-      <h3 className="dental-step">{t("dental.step3")}</h3>
-      <div className="dental-presets" role="radiogroup" aria-label={t("dental.purpose")}>
-        {([
-          ["study", t("dental.study"), t("dental.studyHint")],
-          ["ortho", t("dental.ortho"), t("dental.orthoHint")],
-          ["aligner", t("dental.aligner"), t("dental.alignerHint")],
-          ["crown", t("dental.crown"), t("dental.crownHint")],
-        ] as const).map(([value, label, hint]) => (
-          <button key={value} type="button" role="radio" aria-checked={preset === value} className={preset === value ? "active" : ""} disabled={busy} onClick={() => onPresetChange(value)}>
-            <strong>{label}</strong>
-            <span>{hint}</span>
-          </button>
-        ))}
-      </div>
-      <p className="blend-hint dental-height">{t("dental.height", { height: height.toFixed(1) })}</p>
-      <button type="button" className={`dental-more ${advanced ? "open" : ""}`} aria-expanded={advanced} onClick={() => onAdvancedChange(!advanced)}>
-        <ChevronDown size={15} /> {t("dental.more")}
-      </button>
-      {advanced ? (
-        <div className="dental-advanced">
-          <label className="edge-modifier-check">
-            <input type="checkbox" checked={following} disabled={busy} onChange={(event) => onOptionsChange({ gum: event.currentTarget.checked ? 3 : null })} />
-            <span>{t("dental.gumFollow")}</span>
-          </label>
-          {following ? (
-            <EdgeModifierSlider label={t("dental.gum")} value={options.gum ?? 3} min={0.5} max={10} step={0.1} coarse={{ step: 0.5, max: 10 }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ gum: value })} />
-          ) : (
-            <>
-              <label className="edge-modifier-check">
-                <input type="checkbox" checked={options.keep === null} disabled={busy} onChange={(event) => onOptionsChange({ keep: event.currentTarget.checked ? null : maxKeep })} />
-                <span>{t("dental.keepAll")}</span>
-              </label>
-              {options.keep !== null ? (
-                <EdgeModifierSlider label={t("dental.keep")} value={keep} min={minKeep} max={maxKeep} step={0.1} coarse={{ step: 0.5, max: maxKeep }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ keep: value })} />
-              ) : null}
-            </>
-          )}
-          <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.smooth")}>
-            <span className="edge-modifier-label">{t("dental.smooth")}</span>
-            <div className="shell-opening-options">
-              {(["off", "low", "high"] as const).map((value) => (
-                <button key={value} type="button" role="radio" aria-checked={(options.smooth ?? "low") === value} className={(options.smooth ?? "low") === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ smooth: value })}>{t(`dental.smooth.${value}`)}</button>
-              ))}
-            </div>
-          </div>
-          <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.baseStyle")}>
-            <span className="edge-modifier-label">{t("dental.baseStyle")}</span>
-            <div className="shell-opening-options">
-              {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
-                <button key={value} type="button" role="radio" aria-checked={options.baseStyle === value} className={options.baseStyle === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ baseStyle: value })}>{label}</button>
-              ))}
-            </div>
-          </div>
-          {options.baseStyle === "clean" || options.baseStyle === "articulator" ? (
-            <>
-              {options.baseStyle === "clean" ? (
-                <label className="edge-modifier-check" title={t("dental.notchesHint")}>
-                  <input type="checkbox" checked={options.notches !== false} disabled={busy} onChange={(event) => onOptionsChange({ notches: event.currentTarget.checked })} />
-                  <span>{t("dental.notches")}</span>
-                </label>
-              ) : <p className="blend-hint">{t("dental.articulatorHint")}</p>}
-              <label className="edge-modifier-check" title={t("dental.tieBarHint")}>
-                <input type="checkbox" checked={Boolean(options.tieBar)} disabled={busy} onChange={(event) => onOptionsChange({ tieBar: event.currentTarget.checked })} />
-                <span>{t("dental.tieBar")}</span>
-              </label>
-            </>
-          ) : null}
-          <EdgeModifierSlider label={t(options.baseStyle === "ortho" ? "dental.orthoHeight" : "dental.base")} value={options.base} min={DENTAL_MIN_BASE} max={DENTAL_MAX_BASE} step={0.5} coarse={{ step: 0.5, max: 20 }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ base: value })} />
-          {options.baseStyle !== "ortho" ? (
-            <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.basePresets")} title={t("dental.basePresetsHint")}>
-              <span className="edge-modifier-label">{t("dental.basePresets")}</span>
-              <div className="shell-opening-options">
-                {[3, 5, 10, 15].map((value) => (
-                  <button key={value} type="button" role="radio" aria-checked={Math.abs(options.base - value) < 1e-6} className={Math.abs(options.base - value) < 1e-6 ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ base: value })}>{`${value} mm`}</button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.inside")}>
-            <span className="edge-modifier-label">{t("dental.inside")}</span>
-            <div className="shell-opening-options">
-              {([["solid", t("dental.solid")], ["open", t("dental.hollowOpen")], ["closed", t("dental.hollowClosed")]] as Array<[DentalInside, string]>).map(([value, label]) => (
-                <button key={value} type="button" role="radio" aria-checked={options.inside === value} className={options.inside === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ inside: value })}>{label}</button>
-              ))}
-            </div>
-          </div>
-          {options.inside !== "solid" ? (
-            <>
-              <EdgeModifierSlider label={t("dental.wall")} value={options.wall} min={DENTAL_MIN_WALL} max={DENTAL_MAX_WALL} step={0.1} coarse={{ step: 0.5, max: DENTAL_MAX_WALL }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ wall: value })} />
-              <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.infill")} title={t("dental.infillHint")}>
-                <span className="edge-modifier-label">{t("dental.infill")}</span>
-                <div className="shell-opening-options">
-                  {([["none", t("dental.infillNone")], ["base", t("dental.infillBase")], ["honeycomb", t("dental.infillFull")]] as Array<[DentalInfill, string]>).map(([value, label]) => (
-                    <button key={value} type="button" role="radio" aria-checked={(options.infill ?? "honeycomb") === value} className={(options.infill ?? "honeycomb") === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ infill: value })}>{label}</button>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : null}
-          {pair ? (
-            <>
-              <label className="edge-modifier-check" title={t("dental.hingeHint")}>
-                <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => onOptionsChange({ hinge: event.currentTarget.checked })} />
-                <span>{t("dental.hinge")}</span>
-              </label>
-              {options.hinge ? (
-                <>
-                  {/* Fork (build 58): how tight the hinge turns, and the stop that sets the bite. */}
-                  <label className="dental-label-field" title={t("dental.hingeFitHint")}>
-                    <span>{t("dental.hingeFit")}</span>
-                    <select value={options.hingeFit ?? HINGE_CLEARANCE} disabled={busy} onChange={(event) => onOptionsChange({ hingeFit: Number(event.currentTarget.value) })}>
-                      {HINGE_FITS.map((fit) => <option key={fit} value={fit}>{t(fit === HINGE_CLEARANCE ? "dental.hingeFitDefault" : "dental.hingeFitOption", { fit: fit.toFixed(2) })}</option>)}
-                    </select>
-                  </label>
-                  <label className="edge-modifier-check" title={t("dental.incisalStopHint")}>
-                    <input type="checkbox" checked={options.incisalStop !== false} disabled={busy} onChange={(event) => onOptionsChange({ incisalStop: event.currentTarget.checked })} />
-                    <span>{t("dental.incisalStop")}</span>
-                  </label>
-                </>
-              ) : null}
-              <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.layout")}>
-                <span className="edge-modifier-label">{t("dental.layout")}</span>
-                <div className="shell-opening-options">
-                  {([["print", t("dental.layoutPrint")], ["occlusion", t("dental.layoutOcclusion")]] as const).map(([value, label]) => (
-                    <button key={value} type="button" role="radio" aria-checked={options.layout === value} className={options.layout === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ layout: value })}>{label}</button>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : null}
-          <label className="dental-label-field">
-            <span>{t("dental.label")}</span>
-            <input type="text" maxLength={24} value={options.label} placeholder={t("dental.labelPlaceholder")} disabled={busy} onChange={(event) => onOptionsChange({ label: event.currentTarget.value })} />
-          </label>
-          <p className="blend-hint">{t(options.baseStyle === "ortho" ? "dental.labelOrtho" : options.baseStyle === "plate" && options.inside !== "open" ? "dental.labelPlate" : "dental.labelNone")}</p>
+      </section>
+
+      <section className="dental-section" aria-label={t("dental.step3")}>
+        {step(3, t("dental.step3"), scansDone, t("dental.step3Hint"))}
+        <div className="dental-presets" role="radiogroup" aria-label={t("dental.purpose")}>
+          {([
+            ["study", t("dental.study"), t("dental.studyHint")],
+            ["ortho", t("dental.ortho"), t("dental.orthoHint")],
+            ["aligner", t("dental.aligner"), t("dental.alignerHint")],
+            ["crown", t("dental.crown"), t("dental.crownHint")],
+          ] as const).map(([value, label, hint]) => (
+            <button key={value} type="button" role="radio" aria-checked={preset === value} className={preset === value ? "active" : ""} disabled={busy} onClick={() => onPresetChange(value)}>
+              <strong>{label}</strong>
+              <span>{hint}</span>
+            </button>
+          ))}
         </div>
-      ) : null}
-      <p className="blend-hint">{t(options.inside === "solid" ? (options.baseStyle === "ortho" ? "dental.orthoNote" : options.baseStyle === "plate" ? "dental.crownNote" : "dental.solidNote") : options.inside === "open" ? "dental.hollowNote" : "dental.closedNote")}</p>
+        <p className="dental-summary" data-testid="dental-summary">{t("dental.summary", { base: baseName(options.baseStyle), inside: insideName, height: height.toFixed(1) })}</p>
+        <label className="dental-label-field">
+          <span>{t("dental.label")}</span>
+          <input type="text" maxLength={24} value={options.label} placeholder={t("dental.labelPlaceholder")} disabled={busy} onChange={(event) => onOptionsChange({ label: event.currentTarget.value })} />
+        </label>
+        {options.label ? <p className="blend-hint">{t(options.baseStyle === "ortho" ? "dental.labelOrtho" : options.baseStyle === "plate" && options.inside !== "open" ? "dental.labelPlate" : "dental.labelNone")}</p> : null}
+        <button type="button" className={`dental-more ${advanced ? "open" : ""}`} aria-expanded={advanced} onClick={() => onAdvancedChange(!advanced)}>
+          <ChevronDown size={15} /> {t("dental.more")}
+        </button>
+        {advanced ? (
+          <div className="dental-advanced">
+            <h4 className="dental-group">{t("dental.groupBase")}</h4>
+            {choice(t("dental.baseStyle"), options.baseStyle, [["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")]], (baseStyle) => onOptionsChange({ baseStyle }), undefined, false)}
+            <EdgeModifierSlider label={t(options.baseStyle === "ortho" ? "dental.orthoHeight" : "dental.base")} value={options.base} min={DENTAL_MIN_BASE} max={DENTAL_MAX_BASE} step={0.5} coarse={{ step: 0.5, max: 20 }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ base: value })} />
+            {options.baseStyle !== "ortho" ? (
+              <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.basePresets")} title={t("dental.basePresetsHint")}>
+                <span className="edge-modifier-label">{t("dental.basePresets")}</span>
+                <div className="shell-opening-options">
+                  {[3, 5, 10, 15].map((value) => (
+                    <button key={value} type="button" role="radio" aria-checked={Math.abs(options.base - value) < 1e-6} className={Math.abs(options.base - value) < 1e-6 ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ base: value })}>{`${value} mm`}</button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {options.baseStyle === "clean" || options.baseStyle === "articulator" ? (
+              <>
+                {options.baseStyle === "clean" ? (
+                  <label className="edge-modifier-check" title={t("dental.notchesHint")}>
+                    <input type="checkbox" checked={options.notches !== false} disabled={busy} onChange={(event) => onOptionsChange({ notches: event.currentTarget.checked })} />
+                    <span>{t("dental.notches")}</span>
+                  </label>
+                ) : <p className="blend-hint">{t("dental.articulatorHint")}</p>}
+                <label className="edge-modifier-check" title={t("dental.tieBarHint")}>
+                  <input type="checkbox" checked={Boolean(options.tieBar)} disabled={busy} onChange={(event) => onOptionsChange({ tieBar: event.currentTarget.checked })} />
+                  <span>{t("dental.tieBar")}</span>
+                </label>
+              </>
+            ) : null}
+
+            <h4 className="dental-group">{t("dental.groupScan")}</h4>
+            <label className="edge-modifier-check">
+              <input type="checkbox" checked={following} disabled={busy} onChange={(event) => onOptionsChange({ gum: event.currentTarget.checked ? 3 : null })} />
+              <span>{t("dental.gumFollow")}</span>
+            </label>
+            {following ? (
+              <EdgeModifierSlider label={t("dental.gum")} value={options.gum ?? 3} min={0.5} max={10} step={0.1} coarse={{ step: 0.5, max: 10 }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ gum: value })} />
+            ) : (
+              <>
+                <label className="edge-modifier-check">
+                  <input type="checkbox" checked={options.keep === null} disabled={busy} onChange={(event) => onOptionsChange({ keep: event.currentTarget.checked ? null : maxKeep })} />
+                  <span>{t("dental.keepAll")}</span>
+                </label>
+                {options.keep !== null ? (
+                  <EdgeModifierSlider label={t("dental.keep")} value={keep} min={minKeep} max={maxKeep} step={0.1} coarse={{ step: 0.5, max: maxKeep }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ keep: value })} />
+                ) : null}
+              </>
+            )}
+            {choice(t("dental.smooth"), options.smooth ?? "low", [["off", t("dental.smooth.off")], ["low", t("dental.smooth.low")], ["high", t("dental.smooth.high")]], (smooth) => onOptionsChange({ smooth }))}
+
+            <h4 className="dental-group">{t("dental.inside")}</h4>
+            {choice(t("dental.inside"), options.inside, [["solid", t("dental.solid")], ["open", t("dental.hollowOpen")], ["closed", t("dental.hollowClosed")]] as Array<[DentalInside, string]>, (inside) => onOptionsChange({ inside }), undefined, false)}
+            {options.inside !== "solid" ? (
+              <>
+                <EdgeModifierSlider label={t("dental.wall")} value={options.wall} min={DENTAL_MIN_WALL} max={DENTAL_MAX_WALL} step={0.1} coarse={{ step: 0.5, max: DENTAL_MAX_WALL }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ wall: value })} />
+                {choice(t("dental.infill"), options.infill ?? "honeycomb", [["none", t("dental.infillNone")], ["base", t("dental.infillBase")], ["honeycomb", t("dental.infillFull")]] as Array<[DentalInfill, string]>, (infill) => onOptionsChange({ infill }), t("dental.infillHint"))}
+              </>
+            ) : null}
+            <p className="blend-hint">{t(options.inside === "solid" ? (options.baseStyle === "ortho" ? "dental.orthoNote" : options.baseStyle === "plate" ? "dental.crownNote" : "dental.solidNote") : options.inside === "open" ? "dental.hollowNote" : "dental.closedNote")}</p>
+          </div>
+        ) : null}
+      </section>
+
+      <section className={`dental-section ${pair ? "" : "dental-section-off"}`} aria-label={t("dental.step4")}>
+        {step(4, t("dental.step4"), pair && options.hinge, t(pair ? "dental.step4Hint" : "dental.step4Off"))}
+        {pair ? (
+          <>
+            <label className="edge-modifier-check dental-hinge-check" title={t("dental.hingeHint")}>
+              <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => onOptionsChange({ hinge: event.currentTarget.checked })} />
+              <span>{t("dental.hinge")}</span>
+            </label>
+            {options.hinge ? (
+              <>
+                {/* Fork (build 58): how tight the hinge turns, and the stop that sets the bite. */}
+                <label className="dental-label-field" title={t("dental.hingeFitHint")}>
+                  <span>{t("dental.hingeFit")}</span>
+                  <select value={options.hingeFit ?? HINGE_CLEARANCE} disabled={busy} onChange={(event) => onOptionsChange({ hingeFit: Number(event.currentTarget.value) })}>
+                    {HINGE_FITS.map((fit) => <option key={fit} value={fit}>{t(fit === HINGE_CLEARANCE ? "dental.hingeFitDefault" : "dental.hingeFitOption", { fit: fit.toFixed(2) })}</option>)}
+                  </select>
+                </label>
+                <label className="edge-modifier-check" title={t("dental.incisalStopHint")}>
+                  <input type="checkbox" checked={options.incisalStop !== false} disabled={busy} onChange={(event) => onOptionsChange({ incisalStop: event.currentTarget.checked })} />
+                  <span>{t("dental.incisalStop")}</span>
+                </label>
+              </>
+            ) : null}
+            {choice(t("dental.layout"), options.layout, [["print", t("dental.layoutPrint")], ["occlusion", t("dental.layoutOcclusion")]], (layout) => onOptionsChange({ layout }))}
+          </>
+        ) : null}
+      </section>
+
       {notes.map((note) => <p key={note} className="dental-status warn" role="status">{note}</p>)}
       {error ? <div className="edge-modifier-error" role="alert">{error}</div> : null}
+      {nextStep ? <p className="dental-next" role="status">{nextStep}</p> : null}
       <div className="edge-modifier-footer">
         <button type="button" className="secondary" onClick={onCancel}>{t("common.cancel")}</button>
         <button type="button" className="primary" disabled={!ready} onClick={onApply}>

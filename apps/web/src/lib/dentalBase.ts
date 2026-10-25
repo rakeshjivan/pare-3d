@@ -397,9 +397,15 @@ const deg = Math.PI / 180;
 
 /**
  * The outline of an orthodontic base round the teeth `points` (seen from above, front at -y), each
- * side `clearance` mm clear of them. Counter-clockwise.
+ * side `clearance` mm clear of them, with the ABO's angles: the back square to the midline, heels
+ * at 115 degrees, sides at 65 (upper) or 55 (lower) degrees to the back, the upper's front pointed
+ * and the lower's rounded. Counter-clockwise.
  */
-export function orthoOutline(points: Ring, arch: "upper" | "lower", clearance = 3): Ring {
+export function orthoOutline(points: Ring, arch: "upper" | "lower", clearance = 3, symmetric = true): Ring {
+  // Build 59: symmetric about the midline (x = 0 in the arch's frame), as the ABO trims study
+  // models - each side placed for whichever side's teeth reach further, so a lopsided arch still
+  // gets an even base whose back, heels and sides match left and right.
+  if (symmetric) points = [...points, ...points.map(([x, y]) => [-x, y] as [number, number])];
   // Outward normals by angle (degrees from +x, anticlockwise); each side touches the teeth plus the clearance.
   const angles: number[] = [90, 25, 155];
   if (arch === "upper") {
@@ -892,7 +898,18 @@ export function cleanOutline(runtime: ManifoldRuntime, m: Mesh, teeth: Uint8Arra
   const evened = opened.toPolygons().map((polygon) => smoothRing(polygon.map(([x, y]) => [x, y] as [number, number]), 0.4, 2, 4)).filter((ring) => ring.length >= 3);
   // Smoothing rounds the line a little inwards on convex turns; it stays inside the scan as before.
   const evenedSection = keep(runtime.CrossSection.intersection(keep(new runtime.CrossSection(evened, "EvenOdd")), opened));
-  const smooth = keep(keep(runtime.CrossSection.union(evenedSection, teethShape)).simplify(0.002));
+  const joined = keep(runtime.CrossSection.union(evenedSection, teethShape));
+  // Build 59: the clip to the scan and the join with the teeth leave a staircase of the 0.5 mm cells
+  // along the line - ripples 0.2 mm deep every 1 to 1.5 mm - which the printer draws as vertical
+  // ridges up the wall. The finished line is smoothed again over 4 mm, and only then held inside the
+  // scan (with 1 mm to spare) and round the teeth, so steps come back only where it must bend for them.
+  const closed = keep(keep(joined.offset(3, "Round", 2, 96)).offset(-3, "Round", 2, 96));
+  const fine = closed.toPolygons().map((polygon) => smoothRing(polygon.map(([x, y]) => [x, y] as [number, number]), 0.3, 4, 3)).filter((ring) => ring.length >= 3);
+  const within = keep(opened.offset(1, "Round", 2, 48));
+  const fair = keep(runtime.CrossSection.intersection(keep(new runtime.CrossSection(fine, "EvenOdd")), within));
+  // Where the teeth still push the line out, the corners either side are rounded off (2 mm) too.
+  const held = keep(runtime.CrossSection.union(fair, teethShape));
+  const smooth = keep(keep(keep(held.offset(2, "Round", 2, 96)).offset(-2, "Round", 2, 96)).simplify(0.01));
   const rings = smooth.toPolygons().map((polygon) => polygon.map(([x, y]) => [x, y] as [number, number]));
   made.forEach((section) => section.delete());
   // Specks (under 4 mm²) go.

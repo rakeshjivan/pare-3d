@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 59,
+    items: [
+      "Dental Studio is laid out as four numbered steps - Add the scans, Check the teeth, Choose the model, Articulator - each with one line saying what to do, a tick when it is done, and a line above the button saying what comes next.",
+      "Choosing what the model is for now shows the result in one line (base, inside, height); the finer settings are grouped under Adjust the settings (Base, How much scan is kept, Inside), and the label and the printable articulator are no longer hidden there.",
+      "Smoother base walls: the outline no longer carries the small ripples and steps it picked up from the scan's footprint, and the corners where it bends round the teeth are rounded off. Teeth are kept exactly as before.",
+      "The orthodontic base is symmetric about the midline, as the ABO trims study models: both sides, heels and the back match left and right even when the arch is lopsided.",
+    ],
+  },
+  {
     build: 58,
     items: [
       "Dental Studio's hinge is rebuilt the way printable articulators are: on a full arch a bearing behind each side's last molar, set wide like the jaw's joints, instead of one short clip in the middle - so it turns but does not rock or slide.",

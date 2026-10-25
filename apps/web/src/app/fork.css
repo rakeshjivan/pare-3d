@@ -1638,6 +1638,23 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 .dental-studio-panel .dental-views button:disabled { opacity: 0.5; cursor: default; }
 .dental-studio-panel .dental-step { margin: 10px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: var(--foreground, #1d2430); }
 .dental-studio-panel .dental-trim .dental-step { margin-top: 0; }
+/* Build 59: the studio as four numbered steps. */
+.dental-studio-panel .dental-section { padding: 10px 0 6px; border-top: 1px solid var(--border, #e3e7ed); }
+.dental-studio-panel .dental-section:first-of-type { border-top: none; padding-top: 4px; }
+.dental-studio-panel .dental-trim { margin: 0; }
+.dental-studio-panel .dental-section-off { opacity: 0.7; }
+.dental-step-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+.dental-step-number { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: color-mix(in srgb, var(--primary, #1662b3) 14%, transparent); color: var(--primary, #1662b3); font-size: 11.5px; font-weight: 700; }
+.dental-step-number.done { background: #1d8a4e; color: #fff; }
+.dental-studio-panel .dental-step-head .dental-step { margin: 1px 0 0; font-size: 13px; }
+.dental-step-hint { margin: 2px 0 0; font-size: 11.5px; line-height: 1.35; color: var(--muted-foreground, #5b6573); }
+.dental-summary { margin: 0 0 8px; padding: 6px 8px; border-radius: 6px; background: color-mix(in srgb, var(--primary, #1662b3) 6%, transparent); font-size: 12px; font-weight: 600; }
+.dental-group { margin: 6px 0 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-foreground, #5b6573); }
+.dental-group:first-child { margin-top: 0; }
+.dental-studio-panel label.edge-modifier-check.dental-hinge-check { margin-bottom: 8px; }
+.dental-studio-panel .dental-hinge-check span { font-weight: 600; }
+.dental-studio-panel .dental-section .dental-label-field { margin-bottom: 6px; }
+.dental-next { margin: 8px 0 0; padding: 6px 8px; border-left: 3px solid var(--primary, #1662b3); font-size: 12px; color: var(--foreground, #1d2430); }
 /* Fork (build 53): Dental Studio's tooth-area brush. */
 .dental-brush-overlay { cursor: none; }
 .dental-brush-overlay polyline { fill: none; stroke: rgba(242, 163, 58, 0.45); stroke-linecap: round; stroke-linejoin: round; }
