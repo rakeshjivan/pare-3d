@@ -1,0 +1,34 @@
+# Build 69: the single-threaded and the parallel kernel timed on a 4-core runner (made-up meshes).
+name: Kernel benchmark
+
+on:
+  push:
+    branches: [wasm-par]
+    paths: [".github/workflows/kernel-bench.yml", "scripts/kernel-bench.mjs"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Kernels
+        run: |
+          mkdir bench && cd bench && npm init -y >/dev/null && npm install manifold-3d@3.5.4 >/dev/null
+          git clone --depth 1 -b wasm-par-out "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" par-src
+          mkdir par && cp par-src/manifold-par.js par/manifold.js && cp par-src/manifold-par.wasm par/manifold.wasm
+          cp ../scripts/kernel-bench.mjs .
+          node kernel-bench.mjs ./par/manifold.js | tee result.md
+      - name: Keep the result on wasm-par-out
+        run: |
+          cd bench/par-src
+          cp ../result.md "bench-$(date +%Y%m%d-%H%M).md"
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add . && git commit -q -m "kernel benchmark" && git push -q origin wasm-par-out
