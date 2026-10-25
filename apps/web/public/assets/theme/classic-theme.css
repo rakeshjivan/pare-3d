@@ -2175,6 +2175,12 @@
   box-shadow: 0 1px 4px rgba(29, 34, 41, 0.12);
 }
 
+:where(html[data-palette="classic"]) .tape-label.editable:hover,
+:where(html[data-palette="classic"]) .tape-label.editable:focus-visible {
+  color: #124e8e;
+  border-color: #124e8e;
+}
+
 :where(html[data-palette="classic"]) .tape-mark {
   color: #1e232a;
   border: 1px solid rgba(201, 206, 213, 0.96);
@@ -3267,30 +3273,6 @@
   }
 }
 
-:where(html[data-palette="classic"]) .shortcuts-intro {
-  color: #4c5969;
-}
-
-:where(html[data-palette="classic"]) .shortcuts-group h3 {
-  color: #2c343d;
-  border-bottom: 1px solid #e3e7ed;
-}
-
-:where(html[data-palette="classic"]) .shortcuts-row dt {
-  color: #444f5e;
-}
-
-:where(html[data-palette="classic"]) .shortcuts-plus,
-:where(html[data-palette="classic"]) .shortcuts-or {
-  color: #838e9d;
-}
-
-:where(html[data-palette="classic"]) .shortcuts-row kbd {
-  color: #333c47;
-  background: #eff1f4;
-  border: 1px solid #c8cdd4;
-}
-
 :where(html[data-palette="classic"]) .guide-section li {
   color: #444f5e;
 }
@@ -3810,6 +3792,55 @@
 
 :where(html[data-palette="classic"]) .cube-zone:hover {
   background: rgba(42, 104, 170, 0.26);
+}
+
+:where(html[data-palette="classic"]) .shortcuts-search-icon {
+  color: #848f9e;
+}
+
+:where(html[data-palette="classic"]) .shortcuts-search-input {
+  border: 1px solid #d3d7dc;
+}
+
+:where(html[data-palette="classic"]) .shortcuts-search-input:focus {
+  border-color: #1663b4;
+}
+
+:where(html[data-palette="classic"]) .shortcuts-search-clear {
+  color: #848f9e;
+}
+
+:where(html[data-palette="classic"]) .shortcuts-search-clear:hover {
+  color: #2e3640;
+  background: #e6eaef;
+}
+
+:where(html[data-palette="classic"]) .shortcuts-no-matches {
+  color: #848f9e;
+}
+
+:where(html[data-palette="classic"]) .shortcuts-intro {
+  color: #4c5969;
+}
+
+:where(html[data-palette="classic"]) .shortcuts-group h3 {
+  color: #2c343d;
+  border-bottom: 1px solid #e3e7ed;
+}
+
+:where(html[data-palette="classic"]) .shortcuts-row dt {
+  color: #444f5e;
+}
+
+:where(html[data-palette="classic"]) .shortcuts-plus,
+:where(html[data-palette="classic"]) .shortcuts-or {
+  color: #838e9d;
+}
+
+:where(html[data-palette="classic"]) .shortcuts-row kbd {
+  color: #333c47;
+  background: #eff1f4;
+  border: 1px solid #c8cdd4;
 }
 
 :root:where(html[data-palette="classic"]) {
