@@ -11,7 +11,7 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import { type AppThemePalette, type ResolvedAppTheme } from "@/lib/appTheme";
 import { t } from "@/lib/i18n";
 import { displayToMillimeters, formatLengthMm, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput } from "@/lib/measurementUnits";
-import { computeCornerRulerRelativeCoordinates, cornerRulerAxisModes, cornerRulerDimensionMatchesFromCorner, cornerRulerFlatRotation, cornerRulerTicks, pointAlongRuler, rulerDimensionMatch, worldAxisNameOfDirection, type CornerRulerAxis, type CornerRulerAxisModes, type CornerRulerFrame, type CornerRulerMode, type RulerDimensionField, type RulerDimensionMatch } from "@/lib/rulerDimensions";
+import { computeCornerRulerRelativeCoordinates, cornerRulerAxisModes, cornerRulerDimensionMatchesFromCorner, cornerRulerFlatRotation, cornerRulerTicks, pointAlongRuler, rulerDimensionMatch, spreadCornerRulerFields, worldAxisNameOfDirection, type CornerRulerAxis, type CornerRulerAxisModes, type CornerRulerFrame, type CornerRulerMode, type RulerDimensionField, type RulerDimensionMatch } from "@/lib/rulerDimensions";
 import { type PlacementPoint, type PlacementWorkplane } from "@/lib/placementWorkplane";
 import { capturePointer } from "@/lib/pointerCapture";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
@@ -1382,14 +1382,20 @@ export function syncCornerRulerToolOverlay(
           y: (elevBaseScreen.y + elevTargetScreen.y) / 2,
         };
 
+        // A body at the corner leaves no distance: the three fields would sit on each other and on the ruler's
+        // buttons (#777), so they step aside. Where there is room they stay at the middle of their arrows.
+        const [xFieldPos, zFieldPos, elevationFieldPos] = spreadCornerRulerFields(
+          [xLabelPos, zLabelPos, elevationLabelPos],
+          [{ x: handleScreen.x, y: handleScreen.y + 2, halfWidth: 34, halfHeight: 30 }],
+        );
         selectedCoordinate = {
           shapeIds: selectedShapes.map((shape) => shape.id),
           xValue: coords.x,
           zValue: coords.z,
           elevationValue: coords.elevation,
-          xLabel: { x: xLabelPos.x, y: xLabelPos.y, text: formatMeasure(coords.x, accuracy) },
-          zLabel: { x: zLabelPos.x, y: zLabelPos.y, text: formatMeasure(coords.z, accuracy) },
-          elevationLabel: { x: elevationLabelPos.x, y: elevationLabelPos.y, text: formatMeasure(coords.elevation, accuracy) },
+          xLabel: { x: xFieldPos.x, y: xFieldPos.y, text: formatMeasure(coords.x, accuracy) },
+          zLabel: { x: zFieldPos.x, y: zFieldPos.y, text: formatMeasure(coords.z, accuracy) },
+          elevationLabel: { x: elevationFieldPos.x, y: elevationFieldPos.y, text: formatMeasure(coords.elevation, accuracy) },
         };
         // The numbers' arrows, and the guide lines along the floor to the body (not up in the air at its middle).
         pushSegment(lines.arrows, corner, xEndWorld);
