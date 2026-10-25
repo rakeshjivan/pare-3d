@@ -1,0 +1,51 @@
+# Build 69: manifold-3d built with its parallel backend (TBB on pthreads), the same release as the
+# npm package Pare 3D uses, so the geometry kernel can use every core where the page is
+# cross-origin isolated. Runs on a push to the wasm-par branch; the files come out as an artifact.
+name: Manifold parallel wasm
+
+on:
+  push:
+    branches: [wasm-par]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install cmake
+        run: sudo apt-get update && sudo apt-get install -y cmake
+      - name: Setup EMSDK
+        uses: mymindstorm/setup-emsdk@v16
+        with:
+          version: 5.0.2
+      - name: Clone manifold v3.5.4, oneTBB and googletest
+        run: |
+          git clone --depth 1 --branch v3.5.4 https://github.com/elalish/manifold.git manifold
+          git clone --depth 1 --branch v2022.3.0 https://github.com/oneapi-src/oneTBB.git manifold/tbb
+          git clone --depth 1 --branch v1.17.0 https://github.com/google/googletest.git manifold/gtest
+      - name: Build WASM (parallel)
+        working-directory: manifold
+        run: |
+          emcmake cmake \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DMANIFOLD_PAR=ON \
+            -DMANIFOLD_USE_BUILTIN_TBB=ON \
+            -DMANIFOLD_DEBUG=OFF \
+            -DMANIFOLD_ASSERT=OFF \
+            -DMANIFOLD_TEST=OFF \
+            -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
+            -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=gtest \
+            . -B build
+          cd build
+          emmake make -j4
+          find . -name 'manifold.js' -o -name 'manifold.wasm' | head
+      - name: Collect
+        run: |
+          mkdir out
+          cp $(find manifold/build -name manifold.js | head -1) out/manifold-par.js
+          cp $(find manifold/build -name manifold.wasm | head -1) out/manifold-par.wasm
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manifold-par
+          path: out/
