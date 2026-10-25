@@ -2685,6 +2685,8 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "workspace.frameByDirection": "Le sens du cadre décide",
   "workspace.frameByDirectionHint": "Un cadre tiré vers la droite ne sélectionne que ce qui est entièrement dedans, tiré vers la gauche tout ce qu'il touche (tracé en pointillés), comme dans SketchUp",
   "workspace.objectSnap": "Accrochez-vous à d'autres formes tout en vous déplaçant",
+  "workspace.confirmTabClose": "Demander avant de fermer l'onglet",
+  "workspace.confirmTabCloseHint": "Quand une conception est ouverte, le navigateur pose sa propre question « Quitter le site ? » à la fermeture ou au rechargement de l'onglet. Vos conceptions sont de toute façon enregistrées après chaque modification ; la question n'est qu'un rappel. Le texte est celui du navigateur.",
   "workspace.overhangAngle": "Marquer les surplombs à partir de {angle}°",
   "workspace.overhangStrict": "30° (attention)",
   "workspace.overhangLoose": "70° (bon refroidissement)",

@@ -2702,6 +2702,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "workspace.frameByDirection": "De richting van het kader beslist",
   "workspace.frameByDirectionHint": "Een kader dat naar rechts wordt getrokken selecteert alleen wat er helemaal in ligt, naar links alles wat het raakt (gestippeld getekend), zoals in SketchUp",
   "workspace.objectSnap": "Bij verplaatsen uitlijnen op andere vormen",
+  "workspace.confirmTabClose": "Vragen voor het sluiten van het tabblad",
+  "workspace.confirmTabCloseHint": "Is er een ontwerp open, dan stelt de browser bij het sluiten of herladen van het tabblad zijn eigen vraag \"Site verlaten?\". Je ontwerpen worden na elke wijziging toch opgeslagen, de vraag is alleen een herinnering. De tekst bepaalt de browser.",
   "workspace.overhangAngle": "Overhang markeren vanaf {angle}°",
   "workspace.overhangStrict": "30° (voorzichtig)",
   "workspace.overhangLoose": "70° (goede koeling)",

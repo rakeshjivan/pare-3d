@@ -2693,6 +2693,8 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "workspace.frameByDirection": "Направление рамки решает",
   "workspace.frameByDirectionHint": "Рамка, проведённая вправо, выделяет только то, что целиком внутри неё, влево — всё, чего она касается (рисуется пунктиром), как в SketchUp",
   "workspace.objectSnap": "Привязка к другим фигурам при перемещении",
+  "workspace.confirmTabClose": "Спрашивать перед закрытием вкладки",
+  "workspace.confirmTabCloseHint": "Если открыт проект, браузер при закрытии или перезагрузке вкладки задаёт свой стандартный вопрос «Покинуть сайт?». Проекты и так сохраняются после каждого изменения, вопрос — лишь напоминание. Формулировку задаёт браузер.",
   "workspace.overhangAngle": "Отмечать нависания от {angle}°",
   "workspace.overhangStrict": "30° (осторожно)",
   "workspace.overhangLoose": "70° (хорошее охлаждение)",

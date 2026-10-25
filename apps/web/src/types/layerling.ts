@@ -390,6 +390,8 @@ export type WorkplaneWorkspaceSettings = {
   doubleClickOpensGroup: boolean;
   /** Moving a shape snaps its edges and centre to other shapes, with guide lines. */
   objectSnap: boolean;
+  /** The browser asks "Leave site?" when a design is open and the tab is closed or reloaded; off by default (#683 mail). */
+  confirmTabClose: boolean;
   dimensionsAlwaysVisible: boolean;
   /** A turned body shows its angles about X, Y and Z beside it while it is selected. */
   showRotationAngles: boolean;

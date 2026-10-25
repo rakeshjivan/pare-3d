@@ -203,6 +203,7 @@ import { exportMeshesToStl } from "@/lib/stlExport";
 import { exportMeshesTo3mfAsync, THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
 import { DEFAULT_TAPER_DIMENSION_MAX, readWorkspaceDefault, saveWorkspaceDefault, keyboardNudgeCoarseFactor, keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
+import { leaveGuardReleased } from "@/lib/leaveGuard";
 import { MCP_GRIDFINITY_LIST_KEYS, mcpGridfinityListParams, mcpGridfinityPaddingPatch, mcpThreadSizeParams } from "@/lib/mcpShapeSettings";
 import { createNoteId, normalizeNotes, NOTE_COUNT_LIMIT, patchNote, referencePoints } from "@/lib/workplaneNotes";
 import { notesAfterShapeChange, notesPinnedTo, notesPutBack } from "@/lib/noteAnchoring";
@@ -2233,6 +2234,19 @@ export function LayerlingEditor({
   const projectAssetsRef = useRef(projectAssets);
   const selectedIdsRef = useRef(selectedIds);
   const workspaceSettingsRef = useRef(workspaceSettings);
+
+  // "Ask before closing the tab" (a setting, off): the browser's own "Leave site?" question while a design is open. The design is saved
+  // after every change anyway, so this is only a reminder; the wording is the browser's.
+  useEffect(() => {
+    if (!workspaceSettings.confirmTabClose) return;
+    const ask = (event: BeforeUnloadEvent) => {
+      if (leaveGuardReleased()) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [workspaceSettings.confirmTabClose]);
   const snapGridRef = useRef(snapGrid);
   const placementElevationRef = useRef(placementElevation);
   const placementWorkplaneRef = useRef(placementWorkplane);

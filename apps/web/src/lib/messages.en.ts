@@ -2732,6 +2732,8 @@ export const MESSAGES_EN = {
   "workspace.frameByDirection": "The direction of the frame decides",
   "workspace.frameByDirectionHint": "A frame dragged to the right selects only what lies completely inside it, one dragged to the left everything it touches (drawn dashed), as in SketchUp",
   "workspace.objectSnap": "Snap to other shapes while moving",
+  "workspace.confirmTabClose": "Ask before closing the tab",
+  "workspace.confirmTabCloseHint": "When a design is open, closing or reloading the tab brings up your browser's own question \"Leave site?\". Your designs are saved after every change either way, so the question is only a reminder. The wording is the browser's.",
   "workspace.overhangAngle": "Mark overhangs from {angle}°",
   "workspace.overhangStrict": "30° (careful)",
   "workspace.overhangLoose": "70° (good cooling)",

@@ -2732,6 +2732,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "workspace.doubleClickOpensSketch": "Doppelklick öffnet die Skizze",
   "workspace.doubleClickOpensGroup": "Doppelklick öffnet Gruppe oder Bündel",
   "workspace.objectSnap": "Beim Verschieben an anderen Formen fangen",
+  "workspace.confirmTabClose": "Vor dem Schließen des Tabs nachfragen",
+  "workspace.confirmTabCloseHint": "Ist ein Entwurf offen, fragt der Browser beim Schließen oder Neuladen des Tabs mit seiner eigenen Frage „Seite verlassen?“ nach. Deine Entwürfe sind nach jeder Änderung ohnehin gespeichert, die Frage ist nur eine Gedächtnisstütze. Den Wortlaut bestimmt der Browser.",
   "workspace.showShadows": "Schatten zeigen",
   "workspace.cameraInertia": "Kamera läuft nach",
   "workspace.cameraInertiaHint": "Nach dem Loslassen dreht die Ansicht kurz weiter und bremst sanft ab. Aus: Sie steht sofort, wie in Tinkercad und Fusion 360.",

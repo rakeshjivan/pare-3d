@@ -3216,4 +3216,6 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "export.svg.viewSilhouette": "Silhouette dall'alto",
   "export.svg.viewFootprint": "Impronta sul piano di lavoro",
   "prop.hingeAngle": "Angolo di apertura",
+  "workspace.confirmTabClose": "Chiedi prima di chiudere la scheda",
+  "workspace.confirmTabCloseHint": "Con un progetto aperto, il browser fa la sua domanda «Lasciare il sito?» quando chiudi o ricarichi la scheda. I progetti vengono comunque salvati dopo ogni modifica, la domanda è solo un promemoria. Il testo lo decide il browser.",
 };
