@@ -4,7 +4,8 @@ import { buildMessage } from "@/lib/buildStamp";
 import { buildGroupedShapeFromSelection, splitShapeIfCrossed } from "@/lib/editorBooleans";
 import { getManifoldRuntime, setManifoldAssetBase } from "@/lib/editorMeshCore";
 import { packValue, packedTransfer, unpackValue } from "@/lib/geometryTransfer";
-import type { GeometryWorkerRequest, GeometryWorkerResponse } from "@/lib/geometryWorkerTypes";
+import { resultMeshes, type GeometryWorkerRequest, type GeometryWorkerResponse } from "@/lib/geometryWorkerTypes";
+import { prepareImportedMeshDisplay } from "@/lib/importedMeshDisplay";
 import { setLanguage } from "@/lib/i18n";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
 import type { WorkplaneShape } from "@/types/layerling";
@@ -43,7 +44,15 @@ self.onmessage = async (event: MessageEvent<GeometryWorkerRequest>) => {
     }
     // Lists the result took over unchanged go back as references to the page's own arrays.
     const packed = packValue(result, received);
-    post({ requestId: request.requestId, ok: true, payload: packed.value, buffers: packed.buffers }, packedTransfer(packed));
+    // The view's geometry of what was made, so the page does not work it out after the answer.
+    const transfer: Transferable[] = packedTransfer(packed);
+    const displays = resultMeshes(request.task, result).map((mesh) => {
+      if (!mesh || mesh.positions.length < 9) return null;
+      const prepared = prepareImportedMeshDisplay(mesh);
+      transfer.push(...prepared.transfer);
+      return prepared.display;
+    });
+    post({ requestId: request.requestId, ok: true, payload: packed.value, buffers: packed.buffers, displays }, transfer);
   } catch (error) {
     post({
       requestId: request.requestId,

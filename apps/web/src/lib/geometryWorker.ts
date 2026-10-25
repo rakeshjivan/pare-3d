@@ -1,7 +1,8 @@
 import { buildsDiffer, BUILD_ID, isBuildMessage, reportWorkerBuild } from "@/lib/buildStamp";
 import { buildGroupedShapeFromSelection, splitShapeIfCrossed, splitShapesByPlane, type GroupBuildResult, type SplitShapesOutcome } from "@/lib/editorBooleans";
 import { packValue, packedTransfer, unpackValue } from "@/lib/geometryTransfer";
-import type { GeometryTask, GeometryWorkerRequest, GeometryWorkerResponse } from "@/lib/geometryWorkerTypes";
+import { resultMeshes, type GeometryTask, type GeometryWorkerRequest, type GeometryWorkerResponse } from "@/lib/geometryWorkerTypes";
+import { rememberPreparedDisplay } from "@/lib/importedMeshDisplay";
 import { getLanguage, t } from "@/lib/i18n";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
 import type { WorkplaneShape } from "@/types/layerling";
@@ -33,6 +34,7 @@ type Pending = {
   sharedLists: unknown[][];
   /** Not shown as "calculating": the warm-up. */
   quiet: boolean;
+  task: GeometryTask;
 };
 
 let worker: Worker | null = null;
@@ -122,7 +124,13 @@ function startWorker(): Promise<Worker | null> {
       if (!entry) return;
       if (response.ok) {
         try {
-          entry.resolve(unpackValue(response.payload, response.buffers, entry.sharedLists));
+          const result = unpackValue(response.payload, response.buffers, entry.sharedLists);
+          // The view takes the geometry the worker prepared for the meshes it made.
+          resultMeshes(entry.task, result).forEach((mesh, index) => {
+            const display = response.displays?.[index];
+            if (mesh && display) rememberPreparedDisplay(mesh, display);
+          });
+          entry.resolve(result);
         } catch (error) {
           entry.reject(error instanceof Error ? error : new Error(String(error)));
         }
@@ -177,7 +185,7 @@ async function runGeometryTask<T>(task: GeometryTask, args: unknown, fallback: (
       dropWorker(false);
       resolve(timedOut());
     }, GEOMETRY_WORKER_TIMEOUT_MS);
-    pending.set(requestId, { resolve: resolve as (value: unknown) => void, reject, fallback, timer, sharedLists: packed.lists, quiet });
+    pending.set(requestId, { resolve: resolve as (value: unknown) => void, reject, fallback, timer, sharedLists: packed.lists, quiet, task });
     notifyBusy();
     signal?.addEventListener("abort", () => {
       if (!settle(requestId)) return;

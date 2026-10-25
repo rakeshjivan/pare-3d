@@ -1,4 +1,6 @@
 import type { Language } from "@/lib/i18n";
+import type { PreparedImportedMeshDisplay } from "@/lib/importedMeshDisplay";
+import type { WorkplaneShape } from "@/types/layerling";
 
 /** What the page asks the geometry worker (workers/geometry.worker.ts) to work out. */
 export type GeometryTask = "group" | "split" | "warm";
@@ -16,5 +18,22 @@ export interface GeometryWorkerRequest {
 }
 
 export type GeometryWorkerResponse =
-  | { requestId: number; ok: true; payload: unknown; buffers: Float64Array[] }
+  | {
+    requestId: number;
+    ok: true;
+    payload: unknown;
+    buffers: Float64Array[];
+    /** The view's geometry for each of resultMeshes(task, result), in that order (lib/importedMeshDisplay.ts). */
+    displays: Array<PreparedImportedMeshDisplay | null>;
+  }
   | { requestId: number; ok: false; message: string; name: string };
+
+type ImportedMesh = NonNullable<WorkplaneShape["importedMesh"]>;
+
+/** The meshes a task's result brings into the view: the new group, the two halves of a split. */
+export function resultMeshes(task: GeometryTask, result: unknown): Array<ImportedMesh | undefined> {
+  if (!result || typeof result !== "object") return [];
+  if (task === "group") return [(result as { group?: WorkplaneShape | null }).group?.importedMesh];
+  if (task === "split") return ((result as { parts?: WorkplaneShape[] | null }).parts ?? []).map((part) => part.importedMesh);
+  return [];
+}

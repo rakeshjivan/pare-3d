@@ -173,6 +173,7 @@ type Vec3Like = { x: number; y: number; z: number };
 import { aimPickRay, firstShapeHit, pickLayFlatFace, pickRotationPivot, pickShapeAt, pickShapeIdAt, pointerRayFor, rayPointOnRotationPlane, RENDER_LAYER_SHAPES, splitAxisParameter, usePickOnlyPointer, type LayFlatPick, type PickOnlySelection } from "@/components/workplane/viewportPicking";
 export type { LayFlatPick } from "@/components/workplane/viewportPicking";
 import { fastEdgesGeometry } from "@/lib/fastEdgesGeometry";
+import { buildImportedMeshGeometry, computeImportedBoundsTree, putGeometryOnBase, takePreparedImportedMeshGeometry } from "@/lib/importedMeshDisplay";
 import { RENDER_LAYER_HELPERS, sharedOverlayLineMaterial, sharedShapeGeometryCache, sharedEdgesGeometryCache, sharedShapeMaterialCache, type PointCardOffset, type ShapeRenderRecord, type ThreeState, type MoveDimensionSession, type NoteOverlayState, type TapePoint, type TapeAttachment, type TapeEdgeAttachment, type TapeModel, type TapeOverlayState, type TapeCandidate, type RotationHandleSide, type RotationHandleSides, type DragItem, quaternionForShape, projectToScreen, syncMoveDimensionWorldLines, syncTransformGuideWorldLines, tapeShapeDimensions, tapePointWorld, tapeEdgeWorldPoints, tapeSegmentWorldPoints, syncTapeOverlay, syncNoteOverlay, NoteOverlay, TapeOverlay, type RulerDimensionOverlayItem, type RulerDimensionOverlayState, syncRulerDimensionOverlay, RulerDimensionOverlay, type CornerRulerInstance, type CornerRulerOverlayState, syncCornerRulerToolOverlay, CornerRulerToolOverlay, syncOriginDimensionWorldLines, shapeCenter, shapeLocalExtents, projectShapeExtent, projectShapesExtent, type OriginDimensionFrame, setObjectRenderLayer, freezeStaticObjectMatrices, formatMeasure, findShapeObject, trimSharedShapeGeometryCache, releaseSharedShapeGeometry, trimSharedShapeMaterialCache, releaseSharedShapeMaterials, disposeMaterialResource, disposeChildren, disposeObject } from "@/components/workplane/ViewportOverlays";
 
 const WORKPLANE_WIDTH = 200;
@@ -13983,7 +13984,7 @@ function enableAcceleratedMeshPicking(mesh: THREE.Mesh, geometry: THREE.BufferGe
   mesh.raycast = acceleratedRaycast;
   const bvhGeometry = geometry as THREE.BufferGeometry & { boundsTree?: unknown };
   if ((force || triangles >= BVH_PICKING_TRIANGLE_THRESHOLD) && !bvhGeometry.boundsTree) {
-    computeBoundsTree.call(geometry, { targetLeafSize: 12 });
+    computeImportedBoundsTree(geometry);
   }
 }
 
@@ -14715,15 +14716,8 @@ function getImportedMeshCache(mesh: NonNullable<WorkplaneShape["importedMesh"]>)
     return cached;
   }
 
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(mesh.positions, 3));
-  const hasNormals = Boolean(mesh.normals && mesh.normals.length === mesh.positions.length);
-  if (hasNormals && mesh.normals) {
-    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(mesh.normals, 3));
-  } else {
-    geometry.computeVertexNormals();
-  }
-  putGeometryOnBase(geometry, hasNormals);
+  // A mesh the geometry worker has just made comes with its geometry worked out (lib/importedMeshDisplay.ts).
+  const geometry = takePreparedImportedMeshGeometry(mesh) ?? buildImportedMeshGeometry(mesh);
   geometry.userData.cached = true;
   const next = { geometry, edges: new Map<number, THREE.EdgesGeometry>() };
   importedGeometryCache.set(mesh, next);
@@ -14934,16 +14928,6 @@ function setComplexEdgeVisibility(object: THREE.Object3D, visible: boolean) {
 function addTextShape(group: THREE.Group, material: THREE.MeshStandardMaterial, shape: WorkplaneShape, geometryCacheKey: string) {
   const geometry = sharedShapeGeometry(geometryCacheKey, () => textDisplayGeometry(shape));
   addMesh(group, geometry, material, shape);
-}
-
-function putGeometryOnBase(geometry: THREE.BufferGeometry, preserveNormals = false) {
-  if (!preserveNormals || !geometry.getAttribute("normal")) {
-    geometry.computeVertexNormals();
-  }
-  geometry.computeBoundingBox();
-  const minY = geometry.boundingBox?.min.y ?? 0;
-  geometry.translate(0, -minY, 0);
-  return geometry;
 }
 
 function createRoofGeometry(width: number, height: number, depth: number) {

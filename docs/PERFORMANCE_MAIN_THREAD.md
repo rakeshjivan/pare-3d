@@ -194,6 +194,38 @@ same work happens on import and when a .lyl opens, so that is the next lever.
 Checked: unit and e2e tests; in the browser, the same cut, split and grouping give byte-identical
 STL exports as with step 1, with the worker and with its file blocked.
 
+## Step 4: the view of a new mesh, built in the worker
+
+For each mesh a cut, merge or split makes, the worker now also builds what the view draws
+(`lib/importedMeshDisplay.ts`): the geometry as the viewport builds it (positions as Float32,
+normals, moved onto the plate) and its raycasting index (three-mesh-bvh, the same options). They
+come back as transferred buffers with the answer; the viewport takes them instead of building
+them, the index only where it would build one itself and only for exactly that geometry. Without
+the worker, or for any other mesh, the viewport builds both as before.
+
+On the way: the viewport worked out the normals of a mesh without stored normals twice (once in
+getImportedMeshCache, once in putGeometryOnBase), with the same result; it does that once now.
+
+tests/unit/importedMeshDisplay.test.ts checks that the prepared geometry has the same positions,
+normals, bounds and index as the one the page builds, that 60 rays hit it at the same distance and
+face, and that one normals pass gives what the two gave.
+
+| Action | Longest block, step 3 → now | Input delay, step 3 → now |
+| --- | ---: | ---: |
+| Group 40 cylinders with 20 sphere holes | 111 → 80 ms | 135 → 94 ms |
+| Cut a cylinder out of an imported 200k sphere | 385 → 205 ms | 410 → 302 ms |
+| Group two overlapping imported 100k spheres | 212 → 130 ms | 251 → 220 ms |
+| Split an imported 300k sphere in two | 458 → 108 ms | 535 → 291 ms |
+| Split four imported 100k spheres | 745 → 251 ms | 846 → 348 ms |
+
+From the baseline the longest block of these went down from 1.9, 1.6 and 3.9 s to 0.1 to 0.25 s.
+The input delay stays a little above 200 ms: several shorter tasks follow each other (the answer,
+the history step, the first frame of the new mesh), none of them long.
+
+Checked as well: the same STL exports as before with the worker and with its file blocked; a click
+on a half after a split selects it (picking through the index from the worker); the static export
+lists the worker in the offline copy, and with the network off a reload loads it from there.
+
 ## Still on the main thread
 
 Not profiled yet, so without a cause:
