@@ -2447,6 +2447,7 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "camera.deleteMeasurement": "Slet måledel",
   "camera.deleteAllMeasurements": "Slet alle mål",
   "camera.tapeMarkMiddle": "Markér midten som referencepunkt",
+  "camera.tapeTypeLength": "Skriv en længde: legemet ved det andet punkt flyttes langs linjen",
   "camera.sectionView": "Snitvisning",
   "camera.sectionActive": "Snit aktivt",
   "camera.sectionInactive": "Snit inaktivt",

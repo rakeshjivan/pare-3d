@@ -1997,6 +1997,7 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "camera.deleteMeasurement": "Izbriši del meritve",
   "camera.deleteAllMeasurements": "Izbriši vse meritve",
   "camera.tapeMarkMiddle": "Označi sredino kot referenčno točko",
+  "camera.tapeTypeLength": "Vnesite dolžino: telo pri drugi točki se premakne vzdolž črte",
   "camera.sectionView": "Prerez",
   "camera.sectionActive": "Prerez je vklopljen",
   "camera.sectionInactive": "Prerez je izklopljen",

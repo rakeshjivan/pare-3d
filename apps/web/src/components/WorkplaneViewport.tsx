@@ -108,6 +108,7 @@ import { roundSideCount } from "@/lib/roundSideCount";
 import { createPyramidGeometry } from "@/lib/pyramidGeometry";
 import { projectThumbnailDimensions } from "@/lib/projectThumbnail";
 import { makeShapeFromAsset, parseDroppedShapeAsset } from "@/lib/shapeCatalog";
+import { planarFaceCentre } from "@/lib/faceCentre";
 import { scaledHorizontalShapePatch } from "@/lib/scaleByPercent";
 import { displayYTurn, insideZ } from "@/lib/displayAxes";
 import { positionsForTwist, twistBandCount } from "@/lib/heightSlices";
@@ -175,7 +176,7 @@ import { aimPickRay, firstShapeHit, pickLayFlatFace, pickMateFace, pickRotationP
 export type { LayFlatPick } from "@/components/workplane/viewportPicking";
 import { fastEdgesGeometry } from "@/lib/fastEdgesGeometry";
 import { buildImportedMeshGeometry, computeImportedBoundsTree, putGeometryOnBase, takePreparedImportedMeshGeometry } from "@/lib/importedMeshDisplay";
-import { RENDER_LAYER_HELPERS, sharedOverlayLineMaterial, sharedShapeGeometryCache, sharedEdgesGeometryCache, sharedShapeMaterialCache, type PointCardOffset, type ShapeRenderRecord, type ThreeState, type MoveDimensionSession, type NoteOverlayState, type TapePoint, type TapeAttachment, type TapeEdgeAttachment, type TapeModel, type TapeOverlayState, type TapeCandidate, type RotationHandleSide, type RotationHandleSides, type DragItem, quaternionForShape, projectToScreen, syncMoveDimensionWorldLines, syncTransformGuideWorldLines, tapeShapeDimensions, tapePointWorld, tapeEdgeWorldPoints, tapeSegmentWorldPoints, syncTapeOverlay, syncNoteOverlay, NoteOverlay, TapeOverlay, type RulerDimensionOverlayItem, type RulerDimensionOverlayState, syncRulerDimensionOverlay, RulerDimensionOverlay, type CornerRulerInstance, type CornerRulerOverlayState, syncCornerRulerToolOverlay, CornerRulerToolOverlay, syncOriginDimensionWorldLines, shapeCenter, shapeLocalExtents, projectShapeExtent, projectShapesExtent, type OriginDimensionFrame, setObjectRenderLayer, freezeStaticObjectMatrices, formatMeasure, findShapeObject, trimSharedShapeGeometryCache, releaseSharedShapeGeometry, trimSharedShapeMaterialCache, releaseSharedShapeMaterials, disposeMaterialResource, disposeChildren, disposeObject } from "@/components/workplane/ViewportOverlays";
+import { RENDER_LAYER_HELPERS, sharedOverlayLineMaterial, sharedShapeGeometryCache, sharedEdgesGeometryCache, sharedShapeMaterialCache, type PointCardOffset, type ShapeRenderRecord, type ThreeState, type MoveDimensionSession, type NoteOverlayState, type TapePoint, type TapeAttachment, type TapeEdgeAttachment, type TapeModel, type TapeOverlayState, type TapeCandidate, type RotationHandleSide, type RotationHandleSides, type DragItem, quaternionForShape, projectToScreen, syncMoveDimensionWorldLines, syncTransformGuideWorldLines, tapeShapeDimensions, tapePointWorld, tapeEdgeWorldPoints, tapeSegmentWorldPoints, tapeMovableShapeId, syncTapeOverlay, syncNoteOverlay, NoteOverlay, TapeOverlay, type RulerDimensionOverlayItem, type RulerDimensionOverlayState, syncRulerDimensionOverlay, RulerDimensionOverlay, type CornerRulerInstance, type CornerRulerOverlayState, syncCornerRulerToolOverlay, CornerRulerToolOverlay, syncOriginDimensionWorldLines, shapeCenter, shapeLocalExtents, projectShapeExtent, projectShapesExtent, type OriginDimensionFrame, setObjectRenderLayer, freezeStaticObjectMatrices, formatMeasure, findShapeObject, trimSharedShapeGeometryCache, releaseSharedShapeGeometry, trimSharedShapeMaterialCache, releaseSharedShapeMaterials, disposeMaterialResource, disposeChildren, disposeObject } from "@/components/workplane/ViewportOverlays";
 
 const WORKPLANE_WIDTH = 200;
 const WORKPLANE_DEPTH = 140;
@@ -3646,6 +3647,7 @@ export function WorkplaneViewport({
   const [rulerDuplicatePreview, setRulerDuplicatePreview] = useState<{ x: number; y: number; label: string } | null>(null);
   const [rulerDuplicateEditing, setRulerDuplicateEditing] = useState<{ rulerId: string; shapeId: string; baseAlong: number; x: number; y: number; value: string } | null>(null);
   const [rulerCoordinateEditing, setRulerCoordinateEditing] = useState<{ rulerId: string; shapeIds: string[]; axis: "x" | "z" | "elevation"; x: number; y: number; value: string } | null>(null);
+  const [tapeLengthEditing, setTapeLengthEditing] = useState<{ segmentId: string; x: number; y: number; value: string } | null>(null);
   const [noteOverlay, setNoteOverlay] = useState<NoteOverlayState | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [moveDimensionOverlay, setMoveDimensionOverlay] = useState<MoveDimensionOverlayState | null>(null);
@@ -3851,9 +3853,11 @@ export function WorkplaneViewport({
   onCarryDropRef.current = onCarryDrop;
   // The parts as they stood when C picked them up: the preview turns and moves these.
   const carryStartRef = useRef<WorkplaneShape[]>([]);
-  const pickPlacementSurfaceRef = useRef<((clientX: number, clientY: number, reverse: boolean, skip?: ReadonlySet<string>) => {
+  const pickPlacementSurfaceRef = useRef<((clientX: number, clientY: number, reverse: boolean, skip?: ReadonlySet<string>, faceCentre?: "always" | "near" | false) => {
     point: THREE.Vector3; normal: THREE.Vector3; workplane: PlacementWorkplane; shapeId: string;
   } | null) | null>(null);
+  /** Alt held while a shape is placed by click: it goes where the pointer is, not to a face's middle (#823). */
+  const cruiseFreeRef = useRef(false);
   const cruisePreviewRef = useRef<{ object: THREE.Group; shape: WorkplaneShape } | null>(null);
   const cruisePointerRef = useRef<{ x: number; y: number } | null>(null);
   // A text is drawn with what is there when it is built: a font that arrives later - the Japanese
@@ -5244,7 +5248,7 @@ export function WorkplaneViewport({
    */
   const cruiseTarget = useCallback((clientX: number, clientY: number, skip?: ReadonlySet<string>) => {
     // pickPlacementSurface is declared further down; it is reached through its ref.
-    const surface = pickPlacementSurfaceRef.current?.(clientX, clientY, false, skip) ?? null;
+    const surface = pickPlacementSurfaceRef.current?.(clientX, clientY, false, skip, skip || cruiseFreeRef.current ? false : "near") ?? null;
     // Fork (build 33): which part was hit too, so text set down on a cylinder can wrap round it.
     if (surface) return { point: surface.workplane.origin, workplane: surface.workplane, normal: surface.workplane.normal, shapeId: surface.shapeId as string | undefined, hit: { x: surface.point.x, y: surface.point.y, z: surface.point.z } };
     const point = toFreePlacementWorkplanePoint(clientX, clientY);
@@ -6919,7 +6923,8 @@ export function WorkplaneViewport({
     syncHistoryPickHighlight(state, pickOnlyRef.current?.ids ?? []);
   }, [pickOnlyKey, shapeOutlineIds, shapes]);
 
-  const pickPlacementSurface = useCallback((clientX: number, clientY: number, reverse: boolean, skip?: ReadonlySet<string>) => {
+  /** `faceCentre`: "always" puts the point in the middle of the face hit, "near" only when the pointer is close to it (#823). */
+  const pickPlacementSurface = useCallback((clientX: number, clientY: number, reverse: boolean, skip?: ReadonlySet<string>, faceCentre: "always" | "near" | false = false) => {
     const state = threeRef.current;
     if (!state) return null;
     const rect = aimPickRay(state, clientX, clientY, RENDER_LAYER_SHAPES);
@@ -6975,7 +6980,29 @@ export function WorkplaneViewport({
 
     // A corner is taken as it is; on an edge the point moves along it in grid steps from its end.
     const step = snapStep(snapRef.current);
-    const featurePoint = feature?.kind === "vertex"
+    // A shape dropped from the shape list goes to the middle of the face it was dropped on; one
+    // placed by click snaps there within the inner third of the face, a corner or edge winning (#823).
+    let centre: THREE.Vector3 | null = null;
+    if (faceCentre && hit.faceIndex !== undefined && hit.faceIndex !== null && (faceCentre === "always" || !feature)) {
+      let cache = surface.userData.faceCentres as { geometry: THREE.BufferGeometry; byTriangle: Map<number, ReturnType<typeof planarFaceCentre>> } | undefined;
+      if (!cache || cache.geometry !== surface.geometry) {
+        cache = { geometry: surface.geometry, byTriangle: new Map() };
+        surface.userData.faceCentres = cache;
+      }
+      if (!cache.byTriangle.has(hit.faceIndex)) {
+        // While a shape follows the pointer, a big mesh is not searched on every move.
+        cache.byTriangle.set(hit.faceIndex, planarFaceCentre(position.array, surface.geometry.index?.array ?? null, hit.faceIndex, faceCentre === "always" ? 200_000 : 50_000));
+      }
+      const face = cache.byTriangle.get(hit.faceIndex);
+      if (face) {
+        const world = new THREE.Vector3(...face.centre).applyMatrix4(surface.matrixWorld);
+        const reach = world.distanceTo(new THREE.Vector3(...face.farthest).applyMatrix4(surface.matrixWorld));
+        if (faceCentre === "always" || world.distanceTo(hit.point) <= reach / 3) centre = world;
+      }
+    }
+    const featurePoint = centre
+      ? centre
+      : feature?.kind === "vertex"
       ? feature.point
       : feature?.kind === "edge" && step > 0
         ? feature.start.clone().addScaledVector(feature.direction, Math.round(feature.point.clone().sub(feature.start).dot(feature.direction) / step) * step)
@@ -7282,6 +7309,42 @@ export function WorkplaneViewport({
   const cancelRulerCoordinateEdit = useCallback(() => {
     setRulerCoordinateEditing(null);
   }, []);
+
+  // A typed length moves the body at one end of a measurement along the measured line, until the
+  // distance is the typed one; the points stay on the body, so the measurement follows (#823).
+  const beginTapeLengthEdit = useCallback((segmentId: string) => {
+    const state = threeRef.current;
+    const segment = tapeOverlayRef.current?.segments.find((entry) => entry.id === segmentId);
+    if (!state || !segment) return;
+    const [start, end] = tapeSegmentWorldPoints(state, tapeModelRef.current, segmentId);
+    if (!start || !end) return;
+    setTapeLengthEditing({ segmentId, x: segment.labelX, y: segment.labelY, value: formatMeasure(start.distanceTo(end), workspaceRef.current.accuracy) });
+  }, []);
+
+  const commitTapeLengthEdit = useCallback(() => {
+    const edit = tapeLengthEditing;
+    setTapeLengthEditing(null);
+    const state = threeRef.current;
+    if (!edit || !state) return;
+    const value = parseMeasureMm(edit.value);
+    const shapeId = tapeMovableShapeId(tapeModelRef.current, edit.segmentId, selectedIdsRef.current);
+    const shape = shapeId ? shapesRef.current.find((entry) => entry.id === shapeId) : undefined;
+    const [start, end] = tapeSegmentWorldPoints(state, tapeModelRef.current, edit.segmentId);
+    if (!shape || !start || !end || !Number.isFinite(value) || value < 0) return;
+    const length = start.distanceTo(end);
+    if (length < 1e-6) return;
+    const segment = tapeModelRef.current.segments.find((entry) => entry.id === edit.segmentId);
+    const movesEnd = tapeModelRef.current.points.find((point) => point.id === segment?.endId)?.attachment?.shapeId === shape.id;
+    const shift = end.clone().sub(start).multiplyScalar((value - length) / length);
+    if (!movesEnd) shift.negate();
+    onInteractionActiveChange?.(true);
+    onUpdateShape(shape.id, {
+      ...(Math.abs(shift.x) > 1e-9 ? { x: cleanNearZero(shape.x + shift.x, 0.0005) } : {}),
+      ...(Math.abs(shift.z) > 1e-9 ? { z: cleanNearZero(shape.z + shift.z, 0.0005) } : {}),
+      ...(Math.abs(shift.y) > 1e-9 ? { elevation: cleanNearZero(clamp((shape.elevation ?? 0) + shift.y, MIN_ELEVATION, MAX_ELEVATION), 0.0005) } : {}),
+    });
+    onInteractionActiveChange?.(false);
+  }, [onInteractionActiveChange, onUpdateShape, tapeLengthEditing]);
 
   // The number belongs to the selected bodies: when they are no longer all selected (a click on empty space that
   // leaves the field its focus), the open field goes with them instead of staying in the view (#614).
@@ -8043,6 +8106,7 @@ export function WorkplaneViewport({
 
       if (cruiseAssetRef.current) {
         event.preventDefault();
+        cruiseFreeRef.current = event.altKey;
         const target = cruiseTarget(event.clientX, event.clientY);
         if (target) onAddShape(cruiseAssetRef.current, target.point, target.workplane);
         return;
@@ -8466,6 +8530,7 @@ export function WorkplaneViewport({
       // Gehoert die Flaeche gerade der Kamera, hat hier niemand etwas zu
       // schweben oder zu ziehen - die Finger bewegen die Ansicht.
       if (cameraTouchRef.current) return;
+      cruiseFreeRef.current = event.altKey;
       if (cruiseAssetRef.current) moveCruiseGhost(event.clientX, event.clientY);
       if (carryIdsRef.current) moveCarry(event.clientX, event.clientY);
       if (splitActiveRef.current) {
@@ -9017,10 +9082,16 @@ export function WorkplaneViewport({
       if (!asset) {
         return;
       }
+      // On a body the shape lies on the face under the pointer, in its middle; with Alt where it was let go (#823).
+      const surface = pickPlacementSurface(event.clientX, event.clientY, false, undefined, event.altKey ? false : "always");
+      if (surface) {
+        onAddShape(asset, surface.workplane.origin, surface.workplane);
+        return;
+      }
       const point = toPlacementWorkplanePoint(event.clientX, event.clientY);
       onAddShape(asset, point ?? placementWorkplaneRef.current.origin);
     },
-    [onAddShape, onDropMyShape, toPlacementWorkplanePoint],
+    [onAddShape, onDropMyShape, pickPlacementSurface, toPlacementWorkplanePoint],
   );
 
   /** Zooms to the selection; false when there is none to look at. */
@@ -10369,6 +10440,7 @@ export function WorkplaneViewport({
               onPointPointerUp={handleTapePointPointerUp}
               onSegmentPointerDown={handleTapeSegmentPointerDown}
               onMarkMiddle={onAddReferencePoints ? markTapeMiddle : undefined}
+              onEditLength={beginTapeLengthEdit}
             />
           ) : null}
           {!workplaneMode && !splitActive && rulerDimensionOverlay && rulerDimensionOverlay.items.length > 0 ? (
@@ -10441,6 +10513,24 @@ export function WorkplaneViewport({
               onKeyDown={(event) => {
                 if (event.key === "Enter") commitRulerCoordinateEdit();
                 if (event.key === "Escape") cancelRulerCoordinateEdit();
+              }}
+            />
+          ) : null}
+          {tapeLengthEditing ? (
+            <input
+              className="dimension-input tape-length-input"
+              style={{ "--overlay-x": `${tapeLengthEditing.x}px`, "--overlay-y": `${tapeLengthEditing.y}px` } as CSSProperties}
+              value={tapeLengthEditing.value}
+              autoFocus
+              inputMode="decimal"
+              aria-label={t("camera.tapeTypeLength")}
+              onPointerDown={(event) => event.stopPropagation()}
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) => setTapeLengthEditing((edit) => edit && { ...edit, value: event.target.value })}
+              onBlur={commitTapeLengthEdit}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") commitTapeLengthEdit();
+                if (event.key === "Escape") setTapeLengthEditing(null);
               }}
             />
           ) : null}

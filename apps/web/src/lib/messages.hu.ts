@@ -2478,6 +2478,7 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "camera.deleteMeasurement": "Mérésrész törlése",
   "camera.deleteAllMeasurements": "Minden mérés törlése",
   "camera.tapeMarkMiddle": "A felezőpont megjelölése referenciapontként",
+  "camera.tapeTypeLength": "Hossz beírása: a második pontnál lévő test a vonal mentén mozdul",
   "camera.sectionView": "Metszeti nézet",
   "camera.sectionActive": "Metszet aktív",
   "camera.sectionInactive": "Metszet inaktív",

@@ -2446,6 +2446,7 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "camera.deleteMeasurement": "Elimina una parte della misurazione",
   "camera.deleteAllMeasurements": "Elimina tutte le misurazioni",
   "camera.tapeMarkMiddle": "Segna il punto medio come riferimento",
+  "camera.tapeTypeLength": "Digita una lunghezza: il corpo al secondo punto si sposta lungo la linea",
   "camera.sectionView": "Vista in sezione",
   "camera.sectionActive": "Sezione attiva",
   "camera.sectionInactive": "Sezione inattiva",

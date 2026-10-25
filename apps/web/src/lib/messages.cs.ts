@@ -63,6 +63,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "camera.tapeWholeEdges": "Měřit celé hrany",
   "camera.tapeWholeEdgesHint": "Při zapnutí změří kliknutí celou hranu, například obvod kružnice. Při vypnutí umístí na hranu měřicí bod pro průměr nebo jinou vzdálenost. Alt režim pro jedno kliknutí obrátí. Na kružnici se přichytává protilehlý bod pro přesné změření průměru.",
   "camera.tapeMarkMiddle": "Označit střed referenčním bodem",
+  "camera.tapeTypeLength": "Zadejte délku: těleso u druhého bodu se posune podél čáry",
   "point.deleteAll": "Odstranit všechny ({count})",
   "notice.sendingAllToServer": "Přesouvání na server: {done} z {count}…",
   "notice.sentAllOne": "1 projekt je na serveru.",

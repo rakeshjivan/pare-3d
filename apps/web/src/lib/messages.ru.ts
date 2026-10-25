@@ -2584,6 +2584,7 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "camera.deleteMeasurement": "Удалить часть измерения",
   "camera.deleteAllMeasurements": "Удалить все измерения",
   "camera.tapeMarkMiddle": "Отмечать середину как опорную точку",
+  "camera.tapeTypeLength": "Введите длину: тело во второй точке сдвинется вдоль линии",
   "camera.sectionView": "Вид в разрезе",
   "camera.sectionActive": "Разрез включён",
   "camera.sectionInactive": "Разрез выключен",

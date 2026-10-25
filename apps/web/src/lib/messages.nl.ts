@@ -2593,6 +2593,7 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "camera.deleteMeasurement": "Deel van meting verwijderen",
   "camera.deleteAllMeasurements": "Alle metingen verwijderen",
   "camera.tapeMarkMiddle": "Midden als referentiepunt markeren",
+  "camera.tapeTypeLength": "Lengte typen: het lichaam bij het tweede punt schuift langs de lijn",
   "camera.sectionView": "Doorsnede",
   "camera.sectionActive": "Doorsnede actief",
   "camera.sectionInactive": "Doorsnede inactief",

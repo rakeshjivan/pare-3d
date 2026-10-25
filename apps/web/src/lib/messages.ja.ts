@@ -2462,6 +2462,7 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "camera.deleteMeasurement": "寸法の一部を削除",
   "camera.deleteAllMeasurements": "すべての寸法を削除",
   "camera.tapeMarkMiddle": "真ん中を基準点にする",
+  "camera.tapeTypeLength": "長さを入力:2点目の形状が線に沿って移動します",
   "camera.sectionView": "断面表示",
   "camera.sectionActive": "断面表示オン",
   "camera.sectionInactive": "断面表示オフ",

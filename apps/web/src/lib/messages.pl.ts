@@ -2525,6 +2525,7 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "camera.deleteMeasurement": "Usuń część pomiaru",
   "camera.deleteAllMeasurements": "Usuń wszystkie pomiary",
   "camera.tapeMarkMiddle": "Zaznacz środek jako punkt odniesienia",
+  "camera.tapeTypeLength": "Wpisz długość: bryła przy drugim punkcie przesuwa się wzdłuż linii",
   "camera.sectionView": "Widok przekroju",
   "camera.sectionActive": "Przekrój włączony",
   "camera.sectionInactive": "Przekrój wyłączony",

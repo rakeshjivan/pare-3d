@@ -2489,6 +2489,7 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "camera.deleteMeasurement": "Ölçüm parçasını sil",
   "camera.deleteAllMeasurements": "Tüm ölçümleri sil",
   "camera.tapeMarkMiddle": "Ortayı referans noktası olarak işaretle",
+  "camera.tapeTypeLength": "Uzunluk yazın: ikinci noktadaki gövde çizgi boyunca kayar",
   "camera.sectionView": "Kesit görünümü",
   "camera.sectionActive": "Kesit etkin",
   "camera.sectionInactive": "Kesit etkin değil",
