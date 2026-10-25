@@ -1,6 +1,6 @@
 import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
 import { beforeAll, describe, expect, it } from "vitest";
-import { analyseDental, looksLikeDentalScan, makeDentalStudio, pinchedEdges, type DentalStudioOptions } from "@/lib/dentalModel";
+import { analyseDental, looksLikeDentalScan, makeDentalArchPart, makeDentalStudio, pinchedEdges, type DentalStudioOptions } from "@/lib/dentalModel";
 import { closeToFloor, orthoOutline } from "@/lib/dentalBase";
 import { labelSection, labelText } from "@/lib/dentalLabel";
 import { weld } from "@/lib/dentalMesh";
@@ -178,6 +178,28 @@ describe("Dental Studio (build 47)", () => {
     expect(b.minZ).toBeCloseTo(0, 3);
     expect(Math.max(a.minX, b.minX)).toBeGreaterThan(Math.min(a.maxX, b.maxX));
   }, 60_000);
+
+  it("makes the same pair when one arch is made apart, as the second worker does (build 68)", async () => {
+    const upper = syntheticArch({ teethDown: true, front: -2 });
+    const lower = syntheticArch();
+    for (let i = 2; i < lower.length; i += 3) lower[i] -= 26.6;
+    const inputOf = () => ({ arches: [{ id: "x", positions: Float32Array.from(lower) }, { id: "y", positions: Float32Array.from(upper) }] });
+    const options = { ...base, hinge: true, layout: "print" as const };
+    const whole = await makeDentalStudio(inputOf(), options, runtime as never);
+    const apart = await makeDentalStudio(inputOf(), options, runtime as never, { index: 1, part: makeDentalArchPart(inputOf(), options, 1, runtime as never) });
+    expect(apart.parts.map((part) => part.role)).toEqual(whole.parts.map((part) => part.role));
+    apart.parts.forEach((part, i) => {
+      expect(closedVolume(runtime, part.positions).status).toBe("NoError");
+      expect(pinchedEdges(part.positions)).toBe(0);
+      expect(part.volume).toBeCloseTo(whole.parts[i].volume, 1);
+      expect(part.height).toBeCloseTo(whole.parts[i].height, 4);
+    });
+    expect(apart.warnings).toEqual(whole.warnings);
+    expect(apart.opening).toBe(whole.opening);
+    // An arch that could not be made apart is made here after all.
+    const fallback = await makeDentalStudio(inputOf(), options, runtime as never, { index: 1, part: Promise.reject(new Error("worker gone")) });
+    expect(fallback.parts.map((part) => part.volume)).toEqual(whole.parts.map((part) => part.volume));
+  }, 120_000);
 
   it("starts each preset from the settings the evidence points to", () => {
     expect(dentalPreset("study", 16, false)).toMatchObject({ inside: "open", baseStyle: "clean", keep: null });

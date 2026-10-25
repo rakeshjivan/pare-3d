@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 68,
+    items: [
+      "Dental Studio makes the upper and lower of a pair at the same time, in two background workers, instead of one after the other. On a computer with four or more cores an articulated pair comes out about a third sooner.",
+      "Importing a scan is quicker: the check that the mesh is closed runs about nine times faster, with the same result.",
+      "3MF files - for export and for Send to Bambu Studio - are now made in the background, so the editor keeps answering while a large model is packed.",
+      "Fixed: a tooth area corrected by hand in Dental Studio (Fix by hand) was left out when the models were made in the background, so the automatic area was used instead. It is used now.",
+    ],
+  },
+  {
     build: 67,
     items: [
       "Big meshes no longer hold the editor up: grouping, cutting and splitting, reading STL and OBJ files, packing 3MF files (Send to Bambu Studio too), the print estimate and simplifying now run in the background, so the view keeps turning and the buttons keep answering while a large scan is worked on. Opening a project no longer starts hundreds of helpers at once.",
