@@ -111,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     /// The runtime of the serve.mjs this app carries (RUNTIME_VERSION there).
-    private let ownRuntime = 5
+    private let ownRuntime = 6
 
     /// Fork (build 29): a Pare 3D server already on the port is reused only when it is at least as new as
     /// this app - its runtime and the build it serves. One left running by an older app is replaced,

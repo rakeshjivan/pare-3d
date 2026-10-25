@@ -53,7 +53,7 @@ say() { # a message the person sees even without a terminal
 }
 fetch() { if command -v curl >/dev/null 2>&1; then curl -s --max-time 1 "$@"; else wget -q -T 1 -O - "$@"; fi; }
 is_ours() { [ "$(fetch "http://localhost:$1/__pare3d")" = "pare3d" ]; }
-OWN_RUNTIME=5
+OWN_RUNTIME=6
 OWN_BUILD="$(tr -dc '0-9' < "$HERE/app/pare-build.txt" 2>/dev/null)"; OWN_BUILD="${OWN_BUILD:-0}"
 is_current() {
   local state runtime serving

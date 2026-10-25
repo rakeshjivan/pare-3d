@@ -147,20 +147,28 @@ function windowsProgramRoots() {
 
 /** A program whose file name matches, up to three folders down from the roots (Formlabs\PreForm\PreForm.exe). */
 async function findProgram(roots, patterns, depth = 3) {
+  // Names, then stat for each: Dirent types are not reliable under every runtime on Windows.
   const visit = async (dir, left) => {
-    let entries = [];
+    let names = [];
     try {
-      entries = await readdir(dir, { withFileTypes: true });
+      names = await readdir(dir);
     } catch {
       return null;
     }
-    for (const entry of entries) {
-      if (entry.isFile() && patterns.some((pattern) => pattern.test(entry.name)) && !NOT_THE_APP.test(entry.name)) return join(dir, entry.name);
+    const folders = [];
+    for (const name of names) {
+      let info = null;
+      try {
+        info = await stat(join(dir, name));
+      } catch {
+        continue;
+      }
+      if (info.isFile() && patterns.some((pattern) => pattern.test(name)) && !NOT_THE_APP.test(name)) return join(dir, name);
+      if (info.isDirectory()) folders.push(join(dir, name));
     }
     if (left <= 0) return null;
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const found = await visit(join(dir, entry.name), left - 1);
+    for (const folder of folders) {
+      const found = await visit(folder, left - 1);
       if (found) return found;
     }
     return null;
@@ -720,7 +728,10 @@ createServer(async (req, res) => {
     return;
   }
   if (path === "/__slicers") {
-    json(res, 200, { runtime: RUNTIME_VERSION, installed: await installedSlicers(), names: Object.fromEntries(Object.entries(SLICERS).map(([id, slicer]) => [id, slicer.name])) });
+    const answer = { runtime: RUNTIME_VERSION, installed: await installedSlicers(), names: Object.fromEntries(Object.entries(SLICERS).map(([id, slicer]) => [id, slicer.name])) };
+    // For the release checks: where it looked.
+    if (url.searchParams.get("debug") === "1") answer.searched = platform() === "win32" ? windowsProgramRoots() : [join(homedir(), "Applications"), "/Applications"];
+    json(res, 200, answer);
     return;
   }
   const file = await resolveFile(path);

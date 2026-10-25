@@ -69,12 +69,20 @@ Copy-Item "$env:SystemRoot\System32\whoami.exe" (Join-Path $Pf "Formlabs\PreForm
 $savedPf = $env:ProgramFiles
 $env:ProgramFiles = $Pf
 $env:PORT = "47292"
-$server = Start-Process -FilePath (Join-Path $App "bun.exe") -ArgumentList "`"$(Join-Path $App 'serve.mjs')`"" -WorkingDirectory $App -PassThru -WindowStyle Hidden
+# The server from this commit (the same file the download carries in a release run), so a fix can be
+# tried on the "windows-check" branch without a full rebuild.
+$serveFile = Join-Path $PSScriptRoot "..\..\mac\serve.mjs"
+if (-not (Test-Path $serveFile)) { $serveFile = Join-Path $App "serve.mjs" }
+$server = Start-Process -FilePath (Join-Path $App "bun.exe") -ArgumentList "`"$serveFile`"" -WorkingDirectory $App -PassThru -WindowStyle Hidden
 Wait-For "server answers" 30 { (Get-Text "http://127.0.0.1:47292/__pare3d") -eq "pare3d" }
 $env:ProgramFiles = $savedPf
-$slicers = Get-Text "http://127.0.0.1:47292/__slicers" | ConvertFrom-Json
+$slicersText = Get-Text "http://127.0.0.1:47292/__slicers?debug=1"
+$slicers = $slicersText | ConvertFrom-Json
 Write-Host "installed slicers: $($slicers.installed -join ', ')"
-if (-not ($slicers.installed -contains "preform") -or -not ($slicers.installed -contains "chitubox")) { throw "Send to a slicer did not find PreForm and CHITUBOX" }
+if (-not ($slicers.installed -contains "preform") -or -not ($slicers.installed -contains "chitubox")) {
+  $listing = (Get-ChildItem -Recurse $Pf | ForEach-Object { $_.FullName }) -join "; "
+  throw "Send to a slicer did not find PreForm and CHITUBOX. Server said: $slicersText. Files: $listing"
+}
 $sent = Invoke-WebRequest -UseBasicParsing -Method Post -Headers @{ "x-pare3d-send" = "1" } -ContentType "application/octet-stream" -Body ([byte[]](1, 2, 3)) "http://127.0.0.1:47292/__send-to-slicer?app=preform&name=check.stl" | Select-Object -ExpandProperty Content | ConvertFrom-Json
 if (-not $sent.opened) { throw "PreForm was not opened: $($sent.error)" }
 if (-not (Test-Path $sent.path)) { throw "the file sent to PreForm was not saved" }
