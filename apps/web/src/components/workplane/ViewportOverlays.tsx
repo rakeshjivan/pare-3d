@@ -1649,6 +1649,7 @@ export function CornerRulerToolOverlay({
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={() => onCoordinateClick(item.id, selected.shapeIds, axis, value, label.x, label.y)}
                     >
+                      <span className="ruler-coordinate-axis" aria-hidden="true">{axisName.toLowerCase()}</span>
                       {label.text}
                     </button>
                   </span>
