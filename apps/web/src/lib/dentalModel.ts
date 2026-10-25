@@ -659,9 +659,32 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
     rings.forEach((ring) => ring.forEach(([, y]) => { front = Math.min(front, y); }));
     let fMin = Infinity, fMax = -Infinity;
     rings.forEach((ring) => ring.forEach(([x, y]) => { if (y < front + 4) { fMin = Math.min(fMin, x); fMax = Math.max(fMax, x); } }));
-    const stop = options.incisalStop !== false && Number.isFinite(front) && Number.isFinite(fMin) ? { y: front, x: (fMin + fMax) / 2 } : null;
+    // Build 61: where each base's own outline crosses the pin's line, so each arm joins its own model.
+    // On the midline (x = 0 in the pair's frame), between the central incisors, where the front reaches it.
+    const stopX = fMin < 0 && fMax > 0 ? 0 : (fMin + fMax) / 2;
+    const frontAt = (role: "upper" | "lower") => {
+      let least = Infinity;
+      built.forEach(({ arch, built: b }) => {
+        if (arch.role !== role) return;
+        for (const ring of role === "upper" ? b.footprint.map(mirrorRing) : b.footprint) {
+          for (let i = 0; i < ring.length; i += 1) {
+            const [ax, ay] = ring[i], [bx, by] = ring[(i + 1) % ring.length];
+            if ((ax - stopX) * (bx - stopX) > 0 || ax === bx) continue;
+            least = Math.min(least, ay + ((stopX - ax) / (bx - ax)) * (by - ay));
+          }
+        }
+      });
+      return least;
+    };
+    const upperY = frontAt("upper"), lowerY = frontAt("lower");
+    const stop = options.incisalStop !== false && Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY } : null;
     const motion = { condyle: options.condyle ?? 0, pinRaise: options.pinRaise ?? 0, table: options.incisalTable ?? "flat" } as const;
-    const parts = hingeParts(runtime, back, xMin, xMax, depth, -depth, options.hingeFit ?? HINGE_CLEARANCE, stop, motion);
+    const backOf = (role: "upper" | "lower") => {
+      let most = -Infinity;
+      built.forEach(({ arch, built: b }) => { if (arch.role === role) (role === "upper" ? b.footprint.map(mirrorRing) : b.footprint).forEach((ring) => ring.forEach(([, y]) => { most = Math.max(most, y); })); });
+      return most;
+    };
+    const parts = hingeParts(runtime, back, xMin, xMax, depth, -depth, options.hingeFit ?? HINGE_CLEARANCE, stop, motion, { upper: backOf("upper"), lower: backOf("lower") });
     solids = built.map(({ arch }, i) => {
       const joined = runtime.Manifold.union(solids[i], arch.role === "upper" ? parts.upper : parts.lower);
       toFree.push(solids[i]);

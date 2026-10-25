@@ -580,7 +580,8 @@ const box = (runtime: ManifoldRuntime, x0: number, x1: number, y0: number, y1: n
 const axleAlongX = (runtime: ManifoldRuntime, radius: number, x0: number, x1: number, y: number, z: number) =>
   runtime.Manifold.cylinder(x1 - x0, radius, radius, 64).rotate([0, 90, 0]).translate([x0, y, z]);
 
-export type HingeFront = { y: number; x: number };
+/** Where the incisal pin goes: its x, and the front of each model's base there (the pair's frame). */
+export type HingeFront = { x: number; upperY: number; lowerY: number };
 
 /** Protrusion paths the hinge can offer (build 60), degrees below the occlusal plane; 0 is a plain hinge. */
 export const HINGE_CONDYLE_ANGLES = [0, 15, 20, 25, 30, 35, 40, 45] as const;
@@ -633,9 +634,9 @@ const prismAlongX = (runtime: ManifoldRuntime, ring: Ring, x0: number, x1: numbe
  *   clear in front of the model and meeting in the occlusal plane, so the models close to the
  *   scanned bite every time and the stop, not the teeth, takes the load.
  * - Build 60: `motion` adds a protrusion path, a raised pin and a sloped guide table (HingeMotion).
- * A bar along the back of each base joins its parts to it.
+ * A bar along the back of each base joins its parts to it, reaching into that base's own back (`backs`).
  */
-export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number, xMax: number, floorUpper: number, floorLower: number, clearance = HINGE_CLEARANCE, front: HingeFront | null = null, motion: HingeMotion = {}) {
+export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number, xMax: number, floorUpper: number, floorLower: number, clearance = HINGE_CLEARANCE, front: HingeFront | null = null, motion: HingeMotion = {}, backs: { upper: number; lower: number } | null = null) {
   const r = HINGE_AXLE_RADIUS, bore = r + Math.max(0.05, clearance);
   const angle = Math.max(0, Math.min(60, motion.condyle ?? 0)) * deg;
   const path = angle > 0 ? HINGE_PATH_LENGTH : 0;
@@ -654,8 +655,10 @@ export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number,
   // The bearing block: 4 mm round the axle behind it, and round the whole slot in front.
   const yBack = ay + 4, yFront = back + 2;
   const clipBottom = dz - (bore + 1.8);
-  const lowerParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, back - 4, yBack, floorLower, floorLower + 4))];
-  const upperParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, back - 4, yBack, floorUpper - 4, floorUpper))];
+  // Build 61: each bar reaches 4 mm into its own model's back, wherever that is - a shorter arch's
+  // base ends in front of the other's, and a bar measured from the longer one would miss it.
+  const lowerParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, Math.min(back, backs?.lower ?? back) - 4, yBack, floorLower, floorLower + 4))];
+  const upperParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, Math.min(back, backs?.upper ?? back) - 4, yBack, floorUpper - 4, floorUpper))];
   const cuts: ManifoldSolid[] = [];
   for (const c of centres) {
     lowerParts.push(
@@ -673,24 +676,27 @@ export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number,
     cuts.push(keep(box(runtime, c - clipHalf - 1, c + clipHalf + 1, ay - (r - HINGE_SNAP / 2), ay + (r - HINGE_SNAP / 2), clipBottom - 1, 0)));
   }
   if (front) {
-    // The stop: 6 mm posts standing clear in front of the model (2 to 8 mm out), meeting in the
-    // occlusal plane - or `pinRaise` above it - each joined to its base only through the base's
-    // bottom 4 mm, never near the teeth.
-    const y0 = front.y - 8, y1 = front.y - 2;
+    // Build 61: a slim incisal pin, as on an articulator - a 3 mm pin down from the upper onto a
+    // 5 mm table up from the lower, standing 6 mm in front of whichever model reaches further, so
+    // the front teeth stay in view. Each is carried on a 4 mm arm along the bottom of its own base,
+    // reaching 3 mm into that base at its own front (never near the teeth).
+    const yp = Math.min(front.upperY, front.lowerY) - 6;
     const raise = Math.max(0, Math.min(5, motion.pinRaise ?? 0));
-    const x0 = front.x - 3, x1 = front.x + 3;
+    const x = front.x;
     if (motion.table === "guide") {
       // The table rises towards the back; the pin's tip is its front edge, its underside cut back
       // steeper than the table so only the tip touches as it rides up.
       const rise = Math.tan(INCISAL_TABLE_ANGLE * deg), relief = Math.tan((INCISAL_TABLE_ANGLE + 8) * deg);
-      lowerParts.push(keep(prismAlongX(runtime, [[y0, floorLower], [y1, floorLower], [y1, raise + (y1 - y0) * rise], [y0, raise]], x0, x1)));
-      upperParts.push(keep(prismAlongX(runtime, [[y0, raise], [y1, raise + (y1 - y0) * relief], [y1, floorUpper], [y0, floorUpper]], x0, x1)));
+      const tip = yp - 1.5;
+      lowerParts.push(keep(prismAlongX(runtime, [[yp - 2.5, floorLower], [yp + 2.5, floorLower], [yp + 2.5, raise + (yp + 2.5 - tip) * rise], [tip, raise], [yp - 2.5, raise]], x - 2.5, x + 2.5)));
+      upperParts.push(keep(prismAlongX(runtime, [[tip, raise], [yp + 1.5, raise + 3 * relief], [yp + 1.5, floorUpper], [tip, floorUpper]], x - 1.5, x + 1.5)));
     } else {
-      lowerParts.push(keep(box(runtime, x0, x1, y0, y1, floorLower, raise)));
-      upperParts.push(keep(box(runtime, x0, x1, y0, y1, raise, floorUpper)));
+      const column = (radius: number, z0: number, z1: number) => runtime.Manifold.cylinder(z1 - z0, radius, radius, 32).translate([x, yp, z0]);
+      lowerParts.push(keep(column(2.5, floorLower, raise)));
+      upperParts.push(keep(column(1.5, raise, floorUpper)));
     }
-    lowerParts.push(keep(box(runtime, x0, x1, y0, front.y + 3, floorLower, floorLower + 4)));
-    upperParts.push(keep(box(runtime, x0, x1, y0, front.y + 3, floorUpper - 4, floorUpper)));
+    lowerParts.push(keep(box(runtime, x - 2, x + 2, yp - 2.5, front.lowerY + 3, floorLower, floorLower + 3)));
+    upperParts.push(keep(box(runtime, x - 2, x + 2, yp - 1.5, front.upperY + 3, floorUpper - 3, floorUpper)));
   }
   const lower = runtime.Manifold.union(lowerParts);
   const joined = keep(runtime.Manifold.union(upperParts));

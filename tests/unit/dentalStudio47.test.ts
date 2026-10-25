@@ -408,8 +408,8 @@ describe("Build 58: the hinge sits on two wide bearings, fits close and stops at
 
   it("closes the clip round the axle by the chosen fit, and the stop meets in the occlusal plane", async () => {
     const { hingeParts } = await import("@/lib/dentalBase");
-    const tight = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { y: -30, x: 0 });
-    const loose = hingeParts(runtime, 25, -25, 25, 20, -20, 0.3, { y: -30, x: 0 });
+    const tight = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { x: 0, upperY: -30, lowerY: -30 });
+    const loose = hingeParts(runtime, 25, -25, 25, 20, -20, 0.3, { x: 0, upperY: -30, lowerY: -30 });
     // A looser fit takes more out of the clips.
     expect(loose.upper.volume()).toBeLessThan(tight.upper.volume());
     // The stop: the upper reaches down to z = 0 in front of the arch, the lower up to it.
@@ -461,8 +461,8 @@ describe("Build 60: protrusion path, incisal pin and guide table, opening check"
 
   it("raises the incisal pin and slopes the guide table up towards the back", async () => {
     const { hingeParts } = await import("@/lib/dentalBase");
-    const raised = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { y: -30, x: 0 }, { pinRaise: 2 });
-    const guide = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { y: -30, x: 0 }, { table: "guide" });
+    const raised = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { x: 0, upperY: -30, lowerY: -30 }, { pinRaise: 2 });
+    const guide = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { x: 0, upperY: -30, lowerY: -30 }, { table: "guide" });
     const top = (solid: typeof raised.lower, y: number) => {
       const piece = runtime.Manifold.intersection(solid, runtime.Manifold.cube([2, 0.4, 60]).translate([-1, y - 0.2, -30]));
       const b = piece.boundingBox();
@@ -473,8 +473,8 @@ describe("Build 60: protrusion path, incisal pin and guide table, opening check"
     expect(top(raised.lower, -35).max[2]).toBeCloseTo(2, 4);
     expect(top(raised.upper, -35).min[2]).toBeCloseTo(2, 4);
     // The table: level with the bite at its front edge, 30 degrees up towards the back.
-    expect(top(guide.lower, -37.6).max[2]).toBeLessThan(0.5);
-    expect(top(guide.lower, -32.4).max[2]).toBeGreaterThan(2.5);
+    expect(top(guide.lower, -37.8).max[2]).toBeLessThan(0.5);
+    expect(top(guide.lower, -33.4).max[2]).toBeGreaterThan(2);
     // The pin touches only at its front edge: clear of the table everywhere behind it.
     const overlap = runtime.Manifold.intersection(guide.upper, guide.lower);
     expect(overlap.volume()).toBeLessThan(0.01);
@@ -493,5 +493,36 @@ describe("Build 60: protrusion path, incisal pin and guide table, opening check"
     expect(angle).toBeGreaterThan(0);
     expect(angle).toBeLessThan(90);
     [parts.upper, parts.lower, wall, blocked].forEach((s) => s.delete());
+  });
+});
+
+describe("Build 61: a slim incisal pin, each half joined to its own base", () => {
+  let runtime: ManifoldToplevel;
+  beforeAll(async () => {
+    runtime = await manifoldModule();
+    runtime.setup();
+  });
+  it("keeps the pin 3 mm across and in front of the further model, and joins a lower that stops short", async () => {
+    const { hingeParts } = await import("@/lib/dentalBase");
+    // The lower's base front is 7 mm behind the upper's: the lower's arm must still reach it.
+    const parts = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { x: 0, upperY: -30, lowerY: -23 });
+    const pieces = (solid: typeof parts.lower, base: { delete: () => void } & typeof parts.lower) => {
+      const joined = runtime.Manifold.union(solid, base);
+      const list = joined.decompose();
+      const count = list.length;
+      list.forEach((p) => p.delete()); joined.delete(); base.delete();
+      return count;
+    };
+    const lowerBase = runtime.Manifold.cube([40, 50, 10]).translate([-20, -23, -20]);
+    const upperBase = runtime.Manifold.cube([40, 57, 10]).translate([-20, -30, 10]);
+    expect(pieces(parts.lower, lowerBase)).toBe(1);
+    expect(pieces(parts.upper, upperBase)).toBe(1);
+    // Slim: across the pin at the occlusal plane the upper is 3 mm wide, 6 mm in front of the upper's base.
+    const slab = runtime.Manifold.intersection(parts.upper, runtime.Manifold.cube([60, 30, 1]).translate([-30, -50, 1]));
+    const b = slab.boundingBox();
+    expect(b.max[0] - b.min[0]).toBeLessThan(3.1);
+    expect((b.min[1] + b.max[1]) / 2).toBeCloseTo(-36, 1);
+    slab.delete();
+    [parts.upper, parts.lower].forEach((s) => s.delete());
   });
 });

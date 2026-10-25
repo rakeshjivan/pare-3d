@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 61,
+    items: [
+      "Dental Studio makes models about 40% faster - a study model pair that took 39 seconds now takes about 23 - and the scans are checked faster as the panel opens. The models come out exactly the same, point for point: only the bookkeeping behind them changed (joining corners, checking the teeth are kept, and the final clean-up for the file).",
+      "The articulator's incisal stop is a slim pin now, like an articulator's: a 3 mm pin on the midline between the central incisors onto a small table, 6 mm in front of the models, carried on thin arms along the bottom of the bases - the front teeth stay in view. (It was a wall of two 6 mm posts the full height of the models.)",
+      "Fixed: when one arch reached further forward or further back than the other, the shorter model's half of the incisal stop, or its part of the hinge, could miss its base and print loose. Each half now reaches into its own model's base.",
+    ],
+  },
+  {
     build: 60,
     items: [
       "Hinge fit test: Dental Studio's articulator bearing printed small, once for each fit (0.1 to 0.3 mm). Snap each clip onto its axle, pick the tightest that turns without play, and Dental Studio uses that fit from then on. It is under Ready-made parts, and one click away from Hinge fit in Dental Studio.",

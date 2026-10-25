@@ -326,8 +326,7 @@ export function palateScore(m: Mesh, frame: THREE.Matrix4): number {
     const a = m.f[t] * 3, b = m.f[t + 1] * 3, c = m.f[t + 2] * 3;
     const x = (v[a] + v[b] + v[c]) / 3, y = (v[a + 1] + v[b + 1] + v[c + 1]) / 3, z = (v[a + 2] + v[b + 2] + v[c + 2]) / 3;
     if (z > -8 || !pointInPolygon(x, y, hull)) continue;
-    const near = grid.nearest(x, y, 0);
-    if (near && near[1] < 8) continue; // within 8 mm of the teeth: gum, not palate
+    if (grid.within(x, y, 0, 8)) continue; // within 8 mm of the teeth: gum, not palate
     covered += faceArea(m, t / 3);
   }
   return hullArea > 0 ? covered / hullArea : 0;

@@ -500,6 +500,37 @@ export function toManifold(runtime: ManifoldRuntime, m: Mesh): ManifoldSolid {
   return solid;
 }
 
+/**
+ * Build 61: which corners are the same point, as 32-bit floats (as an STL file holds them; -0 is 0):
+ * an id for each corner, numbered in the order points first appear. A hash table on the floats'
+ * bits, in place of a string per corner - the same answer, many times faster.
+ */
+export function samePointIds(coords: Float32Array): { ids: Int32Array; count: number } {
+  const n = Math.floor(coords.length / 3);
+  let cap = 1;
+  while (cap < n * 2) cap <<= 1;
+  const mask = cap - 1;
+  const slot = new Int32Array(cap).fill(-1);
+  const slotId = new Int32Array(cap);
+  const ids = new Int32Array(n);
+  const f = new Float32Array(1), u = new Uint32Array(f.buffer);
+  const bits = (v: number) => { f[0] = v + 0; return u[0]; };
+  let count = 0;
+  for (let i = 0; i < n; i += 1) {
+    const x = coords[i * 3], y = coords[i * 3 + 1], z = coords[i * 3 + 2];
+    let h = Math.imul(bits(x), 0x9e3779b1) ^ Math.imul(bits(y), 0x85ebca77) ^ Math.imul(bits(z), 0xc2b2ae3d);
+    h ^= h >>> 15;
+    let k = h & mask;
+    for (;;) {
+      const j = slot[k];
+      if (j < 0) { slot[k] = i; slotId[k] = count; ids[i] = count; count += 1; break; }
+      if (coords[j * 3] === x && coords[j * 3 + 1] === y && coords[j * 3 + 2] === z) { ids[i] = slotId[k]; break; }
+      k = (k + 1) & mask;
+    }
+  }
+  return { ids, count };
+}
+
 export function solidPositions(solid: ManifoldSolid): Float32Array {
   const mesh = solid.getMesh();
   const n = mesh.vertProperties.length / mesh.numProp;
@@ -509,16 +540,19 @@ export function solidPositions(solid: ManifoldSolid): Float32Array {
   // vertices at one place. Joined again on import they would make an edge of four faces, so each
   // copy is moved a few microns towards its own neighbours: apart, the solid welds back as
   // Manifold built it.
-  const at = new Map<string, number[]>();
+  // Compared as they will be written (32-bit floats): two corners a nanometre apart in Manifold's
+  // doubles land on one point in the file, and a slicer would read them as one.
+  const same = samePointIds(Float32Array.from(px));
+  const seen = new Int32Array(same.count);
+  for (let i = 0; i < n; i += 1) seen[same.ids[i]] += 1;
+  const groups = new Map<number, number[]>();
   for (let i = 0; i < n; i += 1) {
-    // Compared as they will be written (32-bit floats): two corners a nanometre apart in Manifold's
-    // doubles land on one point in the file, and a slicer would read them as one.
-    const key = `${Math.fround(px[i * 3])},${Math.fround(px[i * 3 + 1])},${Math.fround(px[i * 3 + 2])}`;
-    const list = at.get(key);
-    if (list) list.push(i);
-    else at.set(key, [i]);
+    const id = same.ids[i];
+    if (seen[id] < 2) continue;
+    const list = groups.get(id);
+    if (list) list.push(i); else groups.set(id, [i]);
   }
-  const doubled = [...at.values()].filter((list) => list.length > 1).flat();
+  const doubled = [...groups.values()].flat();
   if (doubled.length) {
     const wanted = new Set(doubled);
     const sum = new Map<number, [number, number, number, number]>();
@@ -540,7 +574,7 @@ export function solidPositions(solid: ManifoldSolid): Float32Array {
     });
     // Copies whose neighbours lie the same way (thin flaps stacked on each other) would land on one
     // point again, so each copy in a group goes a little further than the one before.
-    at.forEach((list) => {
+    groups.forEach((list) => {
       if (list.length < 2) return;
       list.forEach((v, j) => {
         const d = way.get(v) ?? [0, 0, 1];
@@ -577,31 +611,49 @@ export function solidPositions(solid: ManifoldSolid): Float32Array {
  */
 export function tidyForFile(soup: Float32Array): Float32Array {
   const count = soup.length / 3;
-  const ids = new Int32Array(count);
-  const at = new Map<string, number>();
-  const pts: number[] = [];
   // Corners are joined only where they are the same point, as an STL file is read.
+  const joined = samePointIds(soup);
+  const ids = joined.ids;
+  const pts: number[] = new Array(joined.count * 3);
+  const set = new Uint8Array(joined.count);
+  // Each point as it first appears.
   for (let i = 0; i < count; i += 1) {
-    const x = soup[i * 3], y = soup[i * 3 + 1], z = soup[i * 3 + 2];
-    const key = `${x},${y},${z}`;
-    let id = at.get(key);
-    if (id === undefined) { id = pts.length / 3; at.set(key, id); pts.push(x, y, z); }
-    ids[i] = id;
+    const id = ids[i];
+    if (set[id]) continue;
+    set[id] = 1;
+    pts[id * 3] = soup[i * 3]; pts[id * 3 + 1] = soup[i * 3 + 1]; pts[id * 3 + 2] = soup[i * 3 + 2];
   }
   // Drop collapsed triangles, and a triangle met by its own mirror image.
   let tris: number[] = [];
-  const faceOf = new Map<string, number>();
+  // Keyed by the corners in order (numbers, not strings): a * n + b, then c.
+  const faceOf = new KeyTable(count / 3);
+  const faceC = new KeyTable(count / 3);
+  const extra = new Map<string, number>();
+  const np = joined.count;
+  const faceLookup = (lo: number, mid: number, hi: number) => {
+    const key = lo * np + mid;
+    const c = faceC.get(key);
+    if (c === undefined) return undefined;
+    if (c === hi) return faceOf.get(key);
+    return extra.get(`${lo},${mid},${hi}`);
+  };
+  const faceStore = (lo: number, mid: number, hi: number, value: number) => {
+    const key = lo * np + mid;
+    const c = faceC.get(key);
+    if (c === undefined || c === hi) { faceC.set(key, hi); faceOf.set(key, value); }
+    else extra.set(`${lo},${mid},${hi}`, value);
+  };
   for (let t = 0; t < count; t += 3) {
     const a = ids[t], b = ids[t + 1], c = ids[t + 2];
     if (a === b || b === c || a === c) continue;
-    const sorted = [a, b, c].sort((x, y) => x - y).join(",");
-    const other = faceOf.get(sorted);
+    const lo = Math.min(a, b, c), hi = Math.max(a, b, c), mid = a + b + c - lo - hi;
+    const other = faceLookup(lo, mid, hi);
     if (other !== undefined && other >= 0) {
       const oa = tris[other], ob = tris[other + 1], oc = tris[other + 2];
       const same = (oa === a && ob === b && oc === c) || (oa === b && ob === c && oc === a) || (oa === c && ob === a && oc === b);
-      if (!same) { tris[other] = -1; faceOf.set(sorted, -1); continue; }
+      if (!same) { tris[other] = -1; faceStore(lo, mid, hi, -1); continue; }
     }
-    faceOf.set(sorted, tris.length);
+    faceStore(lo, mid, hi, tris.length);
     tris.push(a, b, c);
   }
   const dropped: number[] = [];
@@ -609,11 +661,8 @@ export function tidyForFile(soup: Float32Array): Float32Array {
   tris = dropped;
   const nt = tris.length / 3;
   const edgeKey = (a: number, b: number) => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
-  const edgeUse = new Map<number, number>();
-  for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) {
-    const key = edgeKey(tris[t * 3 + k], tris[t * 3 + ((k + 1) % 3)]);
-    edgeUse.set(key, (edgeUse.get(key) ?? 0) + 1);
-  }
+  const edgeUse = new KeyTable(nt * 2);
+  for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) edgeUse.add(edgeKey(tris[t * 3 + k], tris[t * 3 + ((k + 1) % 3)]));
   const corners = new Map<number, number[]>();
   for (let t = 0; t < nt; t += 1) for (let k = 0; k < 3; k += 1) {
     const v = tris[t * 3 + k];
@@ -812,16 +861,85 @@ export function soupBounds(positions: ArrayLike<number>) {
   return { min, max };
 }
 
-/** Points hashed into cubes of `cell` mm, for nearest-point questions. */
-export class PointGrid {
-  private cells = new Map<number, number[]>();
-  constructor(private points: ArrayLike<number>, private cell: number) {
-    for (let i = 0; i + 2 < points.length; i += 3) {
-      const key = this.key(Math.floor(points[i] / cell), Math.floor(points[i + 1] / cell), Math.floor(points[i + 2] / cell));
-      const list = this.cells.get(key);
-      if (list) list.push(i / 3);
-      else this.cells.set(key, [i / 3]);
+/**
+ * Build 61: a map from whole-number keys (below 2^53) to whole numbers, in typed arrays - for the
+ * millions of lookups making a model takes, where a Map spends most of its time on itself.
+ */
+export class KeyTable {
+  private keys: Float64Array;
+  private values: Int32Array;
+  private used: Uint8Array;
+  private mask: number;
+  size = 0;
+  constructor(expected = 16) {
+    let cap = 16;
+    while (cap < expected * 2) cap <<= 1;
+    this.keys = new Float64Array(cap);
+    this.values = new Int32Array(cap);
+    this.used = new Uint8Array(cap);
+    this.mask = cap - 1;
+  }
+  private slot(key: number) {
+    const lo = key >>> 0, hi = Math.floor(key / 4294967296) >>> 0;
+    let h = Math.imul(lo, 0x9e3779b1) ^ Math.imul(hi + 0x7f4a7c15, 0x85ebca77);
+    h ^= h >>> 15;
+    let k = h & this.mask;
+    while (this.used[k] && this.keys[k] !== key) k = (k + 1) & this.mask;
+    return k;
+  }
+  get(key: number): number | undefined {
+    const k = this.slot(key);
+    return this.used[k] ? this.values[k] : undefined;
+  }
+  set(key: number, value: number) {
+    let k = this.slot(key);
+    if (!this.used[k]) {
+      if ((this.size + 1) * 2 > this.keys.length) { this.grow(); k = this.slot(key); }
+      this.used[k] = 1; this.keys[k] = key; this.size += 1;
     }
+    this.values[k] = value;
+  }
+  /** Adds `by` to the key's value (0 when new) and returns the sum. */
+  add(key: number, by = 1) {
+    const value = (this.get(key) ?? 0) + by;
+    this.set(key, value);
+    return value;
+  }
+  private grow() {
+    const { keys, values, used } = this;
+    this.keys = new Float64Array(keys.length * 2);
+    this.values = new Int32Array(keys.length * 2);
+    this.used = new Uint8Array(keys.length * 2);
+    this.mask = keys.length * 2 - 1;
+    for (let i = 0; i < keys.length; i += 1) if (used[i]) { const k = this.slot(keys[i]); this.used[k] = 1; this.keys[k] = keys[i]; this.values[k] = values[i]; }
+  }
+}
+
+/**
+ * Points hashed into cubes of `cell` mm, for nearest-point questions. Build 61: each cube's points
+ * are kept in one flat list (in the order given), so a question reads typed arrays, not lists of lists.
+ */
+export class PointGrid {
+  private cells: KeyTable;
+  private start: Int32Array;
+  private order: Int32Array;
+  constructor(private points: ArrayLike<number>, private cell: number) {
+    const n = Math.floor(points.length / 3);
+    this.cells = new KeyTable(n);
+    const cellOf = new Int32Array(n);
+    const counts: number[] = [];
+    for (let i = 0; i < n; i += 1) {
+      const key = this.key(Math.floor(points[i * 3] / cell), Math.floor(points[i * 3 + 1] / cell), Math.floor(points[i * 3 + 2] / cell));
+      let id = this.cells.get(key);
+      if (id === undefined) { id = counts.length; this.cells.set(key, id); counts.push(0); }
+      cellOf[i] = id;
+      counts[id] += 1;
+    }
+    this.start = new Int32Array(counts.length + 1);
+    for (let c = 0; c < counts.length; c += 1) this.start[c + 1] = this.start[c] + counts[c];
+    const fill = this.start.slice(0, counts.length);
+    this.order = new Int32Array(n);
+    for (let i = 0; i < n; i += 1) this.order[fill[cellOf[i]]++] = i;
   }
   private key(x: number, y: number, z: number) {
     return ((x + 1024) * 2048 + (y + 1024)) * 2048 + (z + 1024);
@@ -829,12 +947,15 @@ export class PointGrid {
   /** The nearest point within one cell's reach, as [index, distance], or null. */
   nearest(x: number, y: number, z: number): [number, number] | null {
     const cx = Math.floor(x / this.cell), cy = Math.floor(y / this.cell), cz = Math.floor(z / this.cell);
+    const points = this.points, order = this.order, start = this.start;
     let best = -1, bestD = Infinity;
     for (let dx = -1; dx <= 1; dx += 1) for (let dy = -1; dy <= 1; dy += 1) for (let dz = -1; dz <= 1; dz += 1) {
-      const list = this.cells.get(this.key(cx + dx, cy + dy, cz + dz));
-      if (!list) continue;
-      for (const i of list) {
-        const d = (this.points[i * 3] - x) ** 2 + (this.points[i * 3 + 1] - y) ** 2 + (this.points[i * 3 + 2] - z) ** 2;
+      const id = this.cells.get(this.key(cx + dx, cy + dy, cz + dz));
+      if (id === undefined) continue;
+      for (let k = start[id], end = start[id + 1]; k < end; k += 1) {
+        const i = order[k];
+        const ex = points[i * 3] - x, ey = points[i * 3 + 1] - y, ez = points[i * 3 + 2] - z;
+        const d = ex * ex + ey * ey + ez * ez;
         if (d < bestD) {
           bestD = d;
           best = i;
@@ -842,6 +963,28 @@ export class PointGrid {
       }
     }
     return best < 0 ? null : [best, Math.sqrt(bestD)];
+  }
+  /**
+   * Build 61: whether a point lies within `reach` (no more than a cell) of (x, y, z) - looking only in
+   * the cubes that close a reach can touch, usually the one it is in.
+   */
+  within(x: number, y: number, z: number, reach: number): boolean {
+    const c = this.cell, r2 = reach * reach;
+    const fx = x / c, fy = y / c, fz = z / c;
+    const cx = Math.floor(fx), cy = Math.floor(fy), cz = Math.floor(fz);
+    const span = (f: number, i: number): [number, number] => [f - i < reach / c ? -1 : 0, i + 1 - f < reach / c ? 1 : 0];
+    const [x0, x1] = span(fx, cx), [y0, y1] = span(fy, cy), [z0, z1] = span(fz, cz);
+    const points = this.points, order = this.order, start = this.start;
+    for (let dx = x0; dx <= x1; dx += 1) for (let dy = y0; dy <= y1; dy += 1) for (let dz = z0; dz <= z1; dz += 1) {
+      const id = this.cells.get(this.key(cx + dx, cy + dy, cz + dz));
+      if (id === undefined) continue;
+      for (let k = start[id], end = start[id + 1]; k < end; k += 1) {
+        const i = order[k];
+        const ex = points[i * 3] - x, ey = points[i * 3 + 1] - y, ez = points[i * 3 + 2] - z;
+        if (ex * ex + ey * ey + ez * ez < r2) return true;
+      }
+    }
+    return false;
   }
 }
 
@@ -861,8 +1004,7 @@ export function surfaceKept(scan: Mesh, result: ArrayLike<number>, level: number
   const found = new Int8Array(scan.v.length / 3); // 0 unknown, 1 there, -1 gone
   const there = (i: number) => {
     if (!found[i]) {
-      const hit = grid.nearest(scan.v[i * 3], scan.v[i * 3 + 1], scan.v[i * 3 + 2]);
-      found[i] = hit && hit[1] < 0.01 ? 1 : -1;
+      found[i] = grid.within(scan.v[i * 3], scan.v[i * 3 + 1], scan.v[i * 3 + 2], 0.01) ? 1 : -1;
     }
     return found[i] === 1;
   };
