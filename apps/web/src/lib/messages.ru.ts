@@ -2331,6 +2331,8 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "gridfinity.halfGridHint": "Ширина и глубина считаются в клетках по 21 мм, у каждой своя ножка; четыре встают в одно гнездо базовой плиты.",
   "prop.gridfinityFloorHeight": "Высота дна",
   "gridfinity.floorHeightHint": "До этой высоты, считая от низа, контейнер сплошной: заготовка, в которой можно вырезать формы.",
+  "prop.gridfinityWallThickness": "Толщина стенок",
+  "gridfinity.wallThicknessHint": "Стенка отсчитывается от наружной стороны, которая не меняется. Со штабельным бортиком стенка толще 1,75 мм заканчивается уступом на 0,85 мм ниже отметки 7 мм на единицу высоты, не задевая ножки контейнера сверху.",
   "prop.gridfinityOpenBack": "Открыт сзади",
   "prop.gridfinityOpenFront": "Открыт спереди",
   "prop.gridfinityOpenLeft": "Открыт слева",

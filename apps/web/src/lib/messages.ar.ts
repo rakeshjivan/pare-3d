@@ -2322,6 +2322,8 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "gridfinity.halfGridHint": "تحسب الوحدات في العرض والعمق خلايا من 21 مم، لكل منها قدم خاصة بها؛ وتقف أربع منها في تجويف واحد من لوح الشبكة.",
   "prop.gridfinityFloorHeight": "ارتفاع الأرضية",
   "gridfinity.floorHeightHint": "حتى هذا الارتفاع، مقيسًا من الأسفل، تكون العلبة مصمتة: قطعة خام تقطع فيها الأشكال.",
+  "prop.gridfinityWallThickness": "سمك الجدار",
+  "gridfinity.wallThicknessHint": "يُقاس الجدار من الخارج الذي يبقى كما هو. مع حافة التكديس ينتهي الجدار الأسمك من 1.75 مم عند عتبة أخفض بمقدار 0.85 مم من 7 مم لكل وحدة ارتفاع، دون أن يلمس أقدام العلبة المكدّسة فوقها.",
   "prop.gridfinityOpenBack": "الجانب الخلفي مفتوح",
   "prop.gridfinityOpenFront": "الجانب الأمامي مفتوح",
   "prop.gridfinityOpenLeft": "الجانب الأيسر مفتوح",

@@ -2271,6 +2271,8 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "gridfinity.halfGridHint": "Genişlik ve derinlik birimleri 21 mm'lik hücreleri sayar, her birinin kendi ayağı vardır; dördü taban plakasının bir yuvasında durur.",
   "prop.gridfinityFloorHeight": "Zemin yüksekliği",
   "gridfinity.floorHeightHint": "Alt yüzeyden ölçülen bu yüksekliğe kadar kutu doludur: içine şekiller oyabileceğin bir ham parça.",
+  "prop.gridfinityWallThickness": "Duvar kalınlığı",
+  "gridfinity.wallThicknessHint": "Duvar, değişmeyen dış yüzeyden içeri doğru ölçülür. İstifleme kenarıyla 1,75 mm'den kalın bir duvar, yükseklik birimi başına 7 mm'nin 0,85 mm altında bir basamakta biter ve üstüne istiflenen kutunun ayaklarına değmez.",
   "prop.gridfinityOpenBack": "Arkası açık",
   "prop.gridfinityOpenFront": "Önü açık",
   "prop.gridfinityOpenLeft": "Solu açık",

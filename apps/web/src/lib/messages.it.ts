@@ -2227,6 +2227,8 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "gridfinity.halfGridHint": "Le unità in larghezza e in profondità contano celle da 21 mm, ognuna con il proprio piede; quattro stanno in un alloggio della base a griglia.",
   "prop.gridfinityFloorHeight": "Altezza del fondo",
   "gridfinity.floorHeightHint": "Fino a questa altezza, misurata dal lato inferiore, il contenitore è pieno: un grezzo in cui ritagliare forme.",
+  "prop.gridfinityWallThickness": "Spessore della parete",
+  "gridfinity.wallThicknessHint": "La parete si misura dall'esterno, che non cambia. Con il bordo di impilamento, una parete oltre 1,75 mm si ferma su un gradino 0,85 mm sotto 7 mm per unità di altezza, senza toccare i piedini di un contenitore impilato sopra.",
   "prop.gridfinityOpenBack": "Aperto dietro",
   "prop.gridfinityOpenFront": "Aperto davanti",
   "prop.gridfinityOpenLeft": "Aperto a sinistra",

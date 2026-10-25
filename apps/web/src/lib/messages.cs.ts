@@ -2349,6 +2349,8 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "gridfinity.halfGridHint": "Jednotky do šířky a do hloubky počítají buňky po 21 mm, každou s vlastní nožkou; čtyři stojí v jednom lůžku nosné desky.",
   "prop.gridfinityFloorHeight": "Výška dna",
   "gridfinity.floorHeightHint": "Až do této výšky, měřeno od spodku, je krabička plná: polotovar, do kterého vyříznete tvary.",
+  "prop.gridfinityWallThickness": "Tloušťka stěny",
+  "gridfinity.wallThicknessHint": "Stěna se měří od vnější strany, která zůstává stejná. Se stohovacím okrajem končí stěna silnější než 1,75 mm u římsy 0,85 mm pod výškou 7 mm na výškovou jednotku, mimo nožky krabičky postavené navrch.",
   "prop.gridfinityOpenBack": "Otevřeno vzadu",
   "prop.gridfinityOpenFront": "Otevřeno vpředu",
   "prop.gridfinityOpenLeft": "Otevřeno vlevo",

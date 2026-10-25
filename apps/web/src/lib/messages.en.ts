@@ -2368,6 +2368,8 @@ export const MESSAGES_EN = {
   "gridfinity.halfGridHint": "Units across and deep count cells of 21 mm, each with a foot of its own; four stand in one socket of a baseplate.",
   "prop.gridfinityFloorHeight": "Floor height",
   "gridfinity.floorHeightHint": "The bin is solid from its underside up to this height, a blank to cut shapes into.",
+  "prop.gridfinityWallThickness": "Wall thickness",
+  "gridfinity.wallThicknessHint": "The wall is set in from the outside, which stays as it is. With the stacking lip, a wall over 1.75 mm stops at a ledge 0.85 mm under 7 mm per height unit, clear of a stacked bin's feet.",
   "prop.gridfinityOpenBack": "Open at the back",
   "prop.gridfinityOpenFront": "Open at the front",
   "prop.gridfinityOpenLeft": "Open on the left",

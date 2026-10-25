@@ -2323,6 +2323,8 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "gridfinity.halfGridHint": "Les unités en largeur et en profondeur comptent des cellules de 21 mm, chacune avec son propre pied ; quatre se posent dans un logement du socle.",
   "prop.gridfinityFloorHeight": "Hauteur du fond",
   "gridfinity.floorHeightHint": "Jusqu'à cette hauteur, mesurée depuis le dessous, le bac est plein : une ébauche dans laquelle découper des formes.",
+  "prop.gridfinityWallThickness": "Épaisseur de paroi",
+  "gridfinity.wallThicknessHint": "La paroi est mesurée depuis l'extérieur, qui ne change pas. Avec le rebord d'empilage, une paroi de plus de 1,75 mm s'arrête à un palier 0,85 mm sous 7 mm par unité de hauteur, sans toucher les pieds d'un bac empilé dessus.",
   "prop.gridfinityOpenBack": "Ouvert à l'arrière",
   "prop.gridfinityOpenFront": "Ouvert à l'avant",
   "prop.gridfinityOpenLeft": "Ouvert à gauche",

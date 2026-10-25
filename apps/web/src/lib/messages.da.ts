@@ -2233,6 +2233,8 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "gridfinity.halfGridHint": "Enheder i bredden og dybden tæller celler på 21 mm, hver med sin egen fod; fire står i én fordybning i bundpladen.",
   "prop.gridfinityFloorHeight": "Bundens højde",
   "gridfinity.floorHeightHint": "Op til denne højde, målt fra undersiden, er bakken massiv: et emne, du kan skære former ud i.",
+  "prop.gridfinityWallThickness": "Vægtykkelse",
+  "gridfinity.wallThicknessHint": "Væggen måles fra ydersiden, som forbliver uændret. Med stabelkrave stopper en væg over 1,75 mm ved en afsats 0,85 mm under 7 mm pr. højdeenhed, fri af fødderne på en bakke stablet ovenpå.",
   "prop.gridfinityOpenBack": "Åben bagtil",
   "prop.gridfinityOpenFront": "Åben fortil",
   "prop.gridfinityOpenLeft": "Åben til venstre",

@@ -2305,6 +2305,8 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "gridfinity.halfGridHint": "Jednostki wszerz i w głąb liczą komórki po 21 mm, każdą z własną stopką; cztery stoją w jednym gnieździe podstawki.",
   "prop.gridfinityFloorHeight": "Wysokość dna",
   "gridfinity.floorHeightHint": "Do tej wysokości, mierząc od spodu, pojemnik jest pełny: półfabrykat, w którym wytniesz kształty.",
+  "prop.gridfinityWallThickness": "Grubość ścianki",
+  "gridfinity.wallThicknessHint": "Ścianka jest mierzona od strony zewnętrznej, która się nie zmienia. Z kołnierzem piętrowania ścianka grubsza niż 1,75 mm kończy się występem 0,85 mm poniżej 7 mm na jednostkę wysokości, nie dotykając stopek pojemnika postawionego na górze.",
   "prop.gridfinityOpenBack": "Otwarty z tyłu",
   "prop.gridfinityOpenFront": "Otwarty z przodu",
   "prop.gridfinityOpenLeft": "Otwarty z lewej",

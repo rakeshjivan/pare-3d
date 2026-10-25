@@ -2368,6 +2368,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "gridfinity.halfGridHint": "Einheiten breit und tief zählen Zellen von 21 mm, jede mit einem eigenen Fuß; vier stehen in einer Mulde der Bodenplatte.",
   "prop.gridfinityFloorHeight": "Bodenhöhe",
   "gridfinity.floorHeightHint": "Bis zu dieser Höhe, von der Unterseite an gemessen, ist der Behälter massiv: ein Rohling, in den du Formen schneidest.",
+  "prop.gridfinityWallThickness": "Wandstärke",
+  "gridfinity.wallThicknessHint": "Die Wand wird von außen nach innen gemessen; die Außenseite bleibt, wie sie ist. Mit Stapelrand endet eine Wand von mehr als 1,75 mm an einem Absatz 0,85 mm unter 7 mm je Höheneinheit, mit Abstand zu den Füßen eines darauf gestapelten Behälters.",
   "prop.gridfinityOpenBack": "Hinten offen",
   "prop.gridfinityOpenFront": "Vorne offen",
   "prop.gridfinityOpenLeft": "Links offen",

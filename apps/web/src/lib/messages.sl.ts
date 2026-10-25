@@ -1760,6 +1760,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "gridfinity.halfGridHint": "Enote v širino in globino štejejo celice po 21 mm, vsako s svojo nogo; štiri stojijo v enem ležišču podstavka.",
   "prop.gridfinityFloorHeight": "Višina dna",
   "gridfinity.floorHeightHint": "Do te višine, merjeno od spodnje strani, je posoda polna: surovec, v katerega izrežeš oblike.",
+  "prop.gridfinityWallThickness": "Debelina stene",
+  "gridfinity.wallThicknessHint": "Stena se meri od zunanje strani, ki ostane enaka. Z obrobo za zlaganje se stena, debelejša od 1,75 mm, konča na stopnici 0,85 mm pod višino 7 mm na višinsko enoto, stran od nogic posode, zložene na vrh.",
   "prop.gridfinityOpenBack": "Odprto zadaj",
   "prop.gridfinityOpenFront": "Odprto spredaj",
   "prop.gridfinityOpenLeft": "Odprto levo",

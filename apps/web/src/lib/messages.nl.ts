@@ -2338,6 +2338,8 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "gridfinity.halfGridHint": "Eenheden breed en diep tellen cellen van 21 mm, elk met een eigen voet; vier staan in één vak van een draagplaat.",
   "prop.gridfinityFloorHeight": "Bodemhoogte",
   "gridfinity.floorHeightHint": "Tot deze hoogte, gemeten vanaf de onderkant, is de bak massief: een blok om vormen in uit te snijden.",
+  "prop.gridfinityWallThickness": "Wanddikte",
+  "gridfinity.wallThicknessHint": "De wand wordt gemeten vanaf de buitenkant, die blijft zoals hij is. Met stapellip stopt een wand boven 1,75 mm bij een richel 0,85 mm onder 7 mm per hoogte-eenheid, vrij van de voeten van een bak die erop staat.",
   "prop.gridfinityOpenBack": "Achter open",
   "prop.gridfinityOpenFront": "Voor open",
   "prop.gridfinityOpenLeft": "Links open",

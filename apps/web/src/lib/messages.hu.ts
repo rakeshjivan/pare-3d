@@ -2260,6 +2260,8 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "gridfinity.halfGridHint": "A szélességi és mélységi egységek 21 mm-es cellákat számolnak, mindegyiknek saját lába van; négy áll az alapkeret egy fészkében.",
   "prop.gridfinityFloorHeight": "Fenékmagasság",
   "gridfinity.floorHeightHint": "Eddig a magasságig, az aljától mérve, a rekesz tömör: nyersdarab, amelybe formákat vághatsz.",
+  "prop.gridfinityWallThickness": "Falvastagság",
+  "gridfinity.wallThicknessHint": "A falat kívülről befelé mérjük, a külső oldal nem változik. Halmozóperemmel az 1,75 mm-nél vastagabb fal egy párkánynál ér véget, 0,85 mm-rel a magassági egységenkénti 7 mm alatt, nem érve a ráhalmozott rekesz lábaihoz.",
   "prop.gridfinityOpenBack": "Nyitott hátul",
   "prop.gridfinityOpenFront": "Nyitott elöl",
   "prop.gridfinityOpenLeft": "Nyitott a bal oldalon",
