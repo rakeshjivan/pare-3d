@@ -66,8 +66,8 @@ New-Item -ItemType Directory -Force -Path (Join-Path $Pf "Formlabs\PreForm"), (J
 Copy-Item "$env:SystemRoot\System32\whoami.exe" (Join-Path $Pf "Formlabs\PreForm\PreForm.exe")
 Copy-Item "$env:SystemRoot\System32\whoami.exe" (Join-Path $Pf "CHITUBOX Basic\CHITUBOX Basic.exe")
 Copy-Item "$env:SystemRoot\System32\whoami.exe" (Join-Path $Pf "Formlabs\PreForm\Uninstall PreForm.exe")
-$savedPf = $env:ProgramFiles
-$env:ProgramFiles = $Pf
+# Windows sets ProgramFiles afresh for each process, so the stand-in folder is named to the server directly.
+$env:PARE3D_PROGRAM_ROOTS = $Pf
 $env:PORT = "47292"
 # The server from this commit (the same file the download carries in a release run), so a fix can be
 # tried on the "windows-check" branch without a full rebuild.
@@ -75,7 +75,7 @@ $serveFile = Join-Path $PSScriptRoot "..\..\mac\serve.mjs"
 if (-not (Test-Path $serveFile)) { $serveFile = Join-Path $App "serve.mjs" }
 $server = Start-Process -FilePath (Join-Path $App "bun.exe") -ArgumentList "`"$serveFile`"" -WorkingDirectory $App -PassThru -WindowStyle Hidden
 Wait-For "server answers" 30 { (Get-Text "http://127.0.0.1:47292/__pare3d") -eq "pare3d" }
-$env:ProgramFiles = $savedPf
+Remove-Item Env:PARE3D_PROGRAM_ROOTS
 $slicersText = Get-Text "http://127.0.0.1:47292/__slicers?debug=1"
 $slicers = $slicersText | ConvertFrom-Json
 Write-Host "installed slicers: $($slicers.installed -join ', ')"

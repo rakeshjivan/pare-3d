@@ -141,6 +141,8 @@ const NOT_THE_APP = /unins|uninstall|update|crash|helper|setup/i;
 
 /** The folders Windows programs are installed in. */
 function windowsProgramRoots() {
+  // Only for the automated Windows check: Windows sets ProgramFiles afresh for every process.
+  if (process.env.PARE3D_PROGRAM_ROOTS) return process.env.PARE3D_PROGRAM_ROOTS.split(";").filter(Boolean);
   const roots = [process.env.ProgramFiles || "C:\\Program Files", process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "Programs")];
   return [...new Set(roots)];
 }
