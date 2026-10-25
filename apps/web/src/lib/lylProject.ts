@@ -1,6 +1,7 @@
 import { checkedTypefaceData, customFontName, isCustomFontId, textCharacters, typefaceSubset } from "@/lib/customFonts";
 import { customFontEntry, registerCustomFont } from "@/lib/textFonts";
-import { strFromU8, strToU8, unzip, zip, type AsyncZippable } from "fflate";
+import { strFromU8, strToU8, unzip } from "fflate";
+import { boundedProjectZip } from "@/lib/boundedProjectZip";
 import { editorHistoryEntry, hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/editorHistory";
 import { normalizePlacementWorkplane, placementWorkplaneIsBase, type PlacementWorkplane } from "@/lib/placementWorkplane";
 import { importedShapeFromObj } from "@/lib/objImport";
@@ -961,17 +962,8 @@ function activeProjectIndexes(state: LylStateV1) {
   return { features, groups, sketches, exactCad };
 }
 
-function zipAsync(files: AsyncZippable, level: NonNullable<LylProjectExportInput["compressionLevel"]> = 6) {
-  return new Promise<Uint8Array>((resolve, reject) => {
-    // fflate encodes the ZIP entry mtime as a DOS date using local-time getters and
-    // rejects years outside 1980-2099. A UTC-pinned "1980-01-01T00:00:00Z" rolls back
-    // to 1979 in any timezone west of UTC, so build the epoch from local components to
-    // keep the year at exactly 1980 everywhere.
-    zip(files, { level, mtime: new Date(1980, 0, 1) }, (error, data) => {
-      if (error) reject(error);
-      else resolve(data);
-    });
-  });
+function zipAsync(files: ArchiveFiles, level: NonNullable<LylProjectExportInput["compressionLevel"]> = 6) {
+  return boundedProjectZip(files, level);
 }
 
 function unzipAsync(bytes: Uint8Array) {
