@@ -1,6 +1,6 @@
 "use client";
 
-import { AlignCenterHorizontal, AlignCenterVertical, Check, ChevronUp, CornerDownRight, Crop, Crosshair, FlipHorizontal2, FlipVertical2, Home, Layers, Link, Link2Off, LockKeyhole, LockKeyholeOpen, Minus, Plus, Ruler, RulerDimensionLine, Slash, Spline, Split, Trash2, Waves, X } from "lucide-react";
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, Check, ChevronUp, CornerDownRight, Crop, Crosshair, FlipHorizontal2, FlipVertical2, Home, Layers, Link, Link2Off, LockKeyhole, LockKeyholeOpen, Minus, Plus, Ruler, RulerDimensionLine, Slash, Spline, Split, Trash2, Waves, X } from "lucide-react";
 import { displayedHandle } from "@/lib/sketchBezierHandles";
 import { markEscapeHandled } from "@/lib/escapeHandled";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
@@ -31,6 +31,7 @@ import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, keyboardNudgeCoarseFact
 import type { GridSize, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchSegment, SketchStroke, SketchStrokeAlign, SketchStrokeCap, SketchStrokeJoin, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
 import { resizePointerOnGrid } from "@/lib/sketchFrameResize";
 import { resizeSketchPoints, resizeSketchPointsToSize, type ResizeHandle, type SelectionBounds } from "@/lib/sketchSelectionResize";
+import { alignSketchSelection, canAlignSketchSelection, type SketchAlignMode } from "@/lib/sketchAlign";
 import { changesLockedOutline, sketchLockState } from "@/lib/sketchLock";
 import { dragRotationDegrees, rotateSketchPointsAbout, sketchPointsPivot } from "@/lib/sketchRotation";
 import { calibrateImage, centreImage, cropImage, imageAngleTo, imageCorners, imageCropViewBox, imageHandlePositions, imageRotateHandle, imageToWorld, normalizeImageRotation, resizeImage, rotateImage, uncropImage } from "@/lib/sketchImageTransform";
@@ -862,6 +863,13 @@ export function SketchWorkspace({
   const selectedGeometryBounds = boundsForSketchPoints(selectedGeometryPoints);
   // A selection with a locked outline in it (#653) has no handles to stretch or turn it.
   const selectionLock = selected?.kind === "multiple" ? sketchLockState(profile, selected.pointIds) : "none";
+  // Two outlines or more selected: they can be lined up on each other (#836).
+  const canAlignOutlines = selected?.kind === "multiple" && canAlignSketchSelection(profile, selected.pointIds);
+  const alignOutlines = (mode: SketchAlignMode) => {
+    if (selected?.kind !== "multiple") return;
+    const moved = alignSketchSelection(profile, selected.pointIds, mode);
+    if (moved) onTransformPoints(moved, t("sketch.aligned"));
+  };
   const selectionLocked = selectionLock !== "none";
   const isPointSelected = (id: string) => selected?.kind === "point" ? selected.id === id : selected?.kind === "multiple" ? selected.pointIds.includes(id) : false;
   const isSegmentSelected = (id: string) => selected?.kind === "segment" ? selected.id === id : selected?.kind === "multiple" ? selected.segmentIds.includes(id) : false;
@@ -3164,6 +3172,23 @@ export function SketchWorkspace({
                       {selectionLock === "all" ? <LockKeyhole /> : <LockKeyholeOpen />}
                       <span>{t(selectionLock === "all" ? "sketch.unlockOutline" : "sketch.lockOutline")}</span>
                     </button>
+                  ) : null}
+                  {canAlignOutlines ? (
+                    <>
+                      <span className="sketch-point-divider" />
+                      {([
+                        ["left", AlignStartVertical, "sketch.alignLeft"],
+                        ["centerX", AlignCenterVertical, "sketch.alignCenterX"],
+                        ["right", AlignEndVertical, "sketch.alignRight"],
+                        ["top", AlignStartHorizontal, "sketch.alignTop"],
+                        ["centerZ", AlignCenterHorizontal, "sketch.alignCenterZ"],
+                        ["bottom", AlignEndHorizontal, "sketch.alignBottom"],
+                      ] as const).map(([mode, Icon, label]) => (
+                        <button key={mode} type="button" className="sketch-align-button" title={t(label)} aria-label={t(label)} onClick={() => alignOutlines(mode)}>
+                          <Icon />
+                        </button>
+                      ))}
+                    </>
                   ) : null}
                 </>
               ) : null}
