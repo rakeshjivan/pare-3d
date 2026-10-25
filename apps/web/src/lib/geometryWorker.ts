@@ -1,10 +1,11 @@
 import { buildsDiffer, BUILD_ID, isBuildMessage, reportWorkerBuild } from "@/lib/buildStamp";
-import { buildGroupedShapeFromSelection, splitShapeIfCrossed, splitShapesByPlane, type GroupBuildResult, type SplitShapesOutcome } from "@/lib/editorBooleans";
+import { buildGroupedShapeFromSelection, exportSolidVolume, splitShapeIfCrossed, splitShapesByPlane, type ExportSolidVolume, type GroupBuildResult, type SplitShapesOutcome } from "@/lib/editorBooleans";
 import { packValue, packedTransfer, unpackValue } from "@/lib/geometryTransfer";
 import { resultMeshes, type GeometryTask, type GeometryWorkerRequest, type GeometryWorkerResponse } from "@/lib/geometryWorkerTypes";
 import { rememberPreparedDisplay } from "@/lib/importedMeshDisplay";
 import { getLanguage, t } from "@/lib/i18n";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
+import { simplifyTrianglePositions, type SimplifiedMesh } from "@/lib/meshSimplify";
 import { importedShapesFromObj, type ObjImportResult } from "@/lib/objImport";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import type { WorkplaneShape } from "@/types/layerling";
@@ -272,4 +273,28 @@ export function importedShapesFromObjOffThread(fileName: string, text: string, m
   return runGeometryTask("obj", { fileName, text, mtlSources: [...mtlSources] }, async () => importedShapesFromObj(fileName, text, mtlSources), () => {
     throw new Error(t("status.computeTimedOut"));
   }, undefined, true);
+}
+
+/**
+ * The print estimate (exportSolidVolume in lib/editorBooleans.ts) worked out off the page: for a
+ * 300,000-triangle import it held the page for close to a second. The export window shows its
+ * own progress, so this says nothing of its own; text stays on the page.
+ */
+export function exportSolidVolumeOffThread(source: readonly WorkplaneShape[]): Promise<ExportSolidVolume> {
+  const onPage = () => exportSolidVolume(source);
+  if (containsText(source)) return onPage();
+  return runGeometryTask("estimate", { source: [...source] }, onPage, () => {
+    throw new Error(t("status.computeTimedOut"));
+  }, undefined, true);
+}
+
+/**
+ * A mesh simplified off the page (simplifyTrianglePositions in lib/meshSimplify.ts): 0.3 s of the
+ * page for a 300,000-triangle import, at every rest of the slider. A new value calls off the one
+ * before through `signal`. The panel shows its own progress.
+ */
+export function simplifyTrianglePositionsOffThread(positions: ArrayLike<number>, target: number, signal?: AbortSignal): Promise<SimplifiedMesh> {
+  return runGeometryTask("simplify", { positions: Array.isArray(positions) ? positions : Array.from(positions), target }, () => simplifyTrianglePositions(positions, target), () => {
+    throw new Error(t("status.computeTimedOut"));
+  }, signal, true);
 }

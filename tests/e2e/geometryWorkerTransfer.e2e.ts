@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import manifoldModule from "manifold-3d";
 import type { WorkplaneShape } from "@/types/layerling";
-import { buildGroupedShapeFromSelection, splitShapeByPlane } from "@/lib/editorBooleans";
+import { buildGroupedShapeFromSelection, exportSolidVolume, splitShapeByPlane } from "@/lib/editorBooleans";
+import { simplifyTrianglePositions } from "@/lib/meshSimplify";
 import { packValue, unpackValue } from "@/lib/geometryTransfer";
 import { rememberManifoldRuntime } from "@/lib/manifoldHandle";
 import { importedShapesFromObj } from "@/lib/objImport";
@@ -155,6 +156,20 @@ describe("geometry worker transfer", () => {
     const transferredObj = await viaTransfer({ fileName: "cube.obj", text: obj, mtlSources: [] }, async (args: { fileName: string; text: string; mtlSources: string[] }) => importedShapesFromObj(args.fileName, args.text, args.mtlSources));
     expect(directObj.shapes[0].importedMesh?.positions.length).toBeGreaterThan(1000);
     expectSame(directObj, transferredObj, new Set());
+  });
+
+  it("simplifies a mesh and estimates a print the same way as on the page", async () => {
+    const positions = gridCube(20);
+    const direct = await simplifyTrianglePositions(positions, 400);
+    const transferred = await viaTransfer({ positions, target: 400 }, (args: { positions: number[]; target: number }) => simplifyTrianglePositions(args.positions, args.target));
+    expect(direct.triangleCount).toBeLessThan(positions.length / 9);
+    expectSame(direct, transferred, new Set());
+
+    const source = [meshShape("body", gridCube(12)), holeCylinder()];
+    const estimate = await exportSolidVolume(source);
+    const transferredEstimate = await viaTransfer({ source }, (args: { source: WorkplaneShape[] }) => exportSolidVolume(args.source));
+    expect(estimate.volumeMm3).toBeGreaterThan(0);
+    expectSame(estimate, transferredEstimate, new Set());
   });
 
   it("splits a mesh the same way as on the page", async () => {

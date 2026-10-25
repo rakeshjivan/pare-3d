@@ -1,11 +1,12 @@
 /// <reference lib="webworker" />
 
 import { buildMessage } from "@/lib/buildStamp";
-import { buildGroupedShapeFromSelection, splitShapeIfCrossed } from "@/lib/editorBooleans";
+import { buildGroupedShapeFromSelection, exportSolidVolume, splitShapeIfCrossed } from "@/lib/editorBooleans";
 import { getManifoldRuntime, setManifoldAssetBase } from "@/lib/editorMeshCore";
 import { packValue, packedTransfer, unpackValue } from "@/lib/geometryTransfer";
 import { resultMeshes, type GeometryWorkerRequest, type GeometryWorkerResponse } from "@/lib/geometryWorkerTypes";
 import { prepareImportedMeshDisplay } from "@/lib/importedMeshDisplay";
+import { simplifyTrianglePositions } from "@/lib/meshSimplify";
 import { importedShapesFromObj } from "@/lib/objImport";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { setLanguage } from "@/lib/i18n";
@@ -44,6 +45,12 @@ self.onmessage = async (event: MessageEvent<GeometryWorkerRequest>) => {
     } else if (request.task === "obj") {
       const { fileName, text, mtlSources } = args as { fileName: string; text: string; mtlSources: string[] };
       result = importedShapesFromObj(fileName, text, mtlSources);
+    } else if (request.task === "estimate") {
+      const { source } = args as { source: WorkplaneShape[] };
+      result = await exportSolidVolume(source);
+    } else if (request.task === "simplify") {
+      const { positions, target } = args as { positions: number[]; target: number };
+      result = await simplifyTrianglePositions(positions, target);
     } else if (request.task === "warm") {
       await getManifoldRuntime();
       result = null;

@@ -274,6 +274,38 @@ import opens: compiling the WebGL shaders (about 3 s in this container's softwar
 less on a graphics card - not measured) and the design's preview picture (`toBlob`, about 0.9 s).
 The same two are most of opening a .lyl (2,138 → 1,621 ms input delay).
 
+## Step 6: print estimate, simplify, section view
+
+- **Print estimate** (`exportSolidVolumeOffThread`): the whole estimate - solids, holes taken off,
+  union, volume and surface - runs in the geometry worker; the answer is a few numbers. Text stays
+  on the page.
+- **Simplify** (`simplifyTrianglePositionsOffThread`): meshoptimizer runs in the worker, with the
+  view's geometry of the result prepared there. The panel calls off a value the slider has left,
+  in the worker too.
+- **Welding on a grid** (`lib/gridWeld.ts`): one number table for what three places did with a
+  text key per corner - the print estimate's orientation, the part count and the section view's
+  weld (`lib/sectionSvg.ts`). tests/unit/gridWeld.test.ts compares it with the text keys on 60
+  random sets at five grid sizes, -0, NaN and infinity included. The edge lines keep their own
+  (three.js multiplies by the grid where these divide, which can round differently).
+
+| Action | Input delay, step 5 → now |
+| --- | ---: |
+| Print estimate of a 300k import | 784 → 39 ms |
+| Simplify a 300k import to 20 % | 423 → 75 ms |
+| Section view on (300k import and 40 boxes) | 734 → 467 ms |
+
+Checked as well: in the browser the estimate gives the same numbers and the simplified mesh the
+same STL export with the worker and with its file blocked; tests/e2e/geometryWorkerTransfer.e2e.ts
+sends both through the worker's packing.
+
+What is left of the section view: compiling the shaders of the cut faces (about 220 ms, software
+rendering) and building the meshes of the bodies once more on the page (about 190 ms).
+
+Shader compilation and the preview picture, the largest part of opening a .lyl and of an import
+through the file chooser, are not touched: this container renders with SwiftShader, which has no
+parallel shader compilation (`KHR_parallel_shader_compile`), so neither an asynchronous compile
+nor its effect can be measured here. That needs a computer with a graphics card.
+
 ## Still on the main thread
 
 | Action | Longest input delay now | What it is |
@@ -283,6 +315,4 @@ The same two are most of opening a .lyl (2,138 → 1,621 ms input delay).
 | Export STL (through the bridge) | 1,143 ms | mostly the bridge's base64 (profiled); a download not measured |
 | Export 3MF (through the bridge) | 1,061 ms | not profiled again; before, writing the model text and welding came after the packing |
 | Import 3MF | 793 ms | DOMParser, not in a worker |
-| Print estimate | 784 ms | not profiled again |
-| Section view on | 538 ms | not profiled |
-| Simplify | 332 ms | not profiled |
+| Section view on | 467 ms | shaders of the cut faces, meshes built again (profiled) |

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { taperedSlotOutline } from "@/lib/slotGeometry";
+import { weldOnGrid } from "@/lib/gridWeld";
 import type { WorkplaneShape } from "@/types/layerling";
 import type { CadModifierProfileLoop, CadModifierProfilePart, CadModifierProfileSegment, CadModifierGridfinityPart, CadModifierHelicalGearPart, CadModifierSpringPart, CadModifierSweepPiece, CadModifierThreadPart } from "@/lib/cadModifierTypes";
 import { profileArcPoint, profileLoopBounds, TWIST_SECTION_STEP, validateCadProfile } from "@/lib/cadProfileSolid";
@@ -1555,7 +1556,8 @@ export function closedMeshFaceOrientation(vertices: ReadonlyArray<readonly [numb
   });
   const quantum = Math.max(1e-9, extent * 1e-7);
   // Numbers, not text keys: the print estimate of a 300,000-triangle import spent over a second on them.
-  const { ids, count: weldedCount } = weldedVertexIds(vertices, quantum);
+  const { ids, count } = weldOnGrid(vertices, quantum);
+  const weldedCount = Math.max(1, count);
   const edgeFaces = new Map<number, number[]>();
   const edgeKey = (a: number, b: number) => (a < b ? a * weldedCount + b : b * weldedCount + a);
   faces.forEach((face, index) => {
@@ -1616,63 +1618,6 @@ export function closedMeshFaceOrientation(vertices: ReadonlyArray<readonly [numb
   }
   const flip = orientation.map((value, index) => (pieceVolume[pieceOf[index]] < 0 ? -value : value));
   return { flip, pieceVolume: pieceVolume.map(Math.abs) };
-}
-
-/**
- * A number per vertex, the same for vertices on the same point of a `quantum` grid and counted up
- * in the order they first come - what the text key "x,y,z" of the rounded coordinates gave, -0 as 0
- * and NaN as NaN included.
- */
-function weldedVertexIds(vertices: ReadonlyArray<readonly [number, number, number]>, quantum: number) {
-  const count = vertices.length;
-  const grid = new Float64Array(count * 3);
-  for (let index = 0; index < count; index += 1) {
-    const vertex = vertices[index];
-    grid[index * 3] = Math.round(vertex[0] / quantum) + 0;
-    grid[index * 3 + 1] = Math.round(vertex[1] / quantum) + 0;
-    grid[index * 3 + 2] = Math.round(vertex[2] / quantum) + 0;
-  }
-  let capacity = 1;
-  while (capacity < count * 2) capacity <<= 1;
-  const mask = capacity - 1;
-  const table = new Int32Array(capacity).fill(-1);
-  const ids = new Array<number>(count);
-  let next = 0;
-  for (let index = 0; index < count; index += 1) {
-    const x = grid[index * 3];
-    const y = grid[index * 3 + 1];
-    const z = grid[index * 3 + 2];
-    let hash = Math.imul(gridHashPart(x), 0x9e3779b1);
-    hash = Math.imul(hash ^ gridHashPart(y), 0x85ebca6b);
-    hash = Math.imul(hash ^ gridHashPart(z), 0xc2b2ae35);
-    hash ^= hash >>> 16;
-    hash = Math.imul(hash, 0x85ebca6b);
-    hash ^= hash >>> 13;
-    hash &= mask;
-    for (;;) {
-      const entry = table[hash];
-      if (entry === -1) {
-        table[hash] = index;
-        ids[index] = next;
-        next += 1;
-        break;
-      }
-      if (sameGridNumber(grid[entry * 3], x) && sameGridNumber(grid[entry * 3 + 1], y) && sameGridNumber(grid[entry * 3 + 2], z)) {
-        ids[index] = ids[entry];
-        break;
-      }
-      hash = (hash + 1) & mask;
-    }
-  }
-  return { ids, count: Math.max(1, next) };
-}
-
-function gridHashPart(value: number) {
-  return value !== value ? 0x7fc00000 : (value | 0) ^ ((value / 4294967296) | 0);
-}
-
-function sameGridNumber(a: number, b: number) {
-  return a === b || (a !== a && b !== b);
 }
 
 /** Volume enclosed by a closed triangle mesh whatever way its triangles are wound. */
