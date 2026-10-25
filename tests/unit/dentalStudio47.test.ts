@@ -379,3 +379,48 @@ describe("Build 55: a quadrant's front is the end that bends", () => {
     expect(endBends(straight, 0, 40)).toBeNull();
   });
 });
+
+describe("Build 58: the hinge sits on two wide bearings, fits close and stops at the bite", () => {
+  let runtime: ManifoldToplevel;
+  beforeAll(async () => {
+    runtime = await manifoldModule();
+    runtime.setup();
+  });
+  it("puts a bearing behind each side of a full arch and one in the middle of a quadrant", async () => {
+    const { hingeParts } = await import("@/lib/dentalBase");
+    const count = (solid: { decompose: () => Array<{ delete: () => void }> }) => { const parts = solid.decompose(); parts.forEach((p) => p.delete()); return parts.length; };
+    const wide = hingeParts(runtime, 25, -25, 25, 20, -20);
+    const narrow = hingeParts(runtime, 25, -10, 2, 20, -20);
+    // Upper: a bar with its clips - one piece either way; the clips are what differ.
+    const box = (solid: { boundingBox: () => { min: number[]; max: number[] } }) => solid.boundingBox();
+    expect(box(wide.lower).max[0] - box(wide.lower).min[0]).toBeCloseTo(50, 0);
+    expect(count(wide.upper)).toBe(1);
+    // Two clips under the upper's bar on a full arch: the upper, cut level with the axle, shows two pieces.
+    const slice = (solid: { slice: (z: number) => { toPolygons: () => unknown[]; delete?: () => void } }) => solid.slice(0).toPolygons().length;
+    expect(slice(wide.upper as never)).toBeGreaterThanOrEqual(2);
+    expect(slice(narrow.upper as never)).toBeLessThan(slice(wide.upper as never));
+    // The halves never overlap: the axle turns in the clip with room all round.
+    const overlap = runtime.Manifold.intersection(wide.upper, wide.lower);
+    expect(overlap.volume()).toBeLessThan(0.01);
+    overlap.delete();
+    [wide.upper, wide.lower, narrow.upper, narrow.lower].forEach((s) => s.delete());
+  });
+
+  it("closes the clip round the axle by the chosen fit, and the stop meets in the occlusal plane", async () => {
+    const { hingeParts } = await import("@/lib/dentalBase");
+    const tight = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { y: -30, x: 0 });
+    const loose = hingeParts(runtime, 25, -25, 25, 20, -20, 0.3, { y: -30, x: 0 });
+    // A looser fit takes more out of the clips.
+    expect(loose.upper.volume()).toBeLessThan(tight.upper.volume());
+    // The stop: the upper reaches down to z = 0 in front of the arch, the lower up to it.
+    const at = (solid: typeof tight.upper, y: number) => {
+      const piece = runtime.Manifold.intersection(solid, runtime.Manifold.cube([6, 2, 60]).translate([-3, y - 1, -30]));
+      const b = piece.boundingBox();
+      piece.delete();
+      return b;
+    };
+    expect(at(tight.upper, -35).min[2]).toBeCloseTo(0, 5);
+    expect(at(tight.lower, -35).max[2]).toBeCloseTo(0, 5);
+    [tight.upper, tight.lower, loose.upper, loose.lower].forEach((s) => s.delete());
+  });
+});

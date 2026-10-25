@@ -16,7 +16,7 @@
 import * as THREE from "three";
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
 import { alignToBite, archFrame, canineWidth, cleanScan, frontOf, isPartialArch, marginUp, pairFrame, palateScore, type CleanArch, type CleanReport } from "@/lib/dentalArch";
-import { blockOutline, cleanOutline, closeToFloor, distanceFrom, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, hingeParts, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
+import { blockOutline, cleanOutline, closeToFloor, distanceFrom, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, hingeParts, HINGE_CLEARANCE, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
 import {
   applyMatrix, boundaryLoops, cloneMesh, convexHull, cutAlongField, cutBelow, dropFragments, smoothField, faceArea, loopLength, surfaceKept, pinchedEdges, PointGrid, solidPositions, toManifold, upwardness, weld,
@@ -67,6 +67,10 @@ export type DentalStudioOptions = {
   wall: number;
   /** A pair only: the printed snap-on hinge. */
   hinge: boolean;
+  /** Build 58: the fit round the hinge's axle, mm (HINGE_FITS); 0.15 when left out. */
+  hingeFit?: number;
+  /** Build 58: the stop at the front that sets the closed bite; on when left out. */
+  incisalStop?: boolean;
   /** A pair only: laid out base-down for printing, or upper on lower in occlusion. */
   layout: "print" | "occlusion";
   /** Engraved on the base; U or L goes in front for a pair. Empty for none. */
@@ -643,7 +647,13 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
     rings.forEach((ring) => ring.forEach(([, y]) => { back = Math.max(back, y); }));
     let xMin = Infinity, xMax = -Infinity;
     rings.forEach((ring) => ring.forEach(([x, y]) => { if (y > back - 8) { xMin = Math.min(xMin, x); xMax = Math.max(xMax, x); } }));
-    const parts = hingeParts(runtime, back, xMin, xMax, depth, -depth);
+    // Build 58: the incisal stop goes in front of the arch's front, in the middle of what is there.
+    let front = Infinity;
+    rings.forEach((ring) => ring.forEach(([, y]) => { front = Math.min(front, y); }));
+    let fMin = Infinity, fMax = -Infinity;
+    rings.forEach((ring) => ring.forEach(([x, y]) => { if (y < front + 4) { fMin = Math.min(fMin, x); fMax = Math.max(fMax, x); } }));
+    const stop = options.incisalStop !== false && Number.isFinite(front) && Number.isFinite(fMin) ? { y: front, x: (fMin + fMax) / 2 } : null;
+    const parts = hingeParts(runtime, back, xMin, xMax, depth, -depth, options.hingeFit ?? HINGE_CLEARANCE, stop);
     solids = built.map(({ arch }, i) => {
       const joined = runtime.Manifold.union(solids[i], arch.role === "upper" ? parts.upper : parts.lower);
       toFree.push(solids[i]);

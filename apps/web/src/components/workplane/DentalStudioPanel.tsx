@@ -1,5 +1,7 @@
 "use client";
 
+import { HINGE_CLEARANCE, HINGE_FITS } from "@/lib/dentalBase";
+
 import { ArrowLeftRight, Check, ChevronDown, LoaderCircle, Scissors, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
@@ -326,6 +328,21 @@ export function DentalStudioPanel({
                 <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => onOptionsChange({ hinge: event.currentTarget.checked })} />
                 <span>{t("dental.hinge")}</span>
               </label>
+              {options.hinge ? (
+                <>
+                  {/* Fork (build 58): how tight the hinge turns, and the stop that sets the bite. */}
+                  <label className="dental-label-field" title={t("dental.hingeFitHint")}>
+                    <span>{t("dental.hingeFit")}</span>
+                    <select value={options.hingeFit ?? HINGE_CLEARANCE} disabled={busy} onChange={(event) => onOptionsChange({ hingeFit: Number(event.currentTarget.value) })}>
+                      {HINGE_FITS.map((fit) => <option key={fit} value={fit}>{t(fit === HINGE_CLEARANCE ? "dental.hingeFitDefault" : "dental.hingeFitOption", { fit: fit.toFixed(2) })}</option>)}
+                    </select>
+                  </label>
+                  <label className="edge-modifier-check" title={t("dental.incisalStopHint")}>
+                    <input type="checkbox" checked={options.incisalStop !== false} disabled={busy} onChange={(event) => onOptionsChange({ incisalStop: event.currentTarget.checked })} />
+                    <span>{t("dental.incisalStop")}</span>
+                  </label>
+                </>
+              ) : null}
               <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("dental.layout")}>
                 <span className="edge-modifier-label">{t("dental.layout")}</span>
                 <div className="shell-opening-options">

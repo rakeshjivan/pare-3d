@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 58,
+    items: [
+      "Dental Studio's hinge is rebuilt the way printable articulators are: on a full arch a bearing behind each side's last molar, set wide like the jaw's joints, instead of one short clip in the middle - so it turns but does not rock or slide.",
+      "The hinge fits close: 0.15 mm round the axle by default (a Hinge fit setting offers 0.1 to 0.3 mm for your printer), 0.2 mm along it, and a firmer snap.",
+      "An incisal stop (on by default) adds posts in front of the models that meet as they close, so they close to the scanned bite every time and the posts, not the teeth, take the load.",
+    ],
+  },
+  {
     build: 57,
     items: [
       "Clicker top is the inset clicker kit's top cutter again: a recess with a dowel in the middle whose cross hole pushes onto the switch's stem (build 56's post standing out of the face was wrong).",

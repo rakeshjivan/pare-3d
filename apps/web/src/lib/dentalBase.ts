@@ -558,39 +558,82 @@ export function hollowCavity(runtime: ManifoldRuntime, positions: Float32Array, 
 // Hinge
 
 export const HINGE_AXLE_RADIUS = 2;
-export const HINGE_CLEARANCE = 0.3;
+/** The fit round the axle, mm (build 58): the default, and the choices the panel offers. */
+export const HINGE_CLEARANCE = 0.15;
+export const HINGE_FITS = [0.1, 0.15, 0.2, 0.25, 0.3] as const;
+/** Room along the axle between a clip and the posts either side of it, mm. */
+const HINGE_END_PLAY = 0.2;
+/** The opening the clip snaps over the axle through: this much narrower than the axle, mm. */
+const HINGE_SNAP = 0.8;
+/** Bearings this far apart or more go one behind each side's last molar; closer, one in the middle. */
+const HINGE_TWO_BEARINGS = 30;
 
 const box = (runtime: ManifoldRuntime, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number) =>
   runtime.Manifold.cube([x1 - x0, y1 - y0, z1 - z0]).translate([x0, y0, z0]);
 
 const axleAlongX = (runtime: ManifoldRuntime, radius: number, x0: number, x1: number, y: number, z: number) =>
-  runtime.Manifold.cylinder(x1 - x0, radius, radius, 48).rotate([0, 90, 0]).translate([x0, y, z]);
+  runtime.Manifold.cylinder(x1 - x0, radius, radius, 64).rotate([0, 90, 0]).translate([x0, y, z]);
+
+export type HingeFront = { y: number; x: number };
 
 /**
- * A snap-on hinge in the pair's frame (occlusal plane z = 0, back +y): a bar along the back of each
- * base, two posts carrying an axle on the lower, and a clip on the upper that snaps over the axle
- * between them. The axle lies 6 mm behind `back` - behind the last molars - in the occlusal plane.
+ * The hinge in the pair's frame (occlusal plane z = 0, back +y), built the way printable
+ * articulators are (build 58, after Medit's xSNAP and 3Shape's articulators):
+ *
+ * - Bearings set wide: on a full arch one behind each side's last molar, like the two condyles,
+ *   on one axle line 6 mm behind `back` in the occlusal plane; a quadrant gets one. Each bearing is
+ *   a pair of posts on the lower carrying the axle, and a clip on the upper between them that snaps
+ *   over it. Two bearings far apart cannot rock the way one short one did.
+ * - Fitted: `clearance` round the axle (0.15 mm by default), 0.2 mm along it, and an opening
+ *   0.8 mm narrower than the axle, so the clip holds the axle and only turns on it.
+ * - An incisal stop at `front`: a post down from the upper onto one up from the lower, standing
+ *   clear in front of the model and meeting in the occlusal plane, so the models close to the
+ *   scanned bite every time and the stop, not the teeth, takes the load.
+ * A bar along the back of each base joins its parts to it.
  */
-export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number, xMax: number, floorUpper: number, floorLower: number) {
-  const r = HINGE_AXLE_RADIUS, bore = r + HINGE_CLEARANCE;
+export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number, xMax: number, floorUpper: number, floorLower: number, clearance = HINGE_CLEARANCE, front: HingeFront | null = null) {
+  const r = HINGE_AXLE_RADIUS, bore = r + Math.max(0.05, clearance);
   const ay = back + 6;
-  // Build 55: centred on what stands at the back - the last molars of both sides on a full arch,
-  // the last molars of the one side on a quadrant - rather than on the midline, where a quadrant has nothing.
-  const cx = Number.isFinite(xMin) && Number.isFinite(xMax) ? (xMin + xMax) / 2 : 0;
-  const half = Math.max(14, Number.isFinite(xMin) && Number.isFinite(xMax) ? (xMax - xMin) / 2 : 14);
+  const known = Number.isFinite(xMin) && Number.isFinite(xMax);
+  const cx = known ? (xMin + xMax) / 2 : 0;
+  const half = Math.max(14, known ? (xMax - xMin) / 2 : 14);
+  // Bearing centres: inside the ends of the back, or one in the middle.
+  const centres = half * 2 >= HINGE_TWO_BEARINGS + 19 ? [cx - half + 9.5, cx + half - 9.5] : [cx];
   const made: ManifoldSolid[] = [];
   const keep = <T extends ManifoldSolid>(solid: T) => { made.push(solid); return solid; };
-  const lowerBar = keep(box(runtime, cx - half, cx + half, back - 4, back + 10, floorLower, floorLower + 4));
-  const postL = keep(box(runtime, cx - 13, cx - 5.5, back + 2, back + 10, floorLower, r + 2.5));
-  const postR = keep(box(runtime, cx + 5.5, cx + 13, back + 2, back + 10, floorLower, r + 2.5));
-  const axle = keep(axleAlongX(runtime, r, cx - 13, cx + 13, ay, 0));
-  const lower = runtime.Manifold.union([lowerBar, postL, postR, axle]);
-  const upperBar = keep(box(runtime, cx - half, cx + half, back - 4, back + 10, floorUpper - 4, floorUpper));
-  const clipBlock = keep(box(runtime, cx - 4.8, cx + 4.8, back + 2, back + 10, -(bore + 1.8), floorUpper));
-  const joined = keep(runtime.Manifold.union(upperBar, clipBlock));
-  const hole = keep(axleAlongX(runtime, bore, cx - 6, cx + 6, ay, 0));
-  const slot = keep(box(runtime, cx - 6, cx + 6, ay - 1.7, ay + 1.7, -(bore + 3), 0));
-  const upper = runtime.Manifold.difference(joined, runtime.Manifold.union(hole, slot));
+  const clipHalf = 4.8;
+  const postIn = clipHalf + HINGE_END_PLAY, postOut = postIn + 4.5;
+  const lowerParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, back - 4, back + 10, floorLower, floorLower + 4))];
+  const upperParts: ManifoldSolid[] = [keep(box(runtime, cx - half, cx + half, back - 4, back + 10, floorUpper - 4, floorUpper))];
+  const cuts: ManifoldSolid[] = [];
+  for (const c of centres) {
+    lowerParts.push(
+      keep(box(runtime, c - postOut, c - postIn, back + 2, back + 10, floorLower, r + 2.5)),
+      keep(box(runtime, c + postIn, c + postOut, back + 2, back + 10, floorLower, r + 2.5)),
+      keep(axleAlongX(runtime, r, c - postOut, c + postOut, ay, 0)),
+    );
+    upperParts.push(keep(box(runtime, c - clipHalf, c + clipHalf, back + 2, back + 10, -(bore + 1.8), floorUpper)));
+    cuts.push(
+      keep(axleAlongX(runtime, bore, c - clipHalf - 1, c + clipHalf + 1, ay, 0)),
+      keep(box(runtime, c - clipHalf - 1, c + clipHalf + 1, ay - (r - HINGE_SNAP / 2), ay + (r - HINGE_SNAP / 2), -(bore + 3), 0)),
+    );
+  }
+  if (front) {
+    // The stop: 6 mm posts standing clear in front of the model (2 to 8 mm out), meeting in the
+    // occlusal plane, each joined to its base only through the base's bottom 4 mm - never near the teeth.
+    const y0 = front.y - 8, y1 = front.y - 2;
+    lowerParts.push(
+      keep(box(runtime, front.x - 3, front.x + 3, y0, y1, floorLower, 0)),
+      keep(box(runtime, front.x - 3, front.x + 3, y0, front.y + 3, floorLower, floorLower + 4)),
+    );
+    upperParts.push(
+      keep(box(runtime, front.x - 3, front.x + 3, y0, y1, 0, floorUpper)),
+      keep(box(runtime, front.x - 3, front.x + 3, y0, front.y + 3, floorUpper - 4, floorUpper)),
+    );
+  }
+  const lower = runtime.Manifold.union(lowerParts);
+  const joined = keep(runtime.Manifold.union(upperParts));
+  const upper = runtime.Manifold.difference(joined, runtime.Manifold.union(cuts));
   made.forEach((solid) => solid.delete());
   return { upper, lower };
 }
