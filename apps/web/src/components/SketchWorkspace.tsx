@@ -1677,7 +1677,7 @@ export function SketchWorkspace({
       } else if (tool === "select" && !pointerAction && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
         // Fine moves, as on the workplane: one grid step, or a coarser one with
         // Shift. What moves is the selection - points, the ends of lines, an image.
-        const step = keyboardNudgeStep(snap, event.shiftKey, keyboardNudgeCoarseFactor(workspace));
+        const step = keyboardNudgeStep(snap, event.shiftKey, keyboardNudgeCoarseFactor(workspace), event.altKey);
         const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
         const dz = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
         // A clicked handle goes first (#347): it moves alone, a smooth point's other handle with it.

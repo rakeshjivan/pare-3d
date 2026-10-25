@@ -13962,7 +13962,7 @@ export function LayerlingEditor({
       // Follows the Snap Grid so a keyboard nudge lands on the same lattice
       // a pointer drag snaps to. Falls back to the old millimetre when the
       // grid is off.
-      const step = keyboardNudgeStep(snapGridRef.current, event.shiftKey, keyboardNudgeCoarseFactor(workspaceSettingsRef.current));
+      const step = keyboardNudgeStep(snapGridRef.current, event.shiftKey, keyboardNudgeCoarseFactor(workspaceSettingsRef.current), event.altKey);
       if (shortcut && event.key === "ArrowUp") {
         event.preventDefault();
         raiseSelected(step);

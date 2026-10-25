@@ -905,6 +905,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "shortcuts.dropToWorkplane": "Položit výběr na pracovní rovinu",
   "shortcuts.nudge": "Posunout o krok mřížky podle směru pohledu",
   "shortcuts.nudgeCoarse": "Posunout o pět kroků mřížky",
+  "shortcuts.nudgeFine": "Posunout o pětinu kroku mřížky",
   "shortcuts.raise": "Zvednout nebo snížit výběr",
   "shortcuts.rotate": "Otočit o 45°",
   "shortcuts.intersect": "Intersect: keep only where the selected shapes overlap",
