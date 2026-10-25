@@ -32,6 +32,8 @@ afterEach(() => {
 
 /** The settings panel for a Gridfinity part with these fields. */
 function mount(fields: Partial<WorkplaneShape>, onUpdate: (patch: Partial<WorkplaneShape>) => void = () => {}) {
+  // The settings start folded up (Pare 3D build 21): open Properties, as a person would.
+  window.sessionStorage.setItem("layerling.editor.inspectorCards", JSON.stringify({ properties: true }));
   const asset = toolbarShapeAssets.find((entry) => entry.kind === "gridfinity")!;
   const shape = { ...makeShapeFromAsset(asset, { x: 0, z: 0 }), ...fields } as WorkplaneShape;
   container = document.createElement("div");

@@ -21,6 +21,8 @@ beforeAll(() => {
 
 /** The settings panel's text for a Gridfinity part with these fields, unmounted again once read. */
 function panelText(fields: Partial<WorkplaneShape>) {
+  // The settings start folded up (Pare 3D build 21): open Properties, as a person would.
+  window.sessionStorage.setItem("layerling.editor.inspectorCards", JSON.stringify({ properties: true, gridfinityCompartments: true }));
   const asset = toolbarShapeAssets.find((entry) => entry.kind === "gridfinity")!;
   const shape = { ...makeShapeFromAsset(asset, { x: 0, z: 0 }), ...fields } as WorkplaneShape;
   const container = document.createElement("div");
