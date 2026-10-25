@@ -8,6 +8,9 @@ on:
     branches: [wasm-par]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -45,7 +48,12 @@ jobs:
           cp $(find manifold/build -name manifold.js | head -1) out/manifold-par.js
           cp $(find manifold/build -name manifold.wasm | head -1) out/manifold-par.wasm
           ls -la out
-      - uses: actions/upload-artifact@v4
-        with:
-          name: manifold-par
-          path: out/
+      # Kept on a branch of its own as well: artifacts cannot be fetched from every network.
+      - name: Commit the files to wasm-par-out
+        run: |
+          cd out
+          git init -q -b wasm-par-out
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add . && git commit -q -m "manifold v3.5.4 parallel wasm ($GITHUB_SHA)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" wasm-par-out
