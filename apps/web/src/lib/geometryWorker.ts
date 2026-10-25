@@ -5,6 +5,8 @@ import { resultMeshes, type GeometryTask, type GeometryWorkerRequest, type Geome
 import { rememberPreparedDisplay } from "@/lib/importedMeshDisplay";
 import { getLanguage, t } from "@/lib/i18n";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
+import { importedShapesFromObj, type ObjImportResult } from "@/lib/objImport";
+import { importedShapeFromStl } from "@/lib/stlImport";
 import type { WorkplaneShape } from "@/types/layerling";
 import type { CutConnectorOptions } from "@/lib/cutConnectors";
 
@@ -183,7 +185,11 @@ async function runGeometryTask<T>(task: GeometryTask, args: unknown, fallback: (
       if (!entry) return;
       // A stuck worker cannot be talked to; it goes, and the next request starts a fresh one.
       dropWorker(false);
-      resolve(timedOut());
+      try {
+        resolve(timedOut());
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     }, GEOMETRY_WORKER_TIMEOUT_MS);
     pending.set(requestId, { resolve: resolve as (value: unknown) => void, reject, fallback, timer, sharedLists: packed.lists, quiet, task });
     notifyBusy();
@@ -248,4 +254,22 @@ function splitShapeOffThread(shape: WorkplaneShape, plane: SplitPlane, signal?: 
 export function splitShapesByPlaneOffThread(targets: readonly WorkplaneShape[], plane: SplitPlane, stillCurrent: () => boolean, signal?: AbortSignal, connectors?: CutConnectorOptions, manualPoints: readonly [number, number, number][] = []): Promise<SplitShapesOutcome> {
   // Fork: a cut with connectors (pins and holes) stays on the page; a plain cut goes to the worker.
   return splitShapesByPlane(targets, plane, stillCurrent, connectors, manualPoints, (shape, shapePlane) => splitShapeOffThread(shape, shapePlane, signal));
+}
+
+/**
+ * An STL file read off the page (importedShapeFromStl in lib/stlImport.ts): reading a 300,000-triangle
+ * file held the page for over a second. The import window shows its own progress, so this says
+ * nothing of its own.
+ */
+export function importedShapeFromStlOffThread(fileName: string, buffer: ArrayBuffer): Promise<WorkplaneShape> {
+  return runGeometryTask("stl", { fileName, buffer }, async () => importedShapeFromStl(fileName, buffer), () => {
+    throw new Error(t("status.computeTimedOut"));
+  }, undefined, true);
+}
+
+/** An OBJ file read off the page (importedShapesFromObj in lib/objImport.ts). */
+export function importedShapesFromObjOffThread(fileName: string, text: string, mtlSources: readonly string[]): Promise<ObjImportResult> {
+  return runGeometryTask("obj", { fileName, text, mtlSources: [...mtlSources] }, async () => importedShapesFromObj(fileName, text, mtlSources), () => {
+    throw new Error(t("status.computeTimedOut"));
+  }, undefined, true);
 }

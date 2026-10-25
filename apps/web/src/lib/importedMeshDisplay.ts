@@ -58,19 +58,24 @@ export function prepareImportedMeshDisplay(mesh: ImportedMesh): { display: Prepa
   };
 }
 
-const preparedDisplays = new WeakMap<ImportedMesh, PreparedImportedMeshDisplay>();
+/**
+ * Kept by the mesh's position list: the geometry is made from its positions and normals alone, and
+ * a copy of the mesh with something added (its asset id after an import) keeps both lists.
+ */
+const preparedDisplays = new WeakMap<object, { display: PreparedImportedMeshDisplay; normals: number[] | undefined }>();
 const preparedTrees = new WeakMap<THREE.BufferGeometry, SerializedBVH>();
 
 /** Keeps what the worker prepared for a mesh until the view draws it. */
 export function rememberPreparedDisplay(mesh: ImportedMesh, display: PreparedImportedMeshDisplay) {
-  preparedDisplays.set(mesh, display);
+  preparedDisplays.set(mesh.positions, { display, normals: mesh.normals });
 }
 
 /** The view's geometry from what the worker prepared, or null when nothing was. Used once. */
 export function takePreparedImportedMeshGeometry(mesh: ImportedMesh): THREE.BufferGeometry | null {
-  const display = preparedDisplays.get(mesh);
-  if (!display) return null;
-  preparedDisplays.delete(mesh);
+  const prepared = preparedDisplays.get(mesh.positions);
+  if (!prepared || prepared.normals !== mesh.normals) return null;
+  preparedDisplays.delete(mesh.positions);
+  const { display } = prepared;
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(display.position, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(display.normal, 3));

@@ -3,7 +3,7 @@ import type { PreparedImportedMeshDisplay } from "@/lib/importedMeshDisplay";
 import type { WorkplaneShape } from "@/types/layerling";
 
 /** What the page asks the geometry worker (workers/geometry.worker.ts) to work out. */
-export type GeometryTask = "group" | "split" | "warm";
+export type GeometryTask = "group" | "split" | "stl" | "obj" | "warm";
 
 export interface GeometryWorkerRequest {
   requestId: number;
@@ -30,10 +30,12 @@ export type GeometryWorkerResponse =
 
 type ImportedMesh = NonNullable<WorkplaneShape["importedMesh"]>;
 
-/** The meshes a task's result brings into the view: the new group, the two halves of a split. */
+/** The meshes a task's result brings into the view: the new group, the two halves of a split, an import. */
 export function resultMeshes(task: GeometryTask, result: unknown): Array<ImportedMesh | undefined> {
   if (!result || typeof result !== "object") return [];
   if (task === "group") return [(result as { group?: WorkplaneShape | null }).group?.importedMesh];
   if (task === "split") return ((result as { parts?: WorkplaneShape[] | null }).parts ?? []).map((part) => part.importedMesh);
+  if (task === "stl") return [(result as WorkplaneShape).importedMesh];
+  if (task === "obj") return ((result as { shapes?: WorkplaneShape[] }).shapes ?? []).map((shape) => shape.importedMesh);
   return [];
 }

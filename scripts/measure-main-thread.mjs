@@ -178,6 +178,33 @@ async function measure(page, run) {
 }
 
 const ids = (objects) => objects.map((object) => object.id);
+
+/** A file on disk: handed to the input by its path, Playwright does not copy it through the page. */
+function writeScratchFile(name, bytes) {
+  const file = join(scratch, name);
+  writeFileSync(file, bytes);
+  return file;
+}
+
+/** Hands a file to the editor's import input and waits until it stands in the scene. */
+async function importThroughChooser(page, file) {
+  // Editors of earlier runs are closed but may still be listed; asking them would wait for nothing.
+  const current = editorNumber;
+  const earlier = new Set((await listEditors()).map((editor) => editor.editorNumber).filter((number) => number !== current));
+  await page.locator("input[type=file][accept*='.stl']").first().setInputFiles(file);
+  // An import into an empty editor starts a design named after the file, and the page may join the
+  // bridge again under another number: this editor or a new one with the object in it counts.
+  for (let attempt = 0; attempt < 600; attempt += 1) {
+    await page.waitForTimeout(50);
+    for (const editor of await listEditors()) {
+      if (earlier.has(editor.editorNumber)) continue;
+      editorNumber = editor.editorNumber;
+      const listed = await mcp("list_objects", {}, 2000).catch(() => null);
+      if ((listed?.objects?.length ?? 0) > 0) return;
+    }
+  }
+  throw new Error(`${file} did not come in`);
+}
 /** The ids of what import_file brought in. */
 const importedIds = (result) => ids(result.imported ?? []);
 
@@ -192,6 +219,18 @@ const ACTIONS = [
   {
     key: "import-obj", label: "Import OBJ, 300k triangles",
     run: () => mcp("import_file", { fileName: "sphere.obj", text: bigObj }),
+  },
+  // The same files through the file chooser, as a person imports them: the bridge's own work (it
+  // gets the file as base64 and decodes it on the page) is not in these.
+  {
+    key: "import-stl-file", label: "Import STL, 300k triangles, file chooser",
+    setup: async () => writeScratchFile("sphere.stl", Buffer.from(bigStl, "base64")),
+    run: (file, page) => importThroughChooser(page, file),
+  },
+  {
+    key: "import-obj-file", label: "Import OBJ, 300k triangles, file chooser",
+    setup: async () => writeScratchFile("sphere.obj", Buffer.from(bigObj)),
+    run: (file, page) => importThroughChooser(page, file),
   },
   {
     key: "import-3mf", label: "Import 3MF, 100k triangles",

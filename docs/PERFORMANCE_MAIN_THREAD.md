@@ -226,17 +226,63 @@ Checked as well: the same STL exports as before with the worker and with its fil
 on a half after a split selects it (picking through the index from the worker); the static export
 lists the worker in the offline copy, and with the network off a reload loads it from there.
 
+## Step 5: import and export
+
+CPU profiles of the import, export and estimate actions showed:
+
+- **3MF export**: fflate's `zipSync` packed the file on the main thread, 1.3 s for the 300k import.
+  `exportMeshesTo3mfAsync` (lib/threemfExport.ts) hands the same files with the same options to
+  fflate's `zip`, which packs in its own workers, as the .lyl save already did; where those cannot
+  start it packs with `zipSync` as before. tests/unit/threemfExportAsync.test.ts: the same bytes.
+- **Print estimate**: `closedMeshFaceOrientation` (lib/cadProfileExtrusion.ts) built a text key
+  per corner and per edge, 1.2 s for the 300k import. It now welds with a number table and keys the
+  edges by number, ids and lists in the same order, so the result is the same to the bit
+  (tests/unit/closedMeshOrientation.test.ts compares it with the text-key version).
+- **STL and OBJ import**: read in the geometry worker (`importedShapeFromStlOffThread`,
+  `importedShapesFromObjOffThread` in lib/geometryWorker.ts), with the view's geometry prepared
+  there as for a cut (step 4); the .lyl loader reads a stored STL that way as well. Without the
+  worker, and on the server, they are read on the page as before. The import window keeps its own
+  progress; no "Calculating" notice. 3MF stays on the page: it is read with DOMParser, which a
+  worker does not have. The prepared view geometry is now kept by the mesh's position list, so a
+  copy of the mesh with its asset id added still finds it.
+
+Two measuring problems turned up on the way:
+
+- The bridge hands an import file to the page as base64 and the page decodes it, and an export
+  comes back the same way: for 300k triangles that is about a second of the main thread that a
+  person importing through the file chooser or saving a file never has. `import-stl` and the export
+  actions include it; `import-stl-file` and `import-obj-file` (new) go through the file chooser.
+- Playwright's `setInputFiles` with a buffer copies the file through a script in the page (2 s for
+  20 MB); the new actions hand it a path on disk instead.
+
+| Action | Input delay before | now |
+| --- | ---: | ---: |
+| Export 3MF (through the bridge) | 2,274 ms | 1,061 ms |
+| Print estimate | 1,145 ms | 784 ms |
+| Import OBJ (through the bridge) | 1,585 ms | 621 ms |
+| Import STL (through the bridge, base64 decoding on the page) | 1,236 ms | 1,235 ms |
+
+Through the file chooser, against a build of main (both measured here, median of 3):
+
+| Import, 300k triangles | Duration | Main thread blocked | Longest block |
+| --- | ---: | ---: | ---: |
+| STL, main → now | 4,371 → 4,558 ms | 4,528 → 3,926 ms | 1,962 → 1,838 ms |
+| OBJ, main → now | 5,717 → 5,877 ms | 5,717 → 3,660 ms | 2,085 → 1,533 ms |
+
+Reading the file no longer blocks; the longest block left is the editor starting the new design the
+import opens: compiling the WebGL shaders (about 3 s in this container's software rendering, far
+less on a graphics card - not measured) and the design's preview picture (`toBlob`, about 0.9 s).
+The same two are most of opening a .lyl (2,138 → 1,621 ms input delay).
+
 ## Still on the main thread
 
-Not profiled yet, so without a cause:
-
-| Action | Longest input delay |
-| --- | ---: |
-| Export 3MF | 2,274 ms |
-| Open a .lyl | 2,138 ms |
-| Import OBJ / STL / 3MF | 1,585 / 1,236 / 1,000 ms |
-| Print estimate | 1,145 ms |
-| Export STL | 1,143 ms |
-| Section view on | 538 ms |
-| Simplify | 332 ms |
-| After a large cut, merge or split: view mesh, part count, fingerprint (step 1) | 362-574 ms |
+| Action | Longest input delay now | What it is |
+| --- | ---: | --- |
+| Open a .lyl | 1,621 ms | shader compilation and the preview picture (profiled) |
+| Import through the file chooser | 1,533-1,838 ms | the same (profiled) |
+| Export STL (through the bridge) | 1,143 ms | mostly the bridge's base64 (profiled); a download not measured |
+| Export 3MF (through the bridge) | 1,061 ms | not profiled again; before, writing the model text and welding came after the packing |
+| Import 3MF | 793 ms | DOMParser, not in a worker |
+| Print estimate | 784 ms | not profiled again |
+| Section view on | 538 ms | not profiled |
+| Simplify | 332 ms | not profiled |

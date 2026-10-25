@@ -1869,7 +1869,14 @@ function sharedImportedMesh(decoded: object, reference: string, create: () => Im
 }
 
 async function defaultSourceImporter(asset: ProjectAsset) {
-  if (asset.sourceFormat === "stl") return importedShapeFromStl(asset.name, exactArrayBuffer(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
+  if (asset.sourceFormat === "stl") {
+    // In the browser the file is read off the page (lib/geometryWorker.ts); the server reads it here.
+    if (typeof window !== "undefined") {
+      const { importedShapeFromStlOffThread } = await import("@/lib/geometryWorker");
+      return (await importedShapeFromStlOffThread(asset.name, exactArrayBuffer(asset.bytes))).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
+    }
+    return importedShapeFromStl(asset.name, exactArrayBuffer(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
+  }
   if (asset.sourceFormat === "obj") return importedShapeFromObj(asset.name, strFromU8(asset.bytes), true).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
   if (asset.sourceFormat === "svg") return importedShapeFromSvg(asset.name, strFromU8(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
   if (asset.sourceFormat === "3mf") return importedShapeFrom3mf(asset.name, exactArrayBuffer(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;

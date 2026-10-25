@@ -201,7 +201,7 @@ import { simplifyTrianglePositions } from "@/lib/meshSimplify";
 import { displayShapeName, iconTagAsset, qrCodeAsset, libraryShapeAssets, makeShapeFromAsset, nameTagAsset, shapeAssetLabel, toolbarShapeAssets } from "@/lib/shapeCatalog";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { exportMeshesToStl } from "@/lib/stlExport";
-import { exportMeshesTo3mf, THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
+import { exportMeshesTo3mfAsync, THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
 import { DEFAULT_TAPER_DIMENSION_MAX, readWorkspaceDefault, saveWorkspaceDefault, keyboardNudgeCoarseFactor, keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
 import { MCP_GRIDFINITY_LIST_KEYS, mcpGridfinityListParams, mcpGridfinityPaddingPatch, mcpThreadSizeParams } from "@/lib/mcpShapeSettings";
@@ -12091,7 +12091,7 @@ export function LayerlingEditor({
             faceColors: partFaceColors(mesh, joined.quellen[index]),
           }));
           bytes = format === "3mf"
-            ? exportMeshesTo3mf(bodies, { title: projectName }) as Uint8Array
+            ? await exportMeshesTo3mfAsync(bodies, { title: projectName })
             : new TextEncoder().encode(exportMeshesToObj(bodies));
         }
         let binary = "";
@@ -12678,7 +12678,7 @@ export function LayerlingEditor({
             const source = bodiesWritten[quellen[index]];
             return { ...mesh, name: source?.name || mesh.name, color: source?.color, faceColors: partFaceColors(mesh, quellen[index]) };
           });
-          const bytes = exportMeshesTo3mf(bodies, { title: exportName.trim() || projectName });
+          const bytes = await exportMeshesTo3mfAsync(bodies, { title: exportName.trim() || projectName });
           const blob3mf = new Blob([bytes as BlobPart], { type: THREE_MF_MEDIA_TYPE });
           if (toBambu) bambuNote = await sendToBambuStudio(projectExportFileName(exportName, "3mf"), blob3mf, downloadBlobFile);
           else await downloadBlobFile(projectExportFileName(exportName, "3mf"), blob3mf);

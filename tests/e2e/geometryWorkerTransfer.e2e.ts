@@ -4,6 +4,8 @@ import type { WorkplaneShape } from "@/types/layerling";
 import { buildGroupedShapeFromSelection, splitShapeByPlane } from "@/lib/editorBooleans";
 import { packValue, unpackValue } from "@/lib/geometryTransfer";
 import { rememberManifoldRuntime } from "@/lib/manifoldHandle";
+import { importedShapesFromObj } from "@/lib/objImport";
+import { importedShapeFromStl } from "@/lib/stlImport";
 
 /**
  * The geometry worker (workers/geometry.worker.ts) gets its shapes packed and sends its answer
@@ -131,6 +133,28 @@ describe("geometry worker transfer", () => {
     const direct = await buildGroupedShapeFromSelection(selected, 250_000);
     const transferred = await viaTransfer({ selected, triangleLimit: 250_000 }, (args: { selected: WorkplaneShape[]; triangleLimit: number }) => buildGroupedShapeFromSelection(args.selected, args.triangleLimit));
     expectSame(direct, transferred, inputs);
+  });
+
+  it("reads an STL and an OBJ file the same way as on the page", async () => {
+    const positions = gridCube(12);
+    const stl = Buffer.alloc(84 + (positions.length / 9) * 50);
+    stl.writeUInt32LE(positions.length / 9, 80);
+    for (let triangle = 0; triangle < positions.length / 9; triangle += 1) {
+      for (let k = 0; k < 9; k += 1) stl.writeFloatLE(positions[triangle * 9 + k], 84 + triangle * 50 + 12 + k * 4);
+    }
+    const buffer = stl.buffer.slice(stl.byteOffset, stl.byteOffset + stl.byteLength);
+    const directStl = importedShapeFromStl("cube.stl", buffer);
+    const transferredStl = await viaTransfer({ fileName: "cube.stl", buffer }, async (args: { fileName: string; buffer: ArrayBuffer }) => importedShapeFromStl(args.fileName, args.buffer));
+    expectSame(directStl, transferredStl, new Set());
+
+    const lines: string[] = [];
+    for (let index = 0; index < positions.length; index += 3) lines.push(`v ${positions[index]} ${positions[index + 1]} ${positions[index + 2]}`);
+    for (let face = 0; face < positions.length / 9; face += 1) lines.push(`f ${face * 3 + 1} ${face * 3 + 2} ${face * 3 + 3}`);
+    const obj = lines.join("\n");
+    const directObj = importedShapesFromObj("cube.obj", obj, []);
+    const transferredObj = await viaTransfer({ fileName: "cube.obj", text: obj, mtlSources: [] }, async (args: { fileName: string; text: string; mtlSources: string[] }) => importedShapesFromObj(args.fileName, args.text, args.mtlSources));
+    expect(directObj.shapes[0].importedMesh?.positions.length).toBeGreaterThan(1000);
+    expectSame(directObj, transferredObj, new Set());
   });
 
   it("splits a mesh the same way as on the page", async () => {
