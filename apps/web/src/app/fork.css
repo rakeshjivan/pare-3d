@@ -1900,3 +1900,9 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
   margin: 4px 0 8px; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.4;
   color: #8a4b0a; background: color-mix(in srgb, #f59f00 12%, var(--panel, #fff)); border: 1px solid color-mix(in srgb, #f59f00 40%, transparent);
 }
+/* Build 75: the articulator from the side - the opening's turn and how far each part parts. */
+.dental-picture.articulator .tooth { stroke-width: 0.6; stroke-linejoin: round; }
+.dental-picture.articulator .upper-gum, .dental-picture.articulator .lower-gum { stroke: #c7777e; stroke-width: 0.5; }
+.dental-picture.articulator .opening .turn { fill: none; stroke: #1662b3; stroke-width: 1.2; stroke-linecap: round; }
+.dental-picture.articulator text.small { font-size: 7.5px; font-weight: 600; }
+.dental-studio-panel .dental-hinge-options > .dental-picture.articulator { max-width: 340px; }
