@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 73,
+    items: [
+      "Sculpt works in real time, as in Meshmixer: the surface changes under the brush as you drag, also on a full-arch scan of 300,000 triangles. New brushes: Draw, Pinch, Crease and Move (grab the surface and pull it).",
+      "Sculpt's Refine adds triangles where the brush works (Fine, Medium or Coarse), so detail can be shaped on a coarse part, and Symmetry repeats each stroke on the other side, left-right or front-back. Ctrl+Z and Ctrl+Y step through strokes at once, and the view cube can be clicked between strokes.",
+      "Remesh, Offset and Thicken run on the same engine: a full-arch scan remeshes in about ten seconds without a voxel rebuild, an open scan stays open with its rim in place, and sharp edges (a model's base, a cut) are kept exactly, as in MeshLab's isotropic remeshing.",
+    ],
+  },
+  {
     build: 72,
     items: [
       "The Export window's slicers can always be chosen. Where the app could not say which slicers are installed - in a web browser, or in a Pare 3D app older than its pages - build 71 greyed them all out. Now the window says which it is: in a browser the file is downloaded for the slicer you pick; an older app is asked to be downloaded again once.",

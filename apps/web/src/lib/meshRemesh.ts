@@ -146,7 +146,7 @@ export async function remeshPositions(positions: ArrayLike<number>, options: Rem
   if (!mesh.triangleCount()) throw new Error("This part has no surface to work on");
   let out: Float32Array;
   if (mode === "remesh") {
-    remeshLive(mesh, detail, 5);
+    remeshLive(mesh, detail, 3);
     out = mesh.soup();
   } else if (mode === "offset") {
     // Even first at the detail, so a long sliver does not tear when its corners move apart.

@@ -39,6 +39,9 @@ class Grid {
   }
 }
 
+/** Corners (x y z alive, four numbers each) and triangles (a b c alive) to put back, with the counts in use. */
+export type LivePatch = { vCount: number; tCount: number; verts: Int32Array; vData: Float64Array; tris: Int32Array; tData: Int32Array };
+
 export class LiveMesh {
   /** Corner positions (x y z), capacity-sized; `vCount` in use, `vAlive` 0 for removed corners. */
   pos: Float64Array;
@@ -123,10 +126,12 @@ export class LiveMesh {
 
   dist(a: number, b: number) {
     const p = this.pos;
-    return Math.hypot(p[a * 3] - p[b * 3], p[a * 3 + 1] - p[b * 3 + 1], p[a * 3 + 2] - p[b * 3 + 2]);
+    const x = p[a * 3] - p[b * 3], y = p[a * 3 + 1] - p[b * 3 + 1], z = p[a * 3 + 2] - p[b * 3 + 2];
+    return Math.sqrt(x * x + y * y + z * z);
   }
   private cellOfVertex(v: number) { return this.vGrid.cellOf(this.pos[v * 3], this.pos[v * 3 + 1], this.pos[v * 3 + 2]); }
   private binTriangle(t: number) {
+    if (this.bulk) return;
     const cells = this.tCells[t];
     const box = this.tBox, o = t * 6;
     if (!this.tAlive[t]) {
@@ -161,6 +166,7 @@ export class LiveMesh {
   }
   /** After a corner moved: its grid cell, and the cells of its triangles. */
   private moved(v: number) {
+    if (this.bulk) { this.dirtyV.add(v); return; }
     const cell = this.cellOfVertex(v);
     if (cell !== this.vCell[v]) { this.vGrid.remove(this.vCell[v], v); this.vGrid.add(cell, v); this.vCell[v] = cell; }
     this.dirtyV.add(v);
@@ -187,8 +193,8 @@ export class LiveMesh {
     this.pos[v * 3] = x; this.pos[v * 3 + 1] = y; this.pos[v * 3 + 2] = z;
     this.vAlive[v] = 1;
     this.vTris[v] = [];
-    this.vCell[v] = this.cellOfVertex(v);
-    this.vGrid.add(this.vCell[v], v);
+    if (v < this.rim.length) this.rim[v] = -1;
+    if (!this.bulk) { this.vCell[v] = this.cellOfVertex(v); this.vGrid.add(this.vCell[v], v); }
     this.dirtyV.add(v);
     return v;
   }
@@ -207,6 +213,7 @@ export class LiveMesh {
   }
   private removeTriangle(t: number) {
     if (!this.tAlive[t]) return;
+    this.note(t);
     this.tAlive[t] = 0;
     for (let k = 0; k < 3; k += 1) {
       const list = this.vTris[this.tri[t * 3 + k]];
@@ -220,6 +227,7 @@ export class LiveMesh {
   }
   /** Replaces corner `from` with `to` in triangle t. */
   private retarget(t: number, from: number, to: number) {
+    this.note(t);
     for (let k = 0; k < 3; k += 1) if (this.tri[t * 3 + k] === from) this.tri[t * 3 + k] = to;
     const list = this.vTris[from], at = list.indexOf(t);
     if (at >= 0) { list[at] = list[list.length - 1]; list.pop(); }
@@ -227,6 +235,125 @@ export class LiveMesh {
     this.binTriangle(t);
     this.dirtyT.add(t);
   }
+  // ---------------------------------------------------------------------------------------------
+  // Undo: a stroke's changes as a pair of small patches (before and after), so a step back costs what
+  // the stroke touched, not a rebuild of the whole part.
+
+  private journal: Map<number, [number, number, number, number]> | null = null;
+  private journalT = 0;
+  private journalV = 0;
+  private journalPos: Float64Array | null = null;
+  private journalAlive: Uint8Array | null = null;
+  /** Triangle t as it was when the patch began, the first time it changes. */
+  private note(t: number) {
+    if (this.journal && t < this.journalT && !this.journal.has(t)) this.journal.set(t, [this.tri[t * 3], this.tri[t * 3 + 1], this.tri[t * 3 + 2], this.tAlive[t]]);
+  }
+  /** Starts recording changes (call before a stroke). */
+  beginPatch() {
+    this.journal = new Map();
+    this.journalT = this.tCount;
+    this.journalV = this.vCount;
+    this.journalPos = this.pos.slice(0, this.vCount * 3);
+    this.journalAlive = this.vAlive.slice(0, this.vCount);
+  }
+  /** Ends recording: the patches that take the mesh back to the start and forward again, or null if nothing changed. */
+  endPatch(): { undo: LivePatch; redo: LivePatch } | null {
+    const journal = this.journal, oldPos = this.journalPos, oldAlive = this.journalAlive;
+    this.journal = null; this.journalPos = null; this.journalAlive = null;
+    if (!journal || !oldPos || !oldAlive) return null;
+    const oldV = this.journalV, oldT = this.journalT, p = this.pos;
+    const changed: number[] = [];
+    for (let v = 0; v < oldV; v += 1) {
+      if (p[v * 3] !== oldPos[v * 3] || p[v * 3 + 1] !== oldPos[v * 3 + 1] || p[v * 3 + 2] !== oldPos[v * 3 + 2] || this.vAlive[v] !== oldAlive[v]) changed.push(v);
+    }
+    if (!changed.length && !journal.size && this.vCount === oldV && this.tCount === oldT) return null;
+    const vertexData = (list: number[], from: Float64Array, alive: Uint8Array) => {
+      const out = new Float64Array(list.length * 4);
+      list.forEach((v, k) => { out[k * 4] = from[v * 3]; out[k * 4 + 1] = from[v * 3 + 1]; out[k * 4 + 2] = from[v * 3 + 2]; out[k * 4 + 3] = alive[v]; });
+      return out;
+    };
+    const undoTris = [...journal.keys()];
+    const undoTData = new Int32Array(undoTris.length * 4);
+    undoTris.forEach((t, k) => undoTData.set(journal.get(t)!, k * 4));
+    const redoVerts = changed.slice();
+    for (let v = oldV; v < this.vCount; v += 1) redoVerts.push(v);
+    const redoTris = undoTris.slice();
+    for (let t = oldT; t < this.tCount; t += 1) redoTris.push(t);
+    const redoTData = new Int32Array(redoTris.length * 4);
+    redoTris.forEach((t, k) => { redoTData[k * 4] = this.tri[t * 3]; redoTData[k * 4 + 1] = this.tri[t * 3 + 1]; redoTData[k * 4 + 2] = this.tri[t * 3 + 2]; redoTData[k * 4 + 3] = this.tAlive[t]; });
+    return {
+      undo: { vCount: oldV, tCount: oldT, verts: Int32Array.from(changed), vData: vertexData(changed, oldPos, oldAlive), tris: Int32Array.from(undoTris), tData: undoTData },
+      redo: { vCount: this.vCount, tCount: this.tCount, verts: Int32Array.from(redoVerts), vData: vertexData(redoVerts, p, this.vAlive), tris: Int32Array.from(redoTris), tData: redoTData },
+    };
+  }
+  /** Puts the corners and triangles a patch lists back as it has them. */
+  applyPatch(patch: LivePatch) {
+    // Past the patch's counts: gone.
+    for (let t = patch.tCount; t < this.tCount; t += 1) if (this.tAlive[t]) this.removeTriangle(t);
+    for (let v = patch.vCount; v < this.vCount; v += 1) {
+      if (this.vAlive[v]) { this.vGrid.remove(this.vCell[v], v); this.vAlive[v] = 0; }
+      this.vTris[v] = [];
+    }
+    if (patch.vCount > this.vCount) {
+      this.growVertices(patch.vCount - this.vCount);
+      for (let v = this.vCount; v < patch.vCount; v += 1) { this.vAlive[v] = 0; this.vTris[v] = []; }
+    }
+    this.vCount = patch.vCount;
+    if (patch.tCount > this.tCount) {
+      this.growTriangles(patch.tCount - this.tCount);
+      for (let t = this.tCount; t < patch.tCount; t += 1) { this.tAlive[t] = 0; this.tCells[t] = []; this.tBox[t * 6] = 2147483647; }
+    }
+    this.tCount = patch.tCount;
+    // Corners first (positions, alive), then the triangles off their old corners and on to the new.
+    const moved: number[] = [];
+    for (let k = 0; k < patch.verts.length; k += 1) {
+      const v = patch.verts[k], d = patch.vData;
+      const was = this.vAlive[v], now = d[k * 4 + 3];
+      if (was) this.vGrid.remove(this.vCell[v], v);
+      this.pos[v * 3] = d[k * 4]; this.pos[v * 3 + 1] = d[k * 4 + 1]; this.pos[v * 3 + 2] = d[k * 4 + 2];
+      this.vAlive[v] = now;
+      if (now) { this.vCell[v] = this.cellOfVertex(v); this.vGrid.add(this.vCell[v], v); moved.push(v); }
+      this.dirtyV.add(v);
+    }
+    for (let k = 0; k < patch.tris.length; k += 1) {
+      const t = patch.tris[k];
+      if (!this.tAlive[t]) continue;
+      for (let j = 0; j < 3; j += 1) { const list = this.vTris[this.tri[t * 3 + j]], at = list.indexOf(t); if (at >= 0) { list[at] = list[list.length - 1]; list.pop(); } }
+    }
+    for (let k = 0; k < patch.tris.length; k += 1) {
+      const t = patch.tris[k], d = patch.tData;
+      this.tri[t * 3] = d[k * 4]; this.tri[t * 3 + 1] = d[k * 4 + 1]; this.tri[t * 3 + 2] = d[k * 4 + 2];
+      this.tAlive[t] = d[k * 4 + 3];
+      if (this.tAlive[t]) for (let j = 0; j < 3; j += 1) this.vTris[this.tri[t * 3 + j]].push(t);
+    }
+    for (let k = 0; k < patch.tris.length; k += 1) {
+      const t = patch.tris[k];
+      if (!this.tCells[t]) this.tCells[t] = [];
+      // A triangle given new corners in the same grid box keeps its cells: they are still right.
+      this.binTriangle(t);
+      this.dirtyT.add(t);
+      for (let j = 0; j < 3; j += 1) this.dirtyV.add(this.tri[t * 3 + j]);
+    }
+    this.rebin(moved);
+    this.rim.fill(-1);
+    if (patch.tris.length) { this.topologyChanged = true; this.topologyEdits += 1; }
+  }
+
+  /** Whole-part work (Remesh, Offset): the grids are left alone while it runs and made again once at the end. */
+  private bulk = false;
+  beginBulk() { this.bulk = true; }
+  endBulk() {
+    this.bulk = false;
+    let edge = 0, n = 0;
+    for (let t = 0; t < this.tCount && n < 20000; t += Math.max(1, Math.floor(this.tCount / 20000))) if (this.tAlive[t]) { edge += this.dist(this.tri[t * 3], this.tri[t * 3 + 1]); n += 1; }
+    const h = Math.max(0.5, (n ? edge / n : 1) * 3);
+    this.vGrid = new Grid(h);
+    this.tGrid = new Grid(h);
+    for (let v = 0; v < this.vCount; v += 1) if (this.vAlive[v]) { this.vCell[v] = this.cellOfVertex(v); this.vGrid.add(this.vCell[v], v); this.dirtyV.add(v); }
+    this.tBox.fill(2147483647);
+    for (let t = 0; t < this.tCount; t += 1) { this.tCells[t] = []; if (this.tAlive[t]) this.binTriangle(t); }
+  }
+
   /** The corners joined to v by an edge. */
   neighbours(v: number): number[] {
     if (this.stamp.length < this.vCount) { const next = new Int32Array(this.pos.length / 3); next.set(this.stamp); this.stamp = next; }
@@ -239,6 +366,11 @@ export class LiveMesh {
   }
   private stamp = new Int32Array(0);
   private stampNow = 0;
+  private regionMark = new Int32Array(0);
+  private regionNow = 0;
+  /** Whether each corner is on a rim: 1 yes, 0 no, -1 not known yet. A corner's own answer never changes
+   * under split, collapse or flip (they keep rims as rims), so it is worked out once. */
+  private rim = new Int8Array(0);
   /** The (one or two) triangles on edge a-b. */
   edgeTriangles(a: number, b: number): number[] {
     const out: number[] = [];
@@ -247,15 +379,37 @@ export class LiveMesh {
   }
   /** Whether v is on an open edge (a scan's rim). */
   onBoundary(v: number) {
+    if (this.rim.length <= v) { const next = new Int8Array(this.pos.length / 3).fill(-1); next.set(this.rim); this.rim = next; }
+    if (this.rim[v] >= 0) return this.rim[v] === 1;
     // Round an inner corner there are as many neighbours as triangles; on a rim, one more (or the fan
     // is not a single disc).
-    return this.neighbours(v).length !== this.vTris[v].length;
+    const on = this.neighbours(v).length !== this.vTris[v].length;
+    this.rim[v] = on ? 1 : 0;
+    return on;
   }
   private faceNormal(t: number, out = new THREE.Vector3()) {
     const p = this.pos, a = this.tri[t * 3] * 3, b = this.tri[t * 3 + 1] * 3, c = this.tri[t * 3 + 2] * 3;
     const ux = p[b] - p[a], uy = p[b + 1] - p[a + 1], uz = p[b + 2] - p[a + 2];
     const vx = p[c] - p[a], vy = p[c + 1] - p[a + 1], vz = p[c + 2] - p[a + 2];
     return out.set(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+  }
+  /** Whether t is a sliver: twice its area under 2% of its longest edge squared. `n` is its raw face normal. */
+  private isSliver(t: number, n: THREE.Vector3) {
+    const a = this.tri[t * 3], b = this.tri[t * 3 + 1], c = this.tri[t * 3 + 2];
+    const l2 = Math.max(this.dist2(a, b), this.dist2(b, c), this.dist2(c, a));
+    return n.lengthSq() < 0.0004 * l2 * l2;
+  }
+  private dist2(a: number, b: number) {
+    const p = this.pos;
+    const x = p[a * 3] - p[b * 3], y = p[a * 3 + 1] - p[b * 3 + 1], z = p[a * 3 + 2] - p[b * 3 + 2];
+    return x * x + y * y + z * z;
+  }
+  private isSliverOf(a: number, b: number, c: number) {
+    const p = this.pos;
+    const ux = p[b * 3] - p[a * 3], uy = p[b * 3 + 1] - p[a * 3 + 1], uz = p[b * 3 + 2] - p[a * 3 + 2];
+    const vx = p[c * 3] - p[a * 3], vy = p[c * 3 + 1] - p[a * 3 + 1], vz = p[c * 3 + 2] - p[a * 3 + 2];
+    const l2 = Math.max(this.dist2(a, b), this.dist2(b, c), this.dist2(c, a));
+    return (uy * vz - uz * vy) ** 2 + (uz * vx - ux * vz) ** 2 + (ux * vy - uy * vx) ** 2 < 0.0004 * l2 * l2;
   }
   /** Area-weighted unit normal at v. */
   vertexNormal(v: number, out = new THREE.Vector3()) {
@@ -551,7 +705,7 @@ export class LiveMesh {
   }
 
   /** Collapses edge a-b to its middle, when that keeps the surface sound; returns whether it did. */
-  collapseEdge(a: number, b: number, maxEdge: number): boolean {
+  collapseEdge(a: number, b: number, maxEdge: number, at?: Vec3): boolean {
     const shared = this.edgeTriangles(a, b);
     if (shared.length !== 2) return false;
     if (this.onBoundary(a) || this.onBoundary(b)) return false;
@@ -561,26 +715,31 @@ export class LiveMesh {
     for (const v of na) if (nb.includes(v)) common += 1;
     if (common !== 2) return false;
     const p = this.pos;
-    const mx = (p[a * 3] + p[b * 3]) / 2, my = (p[a * 3 + 1] + p[b * 3 + 1]) / 2, mz = (p[a * 3 + 2] + p[b * 3 + 2]) / 2;
+    const mx = at ? at[0] : (p[a * 3] + p[b * 3]) / 2, my = at ? at[1] : (p[a * 3 + 1] + p[b * 3 + 1]) / 2, mz = at ? at[2] : (p[a * 3 + 2] + p[b * 3 + 2]) / 2;
     // No new edge longer than the limit, no triangle turned over.
     for (const v of nb) if (v !== a && Math.hypot(p[v * 3] - mx, p[v * 3 + 1] - my, p[v * 3 + 2] - mz) > maxEdge) return false;
+    if (at) for (const v of na) if (v !== b && Math.hypot(p[v * 3] - mx, p[v * 3 + 1] - my, p[v * 3 + 2] - mz) > maxEdge) return false;
     const before = new THREE.Vector3(), after = new THREE.Vector3();
     const saved = [p[a * 3], p[a * 3 + 1], p[a * 3 + 2], p[b * 3], p[b * 3 + 1], p[b * 3 + 2]];
     const fans = [...new Set([...this.vTris[a], ...this.vTris[b]])].filter((t) => !shared.includes(t));
-    const normalsBefore = fans.map((t) => this.faceNormal(t, new THREE.Vector3()).normalize());
+    // A sliver (thinner than about 1% of its length) has no facing worth keeping: a brush that pinched
+    // the surface into a line leaves them, and refusing to collapse them would leave them for good.
+    const normalsBefore = fans.map((t) => { const n = this.faceNormal(t, new THREE.Vector3()); return this.isSliver(t, n) ? null : n.normalize(); });
     p[a * 3] = mx; p[a * 3 + 1] = my; p[a * 3 + 2] = mz; p[b * 3] = mx; p[b * 3 + 1] = my; p[b * 3 + 2] = mz;
     let ok = true;
     fans.forEach((t, k) => {
+      const was = normalsBefore[k];
+      if (!was) return;
       this.faceNormal(t, after);
       if (after.lengthSq() < 1e-14) { ok = false; return; }
-      before.copy(normalsBefore[k]);
+      before.copy(was);
       if (after.normalize().dot(before) < 0.3) ok = false;
     });
     if (!ok) { p[a * 3] = saved[0]; p[a * 3 + 1] = saved[1]; p[a * 3 + 2] = saved[2]; p[b * 3] = saved[3]; p[b * 3 + 1] = saved[4]; p[b * 3 + 2] = saved[5]; return false; }
     for (const t of shared) this.removeTriangle(t);
     for (const t of [...this.vTris[b]]) this.retarget(t, b, a);
     this.vAlive[b] = 0;
-    this.vGrid.remove(this.vCell[b], b);
+    if (!this.bulk) this.vGrid.remove(this.vCell[b], b);
     this.vTris[b] = [];
     this.moved(a);
     for (const t of this.vTris[a]) this.binTriangle(t);
@@ -600,15 +759,18 @@ export class LiveMesh {
     const c = opposite(t1), d = opposite(t2);
     if (c < 0 || d < 0 || c === d) return false;
     if (this.edgeTriangles(c, d).length) return false;
+    const n1 = this.faceNormal(t1, new THREE.Vector3()), n2 = this.faceNormal(t2, new THREE.Vector3());
+    // A pair with a sliver: flipped when that makes the shared edge shorter (towards Delaunay), whatever the valences.
+    const sliver = this.isSliver(t1, n1) || this.isSliver(t2, n2);
     const target = (v: number) => (this.onBoundary(v) ? 4 : 6);
     const va = this.vTris[a].length, vb = this.vTris[b].length, vc = this.vTris[c].length, vd = this.vTris[d].length;
     // Interior valence is the triangle count round a corner.
     const dev = (x: number, v: number) => (x - target(v)) ** 2;
     const now = dev(va, a) + dev(vb, b) + dev(vc, c) + dev(vd, d);
     const then = dev(va - 1, a) + dev(vb - 1, b) + dev(vc + 1, c) + dev(vd + 1, d);
-    if (then >= now) return false;
-    // The two new triangles must face the same way as the old pair.
-    const n1 = this.faceNormal(t1, new THREE.Vector3()).normalize(), n2 = this.faceNormal(t2, new THREE.Vector3()).normalize();
+    if (sliver ? this.dist(c, d) >= this.dist(a, b) : then >= now) return false;
+    // The two new triangles must face the same way as the old pair (a sliver's own facing does not count).
+    n1.normalize(); n2.normalize();
     const p = this.pos;
     const normalOf = (x: number, y: number, z: number) => {
       const ux = p[y * 3] - p[x * 3], uy = p[y * 3 + 1] - p[x * 3 + 1], uz = p[y * 3 + 2] - p[x * 3 + 2];
@@ -618,7 +780,8 @@ export class LiveMesh {
     const m1 = normalOf(c, a, d), m2 = normalOf(d, b, c);
     if (m1.lengthSq() < 1e-14 || m2.lengthSq() < 1e-14) return false;
     m1.normalize(); m2.normalize();
-    if (n1.dot(n2) < 0.5 || m1.dot(n1) < 0.5 || m2.dot(n2) < 0.5 || m1.dot(m2) < 0.5) return false;
+    if (sliver) { if (m1.dot(m2) < 0.5 || this.isSliverOf(c, a, d) || this.isSliverOf(d, b, c)) return false; }
+    else if (n1.dot(n2) < 0.5 || m1.dot(n1) < 0.5 || m2.dot(n2) < 0.5 || m1.dot(m2) < 0.5) return false;
     // (a, b, c) -> (c, a, d); (b, a, d) -> (d, b, c)
     this.retarget(t1, b, d); // t1: a,d,c in some rotation -> set exactly
     this.tri[t1 * 3] = c; this.tri[t1 * 3 + 1] = a; this.tri[t1 * 3 + 2] = d;
@@ -635,7 +798,21 @@ export class LiveMesh {
    * Keeps the triangles touching `corners` near `target` edge length: splits, collapses, flips, then a
    * relax along the surface. `project` (optional) puts a moved corner back onto a surface. Bounded work.
    */
-  refine(corners: Iterable<number>, target: number, options: { relax?: boolean; project?: (p: THREE.Vector3) => void; budget?: number; fixed?: (v: number) => boolean; within?: { centre: Vec3; radius: number }; milliseconds?: number } = {}) {
+  refine(corners: Iterable<number>, target: number, options: { relax?: boolean; project?: (p: THREE.Vector3) => void; budget?: number; fixed?: (v: number) => boolean; within?: { centre: Vec3; radius: number }; milliseconds?: number; creaseAngle?: number; collapseBelow?: number } = {}) {
+    // Sharp edges (faces meeting at more than `creaseAngle` degrees) are kept, as in VCG's isotropic
+    // remeshing (MeshLab): never flipped, collapsed only along their line, and their corners slide only
+    // along it; where three or more meet (a box's corner) the corner stays put.
+    const creaseCos = options.creaseAngle ? Math.cos((options.creaseAngle * Math.PI) / 180) : null;
+    const na = new THREE.Vector3(), nb = new THREE.Vector3();
+    const isCrease = (a: number, b: number) => {
+      if (creaseCos === null) return false;
+      const ts = this.edgeTriangles(a, b);
+      if (ts.length !== 2) return true;
+      this.faceNormal(ts[0], na); this.faceNormal(ts[1], nb);
+      const l = na.length() * nb.length();
+      return l > 0 && na.dot(nb) / l < creaseCos;
+    };
+    const creaseNeighbours = (v: number) => { const out: number[] = []; if (creaseCos !== null) for (const w of this.neighbours(v)) if (isCrease(v, w)) out.push(w); return out; };
     // Splitting makes new edges out to the corners beyond: without a bound the refinement would creep
     // over the whole part. Only edges whose middle is inside `within` (the brush's ball) are split.
     const ball = options.within;
@@ -644,28 +821,40 @@ export class LiveMesh {
       const p = this.pos, c = ball.centre;
       return ((p[a * 3] + p[b * 3]) / 2 - c[0]) ** 2 + ((p[a * 3 + 1] + p[b * 3 + 1]) / 2 - c[1]) ** 2 + ((p[a * 3 + 2] + p[b * 3 + 2]) / 2 - c[2]) ** 2 <= ball.radius * ball.radius;
     };
-    const hi = target * (4 / 3), lo = target * (4 / 5);
+    // `collapseBelow` keeps detail finer than the target that was there before (a scan's own triangles):
+    // only edges shorter than it are collapsed.
+    const hi = target * (4 / 3), lo = Math.min(target * (4 / 5), options.collapseBelow ?? Infinity);
     let work = options.budget ?? 20000;
     const until = options.milliseconds ? performance.now() + options.milliseconds : Infinity;
     const late = () => performance.now() > until;
     const region = new Set<number>();
     for (const v of corners) if (this.vAlive[v]) region.add(v);
-    const edgesOf = () => {
-      const out: Array<[number, number]> = [];
-      const seen = new Set<number>();
+    /** The edges at the region's corners that pass `keep`, each once, as pairs (a < b) in a flat list. */
+    const edgesOf = (keep?: (a: number, b: number) => boolean) => {
+      const out: number[] = [];
+      const mark = this.regionMark.length >= this.vCount ? this.regionMark : (this.regionMark = new Int32Array(this.pos.length / 3));
+      const now = ++this.regionNow;
+      for (const v of region) if (this.vAlive[v]) mark[v] = now;
       for (const v of region) {
         if (!this.vAlive[v]) continue;
+        // Each edge once: from its smaller corner, or from the corner in the region when only one is.
         for (const w of this.neighbours(v)) {
-          const a = Math.min(v, w), b = Math.max(v, w), key = a * 4294967296 + b;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          out.push([a, b]);
+          if (mark[w] === now && w < v) continue;
+          const a = v < w ? v : w, b = v < w ? w : v;
+          if (!keep || keep(a, b)) out.push(a, b);
         }
       }
       return out;
     };
     // Split, longest first, re-queueing the halves.
-    const queue = edgesOf().filter(([a, b]) => this.dist(a, b) > hi && inside(a, b)).sort((e, f) => this.dist(f[0], f[1]) - this.dist(e[0], e[1]));
+    const long = edgesOf((a, b) => this.dist(a, b) > hi && inside(a, b));
+    const order = Array.from({ length: long.length / 2 }, (_, k) => k);
+    const lengths = new Float64Array(order.length);
+    for (let k = 0; k < order.length; k += 1) lengths[k] = this.dist(long[k * 2], long[k * 2 + 1]);
+    order.sort((e, f) => lengths[f] - lengths[e]);
+    const queue: Array<[number, number]> = order.map((k) => [long[k * 2], long[k * 2 + 1]]);
+    // A guard against a run-away: never more splits in one call than eight per corner it started with.
+    work = Math.min(work, Math.max(256, region.size * 8));
     for (let q = 0; q < queue.length && work > 0; q += 1) {
       if ((q & 31) === 0 && late()) break;
       const [a, b] = queue[q];
@@ -679,16 +868,35 @@ export class LiveMesh {
       for (const w of this.neighbours(m)) if (this.dist(m, w) > hi && inside(m, w)) queue.push([Math.min(m, w), Math.max(m, w)]);
     }
     // Collapse the short ones.
-    for (const [a, b] of late() ? [] : edgesOf()) {
-      if (work <= 0 || late()) break;
+    const short = late() ? [] : edgesOf((a, b) => this.dist(a, b) < lo && inside(a, b));
+    for (let e = 0; e < short.length; e += 2) {
+      const a = short[e], b = short[e + 1];
+      if (work <= 0 || ((e & 63) === 0 && late())) break;
       if (!this.vAlive[a] || !this.vAlive[b] || this.dist(a, b) >= lo || !inside(a, b)) continue;
       if (options.fixed && (options.fixed(a) || options.fixed(b))) continue;
+      if (creaseCos !== null) {
+        const ca = creaseNeighbours(a).length, cb = creaseNeighbours(b).length;
+        if (ca || cb) {
+          // Into the sharper corner, or along a sharp line between two of its corners; never two corners together.
+          let keep = -1, gone = -1;
+          if (!cb) { keep = a; gone = b; } else if (!ca) { keep = b; gone = a; }
+          else if (isCrease(a, b)) { if (ca === 2 && cb !== 2) { keep = b; gone = a; } else if (cb === 2) { keep = a; gone = b; } }
+          if (keep < 0) continue;
+          const both = ca === 2 && cb === 2 && isCrease(a, b);
+          const at: Vec3 = both ? [(this.pos[a * 3] + this.pos[b * 3]) / 2, (this.pos[a * 3 + 1] + this.pos[b * 3 + 1]) / 2, (this.pos[a * 3 + 2] + this.pos[b * 3 + 2]) / 2] : [this.pos[keep * 3], this.pos[keep * 3 + 1], this.pos[keep * 3 + 2]];
+          if (this.collapseEdge(keep, gone, hi, at)) { work -= 1; region.delete(gone); }
+          continue;
+        }
+      }
       if (this.collapseEdge(a, b, hi)) { work -= 1; region.delete(b); }
     }
     // Flip towards six neighbours a corner.
-    for (const [a, b] of late() ? [] : edgesOf()) {
-      if (work <= 0 || late()) break;
+    const all = late() ? [] : edgesOf();
+    for (let e = 0; e < all.length; e += 2) {
+      const a = all[e], b = all[e + 1];
+      if (work <= 0 || ((e & 63) === 0 && late())) break;
       if (!this.vAlive[a] || !this.vAlive[b]) continue;
+      if (creaseCos !== null && isCrease(a, b)) continue;
       if (this.flipEdge(a, b)) work -= 1;
     }
     // Relax: each corner towards the middle of its neighbours, along the surface only.
@@ -699,6 +907,15 @@ export class LiveMesh {
         if (!this.vAlive[v] || this.onBoundary(v) || (options.fixed && options.fixed(v))) continue;
         const around = this.neighbours(v);
         if (around.length < 3) continue;
+        const sharp = creaseNeighbours(v);
+        if (sharp.length) {
+          // On a sharp line: along it, between its two neighbours on the line; a corner stays.
+          if (sharp.length !== 2) continue;
+          const [u, w] = sharp;
+          const mx = (this.pos[u * 3] + this.pos[w * 3]) / 2, my = (this.pos[u * 3 + 1] + this.pos[w * 3 + 1]) / 2, mz = (this.pos[u * 3 + 2] + this.pos[w * 3 + 2]) / 2;
+          moves.push([v, this.pos[v * 3] + (mx - this.pos[v * 3]) * 0.5, this.pos[v * 3 + 1] + (my - this.pos[v * 3 + 1]) * 0.5, this.pos[v * 3 + 2] + (mz - this.pos[v * 3 + 2]) * 0.5]);
+          continue;
+        }
         let ax = 0, ay = 0, az = 0;
         for (const u of around) { ax += this.pos[u * 3]; ay += this.pos[u * 3 + 1]; az += this.pos[u * 3 + 2]; }
         ax /= around.length; ay /= around.length; az /= around.length;
@@ -724,14 +941,26 @@ export class LiveMesh {
 
   /** Living corners and triangles, renumbered from zero. */
   compact(): { points: Float64Array; triangles: Uint32Array } {
+    // Typed arrays throughout: this runs at the start of every refining stroke, on meshes of 300k+ triangles.
     const map = new Int32Array(this.vCount).fill(-1);
-    let n = 0;
-    for (let v = 0; v < this.vCount; v += 1) if (this.vAlive[v] && this.vTris[v].length) map[v] = n++;
+    let m = 0;
+    for (let t = 0; t < this.tCount; t += 1) if (this.tAlive[t]) m += 1;
+    const triangles = new Uint32Array(m * 3);
+    let n = 0, o = 0;
+    for (let t = 0; t < this.tCount; t += 1) {
+      if (!this.tAlive[t]) continue;
+      for (let k = 0; k < 3; k += 1) {
+        const v = this.tri[t * 3 + k];
+        if (map[v] < 0) map[v] = n++;
+        triangles[o++] = map[v];
+      }
+    }
     const points = new Float64Array(n * 3);
-    for (let v = 0; v < this.vCount; v += 1) if (map[v] >= 0) { points[map[v] * 3] = this.pos[v * 3]; points[map[v] * 3 + 1] = this.pos[v * 3 + 1]; points[map[v] * 3 + 2] = this.pos[v * 3 + 2]; }
-    const tris: number[] = [];
-    for (let t = 0; t < this.tCount; t += 1) if (this.tAlive[t]) tris.push(map[this.tri[t * 3]], map[this.tri[t * 3 + 1]], map[this.tri[t * 3 + 2]]);
-    return { points, triangles: Uint32Array.from(tris) };
+    for (let v = 0; v < this.vCount; v += 1) {
+      const w = map[v];
+      if (w >= 0) { points[w * 3] = this.pos[v * 3]; points[w * 3 + 1] = this.pos[v * 3 + 1]; points[w * 3 + 2] = this.pos[v * 3 + 2]; }
+    }
+    return { points, triangles };
   }
   /** The surface as a triangle soup (9 numbers a triangle), in triangle order. */
   soup(): Float32Array {
@@ -755,35 +984,81 @@ export class LiveMesh {
 /** Closest point on the original surface, for keeping a remeshed part on it. */
 export function surfaceProjector(source: LiveMesh) {
   const snapshot = source.compact();
-  const h = Math.max(0.5, source.averageEdge(sampleCorners(source, 2000)) * 3);
+  // Cells about two edges across: a corner near the surface finds its closest point in its own cell,
+  // and a neighbouring cell is only looked in when it could hold something nearer.
+  const h = Math.max(0.05, source.averageEdge(sampleCorners(source, 2000)) * 2);
   const grid = new Map<number, number[]>();
   const key = (ix: number, iy: number, iz: number) => ((ix + OFF) * K + (iy + OFF)) * K + (iz + OFF);
   const P = snapshot.points, T = snapshot.triangles;
   for (let t = 0; t < T.length / 3; t += 1) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (let k = 0; k < 3; k += 1) { const v = T[t * 3 + k] * 3; x0 = Math.min(x0, P[v]); x1 = Math.max(x1, P[v]); y0 = Math.min(y0, P[v + 1]); y1 = Math.max(y1, P[v + 1]); z0 = Math.min(z0, P[v + 2]); z1 = Math.max(z1, P[v + 2]); }
-    for (let ix = Math.floor(x0 / h); ix <= Math.floor(x1 / h); ix += 1) for (let iy = Math.floor(y0 / h); iy <= Math.floor(y1 / h); iy += 1) for (let iz = Math.floor(z0 / h); iz <= Math.floor(z1 / h); iz += 1) {
+    const cx0 = Math.floor(x0 / h), cx1 = Math.floor(x1 / h), cy0 = Math.floor(y0 / h), cy1 = Math.floor(y1 / h), cz0 = Math.floor(z0 / h), cz1 = Math.floor(z1 / h);
+    if ((cx1 - cx0 + 1) * (cy1 - cy0 + 1) * (cz1 - cz0 + 1) > 4000) continue; // a huge base triangle: found by the wide search below
+    for (let ix = cx0; ix <= cx1; ix += 1) for (let iy = cy0; iy <= cy1; iy += 1) for (let iz = cz0; iz <= cz1; iz += 1) {
       const k = key(ix, iy, iz); const list = grid.get(k); if (list) list.push(t); else grid.set(k, [t]);
     }
   }
-  const tri = new THREE.Triangle(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), q = new THREE.Vector3();
+  const huge: number[] = [];
+  for (let t = 0; t < T.length / 3; t += 1) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let k = 0; k < 3; k += 1) { const v = T[t * 3 + k] * 3; x0 = Math.min(x0, P[v]); x1 = Math.max(x1, P[v]); y0 = Math.min(y0, P[v + 1]); y1 = Math.max(y1, P[v + 1]); z0 = Math.min(z0, P[v + 2]); z1 = Math.max(z1, P[v + 2]); }
+    if ((Math.floor(x1 / h) - Math.floor(x0 / h) + 1) * (Math.floor(y1 / h) - Math.floor(y0 / h) + 1) * (Math.floor(z1 / h) - Math.floor(z0 / h) + 1) > 4000) huge.push(t);
+  }
+  const seen = new Int32Array(T.length / 3);
+  let stamp = 0;
+  let bx = 0, by = 0, bz = 0, best = Infinity;
+  /** Closest point on triangle t to (px py pz) (Ericson, Real-Time Collision Detection 5.1.5), kept if nearer. */
+  const test = (t: number, px: number, py: number, pz: number) => {
+    const ia = T[t * 3] * 3, ib = T[t * 3 + 1] * 3, ic = T[t * 3 + 2] * 3;
+    const ax = P[ia], ay = P[ia + 1], az = P[ia + 2];
+    const abx = P[ib] - ax, aby = P[ib + 1] - ay, abz = P[ib + 2] - az;
+    const acx = P[ic] - ax, acy = P[ic + 1] - ay, acz = P[ic + 2] - az;
+    const apx = px - ax, apy = py - ay, apz = pz - az;
+    const d1 = abx * apx + aby * apy + abz * apz, d2 = acx * apx + acy * apy + acz * apz;
+    let qx: number, qy: number, qz: number;
+    if (d1 <= 0 && d2 <= 0) { qx = ax; qy = ay; qz = az; }
+    else {
+      const bpx = px - P[ib], bpy = py - P[ib + 1], bpz = pz - P[ib + 2];
+      const d3 = abx * bpx + aby * bpy + abz * bpz, d4 = acx * bpx + acy * bpy + acz * bpz;
+      const cpx = px - P[ic], cpy = py - P[ic + 1], cpz = pz - P[ic + 2];
+      const d5 = abx * cpx + aby * cpy + abz * cpz, d6 = acx * cpx + acy * cpy + acz * cpz;
+      const vc = d1 * d4 - d3 * d2, vb = d5 * d2 - d1 * d6, va = d3 * d6 - d5 * d4;
+      if (d3 >= 0 && d4 <= d3) { qx = P[ib]; qy = P[ib + 1]; qz = P[ib + 2]; }
+      else if (vc <= 0 && d1 >= 0 && d3 <= 0) { const v = d1 / (d1 - d3); qx = ax + abx * v; qy = ay + aby * v; qz = az + abz * v; }
+      else if (d6 >= 0 && d5 <= d6) { qx = P[ic]; qy = P[ic + 1]; qz = P[ic + 2]; }
+      else if (vb <= 0 && d2 >= 0 && d6 <= 0) { const w = d2 / (d2 - d6); qx = ax + acx * w; qy = ay + acy * w; qz = az + acz * w; }
+      else if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) { const w = (d4 - d3) / (d4 - d3 + (d5 - d6)); qx = P[ib] + (P[ic] - P[ib]) * w; qy = P[ib + 1] + (P[ic + 1] - P[ib + 1]) * w; qz = P[ib + 2] + (P[ic + 2] - P[ib + 2]) * w; }
+      else { const den = 1 / (va + vb + vc), v = vb * den, w = vc * den; qx = ax + abx * v + acx * w; qy = ay + aby * v + acy * w; qz = az + abz * v + acz * w; }
+    }
+    const d = (qx - px) ** 2 + (qy - py) ** 2 + (qz - pz) ** 2;
+    if (d < best) { best = d; bx = qx; by = qy; bz = qz; }
+  };
   return (p: THREE.Vector3) => {
-    let best = Infinity;
-    const out = p.clone();
-    const ix = Math.floor(p.x / h), iy = Math.floor(p.y / h), iz = Math.floor(p.z / h);
-    for (let ring = 1; ring <= 3 && !Number.isFinite(best); ring += 1) {
+    best = Infinity;
+    stamp += 1;
+    const px = p.x, py = p.y, pz = p.z;
+    const ix = Math.floor(px / h), iy = Math.floor(py / h), iz = Math.floor(pz / h);
+    const cell = (ox: number, oy: number, oz: number) => {
+      const list = grid.get(key(ix + ox, iy + oy, iz + oz));
+      if (list) for (const t of list) if (seen[t] !== stamp) { seen[t] = stamp; test(t, px, py, pz); }
+    };
+    cell(0, 0, 0);
+    // Rings outwards; a cell is looked in only when its nearest side is nearer than the best so far.
+    for (let ring = 1; ring <= 3; ring += 1) {
+      const reach = (ring - 1) * h + Math.min(px - ix * h, (ix + 1) * h - px, py - iy * h, (iy + 1) * h - py, pz - iz * h, (iz + 1) * h - pz);
+      if (best <= reach * reach) break;
       for (let ox = -ring; ox <= ring; ox += 1) for (let oy = -ring; oy <= ring; oy += 1) for (let oz = -ring; oz <= ring; oz += 1) {
-        const list = grid.get(key(ix + ox, iy + oy, iz + oz));
-        if (!list) continue;
-        for (const t of list) {
-          a.fromArray(P, T[t * 3] * 3); b.fromArray(P, T[t * 3 + 1] * 3); c.fromArray(P, T[t * 3 + 2] * 3);
-          tri.set(a, b, c).closestPointToPoint(p, q);
-          const d = q.distanceToSquared(p);
-          if (d < best) { best = d; out.copy(q); }
-        }
+        if (Math.max(Math.abs(ox), Math.abs(oy), Math.abs(oz)) !== ring) continue;
+        // Distance from p to that cell's box.
+        const gx = ox > 0 ? (ix + ox) * h - px : ox < 0 ? px - (ix + ox + 1) * h : 0;
+        const gy = oy > 0 ? (iy + oy) * h - py : oy < 0 ? py - (iy + oy + 1) * h : 0;
+        const gz = oz > 0 ? (iz + oz) * h - pz : oz < 0 ? pz - (iz + oz + 1) * h : 0;
+        if (gx * gx + gy * gy + gz * gz < best) cell(ox, oy, oz);
       }
     }
-    p.copy(out);
+    for (const t of huge) test(t, px, py, pz);
+    if (Number.isFinite(best)) p.set(bx, by, bz);
   };
 }
 
@@ -801,12 +1076,18 @@ export function averageEdgeOf(mesh: LiveMesh) { return mesh.averageEdge(sampleCo
  * Remesh: the whole part to triangles of about `edge` mm, kept on its own surface (corners pulled back
  * onto the original after every move), the rim of an open scan kept where it is.
  */
+/** Faces meeting at more than this (degrees) make a sharp edge that Remesh keeps (a model's base, a cut). */
+export const REMESH_CREASE_ANGLE = 40;
 export function remeshLive(mesh: LiveMesh, edge: number, passes = 5, onProgress?: (fraction: number) => void) {
   const project = surfaceProjector(mesh);
+  mesh.beginBulk();
+  try { remeshPasses(mesh, edge, passes, project, onProgress); } finally { mesh.endBulk(); }
+}
+function remeshPasses(mesh: LiveMesh, edge: number, passes: number, project: (p: THREE.Vector3) => void, onProgress?: (fraction: number) => void) {
   for (let pass = 0; pass < passes; pass += 1) {
     const all: number[] = [];
     for (let v = 0; v < mesh.vCount; v += 1) if (mesh.vAlive[v]) all.push(v);
-    mesh.refine(all, edge, { project, budget: Number.MAX_SAFE_INTEGER, fixed: (v) => mesh.onBoundary(v) });
+    mesh.refine(all, edge, { project, budget: Number.MAX_SAFE_INTEGER, fixed: (v) => mesh.onBoundary(v), creaseAngle: REMESH_CREASE_ANGLE });
     onProgress?.((pass + 1) / passes);
   }
 }
@@ -814,10 +1095,12 @@ export function remeshLive(mesh: LiveMesh, edge: number, passes = 5, onProgress?
 /** Offset: every corner moved `amount` mm along its smoothed normal, then evened out (Remesh, one pass). */
 export function offsetLive(mesh: LiveMesh, amount: number) {
   const normals = smoothedNormals(mesh);
+  mesh.beginBulk();
   for (let v = 0; v < mesh.vCount; v += 1) {
     if (!mesh.vAlive[v]) continue;
     mesh.pos[v * 3] += normals[v * 3] * amount; mesh.pos[v * 3 + 1] += normals[v * 3 + 1] * amount; mesh.pos[v * 3 + 2] += normals[v * 3 + 2] * amount;
   }
+  mesh.endBulk();
 }
 
 function smoothedNormals(mesh: LiveMesh) {

@@ -63,7 +63,7 @@ import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
 import { analyseDentalInBackground, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
 import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
 import { applyToSelection, brushChoice, cornerPositions, growChoice, soupFloat32, invertChoice, sculptMeshOf, soupOf, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
-import { LiveMesh, averageEdgeOf, type LiveBrush } from "@/lib/liveSculpt";
+import { LiveMesh, averageEdgeOf, type LiveBrush, type LivePatch } from "@/lib/liveSculpt";
 import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
 import { MeshSculptPanel, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
@@ -8964,7 +8964,7 @@ export function LayerlingEditor({
     known?.live.dispose();
     const live = LiveMesh.fromSoup(worldTriangles(shape));
     const box = live.bounds();
-    sculptState.current = { shapeId: shape.id, key, live, centre: [(box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2], selection: null, strokes: 0, lastBrush: null, undo: [], redo: [] };
+    sculptState.current = { shapeId: shape.id, key, live, baseEdge: averageEdgeOf(live), centre: [(box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2], selection: null, strokes: 0, lastBrush: null, undo: [], redo: [] };
     return sculptState.current;
   };
   /** The selection works on a welded copy (the selection tools of build 69); made when a selection tool needs it. */
@@ -9049,12 +9049,18 @@ export function LayerlingEditor({
     const p = meet(a), q = meet(b);
     return Math.max(0.05, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]));
   };
-  const mirrorOf = (state: SculptSession, symmetry: SculptSymmetry, p: Vec3): Vec3 | null => {
+  /** Symmetry: the view ray mirrored in the part's middle plane, so the twin dab lands on the surface it
+   * meets there (as Meshmixer and ZBrush do), not at a mirrored point that may be off a part that is not
+   * quite symmetric. */
+  const mirroredHit = (state: SculptSession, symmetry: SculptSymmetry, ray: { origin: Vec3; direction: Vec3 }) => {
     if (symmetry === "off") return null;
     const k = symmetry === "x" ? 0 : 2;
-    const out: Vec3 = [p[0], p[1], p[2]];
-    out[k] = 2 * state.centre[k] - p[k];
-    return out;
+    const origin: Vec3 = [ray.origin[0], ray.origin[1], ray.origin[2]];
+    const direction: Vec3 = [ray.direction[0], ray.direction[1], ray.direction[2]];
+    origin[k] = 2 * state.centre[k] - origin[k];
+    direction[k] = -direction[k];
+    const hit = state.live.pick(origin, direction);
+    return hit ? { ...hit, origin, direction } : null;
   };
   const sculptDab = (stroke: SculptStroke, x: number, y: number) => {
     const state = sculptState.current;
@@ -9069,13 +9075,11 @@ export function LayerlingEditor({
     const step = radius * 0.06;
     state.live.dab(stroke.brush, hit.point, [normal.x, normal.y, normal.z], radius, state.live.region(hit.point, radius, hit.triangle), stroke.strength, step);
     stroke.balls.push({ centre: hit.point, radius });
-    const mirrored = mirrorOf(state, stroke.symmetry, hit.point);
-    if (mirrored) {
-      const k = stroke.symmetry === "x" ? 0 : 2;
-      const n: Vec3 = [normal.x, normal.y, normal.z];
-      n[k] = -n[k];
-      state.live.dab(stroke.brush, mirrored, n, radius, state.live.region(mirrored, radius, null), stroke.strength, step);
-      stroke.balls.push({ centre: mirrored, radius });
+    const twin = mirroredHit(state, stroke.symmetry, ray);
+    if (twin) {
+      const n = state.live.vertexNormal(state.live.tri[twin.triangle * 3]);
+      state.live.dab(stroke.brush, twin.point, [n.x, n.y, n.z], radius, state.live.region(twin.point, radius, twin.triangle), stroke.strength, step);
+      stroke.balls.push({ centre: twin.point, radius });
     }
   };
   /** Refines round the balls the dabs since the last frame covered, within a time budget. */
@@ -9091,8 +9095,15 @@ export function LayerlingEditor({
     for (let k = 0; k < balls.length; k += stride) {
       const { centre, radius } = balls[k];
       const reach = radius * 1.15;
-      state.live.refine(state.live.region(centre, reach, null).keys(), Math.max(0.03, radius * factor), { within: { centre, radius: reach }, budget: 600, milliseconds: per });
+      // Adds triangles where the brush needs them; the part's own finer triangles stay (only the brush's slivers go).
+      state.live.refine(state.live.region(centre, reach, null).keys(), Math.max(0.03, radius * factor), { within: { centre, radius: reach }, budget: 600, milliseconds: per, collapseBelow: state.baseEdge * 0.5 });
     }
+  };
+  /** Timings of the last strokes, for the speed checks (window.layerlingSculptStats). */
+  const sculptStat = (kind: string, work: number, gpu: number) => {
+    const list = ((window as unknown as { layerlingSculptStats?: Array<[string, number, number, number]> }).layerlingSculptStats ??= []);
+    list.push([kind, Math.round(work * 10) / 10, Math.round(gpu * 10) / 10, sculptState.current?.live.triangleCount() ?? 0]);
+    if (list.length > 400) list.splice(0, list.length - 400);
   };
   const sculptFrame = () => {
     const stroke = sculptStroke.current;
@@ -9139,9 +9150,12 @@ export function LayerlingEditor({
       }
       sculptRefineBalls(stroke, Math.max(2, 14 - (performance.now() - started)));
     }
+    const worked = performance.now();
     if (state.live.flushGpu()) window.layerlingRedraw?.();
+    sculptStat("frame", worked - started, performance.now() - worked);
   };
   const startSculptStroke = useCallback((x: number, y: number) => {
+    const opened = performance.now();
     const target = sculptTarget();
     if (!target || !target.tool.tool || target.tool.tool === "select" || target.tool.tool === "unselect") return;
     const { tool, shape, state } = target;
@@ -9153,11 +9167,12 @@ export function LayerlingEditor({
     const stroke: SculptStroke = {
       brush, sizePx: tool.size, strength: tool.strength, refine: brush === "move" ? "off" : tool.refine, symmetry: tool.symmetry,
       pending: [], last: null, frame: 0, balls: [], touched: false,
-      before: state.live.pos.slice(0, state.live.vCount * 3), beforeMesh: tool.refine !== "off" ? state.live.compact() : null, edits: state.live.topologyEdits,
+      edits: state.live.topologyEdits,
     };
+    state.live.beginPatch();
     if (brush === "move") {
       const radius = brushRadiusAt(x, y, tool.size, hit.point);
-      const grabOf = (centre: Vec3, seed: number | null) => {
+      const grabOf = (centre: Vec3, seed: number) => {
         const out: Array<[number, number, number, number, number]> = [];
         for (const [v, d] of state.live.region(centre, radius, seed)) {
           const f = 1 - (d / radius) ** 2;
@@ -9165,10 +9180,11 @@ export function LayerlingEditor({
         }
         return out;
       };
-      const mirrored = mirrorOf(state, tool.symmetry, hit.point);
-      stroke.grab = { plane: { point: hit.point, normal: [-ray.direction[0], -ray.direction[1], -ray.direction[2]] }, corners: grabOf(hit.point, hit.triangle), mirrored: mirrored ? grabOf(mirrored, null) : null, radius, centre: hit.point };
+      const twin = mirroredHit(state, tool.symmetry, ray);
+      stroke.grab = { plane: { point: hit.point, normal: [-ray.direction[0], -ray.direction[1], -ray.direction[2]] }, corners: grabOf(hit.point, hit.triangle), mirrored: twin ? grabOf(twin.point, twin.triangle) : null, radius, centre: hit.point };
     }
     sculptStroke.current = stroke;
+    sculptStat("start", performance.now() - opened, 0);
     stroke.pending.push([x, y]);
     sculptFrame();
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -9187,29 +9203,24 @@ export function LayerlingEditor({
     sculptStroke.current = stroke;
     sculptFrame();
     sculptStroke.current = null;
+    const ending = performance.now();
     // Move stretches the surface: the triangles it pulled are evened out once it lets go.
     if (stroke.brush === "move" && stroke.grab && sculptTool?.refine !== "off") {
       const factor = sculptTool?.refine === "fine" ? 0.06 : sculptTool?.refine === "coarse" ? 0.2 : 0.11;
-      const corners = stroke.grab.corners.map((g) => g[0]).filter((v) => state.live.vAlive[v]);
       const reach = stroke.grab.radius * 3;
-      state.live.refine(corners, Math.max(0.03, stroke.grab.radius * factor), { within: { centre: stroke.grab.centre, radius: reach }, budget: 20000, milliseconds: 300 });
+      for (const grabbed of [stroke.grab.corners, stroke.grab.mirrored]) {
+        if (!grabbed?.length) continue;
+        const corners = grabbed.map((g) => g[0]).filter((v) => state.live.vAlive[v]);
+        // Round where those corners are now (they moved with the cursor).
+        const centre: Vec3 = [0, 0, 0];
+        for (const v of corners) { centre[0] += state.live.pos[v * 3] / corners.length; centre[1] += state.live.pos[v * 3 + 1] / corners.length; centre[2] += state.live.pos[v * 3 + 2] / corners.length; }
+        state.live.refine(corners, Math.max(0.03, stroke.grab.radius * factor), { within: { centre, radius: reach }, budget: 20000, milliseconds: 300, collapseBelow: state.baseEdge * 0.5 });
+      }
       if (state.live.flushGpu()) window.layerlingRedraw?.();
     }
-    if (!stroke.touched) return;
-    // One step of undo for the stroke: the corners it moved, or the whole mesh when it changed triangles.
-    let entry: SculptUndo;
-    if (state.live.topologyEdits !== stroke.edits && stroke.beforeMesh) entry = { kind: "mesh", points: stroke.beforeMesh.points, triangles: stroke.beforeMesh.triangles };
-    else if (state.live.topologyEdits !== stroke.edits) {
-      // Changed triangles without a copy from before (Move's evening out): back to the corners only is not possible, so keep the mesh as it is now.
-      entry = { kind: "mesh", ...state.live.compact() };
-    } else {
-      const corners: number[] = [], values: number[] = [];
-      const p = state.live.pos, b = stroke.before;
-      for (let v = 0; v * 3 < b.length; v += 1) {
-        if (p[v * 3] !== b[v * 3] || p[v * 3 + 1] !== b[v * 3 + 1] || p[v * 3 + 2] !== b[v * 3 + 2]) { corners.push(v); values.push(b[v * 3], b[v * 3 + 1], b[v * 3 + 2]); }
-      }
-      entry = { kind: "moves", corners: Int32Array.from(corners), values: Float64Array.from(values) };
-    }
+    // One step of undo for the stroke: what it changed, as a patch back and a patch forward.
+    const entry = state.live.endPatch();
+    if (!stroke.touched || !entry) return;
     state.undo.push(entry);
     // At most about 300 MB of steps back.
     let bytes = state.undo.reduce((sum, e) => sum + undoBytes(e), 0);
@@ -9217,6 +9228,7 @@ export function LayerlingEditor({
     state.redo = [];
     state.strokes += 1;
     state.lastBrush = stroke.brush;
+    sculptStat("end", performance.now() - ending, 0);
     // A selection is of triangles: one the stroke re-made is gone.
     if (state.selection) {
       if (state.live.topologyEdits !== stroke.edits) { const had = state.selection.chosen.some((c) => c); state.selection = null; if (had) { setSculptTool((current) => current ? { ...current, chosen: 0 } : current); setNotice(t("sculpt.selectionGone")); } }
@@ -9299,23 +9311,19 @@ export function LayerlingEditor({
     const from = back ? state?.undo : state?.redo;
     if (!state || !from?.length) return false;
     const entry = from.pop()!;
-    if (entry.kind === "moves") {
-      const now = new Float64Array(entry.values.length);
-      for (let k = 0; k < entry.corners.length; k += 1) { const v = entry.corners[k]; now[k * 3] = state.live.pos[v * 3]; now[k * 3 + 1] = state.live.pos[v * 3 + 1]; now[k * 3 + 2] = state.live.pos[v * 3 + 2]; }
-      (back ? state.redo : state.undo).push({ kind: "moves", corners: entry.corners, values: now });
-      state.live.setPositions(entry.corners, entry.values);
-    } else {
-      (back ? state.redo : state.undo).push({ kind: "mesh", ...state.live.compact() });
-      state.live.dispose();
-      state.live = new LiveMesh(entry.points, entry.triangles);
-      state.selection = null;
-    }
+    const stepped = performance.now();
+    const edits = state.live.topologyEdits;
+    state.live.applyPatch(back ? entry.undo : entry.redo);
+    (back ? state.redo : state.undo).push(entry);
+    // A selection is of triangles: gone if the step changed them, otherwise only out of date.
+    if (state.selection) { if (state.live.topologyEdits !== edits) state.selection = null; else state.selection.stale = true; }
     state.strokes += back ? -1 : 1;
     const shape = shapesRef.current.find((candidate) => candidate.id === state.shapeId);
     state.live.flushGpu();
     if (state.strokes <= 0 && !state.undo.length) { state.strokes = 0; window.layerlingSculptLive?.(state.shapeId, null); }
     else window.layerlingSculptLive?.(state.shapeId, state.live.geometry, shape?.color);
     window.layerlingRedraw?.();
+    sculptStat(back ? "undo" : "redo", performance.now() - stepped, state.undo.length);
     setNotice(t(back ? "sculpt.undone" : "sculpt.redone"));
     return true;
   };
@@ -16305,11 +16313,13 @@ function faceOutlineSpan(face: { outline: { loops: ReadonlyArray<ReadonlyArray<{
 
 /** Build 71: the Select brush's reach (front, back side, through), remembered on this computer. */
 /** Build 73: a Sculpt session - the live copy of one part, its selection and its steps back. */
-type SculptUndo = { kind: "moves"; corners: Int32Array; values: Float64Array } | { kind: "mesh"; points: Float64Array; triangles: Uint32Array };
+type SculptUndo = { undo: LivePatch; redo: LivePatch };
 type SculptSession = {
   shapeId: string;
   key: string;
   live: LiveMesh;
+  /** The part's average edge when Sculpt took it: refine never coarsens below half of it. */
+  baseEdge: number;
   /** The middle of the part when Sculpt opened, for symmetry. */
   centre: Vec3;
   selection: { mesh: SculptMesh; chosen: Uint8Array; stale: boolean } | null;
@@ -16329,13 +16339,12 @@ type SculptStroke = {
   frame: number;
   balls: Array<{ centre: Vec3; radius: number }>;
   touched: boolean;
-  before: Float64Array;
-  beforeMesh: { points: Float64Array; triangles: Uint32Array } | null;
   edits: number;
   grab?: { plane: { point: Vec3; normal: Vec3 }; corners: Array<[number, number, number, number, number]>; mirrored: Array<[number, number, number, number, number]> | null; radius: number; centre: Vec3 };
 };
 function undoBytes(entry: SculptUndo) {
-  return entry.kind === "moves" ? entry.corners.byteLength + entry.values.byteLength : entry.points.byteLength + entry.triangles.byteLength;
+  const size = (p: LivePatch) => p.verts.byteLength + p.vData.byteLength + p.tris.byteLength + p.tData.byteLength;
+  return size(entry.undo) + size(entry.redo);
 }
 function readSculptRefine(): SculptRefine {
   try {

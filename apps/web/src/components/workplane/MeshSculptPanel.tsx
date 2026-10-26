@@ -112,7 +112,7 @@ export function MeshSculptPanel({
       {tool !== "select" && tool !== "unselect" ? (<>
         <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.refine")}>
           <span className="sculpt-reach-label">{t("sculpt.refine")}</span>
-          <div className="shell-opening-options">
+          <div className="shell-opening-options four">
             {(["off", "coarse", "medium", "fine"] as const).map((value) => (
               <button key={value} type="button" role="radio" aria-checked={refine === value} className={refine === value ? "active" : ""} disabled={busy} onClick={() => onRefine(value)}>
                 {t(`sculpt.refine.${value}`)}

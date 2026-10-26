@@ -147,6 +147,77 @@ describe("Build 73: live Sculpt engine", () => {
     expect(mesh.flushGpu()).toBe(false);
   });
 
+  it("a stroke's patch takes the mesh back exactly and forward again, also after refining", () => {
+    const mesh = LiveMesh.fromSoup(sphereSoup(10, 3));
+    const same = (x: { points: Float64Array; triangles: Uint32Array }, y: { points: Float64Array; triangles: Uint32Array }) => {
+      expect(y.triangles.length).toBe(x.triangles.length);
+      expect(Array.from(y.triangles)).toEqual(Array.from(x.triangles));
+      for (let i = 0; i < x.points.length; i += 1) expect(y.points[i]).toBe(x.points[i]);
+    };
+    const states = [mesh.compact()];
+    const patches = [];
+    for (const [brush, z] of [["inflate", 1], ["crease", 0.3], ["pinch", -0.4]] as const) {
+      mesh.beginPatch();
+      const hit = mesh.pick([z * 5, 0, 50], [0, 0, -1])!;
+      for (let i = 0; i < 4; i += 1) {
+        mesh.dab(brush, hit.point, [0, 0, 1], 3, mesh.region(hit.point, 3, hit.triangle), 0.8, 0.3);
+        mesh.refine(mesh.region(hit.point, 3.5, null).keys(), 0.4, { within: { centre: hit.point, radius: 3.5 } });
+      }
+      const patch = mesh.endPatch();
+      expect(patch).not.toBeNull();
+      patches.push(patch!);
+      states.push(mesh.compact());
+    }
+    expect(mesh.triangleCount()).toBeGreaterThan(states[0].triangles.length / 3);
+    for (let k = patches.length - 1; k >= 0; k -= 1) { mesh.applyPatch(patches[k].undo); same(states[k], mesh.compact()); }
+    expect(edgeCounts(mesh).one + edgeCounts(mesh).more).toBe(0);
+    for (let k = 0; k < patches.length; k += 1) { mesh.applyPatch(patches[k].redo); same(states[k + 1], mesh.compact()); }
+    expect(edgeCounts(mesh).one + edgeCounts(mesh).more).toBe(0);
+    // The grids followed: picking and brushing still work, and the GPU copy matches.
+    const hit = mesh.pick([0, 0, 50], [0, 0, -1])!;
+    expect(hit.point[2]).toBeGreaterThan(9);
+    mesh.applyPatch(patches[2].undo); mesh.applyPatch(patches[1].undo);
+    mesh.flushGpu();
+    const index = mesh.geometry.getIndex()!;
+    for (let t = 0; t < mesh.tCount; t += 1) if (mesh.tAlive[t]) for (let k = 0; k < 3; k += 1) expect(index.array[t * 3 + k]).toBe(mesh.tri[t * 3 + k]);
+    expect(mesh.region(hit.point, 3, mesh.pick([0, 0, 50], [0, 0, -1])!.triangle).size).toBeGreaterThan(5);
+    // Nothing changed: no patch.
+    mesh.beginPatch();
+    expect(mesh.endPatch()).toBeNull();
+  });
+
+  it("stays sound and bounded under many pinching dabs with refine (no run-away splitting)", () => {
+    const mesh = LiveMesh.fromSoup(sphereSoup(10, 3));
+    let seed = 7;
+    const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 120; i += 1) {
+      const brush = (["crease", "pinch", "inflate", "draw", "smooth"] as const)[i % 5];
+      const hit = mesh.pick([(rand() - 0.5) * 4, (rand() - 0.5) * 4, 50], [0, 0, -1]);
+      if (!hit) continue;
+      mesh.dab(brush, hit.point, [0, 0, 1], 2.5, mesh.region(hit.point, 2.5, hit.triangle), 1, 0.3);
+      mesh.refine(mesh.region(hit.point, 2.9, null).keys(), 0.3, { within: { centre: hit.point, radius: 2.9 }, budget: 600 });
+    }
+    const counts = edgeCounts(mesh);
+    expect(counts.one + counts.more).toBe(0);
+    // The cap's area at 0.3 mm edges is a few thousand triangles, not tens of thousands.
+    expect(mesh.triangleCount()).toBeLessThan(12000);
+    for (let i = 0; i < mesh.vCount * 3; i += 1) expect(Number.isFinite(mesh.pos[i])).toBe(true);
+  });
+
+  it("Remesh keeps sharp edges where they are (a box stays a box)", () => {
+    const g = new THREE.BoxGeometry(20, 10, 14, 6, 6, 6);
+    const mesh = LiveMesh.fromSoup(Array.from((g.toNonIndexed().getAttribute("position") as THREE.BufferAttribute).array as Float32Array));
+    remeshLive(mesh, 1, 5);
+    expect(edgeCounts(mesh).one + edgeCounts(mesh).more).toBe(0);
+    // Every box corner is still a corner of the mesh, and the volume is the box's.
+    for (const x of [-10, 10]) for (const y of [-5, 5]) for (const z of [-7, 7]) {
+      let near = Infinity;
+      for (let v = 0; v < mesh.vCount; v += 1) if (mesh.vAlive[v]) near = Math.min(near, Math.hypot(mesh.pos[v * 3] - x, mesh.pos[v * 3 + 1] - y, mesh.pos[v * 3 + 2] - z));
+      expect(near).toBeLessThan(1e-6);
+    }
+    expect(volume(mesh)).toBeCloseTo(20 * 10 * 14, 0);
+  });
+
   it("Remesh evens a part's triangles and keeps it on its surface", () => {
     const mesh = LiveMesh.fromSoup(sphereSoup(10, 2));
     remeshLive(mesh, 1.0, 4);

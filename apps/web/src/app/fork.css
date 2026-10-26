@@ -1306,6 +1306,7 @@ html[data-theme="dark"] .edge-modifier-error-action { background: transparent; c
 .edge-kind-switch { margin-bottom: 8px; }
 .edge-kind-switch .shell-opening-options,
 .edge-more-options .shell-opening-options.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.edge-kind-switch .shell-opening-options.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .edge-kind-switch .shell-opening-options button,
 .edge-more-options .shell-opening-options.three button { padding-inline: 4px; }
 .edge-size-presets .edge-size-largest { margin-left: 0; flex: 1 0 auto; }
@@ -1831,3 +1832,7 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .export-window-parts .export-window-option.active { border-color: var(--primary); }
 .export-window-parts input { margin-top: 2px; }
 @media (max-width: 480px) { .export-window-parts { grid-template-columns: 1fr; } }
+/* Build 73: while a brush covers the view (Sculpt, Dental Studio's brushes), the view cube and the view
+   buttons stay above it, so the view can still be turned between strokes. */
+.workplane-stage:has(.dental-brush-overlay) .view-cube,
+.workplane-stage:has(.dental-brush-overlay) .camera-controls { z-index: 31; }
