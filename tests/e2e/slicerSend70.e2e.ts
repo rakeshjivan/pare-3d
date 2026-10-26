@@ -58,6 +58,19 @@ describe("the app server's send to a slicer", () => {
     expect(readFileSync(opened, "utf8").trim()).toBe(`chitubox ${file}`);
   });
 
+  it("from the Export window, saves in the export folder under a free name and opens it from there (build 71)", async () => {
+    const first = await (await fetch(`${base}/__send-to-slicer?app=prusa&name=Bracket.3mf&save=1`, { method: "POST", headers: send, body: new Uint8Array([9]) })).json();
+    const second = await (await fetch(`${base}/__send-to-slicer?app=prusa&name=Bracket.3mf&save=1`, { method: "POST", headers: send, body: new Uint8Array([8]) })).json();
+    const folder = join(home, "Downloads");
+    expect(first.path).toBe(join(folder, "Bracket.3mf"));
+    expect(second.path).toBe(join(folder, "Bracket 2.3mf"));
+    expect(second.folder).toBe(folder);
+    expect(second.name).toBe("Bracket 2.3mf");
+    expect(first.opened).toBe(true);
+    for (let attempt = 0; attempt < 50 && !readFileSync(opened, "utf8").includes("Bracket 2"); attempt += 1) await new Promise((done) => setTimeout(done, 50));
+    expect(readFileSync(opened, "utf8")).toContain(`prusa-slicer ${second.path}`);
+  });
+
   it("saves the file but says so when the slicer is not installed", async () => {
     const answer = await (await fetch(`${base}/__send-to-slicer?app=preform&name=a.3mf`, { method: "POST", headers: send, body: new Uint8Array([7]) })).json();
     expect(answer.opened).toBe(false);

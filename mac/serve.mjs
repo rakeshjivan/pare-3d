@@ -395,11 +395,21 @@ async function sendToBambu(req, res, url, slicerId = "bambu") {
   const name = requested.replace(/[^\w .()+-]/g, "_").slice(0, 120) || `design${extension}`;
   try {
     const body = await readBody(req);
-    await mkdir(EXPORT_DIR, { recursive: true });
-    const file = join(EXPORT_DIR, name);
+    // Build 71: from the Export window the file goes in the folder chosen for exports, under a
+    // name of its own, and opens from there; otherwise it is the slicer's copy in Pare 3D Exports.
+    let file;
+    if (url.searchParams.get("save") === "1") {
+      const folder = (await readFileSettings()).exports;
+      await mkdir(folder, { recursive: true });
+      file = await freeName(folder, name);
+      savedPaths.add(file);
+    } else {
+      await mkdir(EXPORT_DIR, { recursive: true });
+      file = join(EXPORT_DIR, name);
+    }
     await writeFile(file, body);
     const result = await openInSlicer(slicerId, file);
-    json(res, 200, { path: file, ...result });
+    json(res, 200, { path: file, folder: file.slice(0, file.length - basename(file).length).replace(/[\\/]+$/, ""), name: basename(file), ...result });
   } catch (error) {
     json(res, 500, { error: error instanceof Error ? error.message : String(error) });
   }

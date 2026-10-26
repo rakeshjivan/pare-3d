@@ -724,6 +724,11 @@ export type TextEdge = { kind: "round" | "chamfer"; size: number };
 
 export type WorkplaneShape = {
   id: string;
+  /**
+   * Build 71: Dental Studio's mark - "model" on the models it made, "used" on the bite scan it used.
+   * Neither is offered to Dental Studio again, so the next patient's models never pick them up.
+   */
+  dental?: "model" | "used";
   name: string;
   kind: ShapeKind;
   color: string;

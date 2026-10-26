@@ -320,6 +320,7 @@ html:has(.edge-modifier-panel) .empty-plate-hint { display: none; }
   white-space: nowrap;
 }
 .bambu-send-main { padding: 6px 10px; border-radius: 8px 0 0 8px; }
+.export-button .bambu-send-main { padding: 6px 14px; border-radius: 8px; }
 .bambu-send-format {
   padding: 6px 8px;
   border-left: 1px solid rgba(255, 255, 255, 0.35) !important;
@@ -1635,6 +1636,8 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 /* Fork (build 47): Dental Studio - import button */
 .dental-studio-panel .dental-import { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; margin: 0 0 8px; padding: 5px 10px; border: 1px solid var(--border, #d4dae3); border-radius: 6px; background: transparent; color: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .dental-studio-panel .dental-import:hover:not(:disabled) { border-color: var(--primary, #1f6feb); color: var(--primary, #1f6feb); }
+.dental-studio-panel .dental-import-row { grid-column: 1 / -1; display: flex; gap: 8px; }
+.dental-studio-panel .dental-import-row .dental-import { flex: 1; justify-content: center; }
 /* Fork (build 48): Dental Studio trim line */
 .dental-trim-overlay { position: absolute; inset: 0; z-index: 30; cursor: crosshair; touch-action: none; }
 .dental-trim-overlay svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
@@ -1681,6 +1684,7 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 .mesh-sculpt-panel .dental-trim-mode button.active { border-color: var(--primary, #1f6feb); color: var(--primary, #1f6feb); background: rgba(31, 111, 235, 0.08); font-weight: 600; }
 .mesh-sculpt-panel button:disabled { opacity: 0.5; cursor: default; }
 .mesh-sculpt-panel .dental-section-divider { border-top: 1px solid var(--border, #d4dae3); margin: 10px 0 8px; }
+.mesh-sculpt-panel .sculpt-reach-label { display: block; margin-bottom: 4px; font: 600 12px var(--font-ui); }
 .mesh-sculpt-panel .sculpt-subtitle { display: block; font-size: 13px; margin-bottom: 6px; }
 
 /* Fork (build 55): the Texture panel's patterns, each with a small swatch drawn in CSS. */
@@ -1772,3 +1776,51 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 
 /* Build 70: the right-click menu never runs off the bottom of a short window; it scrolls. */
 .shape-context-menu { max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+
+/* Build 71: the part's size above the folded cards. */
+.inspector-size-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 2px 2px 8px; font: 500 12px var(--font-ui); color: var(--muted-strong, #4a5462); }
+.inspector-size-line strong { font-weight: 700; color: var(--foreground, #1d2430); font-variant-numeric: tabular-nums; }
+
+/* Build 71: Sculpt opened from Dental Studio stands to the left of the Studio panel. */
+.mesh-sculpt-panel.beside-dental:not(.floating) { right: calc(14px + min(400px, calc(100vw - 32px)) + 12px); }
+
+/* Build 71: the Export window - where the file opens, its type, its name and folder. */
+.export-window { width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 24px); }
+.export-window header { padding: 12px 16px 8px; }
+.export-window footer { position: sticky; bottom: 0; padding: 10px 16px 12px; background: var(--panel, #fff); border-top: 1px solid var(--border); }
+.export-window-first { display: flex; align-items: center; gap: 10px; }
+.export-window-first .export-window-option { flex: 1; }
+.export-window-first .export-window-default { margin-top: 0; white-space: nowrap; }
+.export-window-icon { color: var(--primary) !important; }
+.export-window-section { margin: 0 16px 8px; padding: 6px 10px 8px; border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
+.export-window-section legend { padding: 0 6px; font: 700 12px var(--font-ui); letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.75; }
+.export-window-option { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1px solid transparent; }
+.export-window-option:hover { background: var(--subbar); }
+.export-window-option.active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.export-window-option.unavailable { opacity: 0.5; cursor: not-allowed; }
+.export-window-option input { margin: 0; accent-color: var(--primary); }
+.export-window-option em { margin-left: auto; font-size: 11px; font-style: normal; opacity: 0.8; }
+.export-window-option span small { display: block; font-size: 11.5px; opacity: 0.72; line-height: 1.3; }
+.export-window-slicers { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin-top: 4px; }
+.export-window-kind { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.export-window-kind-label { font-size: 11.5px; font-weight: 600; opacity: 0.65; padding: 0 8px; }
+.export-window-formats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.export-window-formats .export-window-option { align-items: flex-start; border-color: var(--border); }
+.export-window-formats .export-window-option.active { border-color: var(--primary); }
+.export-window-formats input { margin-top: 2px; }
+.export-window-default { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-size: 12px; opacity: 0.85; cursor: pointer; }
+.export-window-default input { margin: 0; accent-color: var(--primary); }
+.export-window-check { margin: 2px 16px 10px 18px; font-size: 13px; opacity: 1; }
+.export-window-more { margin-top: 8px; padding: 0; border: 0; background: none; color: var(--primary); font: 600 12.5px var(--font-ui); cursor: pointer; }
+.export-window-more:hover { text-decoration: underline; }
+.export-window-note { margin: 6px 0 0; font-size: 12px; opacity: 0.75; line-height: 1.35; }
+.export-window-name { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.export-window-name input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; font: inherit; color: inherit; background: var(--background, transparent); }
+.export-window-name em { font-style: normal; opacity: 0.65; }
+.export-window-folder { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; }
+.export-window-folder span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.export-window-folder button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 7px; background: none; color: inherit; font: 600 12px var(--font-ui); cursor: pointer; }
+.export-window footer button.primary { display: inline-flex; align-items: center; gap: 6px; }
+.export-window footer button:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 480px) { .export-window-slicers, .export-window-formats { grid-template-columns: 1fr; } .export-window-first { flex-wrap: wrap; } }
+.export-window-scope { margin: 0 16px 8px; padding-top: 6px; padding-bottom: 6px; }

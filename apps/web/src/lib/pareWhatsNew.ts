@@ -4,6 +4,19 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 71,
+    items: [
+      "Dental Studio's incisal pin really opens the bite now. Before, a raised pin made the table taller and the pin shorter by the same amount, so the printed models still closed on the scanned bite. Now the pin is longer by the raise and the upper stands turned up about the hinge with the pin on its table - a rotation, as on an articulator, not a lift - also when placed In occlusion. The raise is a slider from 0 to 10 mm in half millimetres, read at the pin, and after Make models the note says how far the front and back teeth part.",
+      "Export is one blue button now (or Ctrl+E): its window asks where the file opens - a slicer, or nowhere - with Make default to keep that choice, then 3MF or STL, then the file name and folder (Change... picks another), and Export. With a slicer chosen the file is saved in your folder and opened from there. More formats opens the full panel for STEP, OBJ, SVG, DXF, drawings, pictures and design files.",
+      "Sculpt's Select brush has a Reach choice, as in Meshmixer: the surface you see, the back side (the side facing away from you, such as the underside of a scan), or through every layer under the brush.",
+      "On a laptop the toolbar stays in one row: when the groups would wrap, the least used (Arrange, then Mesh, Combine, ...) fold into one button each with their tools in a list. The plate keeps its height.",
+      "The right-click menu is about half as long: the tools sit in four sub-menus - Edges and faces, Surface, Mesh and Mark points.",
+      "Split has a Dovetail connector: a key on one half and a slot across the other, so the halves slide together from the side and hold without glue.",
+      "Dental Studio: a label typed for a study model now engraves - its open floor is closed for the label (before, the label was silently left off). A Patient details choice keeps the scan names and label on the models, or removes them for plain names (Upper model, Lower model) and no label. New patient starts a new design with the Studio open, so the next patient's scans never mix with the last, and models already made are no longer offered as scans.",
+      "The side panel always shows the selected part's size; Sculpt opened from Dental Studio stands beside the Studio panel instead of over it; and the home page counts designs \"on this computer\".",
+    ],
+  },
+  {
     build: 70,
     items: [
       "Send to your slicer, not only Bambu Studio: the menu beside the Send button now picks OrcaSlicer or PrusaSlicer for filament, or PreForm (Formlabs), CHITUBOX or Lychee Slicer for resin. The button says where it sends, and a slicer that is not on this computer is marked. (An app installed before this build sends only to Bambu Studio - download it again once.)",

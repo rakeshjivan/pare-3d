@@ -87,41 +87,51 @@ export function JointPicture({ joint }: { joint: "ball" | "dropin" | "axle" }) {
  */
 export function ArticulatorPicture({ joint, condyle, stop, pinRaise, table }: { joint: "ball" | "dropin" | "axle"; condyle: number; stop: boolean; pinRaise: number; table: "flat" | "guide" }) {
   const plane = 46;
-  const gap = Math.min(3, pinRaise) * 2.2;
-  // Crowns meeting on the occlusal plane, the upper's opened by the pin's raise at the front.
+  const jx = 176, jy = plane;
+  const pinX = 20;
+  // Build 71: the upper turned up about the joint by the pin's raise, as the printed models stand -
+  // the pin longer by the raise, its tip on the table - not lifted straight up.
+  const gap = Math.min(10, pinRaise) * 1.6;
+  const turn = stop && gap > 0 ? (Math.atan2(gap, jx - pinX) * 180) / Math.PI : 0;
   const crowns = (down: boolean) => Array.from({ length: 11 }, (_, i) => {
     const x = 45 + i * 10.8;
-    const lift = down ? gap * (1 - i / 11) : 0;
-    return <rect key={`${down}-${i}`} className="tooth" x={x} y={down ? plane - 8 - lift : plane} width="9.4" height="8" rx="3.2" />;
+    return <rect key={`${down}-${i}`} className="tooth" x={x} y={down ? plane - 8 : plane} width="9.4" height="8" rx="3.2" />;
   });
-  const jx = 176, jy = plane;
   const angle = (condyle * Math.PI) / 180;
   const path = { x: jx - Math.cos(angle) * 24, y: jy + Math.sin(angle) * 24 };
-  const pinX = 20;
   return (
     <svg className="dental-picture articulator" viewBox="0 0 200 92" aria-hidden="true">
-      {/* The models. */}
-      <rect className="upper" x="40" y={8 - gap * 0.5} width="124" height="20" rx="2" />
-      <path className="upper-gum" d={`M40 ${28 - gap * 0.5} H164 V${plane - 6} L40 ${plane - 6 - gap} Z`} />
-      {crowns(true)}
+      {/* The lower model, its half of the joint and the incisal table: these stay put. */}
       <rect className="lower" x="40" y="66" width="124" height="20" rx="2" />
       <path className="lower-gum" d={`M40 ${plane + 6} H164 V66 H40 Z`} />
       {crowns(false)}
-      {/* The joint behind the molars. */}
-      <rect className="upper" x="160" y={8 - gap * 0.5} width="30" height="10" />
       <rect className="lower" x="160" y="76" width="30" height="10" />
       <rect className="lower" x={jx - 2.5} y={jy} width="5" height="30" />
-      {joint === "axle" ? (
+      {joint === "axle" ? <circle className="lower" cx={jx} cy={jy} r="3.5" /> : <circle className="lower" cx={jx} cy={jy} r="6.5" />}
+      {stop ? (
         <>
-          <path className="upper" d={`M${jx - 9} ${14 - gap * 0.5} H${jx + 9} V${jy + 5} H${jx + 4} A4.5 4.5 0 1 0 ${jx - 4} ${jy + 5} H${jx - 9} Z`} />
-          <circle className="lower" cx={jx} cy={jy} r="3.5" />
+          <rect className="lower" x={pinX - 4} y="82" width="26" height="4" />
+          {table === "guide"
+            ? <path className="lower" d={`M${pinX - 4} 84 V${plane} L${pinX + 4} ${plane - 5} V84 Z`} />
+            : <rect className="lower" x={pinX - 4} y={plane} width="8" height={84 - plane} />}
         </>
-      ) : (
-        <>
-          <path className="upper" d={`M${jx - 10} ${14 - gap * 0.5} H${jx + 10} V${jy} H${jx + 7} A7 7 0 0 0 ${jx - 7} ${jy} H${jx - 10} Z`} />
-          <circle className="lower" cx={jx} cy={jy} r="6.5" />
-        </>
-      )}
+      ) : null}
+      {/* The upper model, turned about the joint. */}
+      <g transform={turn ? `rotate(${-turn} ${jx} ${jy})` : undefined}>
+        <rect className="upper" x="40" y="8" width="124" height="20" rx="2" />
+        <path className="upper-gum" d={`M40 28 H164 V${plane - 6} H40 Z`} />
+        {crowns(true)}
+        <rect className="upper" x="160" y="8" width="30" height="10" />
+        {joint === "axle"
+          ? <path className="upper" d={`M${jx - 9} 14 H${jx + 9} V${jy + 5} H${jx + 4} A4.5 4.5 0 1 0 ${jx - 4} ${jy + 5} H${jx - 9} Z`} />
+          : <path className="upper" d={`M${jx - 10} 14 H${jx + 10} V${jy} H${jx + 7} A7 7 0 0 0 ${jx - 7} ${jy} H${jx - 10} Z`} />}
+        {stop ? (
+          <>
+            <rect className="upper" x={pinX - 4} y="8" width="26" height="4" />
+            <rect className="upper" x={pinX - 1.5} y="10" width="3" height={plane - 10 + gap} />
+          </>
+        ) : null}
+      </g>
       {condyle > 0 ? (
         <g className="path">
           <line x1={jx} y1={jy} x2={path.x} y2={path.y} />
@@ -129,18 +139,7 @@ export function ArticulatorPicture({ joint, condyle, stop, pinRaise, table }: { 
           <text x={jx - 30} y={jy + 20}>{`${condyle}°`}</text>
         </g>
       ) : null}
-      {stop ? (
-        <>
-          {/* The incisal pin on its table, each on an arm along the bottom of its base. */}
-          <rect className="upper" x={pinX - 4} y={8 - gap * 0.5} width="26" height="4" />
-          <rect className="upper" x={pinX - 1.5} y={10 - gap * 0.5} width="3" height={plane - 10 - gap * 0.5} />
-          <rect className="lower" x={pinX - 4} y="82" width="26" height="4" />
-          {table === "guide"
-            ? <path className="lower" d={`M${pinX - 4} 84 V${plane} L${pinX + 4} ${plane - 5} V84 Z`} />
-            : <rect className="lower" x={pinX - 4} y={plane} width="8" height={84 - plane} />}
-          {pinRaise > 0 ? <text className="raise" x={pinX + 7} y={plane - 2}>{`+${pinRaise}`}</text> : null}
-        </>
-      ) : null}
+      {stop && pinRaise > 0 ? <text className="raise" x={pinX + 7} y={plane - 2}>{`+${pinRaise}`}</text> : null}
     </svg>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { HINGE_CLEARANCE, HINGE_CONDYLE_ANGLES, HINGE_FITS, INCISAL_PIN_RAISES } from "@/lib/dentalBase";
+import { HINGE_CLEARANCE, HINGE_CONDYLE_ANGLES, HINGE_FITS, INCISAL_PIN_MAX, INCISAL_PIN_STEP } from "@/lib/dentalBase";
 import { readMyHingeFit, saveMyHingeFit } from "@/lib/hingeFitTest";
 
-import { ArrowLeftRight, Check, ChevronDown, LoaderCircle, Upload, X } from "lucide-react";
+import { ArrowLeftRight, Check, ChevronDown, FilePlus2, LoaderCircle, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
@@ -86,6 +86,10 @@ export function DentalStudioPanel({
   onImport,
   onHingeTest,
   onCancel,
+  patientDetails = "keep",
+  onPatientDetails,
+  onNewPatient,
+  modelsHere = false,
 }: {
   parts: DentalPartChoice[];
   slots: Record<DentalSlot, string | null>;
@@ -120,6 +124,13 @@ export function DentalStudioPanel({
   /** Build 60: put the hinge fit test in the design. */
   onHingeTest?: () => void;
   onCancel: () => void;
+  /** Build 71: whether the made models keep the patient's details (scan names, label) or lose them. */
+  patientDetails?: "keep" | "remove";
+  onPatientDetails?: (value: "keep" | "remove") => void;
+  /** Build 71: a new design with the Studio open, so the next patient's scans start on their own. */
+  onNewPatient?: () => void;
+  /** Build 71: this design already holds models made here. */
+  modelsHere?: boolean;
 }) {
   useLanguage();
   const title = t("dental.title");
@@ -217,7 +228,11 @@ export function DentalStudioPanel({
         {step(1, t("dental.step1"), scansDone, t("dental.step1Hint"))}
         <div className="dental-slots">
           {parts.length === 0 ? <p className="dental-status" role="status">{t("dental.noScans")}</p> : null}
-          <button type="button" className="dental-import" disabled={stage === "making"} onClick={onImport}><Upload size={15} /> {t("dental.import")}</button>
+          <div className={onNewPatient ? "dental-import-row" : undefined}>
+            <button type="button" className="dental-import" disabled={stage === "making"} onClick={onImport}><Upload size={15} /> {t("dental.import")}</button>
+            {onNewPatient ? <button type="button" className="dental-import dental-new-patient" disabled={stage === "making"} title={t("dental.newPatientHint")} onClick={onNewPatient}><FilePlus2 size={15} /> {t("dental.newPatient")}</button> : null}
+          </div>
+          {modelsHere ? <p className="dental-status warn" role="status">{t("dental.modelsHere")}</p> : null}
           {slotRow("upper", t("dental.upper"), archInfo("upper"))}
           <button type="button" className="dental-swap" title={t("dental.swap")} aria-label={t("dental.swap")} disabled={busy || (!slots.upper && !slots.lower)} onClick={onSwap}><ArrowLeftRight size={15} /></button>
           {slotRow("lower", t("dental.lower"), archInfo("lower"))}
@@ -331,11 +346,14 @@ export function DentalStudioPanel({
           </div>
         </div>
         <p className="blend-hint">{t("dental.gumHeightHint")}</p>
+        {onPatientDetails ? choice(t("dental.patientDetails"), patientDetails, [["keep", t("dental.patientKeep")], ["remove", t("dental.patientRemove")]], onPatientDetails, t("dental.patientDetailsHint")) : null}
+        {patientDetails === "remove" ? <p className="blend-hint">{t("dental.patientRemoveHint")}</p> : (<>
         <label className="dental-label-field">
           <span>{t("dental.label")}</span>
           <input type="text" maxLength={24} value={options.label} placeholder={t("dental.labelPlaceholder")} disabled={busy} onChange={(event) => onOptionsChange({ label: event.currentTarget.value })} />
         </label>
-        {options.label ? <p className="blend-hint">{t(options.baseStyle === "ortho" ? "dental.labelOrtho" : options.baseStyle === "plate" && options.inside !== "open" ? "dental.labelPlate" : "dental.labelNone")}</p> : null}
+        {options.label.trim() ? <p className="blend-hint">{t(options.baseStyle === "ortho" || options.baseStyle === "articulator" ? "dental.labelOrtho" : options.inside === "open" ? "dental.labelClosed" : "dental.labelPlate")}</p> : null}
+        </>)}
         <button type="button" className={`dental-more ${advanced ? "open" : ""}`} aria-expanded={advanced} onClick={() => onAdvancedChange(!advanced)}>
           <ChevronDown size={15} /> {t("dental.more")}
         </button>
@@ -445,12 +463,9 @@ export function DentalStudioPanel({
                 </label>
                 {options.incisalStop !== false ? (
                   <>
-                    <label className="dental-label-field" title={t("dental.pinRaiseHint")}>
-                      <span>{t("dental.pinRaise")}</span>
-                      <select value={options.pinRaise ?? 0} disabled={busy} onChange={(event) => onOptionsChange({ pinRaise: Number(event.currentTarget.value) })}>
-                        {INCISAL_PIN_RAISES.map((mm) => <option key={mm} value={mm}>{mm === 0 ? t("dental.pinRaiseZero") : t("dental.pinRaiseOption", { mm })}</option>)}
-                      </select>
-                    </label>
+                    {/* Build 71: 0 (the scanned bite) to 10 mm open at the pin, in half millimetres. */}
+                    <EdgeModifierSlider label={t("dental.pinRaise")} value={options.pinRaise ?? 0} min={0} max={INCISAL_PIN_MAX} step={INCISAL_PIN_STEP} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ pinRaise: Math.max(0, Math.min(INCISAL_PIN_MAX, Math.round(value / INCISAL_PIN_STEP) * INCISAL_PIN_STEP)) })} />
+                    <p className="blend-hint">{(options.pinRaise ?? 0) > 0 ? t("dental.pinRaiseOpenHint") : t("dental.pinRaiseZeroHint")}</p>
                     {choice(t("dental.incisalTable"), options.incisalTable ?? "flat", [["flat", t("dental.incisalTableFlat")], ["guide", t("dental.incisalTableGuide")]], (incisalTable) => onOptionsChange({ incisalTable }), t("dental.incisalTableHint"))}
                   </>
                 ) : null}

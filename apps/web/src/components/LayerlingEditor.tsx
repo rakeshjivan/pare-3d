@@ -62,7 +62,7 @@ import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
 import { analyseDentalInBackground, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
 import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
-import { applyBrush, applyToSelection, averageEdge, brushChoice, smoothingPasses, cornerPositions, growChoice, soupFloat32, invertChoice, millimetresPerPixel, sculptMeshOf, soupOf, strokeWeights, withoutTriangles, type SculptMesh } from "@/lib/meshSculpt";
+import { applyBrush, applyToSelection, averageEdge, brushChoice, smoothingPasses, cornerPositions, growChoice, soupFloat32, invertChoice, millimetresPerPixel, sculptMeshOf, soupOf, strokeWeights, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
 import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
 import { MeshSculptPanel, type SculptSelectionAction, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
@@ -165,7 +165,8 @@ import { carryShapePivot, heightPatchKeepingBase, shapePivotFromWorld, shapePivo
 import { createLocalId } from "@/lib/localIds";
 import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, trackOpenGroupLevels, type OpenGroupLevel } from "@/lib/openGroupParts";
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
-import { readSlicer, SEND_TO_BAMBU_EVENT, sendToBambuStudio, slicerName, type BambuSendFormat } from "@/lib/bambuSend";
+import { OPEN_EXPORT_WINDOW_EVENT, readSlicer, SEND_TO_BAMBU_EVENT, sendToSlicer, slicerName, type BambuSendFormat, type SlicerId } from "@/lib/bambuSend";
+import { ExportWindow } from "@/components/ExportWindow";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { useEditorNotice } from "@/components/workplane/useEditorNotice";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -1834,6 +1835,7 @@ export function LayerlingEditor({
   onProjectWorkspaceChange,
   onProjectNameChange,
   onCreateProjectFromState,
+  onNewDentalDesign,
   projectId,
   projectName = "Untitled design",
   projectCreatedAt = Date.now(),
@@ -1880,6 +1882,8 @@ export function LayerlingEditor({
   onProjectNameChange?: (name: string) => void;
   /** Legt aus einem frueheren Stand ein neues Projekt an und sagt in einem Satz, was daraus wurde. */
   onCreateProjectFromState?: (request: HistoryProjectRequest) => Promise<string>;
+  /** Build 71: Dental Studio's New patient - a new, empty design of its own with Dental Studio open. */
+  onNewDentalDesign?: () => void;
   onProjectWorkspaceChange?: (snapshot: {
     projectId: string;
     workspace: WorkplaneWorkspaceSettings;
@@ -6514,7 +6518,7 @@ export function LayerlingEditor({
       nextShapes,
       nextSelection,
       withClosedHolesNote(outcome.connectorCount > 0
-        ? `${splitMessage}${/[.!?]$/.test(splitMessage) ? "" : "."} ${t(pins.length ? "connectors.addedDowels" : "connectors.addedPlugs", { count: outcome.connectorCount })}`
+        ? `${splitMessage}${/[.!?]$/.test(splitMessage) ? "" : "."} ${t(pins.length ? "connectors.addedDowels" : splitConnectors.type === "dovetail" ? "connectors.addedDovetails" : "connectors.addedPlugs", { count: outcome.connectorCount })}`
         : splitMessage, closedHoles),
     );
   }, [commitShapes, splitConnectorPoints, splitConnectors, splitPlane, splitSession, splitTargetShapes]);
@@ -8946,7 +8950,7 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69: Sculpt - brushes on a mesh, a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; chosen: number; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null } | null>(null);
   const sculptState = useRef<{ shapeId: string; key: string; mesh: SculptMesh; chosen: Uint8Array; strokes: number; lastBrush: SculptTool | null; drawn?: Float32Array; undo: Float64Array[]; redo: Float64Array[] } | null>(null);
   const flushSculptRef = useRef<() => void>(() => {});
   const sculptPreviewDone = useRef<string | null>(null);
@@ -8965,7 +8969,7 @@ export function LayerlingEditor({
     const triangles = state.mesh.triangles.length / 3;
     if (triangles > 400_000) setNotice(t("sculpt.large", { count: triangles.toLocaleString() }));
     setMeshRoundTool(null);
-    setSculptTool({ shapeId: shape.id, tool: "smooth", size: 30, strength: 0.5, chosen: state.chosen.reduce((a, b) => a + b, 0), remeshMode: "remesh", detail: defaultRemeshDetail(soupOf(state.mesh)), amount: 2, busy: false, error: null });
+    setSculptTool({ shapeId: shape.id, tool: "smooth", size: 30, strength: 0.5, reach: readSculptReach(), chosen: state.chosen.reduce((a, b) => a + b, 0), remeshMode: "remesh", detail: defaultRemeshDetail(soupOf(state.mesh)), amount: 2, busy: false, error: null });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleSculpt = useCallback(() => {
     if (sculptTool) { flushSculpt(); setSculptTool(null); return; }
@@ -9010,7 +9014,7 @@ export function LayerlingEditor({
     const { tool, shape, state } = target;
     const eye = window.layerlingCameraPosition();
     if (tool.tool === "select" || tool.tool === "unselect") {
-      brushChoice(state.mesh, window.layerlingProjectPoints(cornerPositions(state.mesh)), eye, points, tool.size, state.chosen, tool.tool === "select");
+      brushChoice(state.mesh, window.layerlingProjectPoints(cornerPositions(state.mesh)), eye, points, tool.size, state.chosen, tool.tool === "select", tool.reach);
       setSculptTool((current) => current ? { ...current, chosen: state.chosen.reduce((a, b) => a + b, 0) } : current);
       return;
     }
@@ -9210,6 +9214,8 @@ export function LayerlingEditor({
     preset: DentalPreset;
     options: DentalStudioOptions;
     optionsTouched: boolean;
+    /** Build 71: the made models keep the patient's details, or lose them. */
+    patientDetails: "keep" | "remove";
     advanced: boolean;
     error: string | null;
     notes: string[];
@@ -9235,7 +9241,8 @@ export function LayerlingEditor({
     }
     return out;
   };
-  const dentalCandidates = useCallback(() => shapesRef.current.filter((shape) => shape.importedMesh && !shape.groupedShapes?.length && !shape.hole && !shape.locked), []);
+  // Build 71: never a model Dental Studio made, nor a bite scan it already used - those belong to an earlier patient.
+  const dentalCandidates = useCallback(() => shapesRef.current.filter((shape) => shape.importedMesh && !shape.groupedShapes?.length && !shape.hole && !shape.locked && !shape.dental), []);
   // Fork (build 53): the tooth area of each scan (one flag per triangle), with the scan's fingerprint it was made for.
   const dentalAreas = useRef(new Map<string, { key: string; area: Uint8Array }>());
   // Fork (build 56): the area belongs to the scan's triangles, not to where the scan stands - turning
@@ -9374,6 +9381,7 @@ export function LayerlingEditor({
     preset: "study",
     options: dentalPreset("study", 15, Boolean(slots.upper && slots.lower)),
     optionsTouched: false,
+    patientDetails: readPatientDetails(),
     advanced: false,
     error: null,
     notes: [],
@@ -9609,7 +9617,9 @@ export function LayerlingEditor({
     setDentalStudio({ ...state, stage: "making", error: null, notes: [] });
     window.setTimeout(async () => {
       try {
-        const result = await makeDentalStudioInBackground(input, state.options);
+        // Build 71: without the patient's details, no label is engraved and the names are plain.
+        const anonymous = state.patientDetails === "remove";
+        const result = await makeDentalStudioInBackground(input, anonymous ? { ...state.options, label: "" } : state.options);
         const current = shapesRef.current.filter((shape) => involved.includes(shape.id));
         if (projectShapesFingerprint(current) !== fingerprint) {
           setDentalStudio(null);
@@ -9626,12 +9636,14 @@ export function LayerlingEditor({
         result.parts.forEach((part, index) => {
           const shape = current.find((candidate) => candidate.id === part.id);
           if (!shape) return;
-          const name = t(part.role === "upper" ? "dental.upperModel" : "dental.lowerModel", { name: displayShapeName(shape) });
+          const name = anonymous
+            ? t(part.role === "upper" ? "dental.upperModelPlain" : "dental.lowerModelPlain")
+            : t(part.role === "upper" ? "dental.upperModel" : "dental.lowerModel", { name: displayShapeName(shape) });
           const positions = world[index];
           if (lift) for (let i = 1; i < positions.length; i += 3) positions[i] += lift;
-          made.set(part.id, canonicalizeShape({ ...shapeWithWorldPositions(shape, positions), name }));
+          made.set(part.id, canonicalizeShape({ ...shapeWithWorldPositions(shape, positions), name, dental: "model" }));
         });
-        const next = shapesRef.current.map((shape) => made.get(shape.id) ?? (shape.id === state.slots.bite ? { ...shape, hidden: true } : shape));
+        const next = shapesRef.current.map((shape) => made.get(shape.id) ?? (shape.id === state.slots.bite ? { ...shape, hidden: true, dental: "used" as const, ...(anonymous ? { name: t("dental.biteScanPlain") } : {}) } : shape));
         const heights = result.parts.map((part) => part.height.toFixed(1)).join(" / ");
         const kind = t(state.options.inside === "solid" ? "dental.doneSolid" : state.options.inside === "open" ? "dental.doneHollow" : "dental.doneClosed", { wall: state.options.wall.toFixed(1) });
         commitShapes(next, [...made.keys()], t(result.parts.length > 1 ? "dental.donePair" : "dental.done", { height: heights, kind }));
@@ -9639,6 +9651,8 @@ export function LayerlingEditor({
         const notes = result.warnings.map((warning) => t(({ edge: "dental.warn.edge", vents: "dental.warn.vents", apart: "dental.warn.apart", teeth: "dental.warn.teeth", opening: "dental.warn.opening", loose: "dental.warn.loose" } as const)[warning as "edge"] ?? "dental.warn.label"));
         // Build 60: how far the printed articulator opens.
         if (result.opening !== undefined && result.opening >= 30) notes.push(t(result.opening >= 90 ? "dental.opensFully" : "dental.opens", { angle: result.opening }));
+        // Build 71: how far a raised pin holds the bite open, at the pin and at the teeth.
+        if (result.held) notes.push(t("dental.heldOpen", { pin: result.held.pin.toFixed(1), front: result.held.front.toFixed(1), back: result.held.back.toFixed(1) }));
         if (notes.length) setNotice(`${t(result.parts.length > 1 ? "dental.donePair" : "dental.done", { height: heights, kind })} ${notes.join(" ")}`);
         setDentalStudio(null);
       } catch (error) {
@@ -9652,16 +9666,24 @@ export function LayerlingEditor({
     return () => window.removeEventListener(DENTAL_MODEL_EVENT, onOpen);
   }, [openDentalModel]);
   // Build 70: "Dental models from scans" on the home page opens a new design with Dental Studio open.
+  // Build 71: and so does New patient. The note is taken only when the Studio opens: an effect run
+  // twice (React's checks while developing) must not use it up and then cancel the opening.
   useEffect(() => {
     let wanted = false;
     try {
       wanted = window.sessionStorage.getItem(OPEN_DENTAL_STUDIO_KEY) === "1";
-      if (wanted) window.sessionStorage.removeItem(OPEN_DENTAL_STUDIO_KEY);
     } catch {
       wanted = false;
     }
     if (!wanted) return;
-    const timer = window.setTimeout(() => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), 600);
+    const timer = window.setTimeout(() => {
+      try {
+        window.sessionStorage.removeItem(OPEN_DENTAL_STUDIO_KEY);
+      } catch {
+        // Nothing to take back.
+      }
+      window.dispatchEvent(new Event(DENTAL_MODEL_EVENT));
+    }, 600);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -13013,7 +13035,7 @@ export function LayerlingEditor({
         if (format === "stl") {
           const bytes = new Uint8Array(exportMeshesToStl(fertig));
           if (toBambu) {
-            bambuNote = await sendToBambuStudio(projectExportFileName(exportName, "stl"), new Blob([bytes], { type: "model/stl" }), downloadBlobFile);
+            bambuNote = await sendToSlicer(sendTargetRef.current.slicer ?? readSlicer(), projectExportFileName(exportName, "stl"), new Blob([bytes], { type: "model/stl" }), downloadBlobFile, { save: sendTargetRef.current.save });
           } else if (target === "download") {
             await downloadBlobFile(projectExportFileName(exportName, "stl"), new Blob([bytes], { type: "model/stl" }));
           } else {
@@ -13031,7 +13053,7 @@ export function LayerlingEditor({
           });
           const bytes = await exportMeshesTo3mfOffThread(bodies, { title: exportName.trim() || projectName });
           const blob3mf = new Blob([bytes as BlobPart], { type: THREE_MF_MEDIA_TYPE });
-          if (toBambu) bambuNote = await sendToBambuStudio(projectExportFileName(exportName, "3mf"), blob3mf, downloadBlobFile);
+          if (toBambu) bambuNote = await sendToSlicer(sendTargetRef.current.slicer ?? readSlicer(), projectExportFileName(exportName, "3mf"), blob3mf, downloadBlobFile, { save: sendTargetRef.current.save });
           else await downloadBlobFile(projectExportFileName(exportName, "3mf"), blob3mf);
         } else {
           const bodies = fertig.map((mesh, index) => ({ ...mesh, color: bodiesWritten[quellen[index]]?.color, faceColors: partFaceColors(mesh, quellen[index]) }));
@@ -13055,6 +13077,8 @@ export function LayerlingEditor({
   }, [bedPrinter, exportSource, projectId, projectName]);
   // Fork: the "Send to Bambu Studio" button in the title row asks for an export through this event.
   const exportDesignRef = useRef(exportDesign);
+  // Build 71: the slicer the Export window chose for this export, and whether the file is kept in the export folder.
+  const sendTargetRef = useRef<{ slicer: SlicerId | null; save: boolean }>({ slicer: null, save: false });
   exportDesignRef.current = exportDesign;
   const projectNameForBambuRef = useRef(projectName);
   projectNameForBambuRef.current = projectName;
@@ -13284,7 +13308,17 @@ export function LayerlingEditor({
   }, [commitShapes]);
 
   // Fork (build 19): "Ready to print?" - run before Send to Bambu Studio (unless turned off), or on its own.
-  const [printCheck, setPrintCheck] = useState<{ issues: PrintIssue[]; sending: BambuSendFormat | null } | null>(null);
+  const [exportWindowOpen, setExportWindowOpen] = useState(false);
+  useEffect(() => {
+    const onOpen = () => {
+      setTopPanel(null);
+      setExportWindowOpen((open) => !open);
+    };
+    window.addEventListener(OPEN_EXPORT_WINDOW_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_EXPORT_WINDOW_EVENT, onOpen);
+  }, []);
+  type SendDetail = { format?: BambuSendFormat; skipCheck?: boolean; slicer?: SlicerId | null; name?: string; fromWindow?: boolean };
+  const [printCheck, setPrintCheck] = useState<{ issues: PrintIssue[]; sending: SendDetail | null } | null>(null);
   const runPrintCheck = useCallback(() => {
     const printer = printerPresetById(workspaceSettingsRef.current.printer);
     return checkForPrinting(shapesRef.current, {
@@ -13295,17 +13329,26 @@ export function LayerlingEditor({
   }, []);
   useEffect(() => {
     const onSend = (event: Event) => {
-      const detail = (event as CustomEvent<{ format?: BambuSendFormat; skipCheck?: boolean }>).detail;
-      const format = detail?.format === "3mf" ? "3mf" : "stl";
-      if (!detail?.skipCheck && checkBeforeSending()) {
+      const detail = (event as CustomEvent<SendDetail>).detail ?? {};
+      const format = detail.format === "3mf" ? "3mf" : "stl";
+      if (!detail.skipCheck && checkBeforeSending()) {
         const issues = runPrintCheck();
         if (issues.length > 0) {
-          setPrintCheck({ issues, sending: format });
+          setPrintCheck({ issues, sending: { ...detail, format } });
           return;
         }
       }
-      setNotice(t("slicer.preparing", { format: format.toUpperCase(), app: slicerName(readSlicer()) }), true);
-      void exportDesignRef.current(format, projectNameForBambuRef.current, false, true);
+      const name = detail.name ?? projectNameForBambuRef.current;
+      // Build 71: from the Export window with no slicer chosen, the file is only saved.
+      if (detail.fromWindow && !detail.slicer) {
+        sendTargetRef.current = { slicer: null, save: false };
+        void exportDesignRef.current(format, name, false, false);
+        return;
+      }
+      const slicer = detail.slicer ?? readSlicer();
+      sendTargetRef.current = { slicer, save: Boolean(detail.fromWindow) };
+      setNotice(t("slicer.preparing", { format: format.toUpperCase(), app: slicerName(slicer) }), true);
+      void exportDesignRef.current(format, name, false, true);
     };
     const onCheck = () => setPrintCheck({ issues: runPrintCheck(), sending: null });
     const onSplit = () => void splitPartsToFit(selectedIdsRef.current);
@@ -14322,7 +14365,9 @@ export function LayerlingEditor({
 
       if (shortcut && key === "e" && !event.shiftKey && !event.altKey) {
         event.preventDefault();
-        setTopPanel((panel) => (panel === "export" ? null : "export"));
+        // Build 71: Ctrl+E opens the Export window, as the blue button does.
+        setTopPanel(null);
+        setExportWindowOpen((open) => !open);
         return;
       }
 
@@ -14484,7 +14529,7 @@ export function LayerlingEditor({
    * Auswahl - der Viewport hat den angeklickten Koerper schon ausgewaehlt.
    */
   // `stack`: every body under the pointer, front to back; `listing`: the menu shows them for "Select other" (#804).
-  const [shapeContextMenu, setShapeContextMenu] = useState<{ x: number; y: number; onShape: boolean; stack: string[]; listing?: boolean } | null>(null);
+  const [shapeContextMenu, setShapeContextMenu] = useState<{ x: number; y: number; onShape: boolean; stack: string[]; listing?: boolean; submenu?: string } | null>(null);
   const [menuHighlightIds, setMenuHighlightIds] = useState<string[]>([]);
   const closeShapeContextMenu = useCallback(() => {
     setShapeContextMenu(null);
@@ -14604,44 +14649,69 @@ export function LayerlingEditor({
     if (selectedShapes.length >= 2 && !selectionLocked) items.push({ key: "group", label: t("contextMenu.group"), shortcut: "Ctrl+G", onSelect: () => void groupSelected() });
     if (single && (single.groupedShapes?.length || wasGroupBeforeEdgeTreatments(single)) && !selectionLocked) items.push({ key: "ungroup", label: t("contextMenu.ungroup"), shortcut: "Ctrl+Shift+G", onSelect: ungroupSelected });
     if (canSeparateSelectedParts && !selectionLocked) items.push({ key: "separateParts", label: t("inspector.separateParts"), onSelect: separateSelectedParts });
+    // Build 71: the tools in four sub-menus, so the menu is about half as long (31 items before).
+    const edges: ShapeContextMenuItem[] = [];
+    const surface: ShapeContextMenuItem[] = [];
+    const mesh: ShapeContextMenuItem[] = [];
+    const mark: ShapeContextMenuItem[] = [];
     if (single && !selectionLocked) {
-      items.push(
-        { key: "chamfer", label: t("editor.tool.chamfer"), separated: true, onSelect: () => startEdgeModifier("chamfer") },
+      edges.push(
+        { key: "chamfer", label: t("editor.tool.chamfer"), onSelect: () => startEdgeModifier("chamfer") },
         { key: "fillet", label: t("editor.tool.fillet"), onSelect: () => startEdgeModifier("fillet") },
         { key: "hollow", label: t("editor.tool.hollow"), onSelect: startShellTool },
         { key: "deleteFace", label: t("editor.tool.deleteFace"), onSelect: () => startDeleteFaceTool("delete") },
         { key: "draft", label: t("draft.menu"), onSelect: startDraftTool },
         { key: "roundMesh", label: t("meshRound.menu"), onSelect: toggleMeshRound },
+      );
+      surface.push(
         { key: "sculpt", label: t("sculpt.menu"), onSelect: toggleSculpt },
         { key: "texture", label: t("texture.menu"), onSelect: toggleTexture },
         { key: "surfaceText", label: t(selectedShapes.length === 1 && selectedShapes[0].surfaceText ? "surfaceText.editMenu" : "surfaceText.menu"), onSelect: toggleSurfaceText },
       );
       if (!single.hole && !isNonSolidShapeKind(single.kind)) {
-        items.push({ key: "holePattern", label: t("holePattern.title"), onSelect: toggleHolePattern });
-        items.push({ key: "faceTool", label: t("faceTool.title"), onSelect: toggleFaceTool });
+        edges.push({ key: "faceTool", label: t("faceTool.title"), onSelect: toggleFaceTool });
+        surface.push({ key: "holePattern", label: t("holePattern.title"), onSelect: toggleHolePattern });
       }
     }
-    if (!selectionLocked) {
-      items.push(
-        { key: "mirror", label: t("editor.tool.mirror"), shortcut: "M", separated: true, onSelect: toggleMirrorMode },
-        { key: "scalePercent", label: t("scalePercent.title"), onSelect: toggleScalePercentTool },
-      );
-    }
-    // Fork (build 49): for every solid object - whatever hangs below the workplane is cut off.
-    if (!selectionLocked && !allHoles) items.push({ key: "cutBelow", label: t("contextMenu.cutBelow"), onSelect: () => void cutPartsBelowBed(selectedShapes.map((shape) => shape.id)) });
-    if (single && offersMeshSimplify(single) && !selectionLocked) items.push({ key: "simplify", label: t("contextMenu.simplify"), separated: true, onSelect: startSimplifyTool });
+    if (!selectionLocked && !allHoles) mesh.push({ key: "cutBelow", label: t("contextMenu.cutBelow"), onSelect: () => void cutPartsBelowBed(selectedShapes.map((shape) => shape.id)) });
+    if (single && offersMeshSimplify(single) && !selectionLocked) mesh.push({ key: "simplify", label: t("contextMenu.simplify"), onSelect: startSimplifyTool });
     if (single && single.importedMesh && !single.groupedShapes?.length && !single.hole && !selectionLocked) {
-      items.push(
-        { key: "makeSolid", label: t("contextMenu.makeSolid"), separated: !offersMeshSimplify(single), onSelect: () => void makePartsSolid([single.id]) },
+      mesh.push(
+        { key: "makeSolid", label: t("contextMenu.makeSolid"), onSelect: () => void makePartsSolid([single.id]) },
         { key: "fillHole", label: t("contextMenu.fillHole"), onSelect: startFillHole },
       );
     }
     if (!allHoles) {
-      items.push(
-        { key: "markCenter", label: t("contextMenu.markCenter"), separated: true, onSelect: () => markSelectionPoints("center") },
+      mark.push(
+        { key: "markCenter", label: t("contextMenu.markCenter"), onSelect: () => markSelectionPoints("center") },
         { key: "markCorners", label: t("contextMenu.markCorners"), onSelect: () => markSelectionPoints("corners") },
         { key: "markMidpoints", label: t("contextMenu.markMidpoints"), onSelect: () => markSelectionPoints("midpoints") },
         ...(referencePoints(notes).length > 0 ? [{ key: "removePoints", label: t("contextMenu.removeAllPoints", { count: referencePoints(notes).length }), danger: true, onSelect: removeAllReferencePoints }] : []),
+      );
+    }
+    const groups = [
+      { id: "edges", label: t("contextMenu.groupEdges"), items: edges },
+      { id: "surface", label: t("contextMenu.groupSurface"), items: surface },
+      { id: "mesh", label: t("contextMenu.groupMesh"), items: mesh },
+      { id: "mark", label: t("contextMenu.groupMark"), items: mark },
+    ];
+    const open = groups.find((group) => group.id === shapeContextMenu.submenu);
+    if (open) {
+      return [
+        { key: "back", label: `‹ ${open.label}`, keepOpen: true, onSelect: () => setShapeContextMenu((current) => current ? { ...current, submenu: undefined } : current) },
+        ...open.items.map((item, index) => ({ ...item, separated: index === 0 })),
+      ];
+    }
+    groups.forEach((group, index) => {
+      if (!group.items.length) return;
+      // A group of one is shown as itself.
+      if (group.items.length === 1) { items.push({ ...group.items[0], separated: index === 0 }); return; }
+      items.push({ key: `group-${group.id}`, label: `${group.label} ›`, keepOpen: true, separated: index === 0, onSelect: () => setShapeContextMenu((current) => current ? { ...current, submenu: group.id } : current) });
+    });
+    if (!selectionLocked) {
+      items.push(
+        { key: "mirror", label: t("editor.tool.mirror"), shortcut: "M", separated: true, onSelect: toggleMirrorMode },
+        { key: "scalePercent", label: t("scalePercent.title"), onSelect: toggleScalePercentTool },
       );
     }
     items.push(
@@ -15238,11 +15308,28 @@ export function LayerlingEditor({
             setPrintCheck(null);
           }}
           onSend={() => {
-            const format = printCheck.sending;
+            const pending = printCheck.sending;
             setPrintCheck(null);
-            if (format) window.dispatchEvent(new CustomEvent(SEND_TO_BAMBU_EVENT, { detail: { format, skipCheck: true } }));
+            if (pending) window.dispatchEvent(new CustomEvent(SEND_TO_BAMBU_EVENT, { detail: { ...pending, skipCheck: true } }));
           }}
           onClose={() => setPrintCheck(null)}
+        />
+      ) : null}
+      {exportWindowOpen ? (
+        <ExportWindow
+          projectName={historyViewName}
+          shapeCount={exportableShapeCount}
+          selectionLeavesOut={exportSelectionScoped && exportSelectedVisibleCount < exportVisibleCount ? { selected: selectedShapes.length, total: exportVisibleCount } : null}
+          onSelectAll={selectAllVisible}
+          onClose={() => setExportWindowOpen(false)}
+          onMoreFormats={() => {
+            setExportWindowOpen(false);
+            setTopPanel("export");
+          }}
+          onExport={(choice) => {
+            setExportWindowOpen(false);
+            window.dispatchEvent(new CustomEvent(SEND_TO_BAMBU_EVENT, { detail: { format: choice.format, name: choice.name, slicer: choice.target === "none" ? null : choice.target, fromWindow: true, skipCheck: !choice.checkFirst } }));
+          }}
         />
       ) : null}
       <WhatsNew />
@@ -15621,6 +15708,13 @@ export function LayerlingEditor({
           onAdvancedChange={(advanced) => setDentalStudio((current) => current ? { ...current, advanced } : current)}
           onApply={applyDentalStudio}
           onImport={() => fileInputRef.current?.click()}
+          patientDetails={dentalStudio.patientDetails}
+          onPatientDetails={(patientDetails) => {
+            storePatientDetails(patientDetails);
+            setDentalStudio((current) => current ? { ...current, patientDetails } : current);
+          }}
+          onNewPatient={onNewDentalDesign}
+          modelsHere={shapes.some((shape) => shape.dental === "model")}
           onHingeTest={() => {
             // In front of what is on the plate (the scans), not on top of it: the test is 112 x 34 mm,
             // so on most plates it fits beside a pair this way.
@@ -15666,6 +15760,8 @@ export function LayerlingEditor({
           workspace={workspaceSettings}
           onTool={(tool) => setSculptTool((current) => current ? { ...current, tool } : current)}
           onSize={(size) => setSculptTool((current) => current ? { ...current, size: Math.max(4, Math.min(150, size)) } : current)}
+          reach={sculptTool.reach}
+          onReach={(reach) => { storeSculptReach(reach); setSculptTool((current) => current ? { ...current, reach } : current); }}
           onStrength={(strength) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.05, Math.min(1, strength)) } : current)}
           onSelection={applySculptSelection}
           onRemeshMode={(remeshMode) => setSculptTool((current) => current && !current.busy ? { ...current, remeshMode, amount: remeshMode === "thicken" ? Math.max(0.2, Math.abs(current.amount)) : current.amount, error: null } : current)}
@@ -15673,6 +15769,7 @@ export function LayerlingEditor({
           onAmount={(amount) => setSculptTool((current) => current && !current.busy ? { ...current, amount: Math.max(current.remeshMode === "thicken" ? 0.2 : -10, Math.min(10, amount)), error: null } : current)}
           onRemesh={applyRemesh}
           onClose={() => { flushSculptRef.current(); setSculptTool(null); }}
+          besideDental={Boolean(dentalStudio)}
         />
       ) : null}
       {sculptTool?.tool && !sculptTool.busy ? (
@@ -15957,4 +16054,35 @@ function faceOutlineSpan(face: { outline: { loops: ReadonlyArray<ReadonlyArray<{
     minV = Math.min(minV, point.v); maxV = Math.max(maxV, point.v);
   }
   return Number.isFinite(maxU) ? Math.max(maxU - minU, maxV - minV) : 50;
+}
+
+/** Build 71: the Select brush's reach (front, back side, through), remembered on this computer. */
+function readSculptReach(): SelectReach {
+  try {
+    const stored = window.localStorage.getItem("pare3d.sculptReach");
+    return stored === "back" || stored === "through" ? stored : "front";
+  } catch {
+    return "front";
+  }
+}
+function storeSculptReach(reach: SelectReach) {
+  try {
+    window.localStorage.setItem("pare3d.sculptReach", reach);
+  } catch {
+    // Holds for this visit.
+  }
+}
+function readPatientDetails(): "keep" | "remove" {
+  try {
+    return window.localStorage.getItem("pare3d.dentalPatientDetails") === "remove" ? "remove" : "keep";
+  } catch {
+    return "keep";
+  }
+}
+function storePatientDetails(value: "keep" | "remove") {
+  try {
+    window.localStorage.setItem("pare3d.dentalPatientDetails", value);
+  } catch {
+    // Holds for this visit.
+  }
 }

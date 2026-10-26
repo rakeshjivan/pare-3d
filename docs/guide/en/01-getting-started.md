@@ -110,6 +110,6 @@ After Pare 3D has updated itself, a **What's new** card on the start page lists 
 
 ## From design to print
 
-When your part is done, click **Bambu Studio** at the top: Pare 3D first checks the design ({{ui:printCheck.title}}) and then opens it in Bambu Studio. For another slicer - PrusaSlicer, OrcaSlicer, Cura - click {{ui:editor.export}}, choose STL or 3MF and open the file there. If you choose your printer in the settings, you see while building whether the part fits on the print bed. More in [Printing](chapter:printing).
+When your part is done, click the blue **{{ui:editor.export}}** button at the top. Its window asks where the file opens - Bambu Studio, OrcaSlicer, PrusaSlicer, PreForm, CHITUBOX, Lychee Slicer, or nowhere ({{ui:exportWindow.justSave}}) - the file type, and the name and folder; then click {{ui:exportWindow.export}}. Pare 3D first checks the design ({{ui:printCheck.title}}). If you choose your printer in the settings, you see while building whether the part fits on the print bed. More in [Printing](chapter:printing).
 
 > **Tip:** If you come from Tinkercad you will find your way quickly: plate, shapes, solid and hole, group, align and mirror work almost the same, and most keyboard shortcuts too. **Help › Coming from Tinkercad?** shows where everything is. What is new is mostly chamfer and fillet, hollowing, push/pull, blending, threads and sketches.

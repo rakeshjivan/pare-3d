@@ -6,7 +6,7 @@ import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
-import type { SculptBrush } from "@/lib/meshSculpt";
+import type { SculptBrush, SelectReach } from "@/lib/meshSculpt";
 import type { RemeshMode } from "@/lib/meshRemesh";
 import type { WorkplaneWorkspaceSettings } from "@/types/layerling";
 
@@ -24,6 +24,7 @@ export function MeshSculptPanel({
   tool,
   size,
   strength,
+  reach,
   chosen,
   remeshMode,
   detail,
@@ -34,17 +35,20 @@ export function MeshSculptPanel({
   onTool,
   onSize,
   onStrength,
+  onReach,
   onSelection,
   onRemeshMode,
   onDetail,
   onAmount,
   onRemesh,
   onClose,
+  besideDental = false,
 }: {
   targetName: string;
   tool: SculptTool | null;
   size: number;
   strength: number;
+  reach: SelectReach;
   chosen: number;
   remeshMode: RemeshMode;
   detail: number;
@@ -55,17 +59,20 @@ export function MeshSculptPanel({
   onTool: (tool: SculptTool | null) => void;
   onSize: (value: number) => void;
   onStrength: (value: number) => void;
+  onReach: (reach: SelectReach) => void;
   onSelection: (action: SculptSelectionAction) => void;
   onRemeshMode: (mode: RemeshMode) => void;
   onDetail: (value: number) => void;
   onAmount: (value: number) => void;
   onRemesh: () => void;
   onClose: () => void;
+  /** Build 71: opened from Dental Studio - stands beside its panel instead of over it. */
+  besideDental?: boolean;
 }) {
   useLanguage();
   const title = t("sculpt.title");
   return (
-    <MovableToolPanel className="edge-modifier-panel mesh-sculpt-panel" ariaLabel={title}>
+    <MovableToolPanel className={`edge-modifier-panel mesh-sculpt-panel${besideDental ? " beside-dental" : ""}`} ariaLabel={title}>
       {(handleProps) => (<>
       <div className="edge-modifier-header movable" title={t("panel.moveHint")} {...handleProps}>
         <div>
@@ -88,6 +95,19 @@ export function MeshSculptPanel({
       <EdgeModifierSlider label={t("sculpt.size")} value={size} min={4} max={150} step={1} workspace={workspace} disabled={busy} onChange={onSize} />
       {tool !== "select" && tool !== "unselect" ? (
         <EdgeModifierSlider label={t("sculpt.strength")} value={Math.round(strength * 100)} min={5} max={100} step={5} unit="%" workspace={workspace} disabled={busy} onChange={(value) => onStrength(value / 100)} />
+      ) : null}
+      {tool === "select" || tool === "unselect" ? (
+        <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.reach")}>
+          <span className="sculpt-reach-label">{t("sculpt.reach")}</span>
+          <div className="shell-opening-options">
+            {(["front", "back", "through"] as const).map((value) => (
+              <button key={value} type="button" role="radio" aria-checked={reach === value} className={reach === value ? "active" : ""} disabled={busy} title={t(`sculpt.reach.${value}Hint`)} onClick={() => onReach(value)}>
+                {t(`sculpt.reach.${value}`)}
+              </button>
+            ))}
+          </div>
+          <p className="blend-hint">{t(`sculpt.reach.${reach}Hint`)}</p>
+        </div>
       ) : null}
       <p className="blend-hint" role="status">{chosen ? t("sculpt.chosen", { count: chosen.toLocaleString() }) : t("sculpt.noneChosen")}</p>
       <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.selection")}>

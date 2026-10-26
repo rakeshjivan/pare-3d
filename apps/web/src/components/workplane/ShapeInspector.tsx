@@ -4,6 +4,7 @@ import { displayY, displayYTurn, insideZ, insideZTurn } from "@/lib/displayAxes"
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { guideChapterForShape, guideSectionForShape } from "@/lib/guideLinks";
 import { useInspectorCard } from "@/lib/inspectorCards";
+import { worldBoxOfShapes } from "@/lib/scaleByPercent";
 import { ChevronDown, ChevronUp, Cylinder, Eye, EyeOff, FolderOpen, Grid3x3, Layers, Link2, Lock, Minus, Pencil, Plus, RefreshCw, RotateCcw, Split, Tags, Unlock } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Fragment, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
@@ -2955,6 +2956,19 @@ export function ShapeInspector({
         </button>
       ) : null}
 
+      {/* Build 71: the part's size always in view, even with the cards folded (the usability audit). */}
+      {(() => {
+        const box = worldBoxOfShapes([shape]);
+        const imperial = workspace.units === "in";
+        const show = (mm: number) => (imperial ? (mm / 25.4).toFixed(3) : mm.toFixed(2)).replace(/\.?0+$/, "");
+        if (!Number.isFinite(box.max.x - box.min.x)) return null;
+        return (
+          <p className="inspector-size-line" title={t("inspector.sizeLineHint")}>
+            <span>{t("inspector.sizeLine")}</span>
+            <strong>{show(box.max.x - box.min.x)} × {show(box.max.z - box.min.z)} × {show(box.max.y - box.min.y)} {imperial ? "in" : "mm"}</strong>
+          </p>
+        );
+      })()}
       {/* Every part of a plain shape's properties leads to the guide's section about them; the special shapes keep the answers of their own (#424). */}
       <div className={`property-card ${propertiesOpen ? "" : "collapsed"}`} data-help-section-all={guideSectionForShape(shape) === "shapeSettings" ? "shapeSettings" : undefined}>
         <button

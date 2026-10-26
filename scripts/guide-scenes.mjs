@@ -268,11 +268,23 @@ export const scenes = {
     await ctx.shot("settings-workplane");
   },
 
+  // Build 71: the blue Export button opens the Export window; More formats opens the full panel.
+  async "export-window"(ctx) {
+    await freshEditor(ctx);
+    const { box } = await sampleParts(ctx);
+    await select(ctx, [box]);
+    await ctx.click(ctx.t("editor.export"));
+    await ctx.wait(1200);
+    await ctx.shot("export-window");
+  },
+
   async "export-panel"(ctx) {
     await freshEditor(ctx);
     const { box } = await sampleParts(ctx);
     await select(ctx, [box]);
     await ctx.click(ctx.t("editor.export"));
+    await ctx.wait(1200);
+    await ctx.click(ctx.t("exportWindow.moreFormats"));
     await ctx.wait(1200);
     await ctx.shot("export-panel");
   },

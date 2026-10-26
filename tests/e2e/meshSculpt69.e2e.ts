@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 (globalThis as unknown as { window: unknown }).window = { location: { href: pathToFileURL(resolve("apps/web/public") + "/").href } };
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
-import { applyBrush, applyToSelection, cornerNormals, growChoice, invertChoice, millimetresPerPixel, sculptMeshOf, soupOf, strokeWeights, withoutTriangles } from "@/lib/meshSculpt";
+import { applyBrush, applyToSelection, brushChoice, cornerNormals, growChoice, invertChoice, millimetresPerPixel, sculptMeshOf, soupOf, strokeWeights, withoutTriangles } from "@/lib/meshSculpt";
 import { defaultRemeshDetail, pointTriangleDistance2, remeshPositions } from "@/lib/meshRemesh";
 import { meshHealth } from "@/lib/meshRepair";
 
@@ -62,6 +62,30 @@ describe("sculpt brushes and selection (build 69)", () => {
     for (let i = 0; i < weights.length; i += 1) if (weights[i]) { if (mesh.points[i * 3 + 1] > 2) near += 1; else far += 1; }
     expect(near).toBeGreaterThan(5);
     expect(far).toBe(0);
+  });
+
+  it("selects the surface in sight, the back side, or every layer through (build 71)", async () => {
+    const m = await getManifoldRuntime();
+    const mesh = sculptMeshOf(soup(m.Manifold.cube([20, 20, 20], true).refine(4)));
+    const projected = fromAbove(mesh.points);
+    const pick = (reach: "front" | "back" | "through") => {
+      const chosen = new Uint8Array(mesh.triangles.length / 3);
+      brushChoice(mesh, projected, eye, [[480, 480], [520, 520]], 60, chosen, true, reach);
+      let top = 0, bottom = 0;
+      for (let t = 0; t < chosen.length; t += 1) {
+        if (!chosen[t]) continue;
+        const y = (mesh.points[mesh.triangles[t * 3] * 3 + 1] + mesh.points[mesh.triangles[t * 3 + 1] * 3 + 1] + mesh.points[mesh.triangles[t * 3 + 2] * 3 + 1]) / 3;
+        if (y > 9.9) top += 1; else if (y < -9.9) bottom += 1;
+      }
+      return { top, bottom };
+    };
+    const front = pick("front"), back = pick("back"), through = pick("through");
+    expect(front.top).toBeGreaterThan(0);
+    expect(front.bottom).toBe(0);
+    expect(back.top).toBe(0);
+    expect(back.bottom).toBeGreaterThan(0);
+    expect(through.top).toBe(front.top);
+    expect(through.bottom).toBe(back.bottom);
   });
 
   it("smooths a spike away and flattens a dome", async () => {

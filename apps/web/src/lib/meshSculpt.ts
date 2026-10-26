@@ -163,12 +163,19 @@ function pathBox(path: ScreenPoint[], radius: number) {
  * The Select brush: chooses (`add`) or lets go of the triangles the camera at `eye` sees whose middle
  * on screen is within `radius` px of the path. `projected` is x/y page pixels per corner.
  */
-export function brushChoice(mesh: SculptMesh, projected: ArrayLike<number>, eye: [number, number, number], path: ScreenPoint[], radius: number, chosen: Uint8Array, add: boolean): number {
-  const { triangles } = mesh;
+/**
+ * Build 71: which surface the Select brush reaches, as Meshmixer offers - "front" the surface you see
+ * (the default), "back" the side facing away from you at any depth (the underside of a scan, the far
+ * wall of a tooth), "through" every layer under the brush.
+ */
+export type SelectReach = "front" | "back" | "through";
+
+export function brushChoice(mesh: SculptMesh, projected: ArrayLike<number>, eye: [number, number, number], path: ScreenPoint[], radius: number, chosen: Uint8Array, add: boolean, reach: SelectReach = "front"): number {
+  const { triangles, points } = mesh;
   if (!path.length) return 0;
   const box = pathBox(path, radius);
   const { minX, minY, maxX, maxY } = box;
-  const view = viewDepth(mesh, projected, eye, box);
+  const view = reach === "front" ? viewDepth(mesh, projected, eye, box) : null;
   const r2 = radius * radius;
   let changed = 0;
   for (let t = 0; t < chosen.length; t += 1) {
@@ -178,7 +185,14 @@ export function brushChoice(mesh: SculptMesh, projected: ArrayLike<number>, eye:
     const y = (projected[a * 2 + 1] + projected[b * 2 + 1] + projected[c * 2 + 1]) / 3;
     if (!(x >= minX && x <= maxX && y >= minY && y <= maxY)) continue;
     if (pathDistance2(x, y, path) > r2) continue;
-    if (!view.seen(x, y, (view.distance(a) + view.distance(b) + view.distance(c)) / 3)) continue;
+    if (view && !view.seen(x, y, (view.distance(a) + view.distance(b) + view.distance(c)) / 3)) continue;
+    if (reach === "back") {
+      const ax = points[a * 3], ay = points[a * 3 + 1], az = points[a * 3 + 2];
+      const ux = points[b * 3] - ax, uy = points[b * 3 + 1] - ay, uz = points[b * 3 + 2] - az;
+      const vx = points[c * 3] - ax, vy = points[c * 3 + 1] - ay, vz = points[c * 3 + 2] - az;
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      if (nx * (eye[0] - ax) + ny * (eye[1] - ay) + nz * (eye[2] - az) >= 0) continue;
+    }
     chosen[t] = add ? 1 : 0;
     changed += 1;
   }

@@ -7,6 +7,9 @@ import type { ManifoldSolid } from "@/lib/manifoldSplit";
  *
  * - Plug: a round peg on one half and a matching socket in the other.
  * - Dowel: a socket in both halves and a loose pin, printed separately, that joins them.
+ * - Dovetail (build 71): a key with a dovetail section standing on one half and a matching slot in
+ *   the other, running right across the cut face, so the halves slide together from the side and
+ *   then cannot be pulled apart across the cut - they hold without glue.
  *
  * Where they go: the body is sliced at the cut to get the exact cut face, which is shrunk by
  * the socket's radius plus a wall. Any point left inside is a place where a connector fits
@@ -17,7 +20,7 @@ import type { ManifoldSolid } from "@/lib/manifoldSplit";
  * holes); a socket is also a little deeper than its peg so glue and the peg's tip have room.
  */
 
-export type CutConnectorType = "none" | "plug" | "dowel";
+export type CutConnectorType = "none" | "plug" | "dowel" | "dovetail";
 /** Auto: the editor spreads them over the cut face. Manual: where the user clicked on it. */
 export type CutConnectorPlacement = "auto" | "manual";
 
@@ -77,7 +80,7 @@ export function normalizeCutConnectors(options: Partial<CutConnectorOptions> | n
   const merged = { ...DEFAULT_CUT_CONNECTORS, ...(options ?? {}) };
   const clamp = (value: number, min: number, max: number, fallback: number) => (Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback);
   return {
-    type: merged.type === "plug" || merged.type === "dowel" ? merged.type : "none",
+    type: merged.type === "plug" || merged.type === "dowel" || merged.type === "dovetail" ? merged.type : "none",
     diameter: clamp(merged.diameter, CUT_CONNECTOR_LIMITS.minDiameter, CUT_CONNECTOR_LIMITS.maxDiameter, DEFAULT_CUT_CONNECTORS.diameter),
     depth: clamp(merged.depth, CUT_CONNECTOR_LIMITS.minDepth, CUT_CONNECTOR_LIMITS.maxDepth, DEFAULT_CUT_CONNECTORS.depth),
     clearance: clamp(merged.clearance, 0, CUT_CONNECTOR_LIMITS.maxClearance, DEFAULT_CUT_CONNECTORS.clearance),
@@ -332,6 +335,36 @@ export type ConnectedHalves = {
   created: ManifoldSolid[];
 };
 
+/** How much a dovetail widens from the cut face to its far end, each side: 15° flanks. */
+export const DOVETAIL_FLANK = Math.tan((15 * Math.PI) / 180);
+
+/**
+ * A dovetail prism: `width` wide at the cut face, wider by the flanks at `depth` into the half the
+ * key reaches into (`into` = +1 along the normal, -1 against it), running along the plane's first
+ * direction from `uMin` to `uMax`. Built in the plane's frame, returned in the scene.
+ */
+function dovetailPrism(runtime: ManifoldToplevel, frame: ReturnType<typeof planeFrame>, v: number, width: number, depth: number, position: number, into: number, uMin: number, uMax: number, start: number) {
+  const far = width + 2 * depth * DOVETAIL_FLANK;
+  // In the prism's own axes: x = v (across), y = n (along the normal), z = u (along the slot).
+  const section = new runtime.CrossSection([
+    [
+      [v - width / 2, position + into * start],
+      [v + width / 2, position + into * start],
+      [v + far / 2, position + into * depth],
+      [v - far / 2, position + into * depth],
+    ],
+  ], "NonZero");
+  const prism = section.extrude(uMax - uMin).translate([0, 0, uMin]);
+  section.delete();
+  // x -> v, y -> n, z -> u, then the plane's frame back to the scene.
+  const axes: Mat4 = [0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1];
+  const local = prism.transform(axes);
+  prism.delete();
+  const placed = local.transform(frame.toWorld);
+  local.delete();
+  return placed;
+}
+
 /** Fraction of a socket's volume that must lie inside its half; less and it breaks through. */
 const SOCKET_INSIDE = 0.97;
 
@@ -388,6 +421,45 @@ export function connectCutHalves(
     } else {
       nextNegative = negative.add(pegUnion);
       nextPositive = positive.subtract(socketUnion);
+    }
+  } else if (options.type === "dovetail") {
+    // The key stands on the - half (the + half with `flip`) and reaches into the other; its slot is
+    // open at both ends so the other half slides on along the cut.
+    const keyOnPositive = options.flip;
+    const into = keyOnPositive ? -1 : 1;
+    const local = (keyOnPositive ? positive : negative).transform(frame.toLocal);
+    created.push(local);
+    // Just inside the key's own half: exactly on its cut face the slice can come out empty.
+    const face = local.slice(position - into * 1e-3);
+    const bounds = face.bounds();
+    const uMin = bounds.min[0], uMax = bounds.max[0];
+    const keys: ManifoldSolid[] = [];
+    const slots: ManifoldSolid[] = [];
+    const reach = face.extrude(options.depth + 2 * OVERLAP).translate([0, 0, into > 0 ? position - OVERLAP : position - options.depth - OVERLAP]);
+    face.delete();
+    const reachWorld = reach.transform(frame.toWorld);
+    reach.delete();
+    created.push(reachWorld);
+    for (const centre of centres) {
+      const prism = dovetailPrism(runtime, frame, centre[1], options.diameter, options.depth, position, into, uMin - 1, uMax + 1, -OVERLAP);
+      // The key only where the half's cut face is, so it never stands out past the part's outline.
+      const key = prism.intersect(reachWorld);
+      prism.delete();
+      const slot = dovetailPrism(runtime, frame, centre[1], options.diameter + options.clearance, options.depth + SOCKET_EXTRA_DEPTH, position, into, uMin - 5, uMax + 5, -OVERLAP);
+      keys.push(key);
+      slots.push(slot);
+      created.push(key, slot);
+    }
+    if (keys.some((key) => key.isEmpty() || key.volume() < 1e-6)) return { error: "breaksThrough" };
+    const keyUnion = keys.length === 1 ? keys[0] : runtime.Manifold.union(keys);
+    const slotUnion = slots.length === 1 ? slots[0] : runtime.Manifold.union(slots);
+    created.push(keyUnion, slotUnion);
+    if (keyOnPositive) {
+      nextPositive = positive.add(keyUnion);
+      nextNegative = negative.subtract(slotUnion);
+    } else {
+      nextNegative = negative.add(keyUnion);
+      nextPositive = positive.subtract(slotUnion);
     }
   } else if (options.type === "dowel") {
     const positiveSockets: ManifoldSolid[] = [];

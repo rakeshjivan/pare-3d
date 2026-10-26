@@ -660,8 +660,9 @@ export type HingeFront = { x: number; upperY: number; lowerY: number };
 export const HINGE_CONDYLE_ANGLES = [0, 10, 15, 20, 25, 30, 35, 40, 45] as const;
 /** How far the axle can slide along a protrusion path, mm: an incisor-to-incisor protrusion is 5 to 7 mm. */
 export const HINGE_PATH_LENGTH = 4;
-/** Openings the incisal pin can be raised by, mm (build 60). */
-export const INCISAL_PIN_RAISES = [0, 0.5, 1, 2, 3] as const;
+/** Build 71: the pin raise is a slider, 0 (the scanned bite) to 10 mm in half millimetres. */
+export const INCISAL_PIN_MAX = 10;
+export const INCISAL_PIN_STEP = 0.5;
 /** The incisal guide table's slope, degrees (build 60): the average anterior guidance. */
 export const INCISAL_TABLE_ANGLE = 30;
 
@@ -850,41 +851,60 @@ export function hingeParts(runtime: ManifoldRuntime, back: number, xMin: number,
     // The way in for the axle, under its place in the bite.
     cuts.push(keep(box(runtime, c - clipHalf - 1, c + clipHalf + 1, ay - (r - HINGE_SNAP / 2), ay + (r - HINGE_SNAP / 2), clipBottom - 1, 0)));
   }
+  let rest = 0;
   if (front) {
     // Build 61: a slim incisal pin, as on an articulator - a 3 mm pin down from the upper onto a
     // 5 mm table up from the lower, standing 6 mm in front of whichever model reaches further, so
     // the front teeth stay in view. Each is carried on a 4 mm arm along the bottom of its own base,
     // reaching 3 mm into that base at its own front (never near the teeth).
     const yp = Math.min(front.upperY, front.lowerY) - 6;
-    const raise = Math.max(0, Math.min(5, motion.pinRaise ?? 0));
+    // Build 71: a raised pin opens the bite the way it does on an articulator - the pin, fixed to
+    // the upper member and square to it, is longer by the raise, and the table stays at the
+    // occlusal plane, so the upper comes to rest turned up about the hinge axle by `rest`, with its
+    // tip on the table. (Before, the pin was shorter and the table taller by the same amount, so
+    // they met in the scanned bite and nothing opened.) The front teeth part by less than the pin
+    // and the back teeth by less again, as on an articulator.
+    const raise = Math.max(0, Math.min(INCISAL_PIN_MAX, motion.pinRaise ?? 0));
     const x = front.x;
+    // Where a point of the upper, (y, z) in its own frame, comes to rest in the lower's.
+    const atRest = (y: number, z: number): [number, number] => {
+      const dy0 = y - ay;
+      return [ay + dy0 * Math.cos(rest) + z * Math.sin(rest), -dy0 * Math.sin(rest) + z * Math.cos(rest)];
+    };
     if (motion.table === "guide") {
       // The table rises towards the back; the pin's tip is its front edge, its underside cut back
-      // steeper than the table so only the tip touches as it rides up.
-      const rise = Math.tan(INCISAL_TABLE_ANGLE * deg), relief = Math.tan((INCISAL_TABLE_ANGLE + 8) * deg);
-      const tip = yp - 1.5;
-      lowerParts.push(keep(prismAlongX(runtime, [[yp - 2.5, floorLower], [yp + 2.5, floorLower], [yp + 2.5, raise + (yp + 2.5 - tip) * rise], [tip, raise], [yp - 2.5, raise]], x - 2.5, x + 2.5)));
-      upperParts.push(keep(prismAlongX(runtime, [[tip, raise], [yp + 1.5, raise + 3 * relief], [yp + 1.5, floorUpper], [tip, floorUpper]], x - 1.5, x + 1.5)));
+      // steeper than the table (and than the rest angle) so only the tip touches as it rides up.
+      const tipUpper = yp - 1.5;
+      rest = Math.atan2(raise, ay - tipUpper);
+      const [tipY] = atRest(tipUpper, -raise);
+      const rise = Math.tan(INCISAL_TABLE_ANGLE * deg), relief = Math.tan(INCISAL_TABLE_ANGLE * deg + 8 * deg + rest);
+      const tp = tipY + 1.5;
+      lowerParts.push(keep(prismAlongX(runtime, [[tp - 2.5, floorLower], [tp + 2.5, floorLower], [tp + 2.5, (tp + 2.5 - tipY) * rise], [tipY, 0], [tp - 2.5, 0]], x - 2.5, x + 2.5)));
+      upperParts.push(keep(prismAlongX(runtime, [[tipUpper, -raise], [yp + 1.5, -raise + 3 * relief], [yp + 1.5, floorUpper], [tipUpper, floorUpper]], x - 1.5, x + 1.5)));
+      lowerParts.push(keep(box(runtime, x - 2, x + 2, Math.min(tp, yp) - 2.5, front.lowerY + 3, floorLower, floorLower + 3)));
     } else {
-      const column = (radius: number, z0: number, z1: number) => runtime.Manifold.cylinder(z1 - z0, radius, radius, 32).translate([x, yp, z0]);
-      lowerParts.push(keep(column(2.5, floorLower, raise)));
-      upperParts.push(keep(column(1.5, raise, floorUpper)));
+      rest = Math.atan2(raise, ay - yp);
+      const [tipY] = atRest(yp, -raise);
+      const column = (y: number, radius: number, z0: number, z1: number) => runtime.Manifold.cylinder(z1 - z0, radius, radius, 32).translate([x, y, z0]);
+      lowerParts.push(keep(column(tipY, 2.5, floorLower, 0)));
+      upperParts.push(keep(column(yp, 1.5, -raise, floorUpper)));
+      lowerParts.push(keep(box(runtime, x - 2, x + 2, Math.min(tipY, yp) - 2.5, front.lowerY + 3, floorLower, floorLower + 3)));
     }
-    lowerParts.push(keep(box(runtime, x - 2, x + 2, yp - 2.5, front.lowerY + 3, floorLower, floorLower + 3)));
     upperParts.push(keep(box(runtime, x - 2, x + 2, yp - 1.5, front.upperY + 3, floorUpper - 3, floorUpper)));
   }
   const lower = runtime.Manifold.union(lowerParts);
   const joined = keep(runtime.Manifold.union(upperParts));
   const upper = runtime.Manifold.difference(joined, runtime.Manifold.union(cuts));
   made.forEach((solid) => solid.delete());
-  return { upper, lower, axleY: ay };
+  // Build 71: `rest`, degrees - how far the upper stands turned open on its pin (0 with no raise).
+  return { upper, lower, axleY: ay, rest: rest / deg };
 }
 
 /**
  * Build 60: how far a printed articulator opens, degrees - the upper turned up about the axle
  * (y = `axleY`, z = 0) until it meets the lower. Checked every 5 degrees up to `limit`.
  */
-export function hingeOpening(runtime: ManifoldRuntime, upper: ManifoldSolid, lower: ManifoldSolid, axleY: number, limit = 90): number {
+export function hingeOpening(runtime: ManifoldRuntime, upper: ManifoldSolid, lower: ManifoldSolid, axleY: number, limit = 90, from = 0): number {
   const meets = (degrees: number) => {
     const turned = upper.translate([0, -axleY, 0]).rotate([-degrees, 0, 0]);
     const placed = turned.translate([0, axleY, 0]);
@@ -896,8 +916,10 @@ export function hingeOpening(runtime: ManifoldRuntime, upper: ManifoldSolid, low
     return volume > 0.5;
   };
   // Coarse first, then to the nearest 5 degrees.
-  let open = 0;
+  // Build 71: from where the upper rests on a raised pin.
+  let open = from;
   for (const step of [30, 60, 90]) {
+    if (step <= from) continue;
     if (step > limit) break;
     if (meets(step)) break;
     open = step;

@@ -88,11 +88,19 @@ Before you send a design to the printer, {{ui:printCheck.title}} looks it over f
 - overhangs that will need supports ({{ui:printCheck.showOverhangs}} hatches them);
 - hidden parts, which are not exported.
 
-{{ui:printCheck.select}} selects the part in question so you can fix it. Open the check from the menu next to **Send to Bambu Studio**, or search for it with [[Ctrl]]+[[K]].
+{{ui:printCheck.select}} selects the part in question so you can fix it. It runs before every export while **{{ui:exportWindow.checkFirst}}** is ticked in the {{ui:editor.export}} window; search for {{ui:printCheck.title}} with [[Ctrl]]+[[K]] to run it on its own.
 
 ## Sending to Bambu Studio
 
-**Send to Bambu Studio** in the title row exports the design and opens it in your slicer in one step. The small menu beside it chooses the slicer - for filament Bambu Studio, OrcaSlicer or PrusaSlicer, for resin PreForm (Formlabs), CHITUBOX or Lychee Slicer; the button then says "Send to" that slicer, and a slicer the app cannot find on this computer is marked "not found" - and the file type: **STL** (one merged body) or **3MF** (each part with its colour, for multicolour prints; the resin slicers read 3MF too). The app keeps a copy in Documents › Pare 3D Exports. In a web browser the file is downloaded instead, and you open it in the slicer yourself. An app installed before build 70 sends only to Bambu Studio; download the app again once for the others.
+The blue **{{ui:editor.export}}** button in the title row (or [[Ctrl]]+[[E]]) opens one window for the whole step, filled in with what you chose last:
+
+![The Export window: open in a slicer, file type, file name and folder, and the Export button.](shot:export-window)
+
+- **{{ui:exportWindow.openIn}}**: {{ui:exportWindow.justSave}}, or a slicer - for filament Bambu Studio, OrcaSlicer or PrusaSlicer, for resin PreForm (Formlabs), CHITUBOX or Lychee Slicer. A slicer the app cannot find on this computer is greyed out and marked "{{ui:slicer.notFound}}". Tick **{{ui:exportWindow.makeDefault}}** to have the window start on this choice; otherwise it holds for this export only.
+- **{{ui:exportWindow.fileType}}**: **3MF** keeps each part with its colour (for multicolour prints; the resin slicers read 3MF too), **STL** is one merged body. {{ui:exportWindow.moreFormats}} opens the full export panel described in [Files and saving](chapter:files-and-saving).
+- **{{ui:exportWindow.saveTo}}**: the file name (the design's name to start with) and the folder for exports; {{ui:files.change}} picks another folder, which is then kept, as in the settings.
+
+The button says what happens: {{ui:exportWindow.export}}, or "Export and open in" the slicer. The file is saved in the folder and opened from there; a second export with the same name gets a number instead of replacing the first. In a web browser a page cannot open another program, so the file is downloaded and you open it in the slicer yourself. An app installed before build 70 sends only to Bambu Studio; download the app again once for the others.
 
 Switch on {{ui:printCheck.menuItem}} in the same menu and {{ui:printCheck.title}} runs each time you send. If it finds something, you can fix it first or choose {{ui:printCheck.sendAnyway}}.
 
@@ -104,4 +112,4 @@ Switch on {{ui:printCheck.menuItem}} in the same menu and {{ui:printCheck.title}
 
 ## When you are ready
 
-Choose {{ui:editor.export}} and then **STL** or **3MF**. STL is the simplest format. 3MF keeps names and colours of the individual bodies and is therefore handy when you print in several colours. The export window also shows how many grams and metres of filament the part would take printed solid. More in [Files and saving](chapter:files-and-saving).
+Click {{ui:editor.export}} and choose **STL** or **3MF**. STL is the simplest format. 3MF keeps names and colours of the individual bodies and is therefore handy when you print in several colours. The full export panel ({{ui:exportWindow.moreFormats}}) also shows how many grams and metres of filament the part would take printed solid. More in [Files and saving](chapter:files-and-saving).

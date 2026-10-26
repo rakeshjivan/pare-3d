@@ -64,16 +64,16 @@ import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
 import { SaveStatus } from "./SaveStatus";
 import { CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
-import { Brush, Grip, MessageSquareText, Printer } from "lucide-react";
+import { Brush, ChevronDown, Grip, MessageSquareText, Printer } from "lucide-react";
 import { PareBuildBadge } from "./PareVersionStatus";
 import { Signature } from "lucide-react";
 import { CommandPalette, type PaletteCommand } from "./workplane/CommandPalette";
 import { COMMAND_KEYWORDS, SHAPE_KEYWORDS } from "@/lib/commandKeywords";
-import { BambuSendButton } from "@/components/BambuSendButton";
-import { readBambuFormat, readSlicer, SEND_TO_BAMBU_EVENT, slicerName } from "@/lib/bambuSend";
+import { ExportButton } from "@/components/ExportButton";
+import { OPEN_EXPORT_WINDOW_EVENT, readBambuFormat, readSlicer, SEND_TO_BAMBU_EVENT, slicerName } from "@/lib/bambuSend";
 import { ForkDraftIcon, ForkToothIcon } from "./forkToolbarIcons";
 import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon } from "@/components/forkToolbarIcons";
-import { Import, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, Type, Upload, Variable } from "lucide-react";
+import { Import, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, Type, Variable } from "lucide-react";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { SimpleModeSwitch } from "@/components/SimpleModeSwitch";
 import { libraryShapeAssets, shapeAssetColor, shapeAssetLabel, shapeAssetMenuLabel } from "@/lib/shapeCatalog";
@@ -226,6 +226,9 @@ export const SKETCH_PALETTE_ICONS = {
   refine: sketchPaletteIcon("refine"),
   erase: sketchPaletteIcon("erase"),
 };
+
+/** Build 71: the groups folded first when the toolbar would wrap - the least used first. */
+const FOLD_ORDER = ["arrange", "mesh", "combine", "clipboard", "history"] as const;
 
 export function SecondaryToolbar({
   toolbarMode,
@@ -596,6 +599,35 @@ export function SecondaryToolbar({
     window.addEventListener("pointerdown", onDown);
     return () => window.removeEventListener("pointerdown", onDown);
   }, [modifyMoreOpen]);
+  // Build 71: when the groups would wrap onto a second row (a 13-inch laptop), the least used ones fold
+  // into one button each, with their tools in a drop-down - the row stays one row, the plate stays tall.
+  const [foldedGroups, setFoldedGroups] = useState<string[]>([]);
+  const [openFold, setOpenFold] = useState<string | null>(null);
+  useEffect(() => {
+    if (!openFold) return;
+    const onDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (!target?.closest?.(`[data-fold="${openFold}"]`)) setOpenFold(null);
+    };
+    window.addEventListener("pointerdown", onDown);
+    return () => window.removeEventListener("pointerdown", onDown);
+  }, [openFold]);
+  useEffect(() => {
+    const reset = () => setFoldedGroups([]);
+    window.addEventListener("resize", reset);
+    return () => window.removeEventListener("resize", reset);
+  }, []);
+  useLayoutEffect(() => {
+    const content = toolbarContentRef.current;
+    if (!content || toolbarMode !== "geometry") return;
+    const sections = [...content.querySelectorAll<HTMLElement>(".toolbar-section")];
+    if (sections.length < 2) return;
+    const first = sections[0].getBoundingClientRect().top;
+    const wraps = sections.some((section) => section.getBoundingClientRect().top > first + 12);
+    if (!wraps) return;
+    const next = FOLD_ORDER.find((group) => !foldedGroups.includes(group));
+    if (next) setFoldedGroups((current) => (current.includes(next) ? current : [...current, next]));
+  });
   const [visibilityMenuPosition, setVisibilityMenuPosition] = useState({ top: 0, left: 0 });
   const shapesMenuRef = useRef<HTMLDivElement>(null);
   const visibilityMenuRef = useRef<HTMLDivElement>(null);
@@ -859,6 +891,65 @@ export function SecondaryToolbar({
     { id: "sketch-duplicate", label: t("editor.tool.duplicate"), icon: ToolbarDuplicateIcon, action: onSketchDuplicate, enabled: sketchHasSelection },
     { id: "sketch-delete", label: t("editor.tool.delete"), icon: ToolbarTrashIcon, action: onSketchDelete, enabled: sketchHasSelection },
   ];
+  type FoldTool = { id: string; label: string; icon: ComponentType<{ width?: number; height?: number }>; action: () => void; enabled: boolean; active?: boolean };
+  /** A toolbar group: its buttons, or - folded - one button that opens them as a list. */
+  const renderGroup = (group: string, label: string, tools: readonly FoldTool[], render: () => ReactNode, extraClass = "", inert?: boolean) => {
+    if (!foldedGroups.includes(group)) {
+      return (
+        <div className={`toolbar-section ${extraClass}`} data-group={group} inert={inert}>
+          <div className="toolbar-section-label">{label}</div>
+          <div className="toolbar-section-tools">{render()}</div>
+        </div>
+      );
+    }
+    const FirstIcon = (FORK_TOOL_ICONS[tools[0]?.id ?? ""] ?? tools[0]?.icon ?? MoreHorizontal) as ComponentType<{ width?: number; height?: number }>;
+    const active = tools.some((tool) => tool.active);
+    return (
+      <div className={`toolbar-section toolbar-folded-section ${extraClass}`} data-group={group} data-fold={group} inert={inert}>
+        <div className="toolbar-section-label">{label}</div>
+        <div className="toolbar-section-tools">
+          <button
+            className={`toolbar-icon toolbar-more-trigger ${openFold === group || active ? "active" : ""}`}
+            type="button"
+            data-layerling-tool={`fold-${group}`}
+            aria-label={t("editor.foldedGroup", { group: label })}
+            data-tip={t("editor.foldedGroup", { group: label })}
+            aria-haspopup="menu"
+            aria-expanded={openFold === group}
+            onClick={() => setOpenFold((current) => (current === group ? null : group))}
+          >
+            <FirstIcon />
+            <ChevronDown className="toolbar-fold-chevron" width={12} height={12} />
+            <span className="tool-label" aria-hidden="true">{label}</span>
+          </button>
+        </div>
+        {openFold === group ? (
+          <div className="visibility-dropdown mesh-dropdown toolbar-fold-menu" role="menu" aria-label={label}>
+            {tools.map((tool) => {
+              const Icon = (FORK_TOOL_ICONS[tool.id] ?? tool.icon) as ComponentType<{ width?: number; height?: number }>;
+              return (
+                <button
+                  key={tool.id}
+                  className={`visibility-dropdown-action ${tool.active ? "active" : ""}`}
+                  type="button"
+                  role="menuitem"
+                  data-layerling-tool={tool.id}
+                  disabled={!tool.enabled}
+                  onClick={() => {
+                    setOpenFold(null);
+                    tool.action();
+                  }}
+                >
+                  <Icon width={18} height={18} />
+                  <span>{tool.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
   const renderToolButton = (tool: (typeof leftTools)[number] | (typeof visibilityTools)[number] | (typeof combineTools)[number] | (typeof modifyTools)[number] | (typeof arrangeTools)[number] | (typeof makeTools)[number] | (typeof meshTools)[number] | (typeof dentalTools)[number]) => {
     const { id, action, label } = tool;
     // Fork: Pare 3D's own icon where there is one, and a short name under it.
@@ -1010,7 +1101,7 @@ export function SecondaryToolbar({
       ...arrangeTools.map((tool) => fromTool(tool, t("editor.group.arrange"))),
       plain("note", t("editor.tool.note"), manageGroup, true, onNoteTool, { icon: ToolbarNoteIcon, active: noteMode }),
       plain("import", t("editor.import"), manageGroup, true, () => onTopPanel("import"), { icon: ToolbarImportIcon }),
-      plain("export", t("editor.export"), manageGroup, true, () => onTopPanel("export"), { icon: ToolbarVectorExportIcon }),
+      plain("export", t("editor.export"), manageGroup, true, () => window.dispatchEvent(new Event(OPEN_EXPORT_WINDOW_EVENT)), { icon: ToolbarVectorExportIcon }),
       plain("print-check", t("printCheck.command"), manageGroup, true, () => window.dispatchEvent(new Event(PRINT_CHECK_EVENT))),
       plain("split-to-fit", t("splitToFit.command"), manageGroup, true, () => window.dispatchEvent(new Event(SPLIT_TO_FIT_EVENT))),
       plain("cut-below-bed", t("cutBelowBed.command"), manageGroup, true, () => window.dispatchEvent(new Event(CUT_BELOW_BED_EVENT))),
@@ -1060,14 +1151,8 @@ export function SecondaryToolbar({
         </div>
       ) : null}
       <div className="tool-group left">
-        <div className="toolbar-section" data-group="clipboard" inert={historyViewActive}>
-          <div className="toolbar-section-label">{t("editor.group.clipboard")}</div>
-          <div className="toolbar-section-tools">{leftTools.slice(0, 4).map(renderToolButton)}</div>
-        </div>
-        <div className="toolbar-section" data-group="history">
-          <div className="toolbar-section-label">{t("editor.group.history")}</div>
-          <div className="toolbar-section-tools">{leftTools.slice(4).map(renderToolButton)}</div>
-        </div>
+        {renderGroup("clipboard", t("editor.group.clipboard"), leftTools.slice(0, 4), () => leftTools.slice(0, 4).map(renderToolButton), "", historyViewActive)}
+        {renderGroup("history", t("editor.group.history"), leftTools.slice(4), () => leftTools.slice(4).map(renderToolButton))}
         <div className="toolbar-section toolbar-shapes-section" data-group="shapes" ref={shapesMenuRef} inert={historyViewActive}>
           <div className="toolbar-section-label">{t("editor.group.shapes")}</div>
           <div className="toolbar-section-tools">
@@ -1283,10 +1368,7 @@ export function SecondaryToolbar({
             </div>
           ) : null}
         </div>
-        <div className="toolbar-section" data-group="combine">
-          <div className="toolbar-section-label">{t("editor.group.combine")}</div>
-          <div className="toolbar-section-tools">{combineTools.map(renderToolButton)}</div>
-        </div>
+        {renderGroup("combine", t("editor.group.combine"), combineTools, () => combineTools.map(renderToolButton))}
         <div className="toolbar-section toolbar-overflow-section" data-group="modify" ref={modifyMoreRef}>
           <div className="toolbar-section-label">{t("editor.group.modify")}</div>
           <div className="toolbar-section-tools">
@@ -1333,14 +1415,8 @@ export function SecondaryToolbar({
         </div>
         {/* Fork (build 53): the mesh tools sit on the toolbar as their own buttons, not in a menu.
             They wait for an imported mesh to be selected. */}
-        <div className="toolbar-section toolbar-mesh-section" data-group="mesh">
-          <div className="toolbar-section-label">{t("editor.group.mesh")}</div>
-          <div className="toolbar-section-tools">{meshTools.map(renderToolButton)}</div>
-        </div>
-        <div className="toolbar-section" data-group="arrange">
-          <div className="toolbar-section-label">{t("editor.group.arrange")}</div>
-          <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>
-        </div>
+        {renderGroup("mesh", t("editor.group.mesh"), meshTools, () => meshTools.map(renderToolButton), "toolbar-mesh-section")}
+        {renderGroup("arrange", t("editor.group.arrange"), arrangeTools, () => arrangeTools.map(renderToolButton))}
         <div className="toolbar-section" data-group="make">
           <div className="toolbar-section-label">{t("editor.group.make")}</div>
           <div className="toolbar-section-tools">{makeTools.map(renderToolButton)}</div>
@@ -1673,7 +1749,7 @@ export function SecondaryToolbar({
           {/* Fork: Manage and Help sit in the title row, in line, so the tools stay on one row. */}
           {toolbarMode === "geometry" ? (
             <div className="title-row-tools">
-              <BambuSendButton />
+              <ExportButton />
             <div className="toolbar-section toolbar-actions-section" data-group="manage">
               <div className="toolbar-section-label">{t("editor.group.manage")}</div>
               <div className="action-buttons">
@@ -1691,9 +1767,7 @@ export function SecondaryToolbar({
                 <button className="action-icon-button" aria-label={t("editor.import")} title={`${t("editor.import")} (${COMMAND_SHORTCUTS.import})`} data-tip={topTip(t("editor.import"), "bring in STL, 3MF, STEP, SVG or images", COMMAND_SHORTCUTS.import)} onClick={() => onTopPanel("import")} disabled={historyViewActive}>
                   <Import className="title-icon" aria-hidden="true" />
                 </button>
-                <button className="action-icon-button" aria-label={t("editor.export")} title={`${t("editor.export")} (${COMMAND_SHORTCUTS.export})`} data-tip={topTip(t("editor.export"), "save for printing (STL, 3MF) or as a design file", COMMAND_SHORTCUTS.export)} onClick={() => onTopPanel("export")}>
-                  <Upload className="title-icon" aria-hidden="true" />
-                </button>
+                {/* Build 71: Export is the blue button beside these. */}
                 {/* Fork (build 37): the design's named values. */}
                 <button className="action-icon-button" aria-label={t("parameters.title")} title={t("parameters.title")} data-layerling-tool="parameters" data-tip={topTip(t("parameters.title"), "named sizes any field can use - change one, every part follows")} onClick={() => window.dispatchEvent(new Event(OPEN_PARAMETERS_EVENT))} disabled={historyViewActive}>
                   <Variable className="title-icon" aria-hidden="true" />

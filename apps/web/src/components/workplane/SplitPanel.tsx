@@ -365,6 +365,8 @@ const CONNECTOR_TYPES = [
   { type: "none", label: "connectors.none", hint: "connectors.noneHint" },
   { type: "plug", label: "connectors.plug", hint: "connectors.plugHint" },
   { type: "dowel", label: "connectors.dowel", hint: "connectors.dowelHint" },
+  // Build 71: holds without glue - the halves slide together from the side.
+  { type: "dovetail", label: "connectors.dovetail", hint: "connectors.dovetailHint" },
 ] as const satisfies ReadonlyArray<{ type: CutConnectorType; label: string; hint: string }>;
 
 const CONNECTOR_FITS = [
@@ -412,17 +414,17 @@ function CutConnectorControls({
       </div>
       {value.type !== "none" ? (
         <>
-          <p className="split-connector-hint">{t(value.type === "plug" ? "connectors.plugHint" : "connectors.dowelHint")}</p>
+          <p className="split-connector-hint">{t(value.type === "plug" ? "connectors.plugHint" : value.type === "dovetail" ? "connectors.dovetailHint" : "connectors.dowelHint")}</p>
           <div className="split-connector-fields">
             <ConnectorNumber
-              label={t("connectors.size")}
+              label={t(value.type === "dovetail" ? "connectors.keyWidth" : "connectors.size")}
               value={value.diameter}
               min={CUT_CONNECTOR_LIMITS.minDiameter}
               max={CUT_CONNECTOR_LIMITS.maxDiameter}
               onChange={(diameter) => set({ diameter })}
             />
             <ConnectorNumber
-              label={t(value.type === "plug" ? "connectors.pegLength" : "connectors.socketDepth")}
+              label={t(value.type === "plug" ? "connectors.pegLength" : value.type === "dovetail" ? "connectors.keyDepth" : "connectors.socketDepth")}
               value={value.depth}
               min={CUT_CONNECTOR_LIMITS.minDepth}
               max={CUT_CONNECTOR_LIMITS.maxDepth}
@@ -487,10 +489,10 @@ function CutConnectorControls({
             </div>
           </div>
           ) : null}
-          {value.type === "plug" ? (
+          {value.type === "plug" || value.type === "dovetail" ? (
             <label className="split-connector-flip">
               <input type="checkbox" checked={value.flip} onChange={(event) => set({ flip: event.currentTarget.checked })} />
-              {t("connectors.flip")}
+              {t(value.type === "dovetail" ? "connectors.flipKey" : "connectors.flip")}
             </label>
           ) : null}
           <p className={`split-connector-status ${(tooSmall && !count) || invalid ? "warning" : ""}`} role="status">
@@ -503,7 +505,7 @@ function CutConnectorControls({
               : tooSmall && !count
                 ? t("connectors.tooSmallPreview")
                 : count
-                  ? t(value.type === "plug" ? "connectors.previewPlugs" : "connectors.previewDowels", { count })
+                  ? t(value.type === "plug" ? "connectors.previewPlugs" : value.type === "dovetail" ? "connectors.previewDovetails" : "connectors.previewDowels", { count })
                   : t("connectors.working")}
           </p>
         </>

@@ -2926,6 +2926,14 @@ export default function Home() {
                 if (activeProjectId) renameProject(activeProjectId, name);
               }}
               onCreateProjectFromState={createProjectFromHistoryState}
+              onNewDentalDesign={() => {
+                try {
+                  window.sessionStorage.setItem(OPEN_DENTAL_STUDIO_KEY, "1");
+                } catch {
+                  // The new design then opens without Dental Studio.
+                }
+                createAndOpenProject();
+              }}
               projectId={activeProjectId}
               projectName={activeProject?.name}
               projectCreatedAt={activeProject?.createdAt}

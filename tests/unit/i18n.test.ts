@@ -84,7 +84,7 @@ describe("message catalogues", () => {
 
 describe("translation", () => {
   it("fills placeholders", () => {
-    expect(translate("en", "dashboard.projectsVisibleMany", { count: 3 })).toBe("3 in this browser");
+    expect(translate("en", "dashboard.projectsVisibleMany", { count: 3 })).toBe("3 on this computer");
     expect(translate("de", "dashboard.projectsVisibleMany", { count: 3 })).toBe("3 in diesem Browser");
   });
 

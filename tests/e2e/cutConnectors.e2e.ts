@@ -49,6 +49,26 @@ describe("cut connectors", () => {
     expect(plug.negative.width).toBeCloseTo(35, 1);
   });
 
+  it("dovetail (build 71): a key on the - half, a slot right across the + half, and they do not overlap", async () => {
+    const plain = await split();
+    const tail = await split({ type: "dovetail", diameter: 6, depth: 5, clearance: 0.2 });
+    expect(tail.outcome.status === "done" && tail.outcome.connectorCount).toBe(1);
+    // A trapezoid 6 mm at the face, 6 + 2·5·tan 15° at the far end, 5 deep, across the 20 mm face.
+    const far = 6 + 2 * 5 * Math.tan((15 * Math.PI) / 180);
+    const key = ((6 + far) / 2) * 5 * 20;
+    const added = tail.vn - plain.vn;
+    expect(added).toBeGreaterThan(key * 0.97);
+    expect(added).toBeLessThan(key * 1.03);
+    // The slot is a little wider and deeper than the key, so the halves slide together with room.
+    const removed = plain.vp - tail.vp;
+    expect(removed).toBeGreaterThan(added);
+    expect(removed).toBeLessThan(added * 1.25);
+    expect(tail.negative.width).toBeCloseTo(35, 1);
+    // Together they fill no more than the two apart: the key sits in the slot, not in the + half.
+    const together = (await exportSolidVolume([tail.positive, tail.negative])).volumeMm3;
+    expect(together).toBeCloseTo(tail.vp + tail.vn, 0);
+  });
+
   it("plug flipped: the peg moves to the + half", async () => {
     const plain = await split();
     const plug = await split({ type: "plug", diameter: 6, depth: 5, flip: true });

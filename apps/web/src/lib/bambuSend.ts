@@ -5,6 +5,7 @@
  * so the file is downloaded instead and the message says so.
  */
 import { t } from "@/lib/i18n";
+import { cachedFileSettings, friendlyFolder } from "@/lib/pareFiles";
 
 export type BambuSendFormat = "stl" | "3mf";
 
@@ -88,9 +89,10 @@ export async function sendToBambuStudio(fileName: string, blob: Blob, download: 
   return sendToSlicer(readSlicer(), fileName, blob, download);
 }
 
-export async function sendToSlicer(slicer: SlicerId, fileName: string, blob: Blob, download: (name: string, blob: Blob) => Promise<void>): Promise<string> {
+export async function sendToSlicer(slicer: SlicerId, fileName: string, blob: Blob, download: (name: string, blob: Blob) => Promise<void>, options: { save?: boolean } = {}): Promise<string> {
   const app = slicerName(slicer);
-  let response = await post(`/__send-to-slicer?app=${slicer}&name=${encodeURIComponent(fileName)}`, blob);
+  // Build 71: from the Export window the file is kept in the export folder and opened from there.
+  let response = await post(`/__send-to-slicer?app=${slicer}&name=${encodeURIComponent(fileName)}${options.save ? "&save=1" : ""}`, blob);
   // An app installed before build 70 has only the Bambu route.
   let olderApp = false;
   if (response && response.status === 404) {
@@ -98,7 +100,11 @@ export async function sendToSlicer(slicer: SlicerId, fileName: string, blob: Blo
     response = slicer === "bambu" ? await post(`/__send-to-bambu?name=${encodeURIComponent(fileName)}`, blob) : null;
   }
   if (response && response.ok) {
-    const result = (await response.json().catch(() => null)) as { opened?: boolean; path?: string; error?: string } | null;
+    const result = (await response.json().catch(() => null)) as { opened?: boolean; path?: string; folder?: string; name?: string; error?: string } | null;
+    if (options.save && result?.path && result.folder && result.name) {
+      const folder = friendlyFolder(result.folder, cachedFileSettings()?.home ?? "");
+      return t(result.opened ? "slicer.savedAndSent" : "slicer.savedOnly", { app, name: result.name, folder });
+    }
     if (result?.opened) return t("slicer.sent", { app, name: fileName });
     if (result?.path) return t("slicer.savedNotOpened", { app, name: fileName });
   }
@@ -106,3 +112,32 @@ export async function sendToSlicer(slicer: SlicerId, fileName: string, blob: Blo
   if (olderApp) return t("slicer.olderApp", { app, name: fileName });
   return t("slicer.downloaded", { app, name: fileName });
 }
+
+/** Build 71: the Export window's default - a slicer to open the file in, or none (just save it). */
+export const EXPORT_TARGET_STORAGE_KEY = "pare3d.exportTarget";
+export type ExportTarget = SlicerId | "none";
+
+export function readExportTarget(): ExportTarget {
+  try {
+    const stored = window.localStorage.getItem(EXPORT_TARGET_STORAGE_KEY);
+    if (stored === "none" || SLICERS.some((slicer) => slicer.id === stored)) return stored as ExportTarget;
+    // Before build 71 the Send button's slicer was the only choice there was.
+    return window.localStorage.getItem(SLICER_STORAGE_KEY) ? readSlicer() : "none";
+  } catch {
+    return "none";
+  }
+}
+
+export function storeExportTarget(target: ExportTarget) {
+  try {
+    window.localStorage.setItem(EXPORT_TARGET_STORAGE_KEY, target);
+    if (target !== "none") window.localStorage.setItem(SLICER_STORAGE_KEY, target);
+  } catch {
+    // The choice still holds for this visit.
+  }
+  window.dispatchEvent(new Event(EXPORT_TARGET_EVENT));
+}
+export const EXPORT_TARGET_EVENT = "pare3d:export-target";
+
+/** Build 71: the Export window opens on this. */
+export const OPEN_EXPORT_WINDOW_EVENT = "pare3d:open-export-window";

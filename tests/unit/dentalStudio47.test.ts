@@ -1,6 +1,6 @@
 import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
 import { beforeAll, describe, expect, it } from "vitest";
-import { analyseDental, looksLikeDentalScan, makeDentalArchPart, makeDentalStudio, pinchedEdges, type DentalStudioOptions } from "@/lib/dentalModel";
+import { analyseDental, looksLikeDentalScan, makeDentalArchPart, labelledOptions, makeDentalStudio, pinchedEdges, type DentalStudioOptions } from "@/lib/dentalModel";
 import { closeToFloor, orthoOutline } from "@/lib/dentalBase";
 import { labelSection, labelText } from "@/lib/dentalLabel";
 import { weld } from "@/lib/dentalMesh";
@@ -134,6 +134,21 @@ describe("Dental Studio (build 47)", () => {
     expect(labelled.parts[0].volume).toBeLessThan(plain.parts[0].volume - 1);
     expect(labelled.parts[0].volume).toBeGreaterThan(plain.parts[0].volume - 60);
   }, 60_000);
+
+  it("engraves a label on the Study preset by closing its open floor (build 71)", async () => {
+    const input = { arches: [{ id: "a", positions: syntheticArch({ teethDown: true }) }] };
+    const study = { ...base, baseStyle: "clean" as const, inside: "open" as const };
+    expect(labelledOptions({ ...study, label: "" }).inside).toBe("open");
+    expect(labelledOptions({ ...study, label: "J 12" }).inside).toBe("closed");
+    expect(labelledOptions({ ...study, baseStyle: "ortho", label: "J 12" }).inside).toBe("open");
+    const plain = await makeDentalStudio(input, { ...study, inside: "closed" }, runtime as never);
+    const labelled = await makeDentalStudio(input, { ...study, label: "J 12" }, runtime as never);
+    expect(labelled.warnings).not.toContain("label");
+    expect(closedVolume(runtime, labelled.parts[0].positions).status).toBe("NoError");
+    expect(labelled.parts[0].volume).toBeLessThan(plain.parts[0].volume - 0.5);
+    const follow = await makeDentalStudio(input, { ...base, inside: "closed", label: "J 12" }, runtime as never);
+    expect(follow.warnings).not.toContain("label");
+  }, 90_000);
 
   it("draws the orthodontic outlines: square back, pointed upper front, rounded lower front", () => {
     const teeth: Array<[number, number]> = [];
@@ -481,28 +496,81 @@ describe("Build 60: protrusion path, incisal pin and guide table, opening check"
     [plain.upper, plain.lower, path.upper, path.lower].forEach((s) => s.delete());
   });
 
-  it("raises the incisal pin and slopes the guide table up towards the back", async () => {
+  it("opens the bite on a raised pin by turning the upper about the hinge axle, not lifting it (build 71)", async () => {
     const { hingeParts } = await import("@/lib/dentalBase");
-    const raised = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { x: 0, upperY: -30, lowerY: -30 }, { pinRaise: 2 });
-    const guide = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { x: 0, upperY: -30, lowerY: -30 }, { table: "guide" });
-    const top = (solid: typeof raised.lower, y: number) => {
+    const front = { x: 0, upperY: -30, lowerY: -30 };
+    const flat = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, front, { pinRaise: 3 });
+    const guide = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, front, { pinRaise: 3, table: "guide" });
+    const closed = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, front, {});
+    // The rest angle: the raise over the pin's distance in front of the axle (the pin is 6 mm ahead of the teeth).
+    expect(flat.rest).toBeCloseTo((Math.atan2(3, flat.axleY + 36) * 180) / Math.PI, 6);
+    expect(closed.rest).toBe(0);
+    const overlapAt = (parts: typeof flat, degrees: number) => {
+      const turned = parts.upper.translate([0, -parts.axleY, 0]).rotate([-degrees, 0, 0]).translate([0, parts.axleY, 0]);
+      const both = runtime.Manifold.intersection(turned, parts.lower);
+      const volume = both.volume();
+      both.delete();
+      turned.delete();
+      return volume;
+    };
+    for (const parts of [flat, guide]) {
+      // In the scanned bite the pin runs into the table: it cannot close that far ...
+      expect(overlapAt(parts, 0)).toBeGreaterThan(1);
+      expect(overlapAt(parts, parts.rest - 0.5)).toBeGreaterThan(0.01);
+      // ... and turned up to its rest angle the pin just stands on the table, clear of it beyond.
+      expect(overlapAt(parts, parts.rest + 0.05)).toBeLessThan(0.01);
+      expect(overlapAt(parts, parts.rest + 5)).toBeLessThan(0.01);
+    }
+    // With no raise the halves close on the scanned bite as before.
+    expect(overlapAt(closed, 0)).toBeLessThan(0.01);
+    // The table stays at the occlusal plane; the guide still rises towards the back.
+    const top = (solid: typeof flat.lower, y: number) => {
       const piece = runtime.Manifold.intersection(solid, runtime.Manifold.cube([2, 0.4, 60]).translate([-1, y - 0.2, -30]));
       const b = piece.boundingBox();
       piece.delete();
       return b;
     };
-    // The pin meets the table 2 mm up.
-    expect(top(raised.lower, -35).max[2]).toBeCloseTo(2, 4);
-    expect(top(raised.upper, -35).min[2]).toBeCloseTo(2, 4);
-    // The table: level with the bite at its front edge, 30 degrees up towards the back.
-    expect(top(guide.lower, -37.8).max[2]).toBeLessThan(0.5);
-    expect(top(guide.lower, -33.4).max[2]).toBeGreaterThan(2);
-    // The pin touches only at its front edge: clear of the table everywhere behind it.
-    const overlap = runtime.Manifold.intersection(guide.upper, guide.lower);
-    expect(overlap.volume()).toBeLessThan(0.01);
-    overlap.delete();
-    [raised.upper, raised.lower, guide.upper, guide.lower].forEach((s) => s.delete());
+    expect(top(flat.lower, -36).max[2]).toBeCloseTo(0, 4);
+    expect(top(guide.lower, -34).max[2]).toBeGreaterThan(1.5);
+    [flat, guide, closed].forEach((parts) => { parts.upper.delete(); parts.lower.delete(); });
   });
+
+  it("stands the upper open on its raised pin in occlusion, more at the front than at the back (build 71)", async () => {
+    const upper = syntheticArch({ teethDown: true, front: -2 });
+    const lower = syntheticArch();
+    for (let i = 2; i < lower.length; i += 3) lower[i] -= 26.6;
+    const inputOf = () => ({ arches: [{ id: "x", positions: Float32Array.from(lower) }, { id: "y", positions: Float32Array.from(upper) }] });
+    const options = { ...base, hinge: true, layout: "occlusion" as const, incisalStop: true };
+    const shut = await makeDentalStudio(inputOf(), options, runtime as never);
+    const open = await makeDentalStudio(inputOf(), { ...options, pinRaise: 3 }, runtime as never);
+    expect(shut.held).toBeUndefined();
+    expect(open.held?.pin).toBe(3);
+    // At the teeth less than at the pin, and less at the back than at the front: a turn, not a lift.
+    expect(open.held!.front).toBeGreaterThan(1.5);
+    expect(open.held!.front).toBeLessThan(3);
+    expect(open.held!.back).toBeGreaterThan(0.2);
+    expect(open.held!.back).toBeLessThan(open.held!.front - 0.5);
+    // The made upper itself stands turned: its front comes up by more than its back.
+    const upperOf = (result: typeof open) => result.parts.find((part) => part.role === "upper")!.positions;
+    // Away from the midline, where the incisal pin stands (its tip rests on the table and does not rise).
+    const lowestNear = (p: Float32Array, pick: (y: number) => boolean) => {
+      let least = Infinity;
+      for (let i = 0; i < p.length; i += 3) if (pick(p[i + 1]) && Math.abs(p[i]) > 6) least = Math.min(least, p[i + 2]);
+      return least;
+    };
+    const ys = (p: Float32Array) => { let a = Infinity, b = -Infinity; for (let i = 1; i < p.length; i += 3) { a = Math.min(a, p[i]); b = Math.max(b, p[i]); } return [a, b]; };
+    const [minY, maxY] = ys(upperOf(shut));
+    const span = maxY - minY;
+    const frontRise = lowestNear(upperOf(open), (y) => y < minY + span * 0.25) - lowestNear(upperOf(shut), (y) => y < minY + span * 0.25);
+    const backRise = lowestNear(upperOf(open), (y) => y > maxY - span * 0.25) - lowestNear(upperOf(shut), (y) => y > maxY - span * 0.25);
+    // (The back quarter holds the hinge, which turns down behind the axle; the teeth are in front of it.)
+    expect(frontRise).toBeGreaterThan(backRise + 0.5);
+    expect(Math.abs(frontRise - open.held!.front)).toBeLessThan(1);
+    // The lower does not move.
+    const lowerOf = (result: typeof open) => result.parts.find((part) => part.role === "lower")!;
+    expect(Math.abs(lowerOf(open).volume - lowerOf(shut).volume)).toBeLessThan(5);
+    expect(open.warnings).not.toContain("opening");
+  }, 120_000);
 
   it("finds how far the hinge opens before the parts meet", async () => {
     const { hingeParts, hingeOpening } = await import("@/lib/dentalBase");

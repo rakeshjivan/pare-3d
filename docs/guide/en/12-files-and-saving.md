@@ -24,7 +24,7 @@ In the app, **Settings › Files** decides where Pare 3D saves on this computer:
 - **{{ui:files.exportsTitle}}:** the folder every export goes to. {{ui:files.change}} picks another, {{ui:files.show}} opens it, {{ui:files.useDownloads}} goes back to the Downloads folder. Switch on {{ui:files.askEachTime}} to choose the folder and name every time instead.
 - **{{ui:files.backupsTitle}}:** the folder the automatic backups go to.
 
-After an export, a small note says where the file went, with {{ui:files.showInFolder}} to open the folder. "Send to" a slicer keeps its own copy in Documents › Pare 3D Exports. In a web browser, exports and backups go to the browser's download folder instead.
+After an export, a small note says where the file went, with {{ui:files.showInFolder}} to open the folder. A file opened in a slicer from the {{ui:editor.export}} window is saved in this folder too. In a web browser, exports and backups go to the browser's download folder instead.
 
 ## Folders for your designs
 
@@ -47,7 +47,7 @@ You back up a single design in the editor: {{ui:editor.export}}, choose the form
 
 ## Exporting
 
-Click {{ui:editor.export}} or press [[Ctrl]]+[[E]].
+Click the blue {{ui:editor.export}} button or press [[Ctrl]]+[[E]]: the window for printing - slicer, 3MF or STL, name and folder - is described in [Printing](chapter:printing). For every other format, click **{{ui:exportWindow.moreFormats}}** in it to open the full export panel.
 
 ![The export window with the formats STL, 3MF, OBJ, STEP, SVG, DXF, PNG, LYL and 2D.](shot:export-panel)
 
@@ -143,7 +143,7 @@ For a part built in Pare 3D, the fillet tool gives exact, smoother results - use
 
 - Pick a brush and drag over the part: {{ui:sculpt.tool.smooth}} evens out bumps and spikes, {{ui:sculpt.tool.flatten}} pulls the surface onto a flat plane, {{ui:sculpt.tool.inflate}} pushes it out and {{ui:sculpt.tool.deflate}} pushes it in. {{ui:sculpt.size}} is the brush on the screen; {{ui:sculpt.strength}} is how much one stroke moves.
 - Only the surface you can see is touched, not what is hidden behind it. Drag with the right or middle mouse button to turn the view between strokes; [[Ctrl]]+[[Z]] takes strokes back one at a time. The full-detail mesh changes as you stroke; the part itself is rebuilt once, when you press {{ui:sculpt.done}} (or pick another part or tool), and the strokes become one step of undo.
-- {{ui:sculpt.tool.select}} paints triangles orange and {{ui:sculpt.tool.unselect}} takes them off. The selected area can be deleted (to cut away a part of a scan), smoothed or flattened as a whole, grown by a ring, or inverted.
+- {{ui:sculpt.tool.select}} paints triangles orange and {{ui:sculpt.tool.unselect}} takes them off. {{ui:sculpt.reach}} chooses what the brush reaches, as in Meshmixer: {{ui:sculpt.reach.front}} (only what is in front), {{ui:sculpt.reach.back}} (the side facing away from you, at any depth - the underside of a scan) or {{ui:sculpt.reach.through}} (every layer under the brush). The selected area can be deleted (to cut away a part of a scan), smoothed or flattened as a whole, grown by a ring, or inverted.
 
 ## Surface textures
 

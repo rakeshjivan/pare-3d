@@ -77,7 +77,7 @@ export type DentalStudioOptions = {
   bevel?: boolean;
   /** Build 60: the protrusion path, degrees (HINGE_CONDYLE_ANGLES); 0 or left out for a plain hinge. */
   condyle?: number;
-  /** Build 60: the incisal pin raised this much, mm (INCISAL_PIN_RAISES); 0 when left out. */
+  /** Build 60: the incisal pin raised this much, mm, at the pin (build 71: 0 to INCISAL_PIN_MAX); 0 when left out. */
   pinRaise?: number;
   /** Build 60: a flat incisal table, or one sloped as a guide; flat when left out. */
   incisalTable?: "flat" | "guide";
@@ -108,7 +108,7 @@ const SMOOTH_ROUNDS: Record<DentalSmooth, number> = { off: 0, low: 3, high: 10 }
 
 export type DentalPart = { id: string; role: DentalRole; positions: Float32Array; height: number; volume: number };
 /** `surface`: per part, the share of the scan's surface kept above each depth (mm below the occlusal plane). */
-export type DentalStudioResult = { parts: DentalPart[]; worn: number; keptDepth: number[]; voxel: number | null; warnings: string[]; surface: Array<Record<number, number>>; /** Build 60: how far the printed articulator opens, degrees. */ opening?: number; /** Build 65: the solid pieces each part is made of - 1 when it holds together. */ pieces?: number[] };
+export type DentalStudioResult = { parts: DentalPart[]; worn: number; keptDepth: number[]; voxel: number | null; warnings: string[]; surface: Array<Record<number, number>>; /** Build 60: how far the printed articulator opens, degrees. */ opening?: number; /** Build 65: the solid pieces each part is made of - 1 when it holds together. */ pieces?: number[]; /** Build 71: a raised pin holds the bite open this much, mm: at the pin, the front teeth and the back teeth. */ held?: { pin: number; front: number; back: number } };
 
 /** Whether a mesh looks like a raw scan: an open surface with one long open edge. */
 export function looksLikeDentalScan(positions: ArrayLike<number>): boolean {
@@ -552,7 +552,7 @@ function buildArch(
       const origin = new THREE.Vector3((side.a[0] + side.b[0]) / 2, (side.a[1] + side.b[1]) / 2, floor + options.base / 2);
       if (height >= 1.5) solid = keepSolid(engrave(runtime, solid, text, height, origin, right, up, into));
       else warnings.push("label");
-    } else if ((options.baseStyle === "plate" || options.baseStyle === "clean") && options.inside !== "open") {
+    } else if ((options.baseStyle === "plate" || options.baseStyle === "clean" || options.baseStyle === "follow") && options.inside !== "open") {
       const hull = footprint[0];
       let cx = 0, cy = 0;
       hull.forEach(([x, y]) => { cx += x; cy += y; });
@@ -635,7 +635,19 @@ export async function makeDentalStudio(input: DentalStudioInput, options: Dental
   return (await studio(input, options, given, { remote }))!;
 }
 
-async function studio(input: DentalStudioInput, options: DentalStudioOptions, given: ManifoldRuntime | undefined, mode: { only?: number; take?: (part: DentalArchPart) => void; remote?: { index: number; part: Promise<DentalArchPart> } }): Promise<DentalStudioResult | null> {
+/**
+ * Build 71: a label typed for a base that is open underneath used to be left off (a label needs a
+ * floor). Now the floor is closed for it - hollow with vents - and the label goes under it; the
+ * orthodontic and articulator bases keep theirs on the side.
+ */
+export function labelledOptions(options: DentalStudioOptions): DentalStudioOptions {
+  if (!options.label.trim() || options.inside !== "open") return options;
+  if (options.baseStyle === "ortho" || options.baseStyle === "articulator") return options;
+  return { ...options, inside: "closed" };
+}
+
+async function studio(input: DentalStudioInput, given_options: DentalStudioOptions, given: ManifoldRuntime | undefined, mode: { only?: number; take?: (part: DentalArchPart) => void; remote?: { index: number; part: Promise<DentalArchPart> } }): Promise<DentalStudioResult | null> {
+  let options = labelledOptions(given_options);
   const prep = prepared(input);
   // Build 53: an approved tooth area, carried from the scan's triangles to the cleaned scan's corners.
   const areaOn = (id: string, mesh: Mesh): Uint8Array | undefined => {
@@ -703,6 +715,8 @@ async function studio(input: DentalStudioInput, options: DentalStudioOptions, gi
   const voxel = built.find(({ built: b }) => b.voxel !== null)?.built.voxel ?? null;
   const toFree: ManifoldSolid[] = [];
   let opening: number | undefined;
+  let rest: { degrees: number; axleY: number } | null = null;
+  let held: { pin: number; front: number; back: number } | undefined;
   let solids = built.map(({ arch, built: b }) => {
     if (!pair || arch.role === "lower") return b.solid;
     const moved = transformSolid(b.solid, FLIP);
@@ -764,7 +778,22 @@ async function studio(input: DentalStudioInput, options: DentalStudioOptions, gi
     toFree.push(parts.upper, parts.lower);
     // Build 60: how far it opens, the whole models turned on the axle.
     const upperIndex = built.findIndex(({ arch }) => arch.role === "upper");
-    opening = hingeOpening(runtime, solids[upperIndex], solids[1 - upperIndex], parts.axleY);
+    opening = hingeOpening(runtime, solids[upperIndex], solids[1 - upperIndex], parts.axleY, 90, parts.rest);
+    // Build 71: on a raised pin the upper rests turned open about the axle; how far the teeth part.
+    if (parts.rest > 0 && stop) {
+      rest = { degrees: parts.rest, axleY: parts.axleY };
+      const sin = Math.sin(parts.rest * Math.PI / 180);
+      // At the teeth: the incisal edges and the last molars' cusps - the upper's points within
+      // 1.5 mm of the occlusal plane, the furthest forward and (5 mm in) the furthest back.
+      let teethFront = Infinity, teethBack = -Infinity;
+      const upperArch = built.find(({ arch }) => arch.role === "upper")?.arch;
+      if (upperArch) {
+        teethFootprint(upperArch.clean.mesh, upperArch.frame, shared ? FLIP : new THREE.Matrix4(), 1.5).forEach(([, y]) => { teethFront = Math.min(teethFront, y); teethBack = Math.max(teethBack, y); });
+      }
+      if (!Number.isFinite(teethFront)) { teethFront = stop.upperY; teethBack = Math.max(...heelsOf("upper").map((heel) => heel.y)); }
+      const at = (y: number) => Math.round(Math.max(0, parts.axleY - y) * sin * 10) / 10;
+      held = { pin: options.pinRaise ?? 0, front: at(teethFront), back: at(teethBack - 5) };
+    }
     if (opening < 30) warnings.push("opening");
   }
   // Lay out: base down on the plate, the upper turned over beside the lower; or upper on lower.
@@ -785,6 +814,12 @@ async function studio(input: DentalStudioInput, options: DentalStudioOptions, gi
     if (loose > 1 && !warnings.includes("loose")) warnings.push("loose");
     // The model's own height, as built (the scan's highest point may have been trimmed away).
     const own = solid.boundingBox();
+    // Build 71: in occlusion, the upper stands open on its raised pin - turned about the axle, not lifted.
+    if (pair && options.layout !== "print" && rest && arch.role === "upper") {
+      const turned = solid.translate([0, -rest.axleY, 0]).rotate([-rest.degrees, 0, 0]).translate([0, rest.axleY, 0]);
+      toFree.push(solid);
+      solid = turned;
+    }
     if (!pair || options.layout === "print") {
       if (pair && arch.role === "upper") {
         const turned = transformSolid(solid, FLIP);
@@ -821,6 +856,7 @@ async function studio(input: DentalStudioInput, options: DentalStudioOptions, gi
     voxel,
     warnings,
     ...(opening !== undefined ? { opening } : {}),
+    ...(held ? { held } : {}),
     pieces,
   };
 }
