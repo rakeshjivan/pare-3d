@@ -224,7 +224,9 @@ function prepare(input: DentalStudioInput): Prepared {
   // Scanners put the upper above the lower: an upper's teeth point down. Failing that (a scan lying
   // on its side), a scanned palate says upper, then the width across the canines of a full arch.
   const ups = cleaned.map(({ clean }) => marginUp(clean.mesh, clean.margin));
-  const upperness = cleaned.map((_, i) => (Math.abs(ups[i][2]) > 0.5 ? -ups[i][2] * 100 : 0) + (palates[i] > 0.06 ? 10 : 0) + (partials[i] ? 0 : (canines[i] - 30) / 4));
+  // Build 74: a file still in its scanner's Y-up axes (as Medit and 3Shape export) reads its vertical on Y.
+  const vertical = (up: number[]) => (Math.abs(up[2]) > 0.5 ? up[2] : Math.abs(up[1]) > 0.5 ? up[1] : 0);
+  const upperness = cleaned.map((_, i) => -vertical(ups[i]) * 100 + (palates[i] > 0.06 ? 10 : 0) + (partials[i] ? 0 : (canines[i] - 30) / 4));
   const roles: DentalRole[] = cleaned.map(({ id }, i) => input.roles?.[id] ?? (upperness[i] > 0 ? "upper" : "lower"));
   if (cleaned.length === 2) {
     const [a, b] = cleaned.map(({ id }) => input.roles?.[id]);
@@ -512,9 +514,14 @@ function buildArch(
     footprint = [hull];
   }
   let voxel: number | null = null;
+  // Build 74: the model before hollowing, and the wall, so cuts made after it keep a wall round them.
+  let unhollowed: ManifoldSolid | null = null;
+  let hollowWall = 0;
   if (options.inside !== "solid" && options.baseStyle !== "articulator") {
     const open = options.inside === "open";
     const wall = Math.max(DENTAL_MIN_WALL, Math.min(DENTAL_MAX_WALL, options.wall));
+    unhollowed = solid;
+    hollowWall = wall;
     const before = solidPositions(solid);
     const cavity = hollowCavity(runtime, before, floor, wall, open, DENTAL_VENT_RADIUS);
     made.push(cavity.solid);
@@ -540,7 +547,15 @@ function buildArch(
       const bar = tieBar(runtime, outer, floor);
       if (bar) solid = keepSolid(runtime.Manifold.union(solid, keepSolid(bar)));
     }
-    if (outer && options.baseStyle === "clean" && options.notches !== false) solid = keepSolid(runtime.Manifold.difference(solid, keepSolid(locatorNotches(runtime, outer, floor))));
+    if (outer && options.baseStyle === "clean" && options.notches !== false) {
+      // Build 74: on a hollow model each notch is cut from a collar of solid a wall thick, so the
+      // wall round it stays as thick as asked (cut straight into the shell, it was left 1 mm).
+      if (unhollowed && hollowWall > 0) {
+        const collar = keepSolid(runtime.Manifold.intersection(keepSolid(locatorNotches(runtime, outer, floor, hollowWall)), unhollowed));
+        solid = keepSolid(runtime.Manifold.union(solid, collar));
+      }
+      solid = keepSolid(runtime.Manifold.difference(solid, keepSolid(locatorNotches(runtime, outer, floor))));
+    }
   }
   // Build 62: a bevel round the foot, so the model comes off the build plate easily.
   if (options.bevel !== false && options.baseStyle !== "articulator") {

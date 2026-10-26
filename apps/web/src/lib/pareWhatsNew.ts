@@ -10,6 +10,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Scans are laid out side by side on the plate, teeth up with the front towards you, the bite scan hidden; one click puts them in occlusion and back. Sculpting one scan hides the other, and the orange teeth area moves with its scan and can be switched off.",
       "Restore original upper and lower put a scan back as it was imported, still in the locked bite - the original files stay in the design.",
       "Hollow models are made faster with about 30% fewer triangles: the hidden cavity is simplified, and set a little further in so the wall is never thinner than you asked.",
+      "Hollow models with a clean base keep their full wall round the locator notches - cut straight into the shell, the wall there was left about 1 mm.",
+      "A single scan still in its scanner's own axes is told upper or lower by which way its teeth point; a lower could be read as an upper before.",
     ],
   },
   {
