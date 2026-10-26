@@ -9,7 +9,7 @@ import manifoldModule from "manifold-3d";
 import manifoldWasm from "../../../node_modules/manifold-3d/manifold.wasm";
 import { preparedDental, type Prepared } from "@/lib/dentalModel";
 import { filesFromRar, libraryFromFiles, type Jaw, type LibraryFile, type ToothLibrary } from "./library";
-import { findTeeth, type FoundTeeth } from "./teeth";
+import { concavity, findTeeth, projectOnCurve, type FoundTeeth, type Pin } from "./teeth";
 import { archCurve, coverTooth, frameCorrection, fitTooth, NO_ADJUST, placeTeeth, PointGrid2, seatTooth, toothExtent, toothMatrix, type Adjust, type ArchCurve, type PlacedTooth } from "./arch";
 import { archModel, closedTooth, modelWithTeeth, stlBytes, transformed } from "./solid";
 
@@ -24,6 +24,10 @@ type ArchState = {
   sharedSoup: Float32Array;
   /** The patient's teeth found on the scan, and each scan triangle's first vertex (for colouring). */
   found: (FoundTeeth & { curve: ArchCurve }) | null;
+  /** Concavity per vertex, and the contacts the dentist placed (arc lengths along found.curve). */
+  crease?: Float32Array;
+  pins: Pin[];
+  sizeRange?: [number, number];
   faces: Uint32Array;
   /** A quadrant or sextant scan: a diagnostic wax-up needs the full arch, so none is placed. */
   partial: boolean;
@@ -49,10 +53,12 @@ const state: {
   mirror: boolean;
   lastPosition: number;
   rightSide: -1 | 1;
+  /** Clicking the scan moves the nearest contact there. */
+  correcting: boolean;
   colour: "wax" | "contact" | "off";
   showAntagonist: boolean;
   fitTeeth: boolean;
-} = { prepared: null, arches: {}, inOcclusion: false, library: null, libraries: [], jaw: "upper", selected: null, mirror: true, lastPosition: 5, rightSide: 1, colour: "wax", showAntagonist: false, fitTeeth: true };
+} = { prepared: null, arches: {}, inOcclusion: false, library: null, libraries: [], jaw: "upper", selected: null, mirror: true, lastPosition: 5, rightSide: 1, correcting: false, colour: "wax", showAntagonist: false, fitTeeth: true };
 
 let manifold: Awaited<ReturnType<typeof manifoldModule>> | null = null;
 async function runtime() {
@@ -256,12 +262,15 @@ async function loadScans(files: File[]) {
     const isPartial = !(Math.min(...ends) < -12 && Math.max(...ends) > 12);
     if (isPartial) frameNotes.push(`the ${jaw} is a partial scan, so it is shown but not waxed`);
     const geometry = soupGeometry(soup);
-    state.arches[jaw] = { jaw, frame, sharedSoup: shared, soup, points, curve, grid: new PointGrid2(points, 1), bvh: new MeshBVH(geometry), bite: arch.bite, partial: isPartial, found: null, faces: m.f, teeth: [], waxed: new Set() };
+    state.arches[jaw] = { jaw, frame, sharedSoup: shared, soup, points, curve, grid: new PointGrid2(points, 1), bvh: new MeshBVH(geometry), bite: arch.bite, partial: isPartial, found: null, pins: [], faces: m.f, teeth: [], waxed: new Set() };
   }
   // The patient's teeth, upper first: the lower's overall size is held near the upper's.
   const findOn = (jaw: Jaw, range?: [number, number]) => {
     const arch = state.arches[jaw];
-    if (arch && !arch.partial) arch.found = findTeeth(arch.points, arch.curve, jaw, -1, 5, range);
+    if (!arch || arch.partial) return;
+    arch.crease = concavity(arch.points, arch.faces);
+    arch.sizeRange = range;
+    arch.found = findTeeth(arch.points, arch.curve, jaw, -1, { lastPosition: 5, sizeRange: range, faces: arch.faces, crease: arch.crease });
   };
   findOn("upper");
   const upperSize = state.arches.upper?.found?.size;
@@ -387,7 +396,9 @@ function showFound(arch: ArchState, geometry: THREE.BufferGeometry) {
   const gum = new THREE.Color(0xd9c9c2), c = new THREE.Color();
   for (let t = 0; t < arch.faces.length / 3; t += 1) {
     const owner = found.vertexTooth[arch.faces[t * 3]];
-    if (owner >= 0) c.setHex(TOOTH_COLOURS[found.teeth[owner].position % TOOTH_COLOURS.length] ?? 0xffffff); else c.copy(gum);
+    const debug = (globalThis as { creaseDebug?: Float32Array }).creaseDebug;
+    if (debug) { const v = debug[arch.faces[t * 3]]; c.setRGB(v > 0.06 ? 0.85 : 0.85, v > 0.06 ? 0.2 : 0.8, v > 0.06 ? 0.2 : 0.76); }
+    else if (owner >= 0) c.setHex(TOOTH_COLOURS[found.teeth[owner].position % TOOTH_COLOURS.length] ?? 0xffffff); else c.copy(gum);
     for (let k = 0; k < 3; k += 1) { colours[t * 9 + k * 3] = c.r; colours[t * 9 + k * 3 + 1] = c.g; colours[t * 9 + k * 3 + 2] = c.b; }
   }
   geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
@@ -642,9 +653,47 @@ renderer.domElement.addEventListener("pointerup", (event) => {
   if (!down || Math.hypot(event.clientX - down[0], event.clientY - down[1]) > 4) return;
   const r = renderer.domElement.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2(((event.clientX - r.left) / r.width) * 2 - 1, -((event.clientY - r.top) / r.height) * 2 + 1), camera);
+  if (state.correcting) {
+    const hit = ray.intersectObjects(scanGroup.children.filter((o) => o instanceof THREE.Mesh && o.geometry.getAttribute("position").count > 1000), false)[0];
+    if (hit) moveContact(hit.point);
+    return;
+  }
   const hits = ray.intersectObjects([...meshes.values()].filter((m) => m.visible), false);
   select(hits.length ? (hits[0].object.userData.fdi as number) : null);
 });
+
+/**
+ * The dentist's correction: the contact nearest the clicked point (along the arch) moves there and
+ * stays pinned; the other contacts are found again around the pins.
+ */
+function moveContact(point: THREE.Vector3) {
+  const arch = current();
+  if (!arch?.found) return;
+  const curve = arch.found.curve;
+  const at = projectOnCurve(Float32Array.of(point.x, point.y, point.z), curve).s[0];
+  // Every contact with its identity: the midline (k = 0) and, on each side, the distal contact of tooth k.
+  const contacts: Pin[] = [];
+  for (const t of arch.found.teeth) {
+    if (t.position === 1) contacts.push({ s: t.sMesial, side: t.side, k: 0 });
+    contacts.push({ s: t.sDistal, side: t.side, k: t.position });
+  }
+  let nearest = contacts[0];
+  for (const c of contacts) if (Math.abs(c.s - at) < Math.abs(nearest.s - at)) nearest = c;
+  arch.pins = arch.pins.filter((p) => !(p.k === nearest.k && (p.k === 0 || p.side === nearest.side)));
+  arch.pins.push({ s: at, side: nearest.side, k: nearest.k });
+  arch.found = findTeeth(arch.points, arch.curve, state.jaw, -1, { lastPosition: 5, sizeRange: arch.sizeRange, faces: arch.faces, crease: arch.crease, pins: arch.pins, centred: curve });
+  showArch();
+  status(`Contact moved. ${arch.pins.length} contact${arch.pins.length === 1 ? "" : "s"} placed by you; the others were found again around ${arch.pins.length === 1 ? "it" : "them"}.`);
+}
+
+function resetContacts() {
+  const arch = current();
+  if (!arch?.found) return;
+  arch.pins = [];
+  arch.found = findTeeth(arch.points, arch.curve, state.jaw, -1, { lastPosition: 5, sizeRange: arch.sizeRange, faces: arch.faces, crease: arch.crease });
+  showArch();
+  status("Contacts found automatically again.");
+}
 
 function setView(which: "occlusal" | "front" | "left" | "right") {
   const arch = current();
@@ -749,6 +798,13 @@ $("auto").onclick = () => autoPlace();
 $<HTMLInputElement>("fit").onchange = (e) => { state.fitTeeth = (e.target as HTMLInputElement).checked; autoPlace(); };
 $<HTMLSelectElement>("span").onchange = (e) => { state.lastPosition = Number((e.target as HTMLSelectElement).value); autoPlace(); };
 $<HTMLInputElement>("show-found").onchange = () => showArch();
+$("correct-contact").onclick = () => {
+  state.correcting = !state.correcting;
+  $("correct-contact").classList.toggle("active", state.correcting);
+  $("correct-contact").textContent = state.correcting ? "Done moving contacts" : "Move a contact";
+  if (state.correcting) status("Click the scan where a contact should be: the nearest red contact moves there.");
+};
+$("reset-contacts").onclick = () => resetContacts();
 $("swap").onclick = () => { state.rightSide = state.rightSide === 1 ? -1 : 1; autoPlace(); };
 $<HTMLInputElement>("mirror").onchange = (e) => { state.mirror = (e.target as HTMLInputElement).checked; };
 $<HTMLInputElement>("antagonist").onchange = (e) => { state.showAntagonist = (e.target as HTMLInputElement).checked; showArch(); };
@@ -776,5 +832,5 @@ for (const zone of [document.body]) {
   });
 }
 // For the test scripts.
-(window as unknown as { waxLab: unknown }).waxLab = { state, loadScans, loadLibraries, autoPlace, select, exportModels, setView, current };
+(window as unknown as { waxLab: unknown }).waxLab = { concavity, showArch, moveContact, resetContacts, state, loadScans, loadLibraries, autoPlace, select, exportModels, setView, current };
 status("Choose a case's scans (upper, lower and bite STL), then a tooth library (.rar).");

@@ -25,7 +25,7 @@ button { font: inherit; color: var(--ink); background: var(--panel); border: 1px
 button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
-.seg button.active, #arch-choice button.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.seg button.active, #arch-choice button.active, #correct-contact.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .lib { display: flex; gap: 8px; align-items: center; width: 100%; margin: 3px 0; text-align: left; }
 .lib img { width: 44px; height: 30px; object-fit: cover; border-radius: 4px; }
 .lib.active { border-color: var(--accent); background: var(--accent-soft); }
@@ -62,6 +62,7 @@ main { position: relative; }
     <p class="hint">Set up as in Pare 3D's Dental Studio: cleaned, levelled and fitted to the bite.</p>
     <div class="row" id="arch-choice"></div>
     <div class="row"><label title="Each tooth found on the scan in its own colour, with its contact points (red) and long axis"><input type="checkbox" id="show-found" checked> Show the teeth found</label></div>
+    <div class="row"><button id="correct-contact" title="Click the scan where a contact between two teeth should be">Move a contact</button><button id="reset-contacts">Find again</button></div>
   </section>
   <section>
     <h2><span class="n">2</span>Tooth library</h2>

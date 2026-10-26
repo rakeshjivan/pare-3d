@@ -29,6 +29,8 @@ const QUADRANTS: Record<Jaw, [number, number]> = { upper: [1, 2], lower: [4, 3] 
 export type FoundTooth = {
   fdi: number;
   position: number;
+  /** Which side of the midline, as the search runs (-1: toward the curve's start). */
+  side: -1 | 1;
   /** Arc length of the mesial and distal contacts along the arch curve. */
   sMesial: number;
   sDistal: number;
@@ -152,8 +154,32 @@ export function centreCurve(points: Float32Array, curve: ArchCurve, passes = 2):
  * size +-0.1: tooth sizes are in proportion between the arches (Bolton's anterior ratio, 77.2%, which
  * the two width tables already carry), and crowded lower incisors otherwise read as half or double size.
  */
-export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, rightSide: number, lastPosition = 7, sizeRange: [number, number] = [0.8, 1.25]): FoundTeeth & { curve: ArchCurve } {
-  const curve = centreCurve(points, rawCurve);
+export type Pin = { s: number; side: -1 | 1; k: number };
+export type FindOptions = {
+  lastPosition?: number;
+  sizeRange?: [number, number];
+  /** The mesh's triangles (indices into points): with them, crowns are grown over the surface up to the creases. */
+  faces?: Uint32Array;
+  /** Concavity per vertex (see concavity()), computed once per arch. */
+  crease?: Float32Array;
+  /**
+   * Contacts the dentist placed: arc length along the found curve, the side of the midline (-1: toward
+   * the curve's start) and which contact it is counting from the midline (0 = the midline, 1 = between
+   * the central and lateral...). The search passes through each exactly there.
+   */
+  pins?: Pin[];
+  /** The centred curve from an earlier search, so pinned arc lengths keep their meaning. */
+  centred?: ArchCurve;
+};
+/** Crease threshold: the 82nd percentile of the scan's own concavity (0.06 mm on a sharp scan, lower on smoother ones). */
+const CREASE_SHARE = 0.82;
+
+export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, rightSide: number, options: FindOptions = {}): FoundTeeth & { curve: ArchCurve } {
+  const lastPosition = options.lastPosition ?? 7, sizeRange = options.sizeRange ?? [0.8, 1.25];
+  const crease = options.crease;
+  let CREASE = 0.06;
+  if (crease) { const sample: number[] = []; for (let i = 0; i < crease.length; i += 7) sample.push(crease[i]); CREASE = Math.min(0.06, percentile(sample, CREASE_SHARE)); }
+  const curve = options.centred ?? centreCurve(points, rawCurve);
   const n = points.length / 3;
   const { s, d } = projectOnCurve(points, curve);
   const STEP = 0.25, BAND = 3, HALF = 7.5;
@@ -175,6 +201,20 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
     for (let k = Math.max(0, b - win); k <= Math.min(bins - 1, b + win); k += 1) for (const z of zByBin[k]) zs.push(z);
     localTop[b] = zs.length ? percentile(zs, 0.95) : NaN;
   }
+  // Share of crease vertices in the top 5 mm of crown at each bin: an interproximal contact has the
+  // groove on both its buccal and lingual sides; a groove on the occlusal surface runs along the curve.
+  const creaseShare = new Float64Array(bins);
+  if (crease) {
+    const hit = new Float64Array(bins), all = new Float64Array(bins);
+    for (let i = 0; i < n; i += 1) {
+      if (Math.abs(d[i]) > HALF) continue;
+      const b = Math.round(s[i] / STEP);
+      if (b < 0 || b >= bins || !(points[i * 3 + 2] > localTop[b] - 5)) continue;
+      all[b] += 1;
+      if (crease[i] > CREASE) hit[b] += 1;
+    }
+    for (let b = 0; b < bins; b += 1) creaseShare[b] = all[b] ? hit[b] / all[b] : 0;
+  }
   const width = new Float64Array(bins), height = new Float64Array(bins);
   for (let b = 0; b < bins; b += 1) {
     const ds: number[] = [], zs: number[] = [];
@@ -195,9 +235,15 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
     // contact (buccal and lingual embrasures), so width joins in.
     const fromMid = Math.abs(b * STEP - curve.sMid);
     const back = Math.max(0, Math.min(1, (fromMid - 18) / 6));
-    cost[b] = back * wn - hn * (2 - back);
+    let cMax = 1e-6;
+    for (let k = Math.max(0, b - around); k <= Math.min(bins - 1, b + around); k += 1) cMax = Math.max(cMax, creaseShare[k]);
+    cost[b] = back * wn - hn * (2 - back) - (crease ? creaseShare[b] / cMax : 0);
   }
   const smoothCost = Float64Array.from(cost, (_, b) => (cost[Math.max(0, b - 1)] + 2 * cost[b] + cost[Math.min(bins - 1, b + 1)]) / 4);
+  const pinAt = (side: number, k: number) => {
+    const pin = (options.pins ?? []).find((p) => p.k === k && (k === 0 || p.side === side));
+    return pin ? Math.max(0, Math.min(bins - 1, Math.round(pin.s / STEP))) : null;
+  };
 
   // One side outward from a midline contact: Viterbi over bins, tooth k between contacts k-1 and k.
   const widths = WIDTH[jaw];
@@ -208,16 +254,23 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
       const w = widths[k] * size / STEP;
       const next = new Map<number, { cost: number; path: number[] }>();
       for (const [b0, state] of prev) {
-        for (let len = Math.round(w * 0.72); len <= Math.round(w * 1.3); len += 1) {
+        const pinned = pinAt(dir, k + 1);
+        // A pinned contact may make its tooth any width from 40% to 200% of the usual.
+        const lo = pinned === null ? Math.round(w * 0.72) : 1, hi = pinned === null ? Math.round(w * 1.3) : Math.round(w * 2);
+        for (let len = lo; len <= hi; len += 1) {
           const b = b0 + dir * len;
-          if (b < 0 || b >= bins) continue;
+          if (b < 0 || b >= bins || (pinned !== null && b !== pinned)) continue;
           const dev = (len - w) / w;
           const c = state.cost + smoothCost[b] + 2.5 * dev * dev;
           const old = next.get(b);
           if (!old || c < old.cost) next.set(b, { cost: c, path: [...state.path, b] });
         }
       }
-      if (!next.size) break;
+      if (!next.size) {
+        // A pinned contact that cannot be reached rules this midline and size out.
+        if (pinAt(dir, k + 1) !== null) return { cost: Infinity, path: [mid] };
+        break;
+      }
       prev = next;
       let top: { cost: number; path: number[] } | null = null;
       for (const v of next.values()) if (!top || v.cost < top.cost) top = v;
@@ -230,9 +283,12 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
   // of each type should match in width.
   const midBin = Math.round(curve.sMid / STEP);
   let bestSize = 1, bestPaths: [number[], number[]] = [[midBin], [midBin]], bestScore = Infinity;
-  for (let mid = Math.max(0, midBin - 24); mid <= Math.min(bins - 1, midBin + 24); mid += 1) {
+  const midPin = pinAt(0, 0);
+  const midFrom = midPin ?? Math.max(0, midBin - 24), midTo = midPin ?? Math.min(bins - 1, midBin + 24);
+  for (let mid = midFrom; mid <= midTo; mid += 1) {
     for (let size = sizeRange[0]; size <= sizeRange[1] + 0.001; size += 0.025) {
       const a = side(mid, -1, size), b = side(mid, 1, size);
+      if (!Number.isFinite(a.cost) || !Number.isFinite(b.cost)) continue;
       const teethCount = a.path.length + b.path.length - 2;
       if (teethCount < 2) continue;
       let asym = 0;
@@ -258,6 +314,7 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
   };
   const teeth: FoundTooth[] = [];
   const vertexTooth = new Int16Array(n).fill(-1);
+  const adjacency = options.faces ? neighbours(n, options.faces) : null;
   for (const [sideIndex, path] of bestPaths.entries()) {
     // The curve runs from its x < 0 end, so the first path is the x < 0 side.
     const sideSign = sideIndex === 0 ? -1 : 1;
@@ -273,12 +330,42 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
       const floor = top - CROWN[jaw][position - 1] * bestSize;
       const index = teeth.length;
       const crown: number[] = [];
-      for (let i = 0; i < n; i += 1) {
-        if (s[i] < s0 || s[i] > s1 || Math.abs(d[i]) > HALF) continue;
-        const z = points[i * 3 + 2];
-        if (z < floor || z > top + 1.5) continue;
-        vertexTooth[i] = index;
-        crown.push(i);
+      if (adjacency && crease) {
+        // Grown over the surface from the top of the crown, stopping at creases (the gingival margin and
+        // the interproximal grooves), within the contacts (+-0.75 mm) and above the natural crown height.
+        const inside = (i: number) => s[i] > s0 - 0.75 && s[i] < s1 + 0.75 && Math.abs(d[i]) < HALF + 1 && points[i * 3 + 2] > floor && points[i * 3 + 2] < top + 1.5;
+        // The crease line thickened by two rings of vertices, so growth cannot slip through gaps in it.
+        let wall = new Uint8Array(n);
+        for (let i = 0; i < n; i += 1) if (crease[i] > CREASE) wall[i] = 1;
+        for (let ring = 0; ring < 2; ring += 1) {
+          const grown = wall.slice();
+          for (let i = 0; i < n; i += 1) if (wall[i]) for (let e = adjacency.start[i]; e < adjacency.start[i + 1]; e += 1) grown[adjacency.next[e]] = 1;
+          wall = grown;
+        }
+        const queue: number[] = [];
+        for (let i = 0; i < n; i += 1) {
+          if (vertexTooth[i] >= 0 || s[i] < s0 + 0.5 || s[i] > s1 - 0.5 || Math.abs(d[i]) > HALF) continue;
+          if (points[i * 3 + 2] > top - 1.5 && !wall[i]) { vertexTooth[i] = index; queue.push(i); }
+        }
+        for (let q = 0; q < queue.length; q += 1) {
+          const i = queue[q];
+          crown.push(i);
+          if (wall[i]) continue; // the crease itself belongs to the crown, but growth stops there
+          for (let e = adjacency.start[i]; e < adjacency.start[i + 1]; e += 1) {
+            const j = adjacency.next[e];
+            if (vertexTooth[j] >= 0 || !inside(j)) continue;
+            vertexTooth[j] = index;
+            queue.push(j);
+          }
+        }
+      } else {
+        for (let i = 0; i < n; i += 1) {
+          if (s[i] < s0 || s[i] > s1 || Math.abs(d[i]) > HALF) continue;
+          const z = points[i * 3 + 2];
+          if (z < floor || z > top + 1.5) continue;
+          vertexTooth[i] = index;
+          crown.push(i);
+        }
       }
       const centre = new THREE.Vector3(), tip = new THREE.Vector3(0, 0, -Infinity);
       const upper = new THREE.Vector3(), lower = new THREE.Vector3();
@@ -294,7 +381,7 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
       const axis = nu && nl ? upper.divideScalar(nu).sub(lower.divideScalar(nl)).normalize() : new THREE.Vector3(0, 0, 1);
       if (axis.z < 0.5) axis.set(0, 0, 1);
       const confidence = Math.max(0, Math.min(1, -(smoothCost[b0] + smoothCost[b1]) / 2 + 0.5));
-      teeth.push({ fdi, position, sMesial: b0 * STEP, sDistal: b1 * STEP, width: Math.abs(b1 - b0) * STEP, mesial: mesialPoint, distal: distalPoint, centre, tip, axis, height: top - floor, confidence });
+      teeth.push({ fdi, position, side: sideSign as -1 | 1, sMesial: b0 * STEP, sDistal: b1 * STEP, width: Math.abs(b1 - b0) * STEP, mesial: mesialPoint, distal: distalPoint, centre, tip, axis, height: top - floor, confidence });
     }
   }
   return {
@@ -304,4 +391,70 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
     size: bestSize,
     signal: { s: Array.from({ length: bins }, (_, b) => b * STEP), cost: Array.from(smoothCost), width: Array.from(width), height: Array.from(height) },
   };
+}
+
+/** Vertex normals of an indexed mesh (area-weighted). */
+export function vertexNormals(points: Float32Array, faces: Uint32Array): Float32Array {
+  const nrm = new Float32Array(points.length);
+  for (let t = 0; t < faces.length; t += 3) {
+    const a = faces[t] * 3, b = faces[t + 1] * 3, c = faces[t + 2] * 3;
+    const ux = points[b] - points[a], uy = points[b + 1] - points[a + 1], uz = points[b + 2] - points[a + 2];
+    const vx = points[c] - points[a], vy = points[c + 1] - points[a + 1], vz = points[c + 2] - points[a + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    for (const i of [a, b, c]) { nrm[i] += nx; nrm[i + 1] += ny; nrm[i + 2] += nz; }
+  }
+  for (let i = 0; i < nrm.length; i += 3) { const l = Math.hypot(nrm[i], nrm[i + 1], nrm[i + 2]) || 1; nrm[i] /= l; nrm[i + 1] /= l; nrm[i + 2] /= l; }
+  return nrm;
+}
+
+/**
+ * How concave the surface is at each vertex: the mean height, along the vertex normal, of the surface
+ * within `radius` mm (positive = the surface rises all round it: a crease, such as the gingival margin
+ * or an interproximal groove; negative = a convexity, such as a cusp or an incisal edge).
+ */
+export function concavity(points: Float32Array, faces: Uint32Array, radius = 0.8): Float32Array {
+  const n = points.length / 3;
+  const nrm = vertexNormals(points, faces);
+  const cell = radius;
+  const grid = new Map<string, number[]>();
+  for (let i = 0; i < n; i += 1) {
+    const key = `${Math.floor(points[i * 3] / cell)},${Math.floor(points[i * 3 + 1] / cell)},${Math.floor(points[i * 3 + 2] / cell)}`;
+    (grid.get(key) ?? grid.set(key, []).get(key)!).push(i);
+  }
+  const out = new Float32Array(n);
+  const r2 = radius * radius;
+  for (let i = 0; i < n; i += 1) {
+    const x = points[i * 3], y = points[i * 3 + 1], z = points[i * 3 + 2];
+    const gx = Math.floor(x / cell), gy = Math.floor(y / cell), gz = Math.floor(z / cell);
+    let sum = 0, count = 0;
+    for (let dx = -1; dx <= 1; dx += 1) for (let dy = -1; dy <= 1; dy += 1) for (let dz = -1; dz <= 1; dz += 1) {
+      const list = grid.get(`${gx + dx},${gy + dy},${gz + dz}`);
+      if (!list) continue;
+      for (const j of list) {
+        const ex = points[j * 3] - x, ey = points[j * 3 + 1] - y, ez = points[j * 3 + 2] - z;
+        if (ex * ex + ey * ey + ez * ez > r2 || j === i) continue;
+        sum += ex * nrm[i * 3] + ey * nrm[i * 3 + 1] + ez * nrm[i * 3 + 2];
+        count += 1;
+      }
+    }
+    out[i] = count ? sum / count : 0;
+  }
+  return out;
+}
+
+/** Vertex neighbours of an indexed mesh, compressed (start[i]..start[i+1] in next). */
+function neighbours(n: number, faces: Uint32Array) {
+  const count = new Uint32Array(n + 1);
+  for (let t = 0; t < faces.length; t += 1) count[faces[t] + 1] += 2;
+  const start = new Uint32Array(n + 1);
+  for (let i = 0; i < n; i += 1) start[i + 1] = start[i] + count[i + 1];
+  const fill = start.slice(0, n);
+  const next = new Uint32Array(start[n]);
+  for (let t = 0; t < faces.length; t += 3) {
+    const a = faces[t], b = faces[t + 1], c = faces[t + 2];
+    next[fill[a]++] = b; next[fill[a]++] = c;
+    next[fill[b]++] = a; next[fill[b]++] = c;
+    next[fill[c]++] = a; next[fill[c]++] = b;
+  }
+  return { start, next };
 }
