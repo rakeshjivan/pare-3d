@@ -10,6 +10,7 @@ import { ObjectListPanel } from "@/components/workplane/ObjectListPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SAVED_VIEW_KEYS } from "@/lib/designView";
 import * as THREE from "three";
+import { eraseAndFill } from "@/lib/meshFill";
 import { carryScanFrame, localToWorld, placedBounds, placementFor, scanFileCoordinates, scanFrameOf, standUpright } from "@/lib/scanFrame";
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import { t, type MessageKey } from "@/lib/i18n";
@@ -9257,6 +9258,14 @@ export function LayerlingEditor({
       return;
     }
     if (!count()) return;
+    if (action === "fill") {
+      // Build 76: Erase & Fill - the hole each selected area leaves is closed with a smooth patch.
+      const result = eraseAndFill(selection.mesh.points, selection.mesh.triangles, selection.chosen);
+      if (!result.positions.length) return;
+      commitSculpt(shape, result.positions, t(result.open ? "sculpt.filledOpen" : "sculpt.filled", { count: result.removed.toLocaleString(), holes: result.filled, open: result.open }), false);
+      setSculptTool((current) => current ? { ...current, chosen: 0 } : current);
+      return;
+    }
     if (action === "delete") {
       const removed = count();
       const left = withoutTriangles(soupOf(selection.mesh), selection.chosen);

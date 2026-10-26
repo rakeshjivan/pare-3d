@@ -351,31 +351,63 @@ export class LiveMesh {
     for (let i = 0; i < loop.length; i += 1) this.addTriangle(loop[(i + 1) % loop.length], loop[i], c);
     return c;
   }
-  /** Build 76: the corners on the open edges, as loops in the direction their triangles run (a loop's edge a -> b is a's triangle's). */
+  /**
+   * Build 76: the open edges, as loops in the direction their triangles run (a loop's edge a -> b is a
+   * triangle's own). At a corner two holes touch (a bow-tie) the next edge is found by walking round
+   * that corner's triangles from the one the loop came in on, so each hole comes out as its own loop.
+   */
   rimLoops(): number[][] {
-    const next = new Map<number, number>();
-    let broken = false;
+    const key = (a: number, b: number) => a * 4294967296 + b;
+    // Triangle owning each directed edge.
+    const owner = new Map<number, number>();
     for (let t = 0; t < this.tCount; t += 1) {
       if (!this.tAlive[t]) continue;
-      for (let k = 0; k < 3; k += 1) {
-        const a = this.tri[t * 3 + k], b = this.tri[t * 3 + ((k + 1) % 3)];
-        if (this.edgeTriangles(a, b).length !== 1) continue;
-        if (next.has(a)) broken = true;
-        next.set(a, b);
-      }
+      for (let k = 0; k < 3; k += 1) owner.set(key(this.tri[t * 3 + k], this.tri[t * 3 + ((k + 1) % 3)]), t);
     }
-    void broken;
+    const rim: Array<[number, number]> = [];
+    for (const [k, t] of owner) {
+      const a = Math.floor(k / 4294967296), b = k - a * 4294967296;
+      if (!owner.has(key(b, a))) rim.push([a, b]);
+      void t;
+    }
+    const used = new Set<number>();
+    const third = (t: number, a: number, b: number) => { for (let k = 0; k < 3; k += 1) { const v = this.tri[t * 3 + k]; if (v !== a && v !== b) return v; } return -1; };
+    /** From the rim edge u -> v, the rim edge that leaves v next, walking round v. */
+    const nextOf = (u: number, v: number): number => {
+      let t = owner.get(key(u, v))!;
+      let from = u;
+      for (let guard = 0; guard < 256; guard += 1) {
+        const w = third(t, from, v);
+        if (w < 0) return -1;
+        // Leaving v in t is v -> w; the triangle on its other side holds w -> v.
+        const across = owner.get(key(w, v));
+        if (across === undefined) return w;
+        from = w;
+        t = across;
+      }
+      return -1;
+    };
     const loops: number[][] = [];
-    const seen = new Set<number>();
-    for (const start of next.keys()) {
-      if (seen.has(start)) continue;
+    for (const [a0, b0] of rim) {
+      if (used.has(key(a0, b0))) continue;
       const loop: number[] = [];
-      let v: number | undefined = start;
-      while (v !== undefined && !seen.has(v)) { seen.add(v); loop.push(v); v = next.get(v); }
-      if (v === start && loop.length >= 3) loops.push(loop);
+      let a = a0, b = b0, ok = false;
+      for (let guard = 0; guard < 1_000_000; guard += 1) {
+        used.add(key(a, b));
+        loop.push(a);
+        const c = nextOf(a, b);
+        if (c < 0) break;
+        if (b === a0 && c === b0) { ok = true; break; }
+        if (used.has(key(b, c))) { ok = b === a0; break; }
+        a = b; b = c;
+      }
+      if (ok && loop.length >= 3) loops.push(loop);
     }
     return loops;
   }
+  /** Build 76: a new corner, and a new triangle (corners in the order the surface faces). */
+  addCorner(x: number, y: number, z: number) { return this.addVertex(x, y, z); }
+  addFace(a: number, b: number, c: number) { return this.addTriangle(a, b, c); }
   /** Build 76: the corners joined to v (the public form of the neighbour walk, for fairing). */
   around(v: number): number[] { return this.neighbours(v); }
   /** Build 76: moves corner v to (x, y, z), keeping the grids and drawing right. */
@@ -906,7 +938,8 @@ export class LiveMesh {
       if ((q & 31) === 0 && late()) break;
       const [a, b] = queue[q];
       if (!this.vAlive[a] || !this.vAlive[b] || this.dist(a, b) <= hi) continue;
-      if (options.fixed && (options.fixed(a) || options.fixed(b))) continue;
+      // A split moves neither end: only an edge between two held corners stays whole.
+      if (options.fixed && options.fixed(a) && options.fixed(b)) continue;
       const m = this.splitEdge(a, b);
       work -= 1;
       if (m === null) continue;

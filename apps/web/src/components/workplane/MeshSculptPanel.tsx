@@ -16,7 +16,7 @@ export type SculptTool = "select" | "unselect" | LiveBrush;
 export type SculptRefine = "off" | "coarse" | "medium" | "fine";
 /** Build 73: a brush also works mirrored across the part's middle, left-right (x) or front-back (z). */
 export type SculptSymmetry = "off" | "x" | "z";
-export type SculptSelectionAction = "delete" | "smooth" | "flatten" | "grow" | "invert" | "clear";
+export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "grow" | "invert" | "clear";
 
 /** Remesh, Offset and Thicken in the panel: on again in build 73 (they keep the part's surface now). */
 export const WHOLE_PART_TOOLS = true;
@@ -147,8 +147,8 @@ export function MeshSculptPanel({
       ) : null}
       <p className="blend-hint" role="status">{chosen ? t("sculpt.chosen", { count: chosen.toLocaleString() }) : t("sculpt.noneChosen")}</p>
       <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.selection")}>
-        {(["delete", "smooth", "flatten", "grow", "invert", "clear"] as const).map((action) => (
-          <button key={action} type="button" disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
+        {(["fill", "delete", "smooth", "flatten", "grow", "invert", "clear"] as const).map((action) => (
+          <button key={action} type="button" title={action === "fill" ? t("sculpt.selection.fillHint") : undefined} disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
             {t(`sculpt.selection.${action}`)}
           </button>
         ))}
