@@ -679,6 +679,12 @@ declare global {
     layerlingHighlight?: (triangles: Float32Array | null) => void;
     /** Build 69: Sculpt's working copy of a part (world soup) drawn in its place while it is worked on; null puts the part back. */
     layerlingSculptPreview?: (shapeId: string, triangles: Float32Array | null, color?: string) => void;
+    /** Build 73: live Sculpt - the engine's own geometry drawn in the part's place (it updates the buffers itself); null puts the part back. */
+    layerlingSculptLive?: (shapeId: string, geometry: THREE.BufferGeometry | null, color?: string) => void;
+    /** Build 73: draw the next frame (after the live Sculpt geometry changed). */
+    layerlingRedraw?: () => void;
+    /** Build 73: the camera's ray through a page point (client pixels), in the world. */
+    layerlingScreenRay?: (x: number, y: number) => { origin: [number, number, number]; direction: [number, number, number] } | null;
     /** Fork (build 53): where the camera is, in the world. */
     layerlingCameraPosition?: () => [number, number, number];
     layerlingCaptureCanvasAsync?: () => Promise<string>;
@@ -9249,10 +9255,13 @@ export function WorkplaneViewport({
   useEffect(() => {
     let mesh: THREE.Mesh | null = null;
     let hidden: THREE.Object3D[] = [];
+    // Build 73: a live geometry belongs to the Sculpt engine; it is not disposed here.
+    let borrowed = false;
     const clear = () => {
       const state = threeRef.current;
       if (mesh && state) state.scene.remove(mesh);
-      mesh?.geometry.dispose();
+      if (!borrowed) mesh?.geometry.dispose();
+      borrowed = false;
       (mesh?.material as THREE.Material | undefined)?.dispose();
       mesh = null;
       hidden.forEach((object) => { object.visible = true; });
@@ -9261,6 +9270,7 @@ export function WorkplaneViewport({
     };
     window.layerlingSculptPreview = (shapeId, triangles, color) => {
       const state = threeRef.current;
+      if (borrowed) clear();
       if (!state || !triangles || !triangles.length) { clear(); return; }
       if (mesh && mesh.userData.sculptOf === shapeId && (mesh.geometry.getAttribute("position") as THREE.BufferAttribute).count * 3 === triangles.length) {
         const attribute = mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
@@ -9296,6 +9306,49 @@ export function WorkplaneViewport({
       });
       state.needsRender = true;
     };
+    const lookOf = (state: NonNullable<typeof threeRef.current>, shapeId: string, color?: string) => {
+      let look: THREE.Material | null = null;
+      state.scene.traverse((object) => {
+        if (look || object.userData.shapeId !== shapeId || !(object as THREE.Mesh).isMesh) return;
+        const material = (object as THREE.Mesh).material;
+        const first = Array.isArray(material) ? material[0] : material;
+        if (first && (first as THREE.MeshStandardMaterial).isMaterial && !(first as THREE.Material).transparent) look = (first as THREE.Material).clone();
+      });
+      if (look && (look as THREE.MeshStandardMaterial).vertexColors) {
+        (look as THREE.MeshStandardMaterial).vertexColors = false;
+        if (color) (look as THREE.MeshStandardMaterial).color?.set(color);
+      }
+      return look ?? new THREE.MeshStandardMaterial({ color: color ?? "#c9ced6", roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide });
+    };
+    window.layerlingSculptLive = (shapeId, geometry, color) => {
+      const state = threeRef.current;
+      if (!state || !geometry) { clear(); return; }
+      if (!(mesh && mesh.geometry === geometry)) {
+        clear();
+        mesh = new THREE.Mesh(geometry, lookOf(state, shapeId, color));
+        mesh.userData.sculptOf = shapeId;
+        // The engine grows the buffers in place: the drawn box is the part's, padded, not recomputed each stroke.
+        mesh.frustumCulled = false;
+        borrowed = true;
+        state.scene.add(mesh);
+      }
+      const copy = mesh;
+      state.scene.traverse((object) => {
+        if (object !== copy && object.visible && object.userData.shapeId === shapeId) { object.visible = false; hidden.push(object); }
+      });
+      state.needsRender = true;
+    };
+    window.layerlingRedraw = () => { const state = threeRef.current; if (state) state.needsRender = true; };
+    window.layerlingScreenRay = (x, y) => {
+      const state = threeRef.current;
+      if (!state) return null;
+      state.camera.updateMatrixWorld();
+      const rect = state.renderer.domElement.getBoundingClientRect();
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(new THREE.Vector2(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1), state.camera);
+      const o = ray.ray.origin, d = ray.ray.direction;
+      return { origin: [o.x, o.y, o.z], direction: [d.x, d.y, d.z] };
+    };
     // For checks: whether the copy is drawn, and how many of the part's objects still show.
     (window as unknown as { layerlingSculptPreviewInfo?: () => unknown }).layerlingSculptPreviewInfo = () => {
       const state = threeRef.current;
@@ -9304,7 +9357,7 @@ export function WorkplaneViewport({
       if (state && id) state.scene.traverse((object) => { if (object !== mesh && object.userData.shapeId === id && object.visible) showing += 1; });
       return { drawn: Boolean(mesh), inScene: Boolean(mesh?.parent), hidden: hidden.length, showing, triangles: mesh ? (mesh.geometry.getAttribute("position") as THREE.BufferAttribute).count / 3 : 0 };
     };
-    return () => { clear(); delete window.layerlingSculptPreview; };
+    return () => { clear(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingRedraw; delete window.layerlingScreenRay; };
   }, []);
   // Fork (build 53): Dental Studio's tooth area, tinted over the scan while it is being designated.
   useEffect(() => {
