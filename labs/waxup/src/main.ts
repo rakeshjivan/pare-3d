@@ -9,6 +9,7 @@ import manifoldModule from "manifold-3d";
 import manifoldWasm from "../../../node_modules/manifold-3d/manifold.wasm";
 import { preparedDental, type Prepared } from "@/lib/dentalModel";
 import { filesFromRar, libraryFromFiles, type Jaw, type LibraryFile, type ToothLibrary } from "./library";
+import { findTeeth, type FoundTeeth } from "./teeth";
 import { archCurve, coverTooth, frameCorrection, fitTooth, NO_ADJUST, placeTeeth, PointGrid2, seatTooth, toothExtent, toothMatrix, type Adjust, type ArchCurve, type PlacedTooth } from "./arch";
 import { archModel, closedTooth, modelWithTeeth, stlBytes, transformed } from "./solid";
 
@@ -21,6 +22,9 @@ type ArchState = {
   frame: THREE.Matrix4;
   /** The cleaned scan as triangles in shared coordinates. */
   sharedSoup: Float32Array;
+  /** The patient's teeth found on the scan, and each scan triangle's first vertex (for colouring). */
+  found: (FoundTeeth & { curve: ArchCurve }) | null;
+  faces: Uint32Array;
   /** A quadrant or sextant scan: a diagnostic wax-up needs the full arch, so none is placed. */
   partial: boolean;
   /** The same in the arch frame. */
@@ -252,7 +256,7 @@ async function loadScans(files: File[]) {
     const isPartial = !(Math.min(...ends) < -12 && Math.max(...ends) > 12);
     if (isPartial) frameNotes.push(`the ${jaw} is a partial scan, so it is shown but not waxed`);
     const geometry = soupGeometry(soup);
-    state.arches[jaw] = { jaw, frame, sharedSoup: shared, soup, points, curve, grid: new PointGrid2(points, 1), bvh: new MeshBVH(geometry), bite: arch.bite, partial: isPartial, teeth: [], waxed: new Set() };
+    state.arches[jaw] = { jaw, frame, sharedSoup: shared, soup, points, curve, grid: new PointGrid2(points, 1), bvh: new MeshBVH(geometry), bite: arch.bite, partial: isPartial, found: isPartial ? null : findTeeth(points, curve, jaw, -1), faces: m.f, teeth: [], waxed: new Set() };
   }
   const pair = prepared.analysis.pair;
   const fit = pair?.bite ? (pair.bite.fitted ? `fitted to the bite scan (RMS ${pair.bite.rms.toFixed(2)} mm)` : "the bite scan could not be fitted") : pair ? (pair.inOcclusion ? "in occlusion as scanned" : "not in occlusion") : "one arch";
@@ -350,10 +354,12 @@ function showArch() {
   antagonistGroup.clear();
   if (!arch) return;
   const geometry = soupGeometry(arch.soup);
-  scanGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xd9c9c2, roughness: 0.75, metalness: 0 })));
+  scanGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xd9c9c2, roughness: 0.75, metalness: 0, vertexColors: Boolean(arch.found && $<HTMLInputElement>("show-found").checked) })));
   // The arch curve the teeth are spaced along, just above the cusps.
-  const line = new THREE.BufferGeometry().setFromPoints(arch.curve.pts.map(([x, y]) => new THREE.Vector3(x, y, arch.curve.zTop + 0.5)));
+  const shown = arch.found && $<HTMLInputElement>("show-found").checked ? arch.found.curve : arch.curve;
+  const line = new THREE.BufferGeometry().setFromPoints(shown.pts.map(([x, y]) => new THREE.Vector3(x, y, arch.curve.zTop + 0.5)));
   scanGroup.add(new THREE.Line(line, new THREE.LineBasicMaterial({ color: 0x2f6fde })));
+  if (arch.found && $<HTMLInputElement>("show-found").checked) showFound(arch, geometry);
   const other = state.arches[state.jaw === "upper" ? "lower" : "upper"];
   if (other && state.inOcclusion && state.showAntagonist) {
     const soup = other.sharedSoup.slice();
@@ -363,6 +369,40 @@ function showArch() {
   }
   renderTeeth();
   setView("occlusal");
+}
+
+const TOOTH_COLOURS = [0xe8b4a0, 0x9fc4e8, 0xb8dca0, 0xe8d58f, 0xc9a9e0, 0x8fd6cf, 0xf0a8c0, 0xa8b4f0];
+/** The teeth found on the scan: each crown in its own colour, contacts, long axes and numbers. */
+function showFound(arch: ArchState, geometry: THREE.BufferGeometry) {
+  const found = arch.found!;
+  const colours = new Float32Array(arch.soup.length);
+  const gum = new THREE.Color(0xd9c9c2), c = new THREE.Color();
+  for (let t = 0; t < arch.faces.length / 3; t += 1) {
+    const owner = found.vertexTooth[arch.faces[t * 3]];
+    if (owner >= 0) c.setHex(TOOTH_COLOURS[found.teeth[owner].position % TOOTH_COLOURS.length] ?? 0xffffff); else c.copy(gum);
+    for (let k = 0; k < 3; k += 1) { colours[t * 9 + k * 3] = c.r; colours[t * 9 + k * 3 + 1] = c.g; colours[t * 9 + k * 3 + 2] = c.b; }
+  }
+  geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
+  const dot = new THREE.SphereGeometry(0.45, 12, 8);
+  const dotMaterial = new THREE.MeshBasicMaterial({ color: 0xd23c3c });
+  for (const tooth of found.teeth) {
+    for (const p of [tooth.mesial, tooth.distal]) { const m = new THREE.Mesh(dot, dotMaterial); m.position.copy(p); scanGroup.add(m); }
+    const axis = new THREE.BufferGeometry().setFromPoints([tooth.tip.clone().addScaledVector(tooth.axis, -tooth.height), tooth.tip.clone().addScaledVector(tooth.axis, 2)]);
+    scanGroup.add(new THREE.Line(axis, new THREE.LineBasicMaterial({ color: 0x1d2430 })));
+    scanGroup.add(label(String(tooth.fdi), tooth.tip.clone().add(new THREE.Vector3(0, 0, 3))));
+  }
+}
+function label(text: string, at: THREE.Vector3) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64; canvas.height = 40;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.fillRect(0, 0, 64, 40);
+  ctx.fillStyle = "#1d2430"; ctx.font = "bold 26px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(text, 32, 21);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }));
+  sprite.position.copy(at);
+  sprite.scale.set(4.2, 2.6, 1);
+  return sprite;
 }
 
 let antagonistBvh: { jaw: Jaw; bvh: MeshBVH } | null = null;
@@ -700,6 +740,7 @@ $<HTMLInputElement>("library-folder").onchange = (e) => { const f = [...((e.targ
 $("auto").onclick = () => autoPlace();
 $<HTMLInputElement>("fit").onchange = (e) => { state.fitTeeth = (e.target as HTMLInputElement).checked; autoPlace(); };
 $<HTMLSelectElement>("span").onchange = (e) => { state.lastPosition = Number((e.target as HTMLSelectElement).value); autoPlace(); };
+$<HTMLInputElement>("show-found").onchange = () => showArch();
 $("swap").onclick = () => { state.rightSide = state.rightSide === 1 ? -1 : 1; autoPlace(); };
 $<HTMLInputElement>("mirror").onchange = (e) => { state.mirror = (e.target as HTMLInputElement).checked; };
 $<HTMLInputElement>("antagonist").onchange = (e) => { state.showAntagonist = (e.target as HTMLInputElement).checked; showArch(); };
