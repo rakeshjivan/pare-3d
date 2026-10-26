@@ -199,7 +199,15 @@ export const passToView = {
   },
 };
 
-export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel }: { hint: string; radius: number; erase: boolean; onDone: (points: TrimPoint[]) => void; onCancel: () => void }) {
+export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live }: {
+  hint: string;
+  radius: number;
+  erase: boolean;
+  onDone: (points: TrimPoint[]) => void;
+  onCancel: () => void;
+  /** Build 73: a live brush - each pointer move is handed over as it happens, and no path is drawn. */
+  live?: { start: (x: number, y: number) => void; move: (x: number, y: number) => void; end: () => void };
+}) {
   const [host, setHost] = useState<HTMLElement | null>(null);
   const [points, setPoints] = useState<TrimPoint[]>([]);
   const [cursor, setCursor] = useState<TrimPoint | null>(null);
@@ -227,6 +235,7 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel }: { 
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
         drawing.current = true;
+        if (live) { live.start(event.clientX, event.clientY); return; }
         line.current = [[event.clientX, event.clientY]];
         setPoints(line.current);
       }}
@@ -235,6 +244,13 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel }: { 
       onPointerMove={(event) => {
         setCursor([event.clientX, event.clientY]);
         if (!drawing.current) return;
+        if (live) {
+          // Every coalesced point, so a quick stroke keeps its shape.
+          const all = typeof event.nativeEvent.getCoalescedEvents === "function" ? event.nativeEvent.getCoalescedEvents() : [];
+          if (all.length) for (const e of all) live.move(e.clientX, e.clientY);
+          else live.move(event.clientX, event.clientY);
+          return;
+        }
         const last = line.current[line.current.length - 1];
         if (last && Math.hypot(last[0] - event.clientX, last[1] - event.clientY) < 2) return;
         line.current = [...line.current, [event.clientX, event.clientY]];
@@ -245,6 +261,7 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel }: { 
         if (!drawing.current) return;
         drawing.current = false;
         event.currentTarget.releasePointerCapture(event.pointerId);
+        if (live) { live.end(); return; }
         const drawn = line.current;
         line.current = [];
         setPoints([]);

@@ -65,6 +65,8 @@ export class LiveMesh {
   private dirtyT = new Set<number>();
   /** Set when triangles were added or removed (the index buffer and draw range change). */
   topologyChanged = false;
+  /** Counts every change to the triangles (split, collapse, flip): a stroke compares it to know whether it changed them. */
+  topologyEdits = 0;
 
   constructor(points: ArrayLike<number>, triangles: ArrayLike<number>) {
     const n = points.length / 3, m = triangles.length / 3;
@@ -200,6 +202,7 @@ export class LiveMesh {
     this.binTriangle(t);
     this.dirtyT.add(t);
     this.topologyChanged = true;
+    this.topologyEdits += 1;
     return t;
   }
   private removeTriangle(t: number) {
@@ -213,6 +216,7 @@ export class LiveMesh {
     this.binTriangle(t);
     this.dirtyT.add(t);
     this.topologyChanged = true;
+    this.topologyEdits += 1;
   }
   /** Replaces corner `from` with `to` in triangle t. */
   private retarget(t: number, from: number, to: number) {
@@ -353,7 +357,8 @@ export class LiveMesh {
           if (hit !== null && (!best || hit < best.t)) best = { t: hit, triangle: t, point: [origin[0] + d.x * hit, origin[1] + d.y * hit, origin[2] + d.z * hit] };
         }
       }
-      if (best && best.t < s - h) break;
+      const found = best as { t: number } | null;
+      if (found && found.t < s - h) break;
       s += h * 0.5;
     }
     return best;
@@ -497,6 +502,19 @@ export class LiveMesh {
     this.rebin(moves.map((m) => m[0]));
   }
 
+  /** Puts corners back where they were (undo of a stroke that only moved corners). */
+  setPositions(corners: ArrayLike<number>, values: ArrayLike<number>) {
+    const moved: number[] = [];
+    for (let k = 0; k < corners.length; k += 1) {
+      const v = corners[k];
+      if (v >= this.vCount || !this.vAlive[v]) continue;
+      this.pos[v * 3] = values[k * 3]; this.pos[v * 3 + 1] = values[k * 3 + 1]; this.pos[v * 3 + 2] = values[k * 3 + 2];
+      this.moved(v);
+      moved.push(v);
+    }
+    this.rebin(moved);
+  }
+
   /** Move brush: corners grabbed at the stroke's start (with their weights) follow the cursor by `delta`. */
   drag(grabbed: Array<[number, number, number, number, number]>, delta: Vec3) {
     const p = this.pos;
@@ -609,6 +627,7 @@ export class LiveMesh {
     this.binTriangle(t1); this.binTriangle(t2);
     this.dirtyV.add(a); this.dirtyV.add(b); this.dirtyV.add(c); this.dirtyV.add(d);
     this.topologyChanged = true;
+    this.topologyEdits += 1;
     return true;
   }
 

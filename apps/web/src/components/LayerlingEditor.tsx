@@ -62,9 +62,10 @@ import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
 import { analyseDentalInBackground, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground } from "@/lib/meshJobs";
 import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
-import { applyBrush, applyToSelection, averageEdge, brushChoice, smoothingPasses, cornerPositions, growChoice, soupFloat32, invertChoice, millimetresPerPixel, sculptMeshOf, soupOf, strokeWeights, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
+import { applyToSelection, brushChoice, cornerPositions, growChoice, soupFloat32, invertChoice, sculptMeshOf, soupOf, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
+import { LiveMesh, averageEdgeOf, type LiveBrush } from "@/lib/liveSculpt";
 import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
-import { MeshSculptPanel, type SculptSelectionAction, type SculptTool } from "./workplane/MeshSculptPanel";
+import { MeshSculptPanel, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
@@ -8949,27 +8950,39 @@ export function LayerlingEditor({
     if (meshRoundTool && !(selectedIds.length === 1 && selectedIds[0] === meshRoundTool.shapeId) && !meshRoundTool.busy) setMeshRoundTool(null);
   }, [meshRoundTool, selectedIds]);
 
-  // Build 69: Sculpt - brushes on a mesh, a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null } | null>(null);
-  const sculptState = useRef<{ shapeId: string; key: string; mesh: SculptMesh; chosen: Uint8Array; strokes: number; lastBrush: SculptTool | null; drawn?: Float32Array; undo: Float64Array[]; redo: Float64Array[] } | null>(null);
+  // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
+  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null } | null>(null);
+  const sculptState = useRef<SculptSession | null>(null);
   const flushSculptRef = useRef<() => void>(() => {});
   const sculptPreviewDone = useRef<string | null>(null);
-  /** The welded copy of the part being sculpted - made again when the part changed some other way (undo, a move). */
+  /** The live copy of the part being sculpted - made again when the part changed some other way (undo, a move). */
   const sculptMeshFor = (shape: WorkplaneShape) => {
     const key = projectShapesFingerprint([shape]);
     const known = sculptState.current;
     if (known && known.shapeId === shape.id && known.key === key) return known;
-    const mesh = sculptMeshOf(worldTriangles(shape));
-    sculptState.current = { shapeId: shape.id, key, mesh, chosen: new Uint8Array(mesh.triangles.length / 3), strokes: 0, lastBrush: null, undo: [], redo: [] };
+    if (known && known.shapeId === shape.id) window.layerlingSculptLive?.(shape.id, null);
+    known?.live.dispose();
+    const live = LiveMesh.fromSoup(worldTriangles(shape));
+    const box = live.bounds();
+    sculptState.current = { shapeId: shape.id, key, live, centre: [(box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2], selection: null, strokes: 0, lastBrush: null, undo: [], redo: [] };
     return sculptState.current;
+  };
+  /** The selection works on a welded copy (the selection tools of build 69); made when a selection tool needs it. */
+  const sculptSelectionOf = (state: SculptSession) => {
+    if (!state.selection || state.selection.stale) {
+      const mesh = sculptMeshOf(state.live.soup());
+      const chosen = state.selection && !state.selection.stale ? state.selection.chosen : state.selection && state.selection.chosen.length === mesh.triangles.length / 3 ? state.selection.chosen : new Uint8Array(mesh.triangles.length / 3);
+      state.selection = { mesh, chosen, stale: false };
+    }
+    return state.selection;
   };
   const openSculpt = useCallback((shape: WorkplaneShape) => {
     if (shape.locked || shape.hole || isNonSolidShapeKind(shape.kind)) { setNotice(t("sculpt.selectOne")); return; }
     const state = sculptMeshFor(shape);
-    const triangles = state.mesh.triangles.length / 3;
-    if (triangles > 400_000) setNotice(t("sculpt.large", { count: triangles.toLocaleString() }));
+    const triangles = state.live.triangleCount();
+    if (triangles > 1_500_000) setNotice(t("sculpt.large", { count: triangles.toLocaleString() }));
     setMeshRoundTool(null);
-    setSculptTool({ shapeId: shape.id, tool: "smooth", size: 30, strength: 0.5, reach: readSculptReach(), chosen: state.chosen.reduce((a, b) => a + b, 0), remeshMode: "remesh", detail: defaultRemeshDetail(soupOf(state.mesh)), amount: 2, busy: false, error: null });
+    setSculptTool({ shapeId: shape.id, tool: "smooth", size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off", remeshMode: "remesh", detail: Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100), amount: 2, busy: false, error: null });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleSculpt = useCallback(() => {
     if (sculptTool) { flushSculpt(); setSculptTool(null); return; }
@@ -8979,11 +8992,11 @@ export function LayerlingEditor({
     openSculpt(shape);
   }, [openSculpt, refuseLockedSelection, sculptTool, selectedShapes]);
   /** Puts the sculpted mesh in place of the part, as one step of undo, and keeps the copy in step with it. */
-  const commitSculpt = (shape: WorkplaneShape, positions: number[], message: string, keepCopy: boolean) => {
-    const next = canonicalizeShape(shapeWithWorldPositions(shape, positions));
+  const commitSculpt = (shape: WorkplaneShape, positions: ArrayLike<number>, message: string, keepCopy: boolean) => {
+    const next = canonicalizeShape(shapeWithWorldPositions(shape, Array.from(positions)));
     commitShapes(shapesRef.current.map((candidate) => (candidate.id === shape.id ? next : candidate)), next.id, message);
     if (keepCopy && sculptState.current) sculptState.current.key = projectShapesFingerprint([next]);
-    else sculptState.current = null;
+    else { sculptState.current?.live.dispose(); sculptState.current = null; }
     return next;
   };
   /** Strokes not yet in the part go in now, as one step of undo. */
@@ -8996,10 +9009,10 @@ export function LayerlingEditor({
     const shape = shapesRef.current.find((candidate) => candidate.id === state.shapeId);
     const strokes = state.strokes;
     state.strokes = 0;
-    if (!shape || projectShapesFingerprint([shape]) !== state.key) { window.layerlingSculptPreview?.(state.shapeId, null); return; }
+    if (!shape || projectShapesFingerprint([shape]) !== state.key) { window.layerlingSculptLive?.(state.shapeId, null); return; }
     const brush = t(`sculpt.tool.${state.lastBrush ?? "smooth"}` as "sculpt.tool.smooth");
-    commitSculpt(shape, soupOf(state.mesh), strokes > 1 ? t("sculpt.strokes", { count: strokes, brush }) : t("sculpt.stroke", { brush }), true);
-    // The working copy goes once the rebuilt part is drawn, so the old surface never shows in between.
+    commitSculpt(shape, state.live.soup(), strokes > 1 ? t("sculpt.strokes", { count: strokes, brush }) : t("sculpt.stroke", { brush }), true);
+    // The live copy goes once the rebuilt part is drawn, so the old surface never shows in between.
     sculptPreviewDone.current = state.shapeId;
   };
   flushSculptRef.current = flushSculpt;
@@ -9008,58 +9021,238 @@ export function LayerlingEditor({
     const shape = tool ? shapesRef.current.find((candidate) => candidate.id === tool.shapeId) : undefined;
     return tool && shape ? { tool, shape, state: sculptMeshFor(shape) } : null;
   };
+  /** The Select and Unselect brushes: the whole stroke at once, on the welded copy (build 69/71). */
   const applySculptStroke = useCallback((points: TrimPoint[]) => {
     const target = sculptTarget();
     if (!target || !target.tool.tool || !window.layerlingProjectPoints || !window.layerlingCameraPosition) return;
-    const { tool, shape, state } = target;
-    const eye = window.layerlingCameraPosition();
-    if (tool.tool === "select" || tool.tool === "unselect") {
-      brushChoice(state.mesh, window.layerlingProjectPoints(cornerPositions(state.mesh)), eye, points, tool.size, state.chosen, tool.tool === "select", tool.reach);
-      setSculptTool((current) => current ? { ...current, chosen: state.chosen.reduce((a, b) => a + b, 0) } : current);
-      return;
-    }
-    const brush = tool.tool;
-    if (!brush) return;
-    const projected = window.layerlingProjectPoints(cornerPositions(state.mesh));
-    const weights = strokeWeights(state.mesh, projected, eye, points, tool.size, tool.strength);
-    if (!weights.some((w) => w > 0)) { setNotice(t("sculpt.nothing")); return; }
-    state.undo.push(state.mesh.points.slice());
-    if (state.undo.length > 40) state.undo.shift();
-    state.redo = [];
-    // Inflate and Deflate move up to a quarter of the brush's radius a stroke at full strength; Smooth
-    // evens out bumps up to the brush's size.
-    const radius = tool.size * millimetresPerPixel(state.mesh, projected, weights);
-    const step = radius * 0.25;
-    applyBrush(state.mesh, brush, weights, step, smoothingPasses(radius, averageEdge(state.mesh, weights), tool.strength));
-    // Build 69: the strokes change a working copy, drawn at once; the part itself is rebuilt once, when
-    // Sculpt is left (Done, another part, another tool). Ctrl+Z takes strokes back inside the session.
-    state.drawn = soupFloat32(state.mesh, state.drawn);
-    window.layerlingSculptPreview?.(shape.id, state.drawn, shape.color);
-    state.strokes += 1;
-    state.lastBrush = brush;
+    const { tool, state } = target;
+    if (tool.tool !== "select" && tool.tool !== "unselect") return;
+    const selection = sculptSelectionOf(state);
+    brushChoice(selection.mesh, window.layerlingProjectPoints(cornerPositions(selection.mesh)), window.layerlingCameraPosition(), points, tool.size, selection.chosen, tool.tool === "select", tool.reach);
+    setSculptTool((current) => current ? { ...current, chosen: selection.chosen.reduce((a, b) => a + b, 0) } : current);
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Build 73: live brushes. A stroke is a stream of dabs along the pointer's path, applied as it moves,
+  // a frame at a time; the GPU buffers get only what changed. Refine keeps the triangles under the
+  // brush near a size that follows the brush.
+  const sculptStroke = useRef<SculptStroke | null>(null);
+  /** The brush's radius in mm where it meets the surface: `px` page pixels at that depth. */
+  const brushRadiusAt = (x: number, y: number, px: number, at: Vec3) => {
+    const a = window.layerlingScreenRay?.(x, y), b = window.layerlingScreenRay?.(x + px, y);
+    if (!a || !b) return 1;
+    const n = a.direction;
+    const meet = (ray: { origin: Vec3; direction: Vec3 }) => {
+      const denom = ray.direction[0] * n[0] + ray.direction[1] * n[1] + ray.direction[2] * n[2];
+      const s = ((at[0] - ray.origin[0]) * n[0] + (at[1] - ray.origin[1]) * n[1] + (at[2] - ray.origin[2]) * n[2]) / (denom || 1e-9);
+      return [ray.origin[0] + ray.direction[0] * s, ray.origin[1] + ray.direction[1] * s, ray.origin[2] + ray.direction[2] * s];
+    };
+    const p = meet(a), q = meet(b);
+    return Math.max(0.05, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]));
+  };
+  const mirrorOf = (state: SculptSession, symmetry: SculptSymmetry, p: Vec3): Vec3 | null => {
+    if (symmetry === "off") return null;
+    const k = symmetry === "x" ? 0 : 2;
+    const out: Vec3 = [p[0], p[1], p[2]];
+    out[k] = 2 * state.centre[k] - p[k];
+    return out;
+  };
+  const sculptDab = (stroke: SculptStroke, x: number, y: number) => {
+    const state = sculptState.current;
+    if (!state || stroke.brush === "move") return;
+    const ray = window.layerlingScreenRay?.(x, y);
+    if (!ray) return;
+    const hit = state.live.pick(ray.origin, ray.direction);
+    if (!hit) return;
+    stroke.touched = true;
+    const radius = brushRadiusAt(x, y, stroke.sizePx, hit.point);
+    const normal = state.live.vertexNormal(state.live.tri[hit.triangle * 3]);
+    const step = radius * 0.06;
+    state.live.dab(stroke.brush, hit.point, [normal.x, normal.y, normal.z], radius, state.live.region(hit.point, radius, hit.triangle), stroke.strength, step);
+    stroke.balls.push({ centre: hit.point, radius });
+    const mirrored = mirrorOf(state, stroke.symmetry, hit.point);
+    if (mirrored) {
+      const k = stroke.symmetry === "x" ? 0 : 2;
+      const n: Vec3 = [normal.x, normal.y, normal.z];
+      n[k] = -n[k];
+      state.live.dab(stroke.brush, mirrored, n, radius, state.live.region(mirrored, radius, null), stroke.strength, step);
+      stroke.balls.push({ centre: mirrored, radius });
+    }
+  };
+  /** Refines round the balls the dabs since the last frame covered, within a time budget. */
+  const sculptRefineBalls = (stroke: SculptStroke, milliseconds: number) => {
+    const state = sculptState.current;
+    if (!state || stroke.refine === "off" || !stroke.balls.length) { stroke.balls = []; return; }
+    const factor = stroke.refine === "fine" ? 0.06 : stroke.refine === "coarse" ? 0.2 : 0.11;
+    // Fewer, wider balls: neighbouring dabs overlap, so only every few is refined.
+    const balls = stroke.balls;
+    stroke.balls = [];
+    const per = milliseconds / Math.min(balls.length, 6);
+    const stride = Math.max(1, Math.floor(balls.length / 6));
+    for (let k = 0; k < balls.length; k += stride) {
+      const { centre, radius } = balls[k];
+      const reach = radius * 1.15;
+      state.live.refine(state.live.region(centre, reach, null).keys(), Math.max(0.03, radius * factor), { within: { centre, radius: reach }, budget: 600, milliseconds: per });
+    }
+  };
+  const sculptFrame = () => {
+    const stroke = sculptStroke.current;
+    const state = sculptState.current;
+    if (!stroke || !state) return;
+    stroke.frame = 0;
+    const started = performance.now();
+    const pending = stroke.pending;
+    stroke.pending = [];
+    if (stroke.brush === "move") {
+      const last = pending[pending.length - 1];
+      if (last && stroke.grab) {
+        const ray = window.layerlingScreenRay?.(last[0], last[1]);
+        if (ray) {
+          const { point, normal } = stroke.grab.plane;
+          const denom = ray.direction[0] * normal[0] + ray.direction[1] * normal[1] + ray.direction[2] * normal[2];
+          if (Math.abs(denom) > 1e-9) {
+            const s = ((point[0] - ray.origin[0]) * normal[0] + (point[1] - ray.origin[1]) * normal[1] + (point[2] - ray.origin[2]) * normal[2]) / denom;
+            const delta: Vec3 = [ray.origin[0] + ray.direction[0] * s - point[0], ray.origin[1] + ray.direction[1] * s - point[1], ray.origin[2] + ray.direction[2] * s - point[2]];
+            state.live.drag(stroke.grab.corners, delta);
+            if (stroke.grab.mirrored) {
+              const k = stroke.symmetry === "x" ? 0 : 2;
+              const m: Vec3 = [delta[0], delta[1], delta[2]];
+              m[k] = -m[k];
+              state.live.drag(stroke.grab.mirrored, m);
+            }
+            stroke.touched = true;
+          }
+        }
+      }
+    } else {
+      // Dabs a fifth of the brush apart along the path.
+      const spacing = Math.max(2, stroke.sizePx * 0.2);
+      for (const [x, y] of pending) {
+        const [lx, ly] = stroke.last ?? [x, y];
+        const length = Math.hypot(x - lx, y - ly);
+        if (stroke.last && length < spacing) continue;
+        const count = stroke.last ? Math.max(1, Math.floor(length / spacing)) : 1;
+        for (let k = 1; k <= count; k += 1) {
+          sculptDab(stroke, lx + ((x - lx) * k) / count, ly + ((y - ly) * k) / count);
+          if (performance.now() - started > 24) break;
+        }
+        stroke.last = [x, y];
+      }
+      sculptRefineBalls(stroke, Math.max(2, 14 - (performance.now() - started)));
+    }
+    if (state.live.flushGpu()) window.layerlingRedraw?.();
+  };
+  const startSculptStroke = useCallback((x: number, y: number) => {
+    const target = sculptTarget();
+    if (!target || !target.tool.tool || target.tool.tool === "select" || target.tool.tool === "unselect") return;
+    const { tool, shape, state } = target;
+    const ray = window.layerlingScreenRay?.(x, y);
+    const hit = ray ? state.live.pick(ray.origin, ray.direction) : null;
+    if (!ray || !hit) { setNotice(t("sculpt.nothing")); return; }
+    window.layerlingSculptLive?.(shape.id, state.live.geometry, shape.color);
+    const brush = tool.tool as LiveBrush;
+    const stroke: SculptStroke = {
+      brush, sizePx: tool.size, strength: tool.strength, refine: brush === "move" ? "off" : tool.refine, symmetry: tool.symmetry,
+      pending: [], last: null, frame: 0, balls: [], touched: false,
+      before: state.live.pos.slice(0, state.live.vCount * 3), beforeMesh: tool.refine !== "off" ? state.live.compact() : null, edits: state.live.topologyEdits,
+    };
+    if (brush === "move") {
+      const radius = brushRadiusAt(x, y, tool.size, hit.point);
+      const grabOf = (centre: Vec3, seed: number | null) => {
+        const out: Array<[number, number, number, number, number]> = [];
+        for (const [v, d] of state.live.region(centre, radius, seed)) {
+          const f = 1 - (d / radius) ** 2;
+          if (f > 0) out.push([v, f * f * tool.strength * 2, state.live.pos[v * 3], state.live.pos[v * 3 + 1], state.live.pos[v * 3 + 2]]);
+        }
+        return out;
+      };
+      const mirrored = mirrorOf(state, tool.symmetry, hit.point);
+      stroke.grab = { plane: { point: hit.point, normal: [-ray.direction[0], -ray.direction[1], -ray.direction[2]] }, corners: grabOf(hit.point, hit.triangle), mirrored: mirrored ? grabOf(mirrored, null) : null, radius, centre: hit.point };
+    }
+    sculptStroke.current = stroke;
+    stroke.pending.push([x, y]);
+    sculptFrame();
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  const moveSculptStroke = useCallback((x: number, y: number) => {
+    const stroke = sculptStroke.current;
+    if (!stroke) return;
+    stroke.pending.push([x, y]);
+    if (!stroke.frame) stroke.frame = requestAnimationFrame(sculptFrame);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const endSculptStroke = useCallback(() => {
+    const stroke = sculptStroke.current;
+    const state = sculptState.current;
+    sculptStroke.current = null;
+    if (!stroke || !state) return;
+    if (stroke.frame) cancelAnimationFrame(stroke.frame);
+    sculptStroke.current = stroke;
+    sculptFrame();
+    sculptStroke.current = null;
+    // Move stretches the surface: the triangles it pulled are evened out once it lets go.
+    if (stroke.brush === "move" && stroke.grab && sculptTool?.refine !== "off") {
+      const factor = sculptTool?.refine === "fine" ? 0.06 : sculptTool?.refine === "coarse" ? 0.2 : 0.11;
+      const corners = stroke.grab.corners.map((g) => g[0]).filter((v) => state.live.vAlive[v]);
+      const reach = stroke.grab.radius * 3;
+      state.live.refine(corners, Math.max(0.03, stroke.grab.radius * factor), { within: { centre: stroke.grab.centre, radius: reach }, budget: 20000, milliseconds: 300 });
+      if (state.live.flushGpu()) window.layerlingRedraw?.();
+    }
+    if (!stroke.touched) return;
+    // One step of undo for the stroke: the corners it moved, or the whole mesh when it changed triangles.
+    let entry: SculptUndo;
+    if (state.live.topologyEdits !== stroke.edits && stroke.beforeMesh) entry = { kind: "mesh", points: stroke.beforeMesh.points, triangles: stroke.beforeMesh.triangles };
+    else if (state.live.topologyEdits !== stroke.edits) {
+      // Changed triangles without a copy from before (Move's evening out): back to the corners only is not possible, so keep the mesh as it is now.
+      entry = { kind: "mesh", ...state.live.compact() };
+    } else {
+      const corners: number[] = [], values: number[] = [];
+      const p = state.live.pos, b = stroke.before;
+      for (let v = 0; v * 3 < b.length; v += 1) {
+        if (p[v * 3] !== b[v * 3] || p[v * 3 + 1] !== b[v * 3 + 1] || p[v * 3 + 2] !== b[v * 3 + 2]) { corners.push(v); values.push(b[v * 3], b[v * 3 + 1], b[v * 3 + 2]); }
+      }
+      entry = { kind: "moves", corners: Int32Array.from(corners), values: Float64Array.from(values) };
+    }
+    state.undo.push(entry);
+    // At most about 300 MB of steps back.
+    let bytes = state.undo.reduce((sum, e) => sum + undoBytes(e), 0);
+    while (state.undo.length > 1 && bytes > 300e6) bytes -= undoBytes(state.undo.shift()!);
+    state.redo = [];
+    state.strokes += 1;
+    state.lastBrush = stroke.brush;
+    // A selection is of triangles: one the stroke re-made is gone.
+    if (state.selection) {
+      if (state.live.topologyEdits !== stroke.edits) { const had = state.selection.chosen.some((c) => c); state.selection = null; if (had) { setSculptTool((current) => current ? { ...current, chosen: 0 } : current); setNotice(t("sculpt.selectionGone")); } }
+      else state.selection.stale = true;
+    }
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const applySculptSelection = useCallback((action: SculptSelectionAction) => {
     flushSculpt();
     const target = sculptTarget();
     if (!target) return;
     const { shape, state } = target;
-    const count = () => state.chosen.reduce((a, b) => a + b, 0);
+    const selection = sculptSelectionOf(state);
+    const count = () => selection.chosen.reduce((a, b) => a + b, 0);
     if (action === "clear" || action === "invert" || action === "grow") {
-      state.chosen = action === "clear" ? new Uint8Array(state.chosen.length) : action === "invert" ? invertChoice(state.chosen) : growChoice(state.mesh, state.chosen);
+      selection.chosen = action === "clear" ? new Uint8Array(selection.chosen.length) : action === "invert" ? invertChoice(selection.chosen) : growChoice(selection.mesh, selection.chosen);
       setSculptTool((current) => current ? { ...current, chosen: count() } : current);
       return;
     }
     if (!count()) return;
     if (action === "delete") {
       const removed = count();
-      const left = withoutTriangles(soupOf(state.mesh), state.chosen);
+      const left = withoutTriangles(soupOf(selection.mesh), selection.chosen);
       if (!left.length) return;
       commitSculpt(shape, left, t("sculpt.deleted", { count: removed.toLocaleString() }), false);
       setSculptTool((current) => current ? { ...current, chosen: 0 } : current);
       return;
     }
-    applyToSelection(state.mesh, state.chosen, action);
-    commitSculpt(shape, soupOf(state.mesh), t("sculpt.selectionDone", { action: t(`sculpt.selection.${action}`) }), true);
+    applyToSelection(selection.mesh, selection.chosen, action);
+    const positions = soupOf(selection.mesh);
+    commitSculpt(shape, positions, t("sculpt.selectionDone", { action: t(`sculpt.selection.${action}`) }), true);
+    // The live copy follows (same triangles, same order), and the selection stays.
+    const kept = selection.chosen;
+    state.live.dispose();
+    state.live = LiveMesh.fromSoup(positions);
+    state.selection = { mesh: selection.mesh, chosen: kept, stale: false };
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
   const applyRemesh = useCallback(() => {
     flushSculpt();
@@ -9070,12 +9263,13 @@ export function LayerlingEditor({
     setSculptTool({ ...tool, busy: true, error: null });
     window.setTimeout(async () => {
       try {
-        const result = await remeshInBackground(soupOf(state.mesh), { mode: tool.remeshMode, detail: tool.detail, amount: tool.amount });
+        const result = await remeshInBackground(state.live.soup(), { mode: tool.remeshMode, detail: tool.detail, amount: tool.amount });
         const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
         if (!current || projectShapesFingerprint([current]) !== fingerprint) throw new Error(t("sculpt.changed"));
         const amount = tool.amount.toFixed(1);
         const message = tool.remeshMode === "remesh" ? t("sculpt.remeshed", { triangles: result.triangles.toLocaleString(), voxel: result.voxel.toFixed(2) })
           : tool.remeshMode === "offset" ? t("sculpt.offsetDone", { amount }) : t("sculpt.thickened", { amount });
+        window.layerlingSculptLive?.(shape.id, null);
         commitSculpt(current, result.positions, message + (result.coarse ? t("sculpt.coarse", { voxel: result.voxel.toFixed(2) }) : ""), false);
         setSculptTool((latest) => latest ? { ...latest, busy: false, chosen: 0 } : latest);
       } catch (error) {
@@ -9087,7 +9281,7 @@ export function LayerlingEditor({
   useEffect(() => {
     if (sculptTool && !sculptTool.busy && !(selectedIds.length === 1 && selectedIds[0] === sculptTool.shapeId)) { flushSculptRef.current(); setSculptTool(null); }
   }, [sculptTool, selectedIds]);
-  useEffect(() => { if (!sculptTool) sculptState.current = null; }, [sculptTool]);
+  useEffect(() => { if (!sculptTool) { sculptState.current?.live.dispose(); sculptState.current = null; } }, [sculptTool]);
   const sculptOpen = Boolean(sculptTool);
   useEffect(() => {
     const id = sculptPreviewDone.current;
@@ -9095,22 +9289,33 @@ export function LayerlingEditor({
     sculptPreviewDone.current = null;
     // Two frames: one for the view to rebuild the part, one to draw it.
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (!sculptState.current?.strokes) window.layerlingSculptPreview?.(id, null);
+      if (!sculptState.current?.strokes && !sculptStroke.current) window.layerlingSculptLive?.(id, null);
     }));
   }, [shapes]);
-  useEffect(() => { if (!sculptTool) window.layerlingSculptPreview?.("", null); }, [sculptTool]);
-  /** Ctrl+Z / Ctrl+Shift+Z inside a Sculpt session: the last stroke back (or again), on the working copy. */
+  useEffect(() => { if (!sculptTool) window.layerlingSculptLive?.("", null); }, [sculptTool]);
+  /** Ctrl+Z / Ctrl+Shift+Z inside a Sculpt session: the last stroke back (or again), on the live copy. */
   const stepSculpt = (back: boolean) => {
     const state = sculptState.current;
     const from = back ? state?.undo : state?.redo;
     if (!state || !from?.length) return false;
-    (back ? state.redo : state.undo).push(state.mesh.points.slice());
-    state.mesh.points = from.pop()!;
+    const entry = from.pop()!;
+    if (entry.kind === "moves") {
+      const now = new Float64Array(entry.values.length);
+      for (let k = 0; k < entry.corners.length; k += 1) { const v = entry.corners[k]; now[k * 3] = state.live.pos[v * 3]; now[k * 3 + 1] = state.live.pos[v * 3 + 1]; now[k * 3 + 2] = state.live.pos[v * 3 + 2]; }
+      (back ? state.redo : state.undo).push({ kind: "moves", corners: entry.corners, values: now });
+      state.live.setPositions(entry.corners, entry.values);
+    } else {
+      (back ? state.redo : state.undo).push({ kind: "mesh", ...state.live.compact() });
+      state.live.dispose();
+      state.live = new LiveMesh(entry.points, entry.triangles);
+      state.selection = null;
+    }
     state.strokes += back ? -1 : 1;
-    state.drawn = soupFloat32(state.mesh, state.drawn);
     const shape = shapesRef.current.find((candidate) => candidate.id === state.shapeId);
-    if (state.strokes <= 0 && !state.undo.length) { state.strokes = 0; window.layerlingSculptPreview?.(state.shapeId, null); }
-    else window.layerlingSculptPreview?.(state.shapeId, state.drawn, shape?.color);
+    state.live.flushGpu();
+    if (state.strokes <= 0 && !state.undo.length) { state.strokes = 0; window.layerlingSculptLive?.(state.shapeId, null); }
+    else window.layerlingSculptLive?.(state.shapeId, state.live.geometry, shape?.color);
+    window.layerlingRedraw?.();
     setNotice(t(back ? "sculpt.undone" : "sculpt.redone"));
     return true;
   };
@@ -9504,10 +9709,12 @@ export function LayerlingEditor({
     }
     sculptWasOpen.current = true;
     if (!sculptTool.chosen) { window.layerlingHighlight?.(null); return; }
-    const world = state.drawn ?? soupFloat32(state.mesh);
+    const selection = state.selection;
+    if (!selection) { window.layerlingHighlight?.(null); return; }
+    const world = soupFloat32(selection.mesh);
     const parts = new Float32Array(sculptTool.chosen * 9);
     let at = 0;
-    for (let t = 0; t < state.chosen.length && at < parts.length; t += 1) if (state.chosen[t]) { for (let k = 0; k < 9; k += 1) parts[at + k] = world[t * 9 + k]; at += 9; }
+    for (let t = 0; t < selection.chosen.length && at < parts.length; t += 1) if (selection.chosen[t]) { for (let k = 0; k < 9; k += 1) parts[at + k] = world[t * 9 + k]; at += 9; }
     window.layerlingHighlight?.(parts);
   }, [sculptTool, shapes]);
   const chooseDentalAreaTool = useCallback((slot: "upper" | "lower", tool: DentalAreaTool | null) => {
@@ -15791,6 +15998,10 @@ export function LayerlingEditor({
           onSize={(size) => setSculptTool((current) => current ? { ...current, size: Math.max(4, Math.min(150, size)) } : current)}
           reach={sculptTool.reach}
           onReach={(reach) => { storeSculptReach(reach); setSculptTool((current) => current ? { ...current, reach } : current); }}
+          refine={sculptTool.refine}
+          symmetry={sculptTool.symmetry}
+          onRefine={(refine) => { storeSculptRefine(refine); setSculptTool((current) => current ? { ...current, refine } : current); }}
+          onSymmetry={(symmetry) => setSculptTool((current) => current ? { ...current, symmetry } : current)}
           onStrength={(strength) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.05, Math.min(1, strength)) } : current)}
           onSelection={applySculptSelection}
           onRemeshMode={(remeshMode) => setSculptTool((current) => current && !current.busy ? { ...current, remeshMode, amount: remeshMode === "thicken" ? Math.max(0.2, Math.abs(current.amount)) : current.amount, error: null } : current)}
@@ -15802,7 +16013,14 @@ export function LayerlingEditor({
         />
       ) : null}
       {sculptTool?.tool && !sculptTool.busy ? (
-        <DentalBrushOverlay hint={t("sculpt.hint", { brush: t(`sculpt.tool.${sculptTool.tool}`) })} radius={sculptTool.size} erase={sculptTool.tool === "unselect"} onDone={applySculptStroke} onCancel={() => setSculptTool((current) => current ? { ...current, tool: null } : current)} />
+        <DentalBrushOverlay
+          hint={t("sculpt.hint", { brush: t(`sculpt.tool.${sculptTool.tool}`) })}
+          radius={sculptTool.size}
+          erase={sculptTool.tool === "unselect"}
+          onDone={applySculptStroke}
+          onCancel={() => { endSculptStroke(); setSculptTool((current) => current ? { ...current, tool: null } : current); }}
+          live={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : { start: startSculptStroke, move: moveSculptStroke, end: endSculptStroke }}
+        />
       ) : null}
       {textureTool ? (
         <SurfaceTexturePanel
@@ -16086,6 +16304,51 @@ function faceOutlineSpan(face: { outline: { loops: ReadonlyArray<ReadonlyArray<{
 }
 
 /** Build 71: the Select brush's reach (front, back side, through), remembered on this computer. */
+/** Build 73: a Sculpt session - the live copy of one part, its selection and its steps back. */
+type SculptUndo = { kind: "moves"; corners: Int32Array; values: Float64Array } | { kind: "mesh"; points: Float64Array; triangles: Uint32Array };
+type SculptSession = {
+  shapeId: string;
+  key: string;
+  live: LiveMesh;
+  /** The middle of the part when Sculpt opened, for symmetry. */
+  centre: Vec3;
+  selection: { mesh: SculptMesh; chosen: Uint8Array; stale: boolean } | null;
+  strokes: number;
+  lastBrush: SculptTool | null;
+  undo: SculptUndo[];
+  redo: SculptUndo[];
+};
+type SculptStroke = {
+  brush: LiveBrush;
+  sizePx: number;
+  strength: number;
+  refine: SculptRefine;
+  symmetry: SculptSymmetry;
+  pending: Array<[number, number]>;
+  last: [number, number] | null;
+  frame: number;
+  balls: Array<{ centre: Vec3; radius: number }>;
+  touched: boolean;
+  before: Float64Array;
+  beforeMesh: { points: Float64Array; triangles: Uint32Array } | null;
+  edits: number;
+  grab?: { plane: { point: Vec3; normal: Vec3 }; corners: Array<[number, number, number, number, number]>; mirrored: Array<[number, number, number, number, number]> | null; radius: number; centre: Vec3 };
+};
+function undoBytes(entry: SculptUndo) {
+  return entry.kind === "moves" ? entry.corners.byteLength + entry.values.byteLength : entry.points.byteLength + entry.triangles.byteLength;
+}
+function readSculptRefine(): SculptRefine {
+  try {
+    const stored = window.localStorage.getItem("pare3d.sculptRefine");
+    return stored === "off" || stored === "coarse" || stored === "fine" ? stored : "medium";
+  } catch {
+    return "medium";
+  }
+}
+function storeSculptRefine(refine: SculptRefine) {
+  try { window.localStorage.setItem("pare3d.sculptRefine", refine); } catch { /* holds for this session */ }
+}
+
 function readSculptReach(): SelectReach {
   try {
     const stored = window.localStorage.getItem("pare3d.sculptReach");

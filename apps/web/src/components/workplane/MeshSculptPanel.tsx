@@ -6,17 +6,22 @@ import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
-import type { SculptBrush, SelectReach } from "@/lib/meshSculpt";
+import type { SelectReach } from "@/lib/meshSculpt";
+import type { LiveBrush } from "@/lib/liveSculpt";
 import type { RemeshMode } from "@/lib/meshRemesh";
 import type { WorkplaneWorkspaceSettings } from "@/types/layerling";
 
-export type SculptTool = "select" | "unselect" | SculptBrush;
+export type SculptTool = "select" | "unselect" | LiveBrush;
+/** Build 73: how finely the triangles under a brush are remade as it goes (Meshmixer's Refine). */
+export type SculptRefine = "off" | "coarse" | "medium" | "fine";
+/** Build 73: a brush also works mirrored across the part's middle, left-right (x) or front-back (z). */
+export type SculptSymmetry = "off" | "x" | "z";
 export type SculptSelectionAction = "delete" | "smooth" | "flatten" | "grow" | "invert" | "clear";
 
-/** Remesh, Offset and Thicken in the panel: off for now (see below). */
-export const WHOLE_PART_TOOLS = false;
+/** Remesh, Offset and Thicken in the panel: on again in build 73 (they keep the part's surface now). */
+export const WHOLE_PART_TOOLS = true;
 
-export const SCULPT_TOOLS: SculptTool[] = ["smooth", "flatten", "inflate", "deflate", "select", "unselect"];
+export const SCULPT_TOOLS: SculptTool[] = ["draw", "inflate", "deflate", "smooth", "flatten", "pinch", "crease", "move", "select", "unselect"];
 
 /** Build 69: Sculpt - brushes that shape a mesh, a brush that selects a patch of it, and the whole part rebuilt. */
 export function MeshSculptPanel({
@@ -26,6 +31,8 @@ export function MeshSculptPanel({
   strength,
   reach,
   chosen,
+  refine,
+  symmetry,
   remeshMode,
   detail,
   amount,
@@ -36,6 +43,8 @@ export function MeshSculptPanel({
   onSize,
   onStrength,
   onReach,
+  onRefine,
+  onSymmetry,
   onSelection,
   onRemeshMode,
   onDetail,
@@ -50,6 +59,8 @@ export function MeshSculptPanel({
   strength: number;
   reach: SelectReach;
   chosen: number;
+  refine: SculptRefine;
+  symmetry: SculptSymmetry;
   remeshMode: RemeshMode;
   detail: number;
   amount: number;
@@ -60,6 +71,8 @@ export function MeshSculptPanel({
   onSize: (value: number) => void;
   onStrength: (value: number) => void;
   onReach: (reach: SelectReach) => void;
+  onRefine: (refine: SculptRefine) => void;
+  onSymmetry: (symmetry: SculptSymmetry) => void;
   onSelection: (action: SculptSelectionAction) => void;
   onRemeshMode: (mode: RemeshMode) => void;
   onDetail: (value: number) => void;
@@ -96,6 +109,29 @@ export function MeshSculptPanel({
       {tool !== "select" && tool !== "unselect" ? (
         <EdgeModifierSlider label={t("sculpt.strength")} value={Math.round(strength * 100)} min={5} max={100} step={5} unit="%" workspace={workspace} disabled={busy} onChange={(value) => onStrength(value / 100)} />
       ) : null}
+      {tool !== "select" && tool !== "unselect" ? (<>
+        <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.refine")}>
+          <span className="sculpt-reach-label">{t("sculpt.refine")}</span>
+          <div className="shell-opening-options">
+            {(["off", "coarse", "medium", "fine"] as const).map((value) => (
+              <button key={value} type="button" role="radio" aria-checked={refine === value} className={refine === value ? "active" : ""} disabled={busy} onClick={() => onRefine(value)}>
+                {t(`sculpt.refine.${value}`)}
+              </button>
+            ))}
+          </div>
+          <p className="blend-hint">{t(refine === "off" ? "sculpt.refine.offHint" : "sculpt.refine.onHint")}</p>
+        </div>
+        <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.symmetry")}>
+          <span className="sculpt-reach-label">{t("sculpt.symmetry")}</span>
+          <div className="shell-opening-options">
+            {(["off", "x", "z"] as const).map((value) => (
+              <button key={value} type="button" role="radio" aria-checked={symmetry === value} className={symmetry === value ? "active" : ""} disabled={busy} onClick={() => onSymmetry(value)}>
+                {t(`sculpt.symmetry.${value}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </>) : null}
       {tool === "select" || tool === "unselect" ? (
         <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.reach")}>
           <span className="sculpt-reach-label">{t("sculpt.reach")}</span>

@@ -164,7 +164,10 @@ describe("remesh, offset and thicken (build 69)", () => {
     const top: number[] = [];
     for (let t = 0; t < plate.length; t += 9) if (plate[t + 1] > 0.49 && plate[t + 4] > 0.49 && plate[t + 7] > 0.49) top.push(...plate.slice(t, t + 9));
     expect(meshHealth(top).openEdges).toBeGreaterThan(0);
-    await expect(remeshPositions(top, { mode: "remesh", detail: 0.5, amount: 0 })).rejects.toThrow(/closed solid/);
+    // Build 73: Remesh works on the surface itself, so an open scan is evened out and stays open.
+    const evened = await remeshPositions(top, { mode: "remesh", detail: 0.5, amount: 0 });
+    expect(meshHealth(evened.positions).openEdges).toBeGreaterThan(0);
+    expect(evened.triangles).toBeGreaterThan(top.length / 9);
     const shell = await remeshPositions(top, { mode: "thicken", detail: 0.5, amount: 2 });
     expect(meshHealth(shell.positions).openEdges).toBe(0);
     // 30 x 30 x 2, with rounded rims.

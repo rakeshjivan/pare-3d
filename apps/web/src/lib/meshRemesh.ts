@@ -129,8 +129,54 @@ function meshPositions(solid: { getMesh(): { numProp: number; vertProperties: Fl
   return out;
 }
 
-/** Rebuilds a part (world positions) as Remesh, Offset or Thicken say. Throws with a message for the person. */
+/**
+ * Build 73: Remesh, Offset and Thicken on the surface itself (the live Sculpt engine), so a scan keeps
+ * its detail: Remesh evens the triangles to about `detail` mm while pulling every corner back onto the
+ * part's own surface; Offset moves the surface along its (smoothed) normals and evens it again;
+ * Thicken makes a shell centred on the surface, its rims joined. The voxel version (below) is kept.
+ */
 export async function remeshPositions(positions: ArrayLike<number>, options: RemeshOptions): Promise<RemeshResult> {
+  const { mode } = options;
+  const amount = mode === "remesh" ? 0 : options.amount;
+  if (mode === "thicken" && !(amount > 0)) throw new Error("Choose a thickness above 0 mm");
+  if (mode === "offset" && amount === 0) throw new Error("Choose a distance other than 0 mm");
+  const { LiveMesh, offsetLive, remeshLive, thickenSoup } = await import("@/lib/liveSculpt");
+  const detail = Math.max(0.03, options.detail);
+  const mesh = LiveMesh.fromSoup(positions);
+  if (!mesh.triangleCount()) throw new Error("This part has no surface to work on");
+  let out: Float32Array;
+  if (mode === "remesh") {
+    remeshLive(mesh, detail, 5);
+    out = mesh.soup();
+  } else if (mode === "offset") {
+    // Even first at the detail, so a long sliver does not tear when its corners move apart.
+    remeshLive(mesh, detail, 2);
+    const before = signedVolume(mesh.soup());
+    offsetLive(mesh, amount);
+    out = mesh.soup();
+    // Shrunk through itself, a closed part turns inside out (its volume changes sign) or to nothing.
+    const after = signedVolume(out);
+    if (amount < 0 && Math.abs(before) > 1e-6 && (Math.sign(after) !== Math.sign(before) || Math.abs(after) < Math.abs(before) * 0.02)) {
+      throw new Error("Nothing is left after shrinking by that much - try a smaller distance");
+    }
+    remeshLive(mesh, detail, 2);
+    out = mesh.soup();
+  } else {
+    remeshLive(mesh, Math.min(detail, amount), 2);
+    out = thickenSoup(mesh, amount);
+  }
+  mesh.dispose();
+  return { positions: Array.from(out), voxel: detail, coarse: false, triangles: out.length / 9 };
+}
+
+function signedVolume(p: ArrayLike<number>) {
+  let v = 0;
+  for (let i = 0; i + 8 < p.length; i += 9) v += (p[i] * (p[i + 4] * p[i + 8] - p[i + 5] * p[i + 7]) - p[i + 1] * (p[i + 3] * p[i + 8] - p[i + 5] * p[i + 6]) + p[i + 2] * (p[i + 3] * p[i + 7] - p[i + 4] * p[i + 6])) / 6;
+  return v;
+}
+
+/** Rebuilds a part (world positions) as Remesh, Offset or Thicken say, on a voxel grid (build 69). Throws with a message for the person. */
+export async function voxelRemeshPositions(positions: ArrayLike<number>, options: RemeshOptions): Promise<RemeshResult> {
   const { mode } = options;
   const amount = mode === "remesh" ? 0 : options.amount;
   if (mode === "thicken" && !(amount > 0)) throw new Error("Choose a thickness above 0 mm");
