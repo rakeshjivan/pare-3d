@@ -58,22 +58,31 @@ export function archCurve(points: Float32Array, above = 3): ArchCurve {
   const ys = crown.map((p) => p[1]);
   const yFront = percentile(ys, 0.01), yBack = percentile(ys, 0.99);
   const centre: Vec2 = [0, yFront + 0.62 * (yBack - yFront)];
-  // Buckets by angle around the centre. The crown band is set per bucket from its own top: with the
-  // curve of Spee (or a compensating curve) the last molars sit several mm below the front teeth.
-  const near = new Map<number, [number, number][]>();
+  // The biting surfaces: top-surface cells of a 1 mm height map within 2.5 mm of the highest in their
+  // part of the arch (the curve of Spee lowers the back teeth).
+  const cell = new Map<string, [number, number, number]>();
   for (let i = 0; i < points.length; i += 3) {
-    const x = points[i], y = points[i + 1], zc = points[i + 2];
-    if (zc <= zTop - 7 || zc >= above + 1) continue;
-    const angle = (Math.atan2(x - centre[0], -(y - centre[1])) * 180) / Math.PI;
-    const key = Math.round(angle / 2);
-    (near.get(key) ?? near.set(key, []).get(key)!).push([Math.hypot(x - centre[0], y - centre[1]), zc]);
+    const zc = points[i + 2];
+    if (zc <= zTop - 8 || zc >= above + 1) continue;
+    const key = `${Math.round(points[i])},${Math.round(points[i + 1])}`;
+    const c = cell.get(key);
+    if (!c || zc > c[2]) cell.set(key, [points[i], points[i + 1], zc]);
   }
+  // Every top-surface cell counts (side walls drop out of a height map); peaks alone favour one row of cusps.
+  const peaks = [...cell.values()];
+  const angleKey = (x: number, y: number) => Math.round(((Math.atan2(x - centre[0], -(y - centre[1])) * 180) / Math.PI) / 2);
+  // The highest tip per 20-degree span sets the level for that part of the arch.
+  const spanTop = new Map<number, number>();
+  const spanZ = new Map<number, number[]>();
+  for (const [x, y, zc] of peaks) { const k = Math.round(angleKey(x, y) / 10); (spanZ.get(k) ?? spanZ.set(k, []).get(k)!).push(zc); }
+  for (const [k, zs] of spanZ) spanTop.set(k, percentile(zs, 0.97));
   const buckets = new Map<number, number[]>();
-  for (const [key, list] of near) {
-    const top = percentile(list.map((e) => e[1]), 0.98);
-    buckets.set(key, list.filter((e) => e[1] > top - 3).map((e) => e[0]));
+  for (const [x, y, zc] of peaks) {
+    const k = angleKey(x, y);
+    if (zc < (spanTop.get(Math.round(k / 10)) ?? Infinity) - 2.5) continue;
+    (buckets.get(k) ?? buckets.set(k, []).get(k)!).push(Math.hypot(x - centre[0], y - centre[1]));
   }
-  const keys = [...buckets.keys()].filter((k) => buckets.get(k)!.length >= 6).sort((a, b) => a - b);
+  const keys = [...buckets.keys()].filter((k) => buckets.get(k)!.length >= 3).sort((a, b) => a - b);
   let pts: Vec2[] = keys.map((k) => {
     const a = (k * 2 * Math.PI) / 180, r = percentile(buckets.get(k)!, 0.5);
     return [centre[0] + r * Math.sin(a), centre[1] - r * Math.cos(a)];
@@ -301,7 +310,7 @@ type Closest = { closestPointToPoint(p: THREE.Vector3, target: { point: THREE.Ve
  * Fits the tooth onto the scanned tooth under it (closest-point iterations, its upper crown only):
  * for a wax-up over existing teeth the library crown then follows the patient's tooth, and the wax is
  * what the library shape adds. Refused (left as seated) when it would move more than 3 mm or turn more
- * than 12 degrees - over a gap, say.
+ * than 12 degrees (25 when the crown fits within 0.7 mm) - over a gap, say.
  */
 export function fitTooth(tooth: PlacedTooth, scan: Closest, iterations = 16): boolean {
   tooth.fit = new THREE.Matrix4();
@@ -344,7 +353,8 @@ export function fitTooth(tooth: PlacedTooth, scan: Closest, iterations = 16): bo
   }
   const moved = new THREE.Vector3().setFromMatrixPosition(fit.clone().multiply(start)).distanceTo(centre0);
   const turn = 2 * Math.acos(Math.min(1, Math.abs(new THREE.Quaternion().setFromRotationMatrix(fit).w))) * 180 / Math.PI;
-  if (moved > 3 || turn > 12) { tooth.fitNote = `would move ${moved.toFixed(1)} mm / turn ${turn.toFixed(0)} degrees`; tooth.fit = new THREE.Matrix4(); return false; }
+  // A close fit may turn further: levelled on its cusps, a back tooth's long axis leans with the curve of Spee.
+  if (moved > 3 || turn > (error < 0.7 ? 25 : 12)) { tooth.fitNote = `would move ${moved.toFixed(1)} mm / turn ${turn.toFixed(0)} degrees`; tooth.fit = new THREE.Matrix4(); return false; }
   tooth.fit = fit;
   tooth.fitError = error;
   tooth.fitNote = `moved ${moved.toFixed(1)} mm, turned ${turn.toFixed(0)} degrees`;
@@ -528,13 +538,15 @@ export function frameCorrection(points: Float32Array, above: number, forceTurn?:
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
   }
   {
-    if (Math.abs(turn) > (20 * Math.PI) / 180) {
-      const rot = new THREE.Matrix4().makeRotationZ(turn);
-      // Centre the arch on x = 0 after turning (the midline runs through the band's centre).
-      const c = new THREE.Vector3(bx, by, 0).applyMatrix4(rot);
-      fix.premultiply(rot).premultiply(new THREE.Matrix4().makeTranslation(-c.x, 0, 0));
+    const rot = new THREE.Matrix4();
+    if (Math.abs(turn) > (12 * Math.PI) / 180) {
+      rot.makeRotationZ(turn);
       notes.push(`turned ${((turn * 180) / Math.PI).toFixed(0)} degrees`);
     }
+    // Centre the arch on x = 0 (the midline runs through the middle of the band of teeth).
+    const c = new THREE.Vector3(bx, by, 0).applyMatrix4(rot);
+    fix.premultiply(rot);
+    if (Math.abs(c.x) > 3) { fix.premultiply(new THREE.Matrix4().makeTranslation(-c.x, 0, 0)); notes.push(`centred ${c.x.toFixed(0)} mm`); }
   }
   // Cusp height after the correction.
   const tops = list.map(([x, y, z]) => p.set(x, y, z).applyMatrix4(fix).z);

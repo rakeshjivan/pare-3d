@@ -668,6 +668,7 @@ async function exportModels(kind: "total" | "partial-odd" | "partial-even" | "im
   const rt = await runtime();
   const started = performance.now();
   const files: { name: string; bytes: Uint8Array }[] = [];
+  const loose: string[] = [];
   for (const jaw of jaws) {
     const arch = state.arches[jaw]!;
     const { model, toModel } = await modelFor(jaw);
@@ -680,11 +681,14 @@ async function exportModels(kind: "total" | "partial-odd" | "partial-even" | "im
       await later();
       const teeth = waxedTeethIn(arch, filter, toModel);
       const out = modelWithTeeth(rt, model, teeth);
-      files.push({ name: `${jaw === "upper" ? "Upper" : "Lower"} model - ${label} wax-up.stl`, bytes: stlBytes(out) });
+      if (out.pieces > 1) loose.push(`${jaw} ${label}: ${out.pieces - 1} loose`);
+      files.push({ name: `${jaw === "upper" ? "Upper" : "Lower"} model - ${label} wax-up.stl`, bytes: stlBytes(out.mesh) });
     }
   }
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
-  if (await saveFiles(files, kind === "imt" ? "IMT wax-up models.zip" : `${state.jaw === "upper" ? "Upper" : "Lower"} wax-up model.zip`)) status(`Models saved in ${seconds} s.`);
+  if (await saveFiles(files, kind === "imt" ? "IMT wax-up models.zip" : `${state.jaw === "upper" ? "Upper" : "Lower"} wax-up model.zip`)) status(loose.length
+    ? `Models saved in ${seconds} s, but some waxed teeth do not touch the model (${loose.join("; ")}). Move them onto the scanned teeth, or leave them unwaxed, and export again.`
+    : `Models saved in ${seconds} s.`);
 }
 
 // ---------------------------------------------------------------------------------------------

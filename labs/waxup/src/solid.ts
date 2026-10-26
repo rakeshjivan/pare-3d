@@ -126,11 +126,14 @@ export async function archModel(runtime: Runtime, scan: Float32Array, labFrame: 
 }
 
 /** The model joined with the given teeth (each already closed and in the model's frame). */
-export function modelWithTeeth(runtime: Runtime, model: ToothMesh, teeth: ToothMesh[]): ToothMesh {
+export function modelWithTeeth(runtime: Runtime, model: ToothMesh, teeth: ToothMesh[]): { mesh: ToothMesh; pieces: number } {
   const solids = [toManifold(runtime, model), ...teeth.map((tooth) => toManifold(runtime, tooth))];
   const joined = runtime.Manifold.union(solids);
   const out = solidMesh(joined);
+  const parts = joined.decompose();
+  const pieces = parts.length;
+  parts.forEach((part) => part.delete());
   solids.forEach((solid) => solid.delete());
   joined.delete();
-  return out;
+  return { mesh: out, pieces };
 }
