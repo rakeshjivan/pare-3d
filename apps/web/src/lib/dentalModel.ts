@@ -45,6 +45,12 @@ export type DentalStudioInput = {
   bite?: ArrayLike<number> | null;
   /** Roles the person chose; the rest are worked out. */
   roles?: Record<string, DentalRole>;
+  /**
+   * Build 74: the arches already stand in occlusion as the bite scan placed them (the fit was locked
+   * into them once), so no bite scan is needed and none is fitted again - trimming, sculpting or
+   * cutting the palate away cannot move the bite.
+   */
+  locked?: boolean;
 };
 
 /** `depth`: how much of the scan is kept by default below the occlusal plane; `teeth`: the least that may be kept - 2 mm under the lowest tooth surface; `above`: how far the tallest tooth stands above the occlusal plane (mm). */
@@ -54,7 +60,7 @@ export type DentalArchInfo = { id: string; role: DentalRole; report: CleanReport
 export type DentalAnalysis = {
   arches: DentalArchInfo[];
   /** `apart`: the two scans do not share the scanner's coordinates, so each is set up on its own. */
-  pair: null | { inOcclusion: boolean; apart: boolean; contacts: number; bite: null | { rms: number; overlap: number; fitted: boolean } };
+  pair: null | { inOcclusion: boolean; apart: boolean; contacts: number; bite: null | { rms: number; overlap: number; fitted: boolean; locked?: boolean; fit?: Record<string, number[]> } };
 };
 
 export type DentalStudioOptions = {
@@ -242,8 +248,9 @@ function prepare(input: DentalStudioInput): Prepared {
   }
   let upperIndex = roles[0] === "upper" ? 0 : 1;
   let upper = cleaned[upperIndex].clean, lower = cleaned[1 - upperIndex].clean;
-  let bite: { rms: number; overlap: number; fitted: boolean } | null = null;
-  if (input.bite && input.bite.length >= 9 * 100) {
+  let bite: NonNullable<DentalAnalysis["pair"]>["bite"] = null;
+  if (input.locked) bite = { rms: 0, overlap: 1, fitted: true, locked: true };
+  else if (input.bite && input.bite.length >= 9 * 100) {
     const biteMesh = weld(input.bite);
     const fitUpper = alignToBite(upper.mesh, biteMesh);
     const fitLower = alignToBite(lower.mesh, biteMesh);
@@ -252,7 +259,9 @@ function prepare(input: DentalStudioInput): Prepared {
       applyMatrix(upper.mesh, fitUpper.matrix);
       applyMatrix(lower.mesh, fitLower.matrix);
     }
-    bite = { rms: Math.max(fitUpper.rms, fitLower.rms), overlap: Math.min(fitUpper.overlap, fitLower.overlap), fitted };
+    // Build 74: the fit, in the input's coordinates, handed back so the editor can lock it into the scans.
+    const fit = fitted ? { [cleaned[upperIndex].id]: fitUpper.matrix.toArray(), [cleaned[1 - upperIndex].id]: fitLower.matrix.toArray() } : undefined;
+    bite = { rms: Math.max(fitUpper.rms, fitLower.rms), overlap: Math.min(fitUpper.overlap, fitLower.overlap), fitted, ...(fit ? { fit } : {}) };
   }
   let pair = pairFrame(upper, lower);
   // Worked out roles are checked by the overjet: in the bite the upper incisors stand in front of the lower.
@@ -303,7 +312,7 @@ function inputKey(input: DentalStudioInput) {
     for (let i = 0; i < p.length; i += step) s += p[i] * ((i % 7) + 1);
     return `${p.length}:${s.toFixed(4)}`;
   };
-  return JSON.stringify([input.arches.map((a) => [a.id, sum(a.positions)]), input.bite ? sum(input.bite) : null, input.roles ?? {}]);
+  return JSON.stringify([input.arches.map((a) => [a.id, sum(a.positions)]), input.bite ? sum(input.bite) : null, input.roles ?? {}, Boolean(input.locked)]);
 }
 
 function prepared(input: DentalStudioInput): Prepared {

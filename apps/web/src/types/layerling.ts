@@ -1092,6 +1092,21 @@ export type WorkplaneShape = {
      */
     sourceOrigin?: [number, number, number];
     sourceTurned?: boolean;
+    /**
+     * Fork (build 74): local position to the scan file's own coordinates, a 4x4 matrix (column-major).
+     * Takes the place of `sourceOrigin`/`sourceTurned` once an edit has rebuilt the part (lib/scanFrame.ts).
+     */
+    scanFrame?: number[];
+    /**
+     * Fork (build 74): the occlusion the bite scan gave, locked into `scanFrame` once - Dental Studio
+     * takes the arches as they stand from then on and never fits the bite again, so trimming the scan
+     * or cutting the palate away cannot move it. `biteFit` is the fit itself (file coordinates to file
+     * coordinates, 4x4 column-major), kept so the original scan can be put back still in the bite.
+     */
+    biteLocked?: boolean;
+    biteFit?: number[];
+    /** Fork (build 74): the imported file this scan came from, kept in the design so it can be restored. */
+    originalAssetId?: string;
     // IndexedDB persistence uses this only in compact stored shape records.
     // Runtime editor shapes are hydrated with the full immutable mesh resource.
     storageResourceId?: string;

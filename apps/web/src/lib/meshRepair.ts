@@ -15,6 +15,7 @@ import * as THREE from "three";
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
 import { meshShapeFromPositions } from "@/lib/lithophane";
 import type { WorkplaneShape } from "@/types/layerling";
+import { carryScanFrame } from "@/lib/scanFrame";
 
 const WELD = 1e4; // corners within 0.1 µm are one corner
 
@@ -407,6 +408,10 @@ export async function isManifoldSolid(positions: ArrayLike<number>): Promise<boo
 
 /** The part with new triangles (in the world), keeping its name, colour and settings; turned and mirrored into the mesh. */
 export function shapeWithWorldPositions(shape: WorkplaneShape, positions: number[]): WorkplaneShape {
+  // Build 74: a scan keeps where it stands in the scanner's coordinates (the bite) through the edit.
+  return carryScanFrame(shape, rebuiltFromWorld(shape, positions));
+}
+function rebuiltFromWorld(shape: WorkplaneShape, positions: number[]): WorkplaneShape {
   const rebuilt = meshShapeFromPositions(shape.name, shape.color, positions);
   let minX = Infinity, maxX = -Infinity, minY = Infinity, minZ = Infinity, maxZ = -Infinity;
   for (let i = 0; i < positions.length; i += 3) {

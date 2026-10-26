@@ -10,6 +10,7 @@ import { ObjectListPanel } from "@/components/workplane/ObjectListPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SAVED_VIEW_KEYS } from "@/lib/designView";
 import * as THREE from "three";
+import { carryScanFrame, localToWorld, placedBounds, placementFor, scanFileCoordinates, scanFrameOf, standUpright } from "@/lib/scanFrame";
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import { t, type MessageKey } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -6486,7 +6487,8 @@ export function LayerlingEditor({
       return;
     }
 
-    const nextShapes = shapesRef.current.flatMap((shape) => replacements.get(shape.id) ?? [shape]);
+    // Build 74: each piece of a cut scan keeps where the scan stands in the scanner's coordinates (the bite).
+    const nextShapes = shapesRef.current.flatMap((shape) => replacements.get(shape.id)?.map((piece) => carryScanFrame(shape, piece)) ?? [shape]);
     // Fork: dowel pins stand in a row beside the cut parts.
     const pins = outcome.pins;
     if (pins.length) {
@@ -8982,6 +8984,12 @@ export function LayerlingEditor({
     const triangles = state.live.triangleCount();
     if (triangles > 1_500_000) setNotice(t("sculpt.large", { count: triangles.toLocaleString() }));
     setMeshRoundTool(null);
+    // Build 74: sculpting one of Dental Studio's scans, the other scans step aside until Sculpt closes.
+    const studio = dentalStudioRef.current;
+    if (studio && Object.values(studio.slots).includes(shape.id)) {
+      sculptHidOthers.current = true;
+      setDentalHidden(Object.values(studio.slots).filter((id): id is string => Boolean(id) && id !== shape.id));
+    }
     setSculptTool({ shapeId: shape.id, tool: "smooth", size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off", remeshMode: "remesh", detail: Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100), amount: 2, busy: false, error: null });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleSculpt = useCallback(() => {
@@ -9432,12 +9440,17 @@ export function LayerlingEditor({
     advanced: boolean;
     error: string | null;
     notes: string[];
+    /** Build 74: how the scans stand on the plate - side by side (for trimming) or in occlusion. */
+    layout?: "side" | "occlusion";
   };
   const [dentalStudio, setDentalStudio] = useState<DentalStudioState | null>(null);
   const dentalStudioRef = useRef(dentalStudio);
   dentalStudioRef.current = dentalStudio;
   const dentalRun = useRef(0);
   const dentalSceneDirection = useRef(new Map<string, (v: [number, number, number]) => [number, number, number]>());
+  /** Build 74: each scan's local positions to the studio's input coordinates, and the file-to-input turn (null when not from the files). */
+  const dentalLocalToInput = useRef(new Map<string, THREE.Matrix4>());
+  const dentalFileTurn = useRef<THREE.Matrix4 | null>(null);
   const toZUp = (positions: ArrayLike<number>) => {
     const out = new Float32Array(positions.length);
     for (let i = 0; i + 2 < positions.length; i += 3) {
@@ -9478,24 +9491,17 @@ export function LayerlingEditor({
     if (!arches.length) return null;
     const roles: Record<string, DentalRole> = {};
     if (state.rolesChosen) arches.forEach(({ slot, shape }) => { roles[shape!.id] = slot; });
-    const bite = find(state.slots.bite);
+    // Build 74: arches whose bite was locked in stand in occlusion already - the bite scan is not used again.
+    const locked = arches.every(({ shape }) => shape!.importedMesh?.biteLocked && scanFrameOf(shape!.importedMesh));
+    const bite = locked ? null : find(state.slots.bite);
     // Scans of one patient share the scanner's coordinates, which place them in the bite. Import
     // centres each file, so they are taken back to the file's own coordinates when all can be.
     const chosen = [...arches.map(({ shape }) => shape!), ...(bite ? [bite] : [])];
-    const fromFile = chosen.every((shape) => shape.importedMesh?.sourceOrigin && shape.importedMesh.positions.length >= 9);
+    // Build 74: the scan's frame (lib/scanFrame.ts) - kept through moves, turns and edits on the plate.
+    const fromFile = chosen.every((shape) => scanFrameOf(shape.importedMesh) && (shape.importedMesh?.positions.length ?? 0) >= 9);
     // The files' own coordinates, then all turned alike: scans of arches are flattest along the
     // vertical, so if together they are flatter on Y than on Z they are Y-up files, turned Z-up.
-    const fileCoordinates = (shape: WorkplaneShape) => {
-      const mesh = shape.importedMesh!;
-      const [ox, oy, oz] = mesh.sourceOrigin!;
-      const out = new Float32Array(mesh.positions.length);
-      for (let i = 0; i + 2 < mesh.positions.length; i += 3) {
-        const point: [number, number, number] = [mesh.positions[i] + ox, mesh.positions[i + 1] + oy, mesh.positions[i + 2] + oz];
-        const [x, y, z] = mesh.sourceTurned ? layerlingToZUp(point) : point;
-        out[i] = x; out[i + 1] = y; out[i + 2] = z;
-      }
-      return out;
-    };
+    const fileCoordinates = (shape: WorkplaneShape) => scanFileCoordinates(shape.importedMesh!)!;
     const files = new Map(fromFile ? chosen.map((shape) => [shape.id, fileCoordinates(shape)] as const) : []);
     let ySpans = 0, zSpans = 0;
     files.forEach((p) => {
@@ -9504,14 +9510,19 @@ export function LayerlingEditor({
       ySpans += maxY - minY; zSpans += maxZ - minZ;
     });
     const yUpFiles = fromFile && ySpans < zSpans;
-    // Directions found in the scans' axes, back in the scene's (for Dental Studio's views).
+    // Build 74: each scan's map from its own positions to the coordinates handed to the studio, and
+    // back to the scene through where it stands now - for the views, locking the bite and laying out.
+    const yToZ = new THREE.Matrix4().set(1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1);
+    dentalFileTurn.current = fromFile ? (yUpFiles ? yToZ.clone() : new THREE.Matrix4()) : null;
     chosen.forEach((shape) => {
-      const turned = Boolean(files.get(shape.id) && shape.importedMesh?.sourceTurned);
+      const world = localToWorld(shape);
+      const toInput = fromFile ? (yUpFiles ? yToZ.clone() : new THREE.Matrix4()).multiply(scanFrameOf(shape.importedMesh)!) : world ? yToZ.clone().multiply(world) : null;
+      if (toInput) dentalLocalToInput.current.set(shape.id, toInput); else dentalLocalToInput.current.delete(shape.id);
+      const back = world && toInput ? new THREE.Matrix3().setFromMatrix4(world.clone().multiply(toInput.clone().invert())) : null;
       dentalSceneDirection.current.set(shape.id, (v) => {
-        let d: [number, number, number] = v;
-        if (!files.get(shape.id)) return zUpToLayerling(d);
-        if (yUpFiles) d = zUpToLayerling(d);
-        return turned ? zUpToLayerling(d) : d;
+        if (!back) return zUpToLayerling(v);
+        const d = new THREE.Vector3(...v).applyMatrix3(back).normalize();
+        return [d.x, d.y, d.z];
       });
     });
     const scan = (shape: WorkplaneShape) => {
@@ -9526,8 +9537,121 @@ export function LayerlingEditor({
       arches: arches.map(({ shape }) => ({ id: shape!.id, positions: scan(shape!), area: dentalAreaFor(shape!) ?? undefined })),
       bite: bite ? scan(bite) : null,
       roles: state.rolesChosen ? roles : undefined,
+      ...(locked && fromFile ? { locked: true } : {}),
     };
   }, []);
+  /**
+   * Build 74: the bite the bite scan gave, locked into the two arches (their scan frames) - from then
+   * on they are taken as they stand, so trimming, sculpting or cutting the palate away never moves
+   * the occlusion. Returns the arches with their new frames, or null when there is no fit to lock.
+   */
+  const lockedDentalBite = (analysis: DentalAnalysis): Map<string, WorkplaneShape> | null => {
+    const fit = analysis.pair?.bite?.fit;
+    if (!fit || analysis.pair?.bite?.locked) return null;
+    const turn = dentalFileTurn.current;
+    const out = new Map<string, WorkplaneShape>();
+    for (const [id, values] of Object.entries(fit)) {
+      const shape = shapesRef.current.find((candidate) => candidate.id === id);
+      const toInput = dentalLocalToInput.current.get(id);
+      if (!shape?.importedMesh || !toInput || values.length !== 16) return null;
+      const g = new THREE.Matrix4().fromArray(values);
+      // In the files' coordinates when the scans came from files (kept to put the original back in the bite).
+      const biteFit = turn ? turn.clone().invert().multiply(g).multiply(turn) : null;
+      const frame = biteFit ? biteFit.clone().multiply(scanFrameOf(shape.importedMesh)!) : g.clone().multiply(toInput);
+      const { sourceOrigin, sourceTurned, ...rest } = shape.importedMesh;
+      void sourceOrigin; void sourceTurned;
+      const original = rest.originalAssetId ?? rest.assetId;
+      out.set(id, { ...shape, importedMesh: { ...rest, scanFrame: frame.toArray(), biteLocked: true, ...(biteFit ? { biteFit: biteFit.toArray() } : {}), ...(original ? { originalAssetId: original } : {}) } });
+      dentalLocalToInput.current.set(id, g.clone().multiply(toInput));
+    }
+    return out.size === 2 ? out : null;
+  };
+  /**
+   * Build 74: the scans laid out on the plate - side by side, each standing teeth up with its front
+   * towards you (for trimming), or the pair in occlusion. Only where the parts stand changes, never
+   * the scans: the bite is kept in their frames. The bite scan is hidden (it is only for the fit).
+   */
+  const arrangedDentalScans = (mode: "side" | "occlusion", analysis: DentalAnalysis, slots: Record<DentalSlot, string | null>, changed: Map<string, WorkplaneShape>): Map<string, WorkplaneShape> => {
+    const out = new Map(changed);
+    const shapeOf = (id: string) => out.get(id) ?? shapesRef.current.find((candidate) => candidate.id === id);
+    const arches = analysis.arches.filter((arch) => shapeOf(arch.id) && dentalLocalToInput.current.get(arch.id));
+    const lowerAxes = analysis.arches.find((arch) => arch.role === "lower")?.axes;
+    const placed = arches.map((arch) => {
+      const axes = mode === "occlusion" && lowerAxes ? lowerAxes : arch.axes;
+      return { arch, shape: shapeOf(arch.id)!, place: standUpright(axes.up, axes.front).multiply(dentalLocalToInput.current.get(arch.id)!) };
+    });
+    const boxes = placed.map(({ shape, place }) => placedBounds(shape, place));
+    const shift = (box: THREE.Box3, role: DentalRole) => {
+      if (mode === "occlusion") {
+        const all = boxes.reduce((acc, b) => acc.union(b), new THREE.Box3());
+        return new THREE.Vector3(-(all.min.x + all.max.x) / 2, -all.min.y, -(all.min.z + all.max.z) / 2);
+      }
+      // Side by side as you look at the patient: the upper on the left, the lower on the right, 10 mm apart.
+      const gap = placed.length > 1 ? 5 : 0;
+      const x = placed.length > 1 ? (role === "upper" ? -gap - box.max.x : gap - box.min.x) : -(box.min.x + box.max.x) / 2;
+      return new THREE.Vector3(x, -box.min.y, -(box.min.z + box.max.z) / 2);
+    };
+    placed.forEach(({ arch, shape, place }, i) => {
+      const fields = placementFor(shape, new THREE.Matrix4().makeTranslation(shift(boxes[i], arch.role)).multiply(place));
+      if (fields) out.set(shape.id, canonicalizeShape({ ...shape, ...fields }));
+    });
+    const bite = slots.bite ? shapeOf(slots.bite) : undefined;
+    if (bite && !bite.hidden) out.set(bite.id, { ...bite, hidden: true });
+    return out;
+  };
+  const dentalArranged = useRef(new Set<string>());
+  /** Puts arranged and locked scans in the design as one step of undo. */
+  const commitDentalScans = (changed: Map<string, WorkplaneShape>, message: string) => {
+    if (!changed.size) return;
+    commitShapes(shapesRef.current.map((shape) => changed.get(shape.id) ?? shape), selectedIdsRef.current, message);
+  };
+  const layOutDentalScans = useCallback((mode: "side" | "occlusion") => {
+    const state = dentalStudioRef.current;
+    if (!state?.analysis || state.stage !== "ready") return;
+    commitDentalScans(arrangedDentalScans(mode, state.analysis, state.slots, new Map()), t(mode === "side" ? "dental.layoutSideDone" : "dental.layoutOcclusionDone"));
+    setDentalStudio((latest) => latest ? { ...latest, layout: mode } : latest);
+    const ids = (Object.values(state.slots).filter(Boolean) as string[]);
+    window.setTimeout(() => window.layerlingShowParts?.(ids, [0.35, 0.55, 0.75]), 400);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  /**
+   * Build 74: puts an arch's original scan back (the imported file, kept in the design), still in the
+   * locked bite and where the edited one stood - undoing every trim, sculpt and cut of it at once.
+   */
+  const restoreDentalScan = useCallback(async (slot: "upper" | "lower") => {
+    const state = dentalStudioRef.current;
+    const id = state?.slots[slot];
+    const shape = id ? shapesRef.current.find((candidate) => candidate.id === id) : undefined;
+    const mesh = shape?.importedMesh;
+    if (!state || state.stage !== "ready" || !shape || !mesh) return;
+    const originalId = mesh.originalAssetId ?? mesh.assetId;
+    if (mesh.assetId && mesh.assetId === originalId) { setNotice(t("dental.restoreSame")); return; }
+    const asset = originalId ? projectAssetsRef.current.find((candidate) => candidate.id === originalId) : undefined;
+    if (!asset) { setNotice(t("dental.restoreMissing")); return; }
+    try {
+      const { importedMeshFromAsset } = await import("@/lib/lylProject");
+      const fresh = await importedMeshFromAsset(asset);
+      const freshFrame = scanFrameOf(fresh);
+      const fit = mesh.biteFit?.length === 16 ? new THREE.Matrix4().fromArray(mesh.biteFit) : null;
+      const frame = freshFrame && fit ? fit.clone().multiply(freshFrame) : freshFrame;
+      const keepsBite = Boolean(mesh.biteLocked && fit && frame);
+      const { sourceOrigin, sourceTurned, ...rest } = fresh;
+      void sourceOrigin; void sourceTurned;
+      let next: WorkplaneShape = {
+        ...shape,
+        width: fresh.baseWidth, depth: fresh.baseDepth, height: fresh.baseHeight, size: Math.max(fresh.baseWidth, fresh.baseDepth),
+        importedMesh: { ...rest, assetId: asset.id, originalAssetId: asset.id, ...(frame ? { scanFrame: frame.toArray() } : {}), ...(keepsBite ? { biteLocked: true, biteFit: mesh.biteFit } : {}) },
+      };
+      // Where the edited scan stood: world = (where it stood) x (its frame)^-1 x (the original's frame).
+      const was = localToWorld(shape), oldFrame = scanFrameOf(mesh);
+      if (was && oldFrame && frame) {
+        const fields = placementFor(next, was.clone().multiply(oldFrame.clone().invert()).multiply(frame));
+        if (fields) next = { ...next, ...fields };
+      }
+      commitShapes(shapesRef.current.map((candidate) => (candidate.id === shape.id ? canonicalizeShape(next) : candidate)), [shape.id], t(keepsBite ? "dental.restored" : "dental.restoredUnlocked"));
+    } catch (error) {
+      setNotice(error instanceof Error ? localizedError(error.message) : String(error));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const analyseDentalStudio = useCallback((state: DentalStudioState) => {
     const input = dentalInput(state);
     const run = ++dentalRun.current;
@@ -9540,6 +9664,21 @@ export function LayerlingEditor({
       try {
         const analysis = await analyseDentalInBackground(input);
         if (run !== dentalRun.current) return;
+        // Build 74: the first time a set is looked at, the bite is locked into the arches and the
+        // scans are laid out side by side, the bite scan hidden - one step of undo.
+        const ids = analysis.arches.map((arch) => arch.id).sort().join("|");
+        const locked = lockedDentalBite(analysis);
+        let laidOut: "side" | undefined;
+        if (!dentalArranged.current.has(ids)) {
+          dentalArranged.current.add(ids);
+          const slotsNow = { ...state.slots };
+          if (!state.rolesChosen) analysis.arches.forEach((arch) => { slotsNow[arch.role] = arch.id; });
+          commitDentalScans(arrangedDentalScans("side", analysis, slotsNow, locked ?? new Map()), t(locked ? "dental.biteLockedDone" : "dental.layoutSideDone"));
+          laidOut = "side";
+          const shown = analysis.arches.map((arch) => arch.id);
+          window.setTimeout(() => window.layerlingShowParts?.(shown, [0.35, 0.55, 0.75]), 400);
+        } else if (locked) commitDentalScans(locked, t("dental.biteLockedDone"));
+        if (locked) analysis.pair!.bite = { ...analysis.pair!.bite!, locked: true };
         setDentalStudio((latest) => {
           if (!latest) return latest;
           // Worked out: each scan goes to the slot of the arch it was found to be.
@@ -9551,7 +9690,7 @@ export function LayerlingEditor({
           const pair = Boolean(slots.upper && slots.lower);
           const depth = Math.max(...analysis.arches.map((arch) => arch.depth));
           const above = Math.max(...analysis.arches.map((arch) => arch.above)), teeth = Math.max(...analysis.arches.map((arch) => arch.teeth));
-          return { ...latest, slots, stage: "ready", analysis, options: latest.optionsTouched ? latest.options : dentalPreset(latest.preset, depth, pair, above, teeth) };
+          return { ...latest, slots, stage: "ready", analysis, ...(laidOut ? { layout: laidOut } : {}), options: latest.optionsTouched ? latest.options : dentalPreset(latest.preset, depth, pair, above, teeth) };
         });
       } catch (error) {
         if (run !== dentalRun.current) return;
@@ -9613,7 +9752,7 @@ export function LayerlingEditor({
     analyseDentalStudio(freshDentalState(slots, rolesChosen));
   }, [analyseDentalStudio, dentalCandidates, selectedShapes]);
   // A scan in a slot that changes (a trim, Undo, Redo) is looked at again.
-  const dentalSlotKey = dentalStudio ? (Object.values(dentalStudio.slots).filter(Boolean) as string[]).map((id) => { const shape = shapes.find((candidate) => candidate.id === id); return shape ? `${id}:${shape.importedMesh?.positions.length ?? 0}:${shape.x}:${shape.z}` : `${id}:gone`; }).join("|") : "";
+  const dentalSlotKey = dentalStudio ? (Object.values(dentalStudio.slots).filter(Boolean) as string[]).map((id) => { const shape = shapes.find((candidate) => candidate.id === id); return shape ? `${id}:${shape.importedMesh?.positions.length ?? 0}:${scanFrameOf(shape.importedMesh) ? `f${shape.importedMesh?.biteLocked ? "L" : ""}` : `${shape.x}:${shape.z}`}` : `${id}:gone`; }).join("|") : "";
   const dentalSlotSeen = useRef("");
   useEffect(() => {
     const state = dentalStudioRef.current;
@@ -9669,6 +9808,8 @@ export function LayerlingEditor({
   const [dentalBrush, setDentalBrush] = useState(18);
   const [dentalAreaBusy, setDentalAreaBusy] = useState(false);
   const [dentalAreaVersion, setDentalAreaVersion] = useState(0);
+  /** Build 74: the teeth tint can be hidden (it comes back while painting the teeth). */
+  const [dentalAreaShown, setDentalAreaShown] = useState(true);
   const dentalAreaManual = dentalStudio?.options.margin === "manual";
   const ensureDentalAreas = useCallback(async (force?: "upper" | "lower") => {
     const state = dentalStudioRef.current;
@@ -9693,22 +9834,32 @@ export function LayerlingEditor({
   // The area tinted over the scans while it can be edited.
   useEffect(() => {
     const state = dentalStudioRef.current;
-    if (!dentalAreaManual || !state || state.stage === "making") { window.layerlingHighlight?.(null); return; }
+    // Build 74: shown while the teeth are being set (or when asked for), not while a scan is trimmed.
+    if (!dentalAreaManual || !state || state.stage === "making" || dentalTrim || (!dentalAreaShown && !dentalAreaTool)) { window.layerlingHighlight?.(null); return; }
     const parts: number[] = [];
+    const owners: Array<{ shapeId: string; triangles: number }> = [];
     (["upper", "lower"] as const).forEach((slot) => {
       const shape = state.slots[slot] ? shapesRef.current.find((candidate) => candidate.id === state.slots[slot]) : undefined;
       if (!shape || dentalHidden.includes(shape.id)) return;
       const area = dentalAreaFor(shape);
       if (!area) return;
       const world = worldTriangles(shape);
+      const before = parts.length;
       for (let t = 0; t < area.length; t += 1) if (area[t]) for (let k = 0; k < 9; k += 1) parts.push(world[t * 9 + k]);
+      owners.push({ shapeId: shape.id, triangles: (parts.length - before) / 9 });
     });
-    window.layerlingHighlight?.(parts.length ? Float32Array.from(parts) : null);
+    window.layerlingHighlight?.(parts.length ? Float32Array.from(parts) : null, owners);
     // Build 56: drawn again whenever the shapes change, so the tint turns and moves with its model.
-  }, [dentalAreaManual, dentalAreaVersion, dentalHidden, dentalStudio?.stage, dentalStudio?.slots.upper, dentalStudio?.slots.lower, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dentalAreaManual, dentalAreaVersion, dentalHidden, dentalStudio?.stage, dentalStudio?.slots.upper, dentalStudio?.slots.lower, shapes, dentalTrim, dentalAreaShown, dentalAreaTool]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => window.layerlingHighlight?.(null), []);
   // Build 69: the triangles chosen with Sculpt's Select brush, tinted (after the dental tint, so it wins while Sculpt is open).
   const sculptWasOpen = useRef(false);
+  const sculptHidOthers = useRef(false);
+  useEffect(() => {
+    if (sculptTool || !sculptHidOthers.current) return;
+    sculptHidOthers.current = false;
+    setDentalHidden([]);
+  }, [sculptTool]);
   useEffect(() => {
     const state = sculptState.current;
     if (!sculptTool || !state) {
@@ -9775,7 +9926,7 @@ export function LayerlingEditor({
         // Build 52: cut exactly along the line; the cut scan replaces the old (its normals are made afresh).
         let positions = result.positions ? Array.from(result.positions) : pick(mesh.positions);
         const normals = !result.positions && mesh.normals?.length === mesh.positions.length ? pick(mesh.normals) : undefined;
-        let next: WorkplaneShape = { ...shape, importedMesh: { ...mesh, positions, normals, triangleCount: positions.length / 9, assetId: undefined, storageResourceId: undefined } };
+        let next: WorkplaneShape = { ...shape, importedMesh: { ...mesh, positions, normals, triangleCount: positions.length / 9, assetId: undefined, storageResourceId: undefined, ...(mesh.originalAssetId ?? mesh.assetId ? { originalAssetId: mesh.originalAssetId ?? mesh.assetId } : {}) } };
         // Unturned and at its size, the part is centred on what is left; the file's own place goes with it.
         const plain = !shape.rotation && !shape.rotationX && !shape.rotationZ && !shape.mirrorX && !shape.mirrorY && !shape.mirrorZ
           && Math.abs(shape.width - mesh.baseWidth) < 1e-6 && Math.abs(shape.depth - mesh.baseDepth) < 1e-6 && Math.abs(shape.height - mesh.baseHeight) < 1e-6;
@@ -9797,7 +9948,10 @@ export function LayerlingEditor({
             elevation: (shape.elevation ?? 0) + dy,
             width, depth, height,
             size: Math.max(width, depth),
-            importedMesh: { ...next.importedMesh!, positions, baseWidth: width, baseDepth: depth, baseHeight: height, ...(mesh.sourceOrigin ? { sourceOrigin: [ox + dx, oy + dy, oz + dz] as [number, number, number] } : {}) },
+            importedMesh: {
+              ...next.importedMesh!, positions, baseWidth: width, baseDepth: depth, baseHeight: height,
+              ...(mesh.scanFrame ? { scanFrame: new THREE.Matrix4().fromArray(mesh.scanFrame).multiply(new THREE.Matrix4().makeTranslation(dx, dy, dz)).toArray() } : mesh.sourceOrigin ? { sourceOrigin: [ox + dx, oy + dy, oz + dz] as [number, number, number] } : {}),
+            },
           };
         }
         const committed = shapesRef.current.map((candidate) => (candidate.id === id ? canonicalizeShape(next) : candidate));
@@ -15919,6 +16073,12 @@ export function LayerlingEditor({
             openSculpt(shape);
           }}
           onView={showDentalView}
+          layout={dentalStudio.layout}
+          onLayout={layOutDentalScans}
+          biteLocked={Boolean(dentalStudio.analysis?.pair?.bite?.locked)}
+          onRestore={(slot) => void restoreDentalScan(slot)}
+          areaShown={dentalAreaShown}
+          onAreaShown={setDentalAreaShown}
           analysis={dentalStudio.analysis}
           preset={dentalStudio.preset}
           options={dentalStudio.options}

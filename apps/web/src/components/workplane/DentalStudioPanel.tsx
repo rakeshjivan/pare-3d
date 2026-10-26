@@ -90,6 +90,12 @@ export function DentalStudioPanel({
   onPatientDetails,
   onNewPatient,
   modelsHere = false,
+  layout,
+  onLayout,
+  biteLocked = false,
+  onRestore,
+  areaShown = true,
+  onAreaShown,
 }: {
   parts: DentalPartChoice[];
   slots: Record<DentalSlot, string | null>;
@@ -107,6 +113,16 @@ export function DentalStudioPanel({
   /** Build 69: opens Sculpt on that scan. */
   onSculpt?: (slot: "upper" | "lower") => void;
   onView: (slot: "upper" | "lower", view: DentalView) => void;
+  /** Build 74: how the scans stand on the plate, and the button that changes it. */
+  layout?: "side" | "occlusion";
+  onLayout?: (layout: "side" | "occlusion") => void;
+  /** Build 74: the bite is locked into the arches (edits can no longer move it). */
+  biteLocked?: boolean;
+  /** Build 74: puts an arch's original scan back. */
+  onRestore?: (slot: "upper" | "lower") => void;
+  /** Build 74: whether the teeth tint shows over the scans. */
+  areaShown?: boolean;
+  onAreaShown?: (shown: boolean) => void;
   analysis: DentalAnalysis | null;
   preset: DentalPreset;
   options: DentalStudioOptions;
@@ -163,6 +179,8 @@ export function DentalStudioPanel({
     if (!pair || !analysis?.pair) return null;
     const { inOcclusion, bite, apart } = analysis.pair;
     if (apart) return { text: t("dental.apart"), warn: true };
+    // Build 74: a locked bite has its own line (biteLocked) - nothing was fitted again.
+    if (bite?.locked) return null;
     if (bite && !bite.fitted) return { text: t("dental.biteFailed"), warn: true };
     if (bite) return { text: t("dental.biteFitted", { error: bite.rms.toFixed(2) }), warn: false };
     if (inOcclusion) return { text: t("dental.inOcclusion"), warn: false };
@@ -239,6 +257,25 @@ export function DentalStudioPanel({
           {slotRow("bite", t("dental.bite"), null)}
           {stage === "analysing" ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.analysing")}</p> : null}
           {pairLine ? <p className={`dental-status ${pairLine.warn ? "warn" : ""}`} role="status">{pairLine.text}</p> : null}
+          {biteLocked ? <p className="dental-status" role="status">{t("dental.biteLocked")}</p> : null}
+          {onLayout && analysis && slots.upper && slots.lower ? (
+            <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.scanLayout")}>
+              {(["side", "occlusion"] as const).map((value) => (
+                <button key={value} type="button" role="radio" aria-checked={layout === value} className={layout === value ? "active" : ""} disabled={busy} onClick={() => onLayout(value)}>
+                  {t(value === "side" ? "dental.scanSide" : "dental.scanOcclusion")}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {onRestore && analysis ? (
+            <div className="dental-trim-buttons" role="group" aria-label={t("dental.restore")}>
+              {(["upper", "lower"] as const).filter((slot) => slots[slot]).map((slot) => (
+                <button key={slot} type="button" disabled={busy} title={t("dental.restoreHint")} onClick={() => onRestore(slot)}>
+                  {t(slot === "upper" ? "dental.restoreUpper" : "dental.restoreLower")}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -277,6 +314,11 @@ export function DentalStudioPanel({
           <EdgeModifierSlider label={t("dental.brushSize")} value={brushSize} min={4} max={80} step={1} workspace={workspace} disabled={busy} onChange={onBrushSize} />
         ) : null}
         <EdgeModifierSlider label={t("dental.expand")} value={options.gum ?? 3} min={0.5} max={10} step={0.5} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ gum: value })} />
+        {onAreaShown ? (
+          <label className="edge-modifier-check">
+            <input type="checkbox" checked={areaShown} onChange={(event) => onAreaShown(event.target.checked)} /> {t("dental.areaShown")}
+          </label>
+        ) : null}
         <div className="dental-trim-buttons">
           <button type="button" disabled={busy || !slots[arch] || areaBusy} onClick={() => onResetArea(arch)}>{t("dental.areaReset")}</button>
           {onSculpt ? <button type="button" disabled={busy || !slots[arch] || areaBusy} onClick={() => onSculpt(arch)}>{t("dental.sculpt")}</button> : null}

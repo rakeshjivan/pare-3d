@@ -84,6 +84,12 @@ export type LylImportedMeshReferenceV1 = {
   /** Fork (build 47): see WorkplaneShape importedMesh. */
   sourceOrigin?: [number, number, number];
   sourceTurned?: boolean;
+  /** Fork (build 74): see WorkplaneShape importedMesh. */
+  scanFrame?: number[];
+  biteLocked?: boolean;
+  biteFit?: number[];
+  /** The archive id of the original file (as `sourceAssetId`). */
+  originalSourceAssetId?: string;
 };
 
 export type LylShapeNodeV1 = {
@@ -695,6 +701,8 @@ function referencedSourceAssetIds(states: WorkplaneShape[][]) {
   const ids = new Set<string>();
   const visit = (shape: WorkplaneShape) => {
     if (shape.importedMesh?.assetId) ids.add(shape.importedMesh.assetId);
+    // Build 74: a scan's original file stays in the design, so it can be restored.
+    if (shape.importedMesh?.originalAssetId) ids.add(shape.importedMesh.originalAssetId);
     shape.groupedShapes?.forEach(visit);
     shape.edgeTreatmentHistory?.forEach((entry) => visit(entry.before));
   };
@@ -779,6 +787,10 @@ async function serializeShapeNode(
       sourceFormat: importedMesh.sourceFormat,
       ...(importedMesh.sourceOrigin ? { sourceOrigin: importedMesh.sourceOrigin } : {}),
       ...(importedMesh.sourceTurned ? { sourceTurned: true } : {}),
+      ...(importedMesh.scanFrame?.length === 16 ? { scanFrame: importedMesh.scanFrame } : {}),
+      ...(importedMesh.biteLocked ? { biteLocked: true } : {}),
+      ...(importedMesh.biteFit?.length === 16 ? { biteFit: importedMesh.biteFit } : {}),
+      ...(importedMesh.originalAssetId && builder.sourceIdMap.get(importedMesh.originalAssetId) ? { originalSourceAssetId: builder.sourceIdMap.get(importedMesh.originalAssetId) } : {}),
     };
   }
 
@@ -1890,6 +1902,10 @@ function sharedImportedMesh(decoded: object, reference: string, create: () => Im
   return mesh;
 }
 
+/** Build 74: also used to put a scan's original file back (Dental Studio). */
+export async function importedMeshFromAsset(asset: ProjectAsset) {
+  return defaultSourceImporter(asset);
+}
 async function defaultSourceImporter(asset: ProjectAsset) {
   if (asset.sourceFormat === "stl") {
     // In the browser the file is read off the page (lib/geometryWorker.ts); the server reads it here.
@@ -1960,6 +1976,17 @@ async function restoreShapeFromNode(
   }
 
   let importedMesh: WorkplaneShape["importedMesh"];
+  // Build 74: a scan's frame, locked bite and original file (lib/scanFrame.ts).
+  const scanFields = (reference: NonNullable<typeof node.importedMesh>) => {
+    const matrix = (value: unknown) => Array.isArray(value) && value.length === 16 && value.every(Number.isFinite) ? value as number[] : undefined;
+    const original = reference.originalSourceAssetId ? runtimeAssetByArchiveId.get(reference.originalSourceAssetId)?.id : undefined;
+    return {
+      ...(matrix(reference.scanFrame) ? { scanFrame: matrix(reference.scanFrame) } : {}),
+      ...(reference.biteLocked === true ? { biteLocked: true } : {}),
+      ...(matrix(reference.biteFit) ? { biteFit: matrix(reference.biteFit) } : {}),
+      ...(original ? { originalAssetId: original } : {}),
+    };
+  };
   if (node.importedMesh?.sourceAssetId) {
     const sourceAsset = runtimeAssetByArchiveId.get(node.importedMesh.sourceAssetId);
     if (!sourceAsset) throw new Error(`Object '${node.objectId}' is missing its imported source asset`);
@@ -1969,7 +1996,8 @@ async function restoreShapeFromNode(
       sourceMeshCache.set(sourceAsset.id, promise);
     }
     const regenerated = await promise;
-    importedMesh = sharedImportedMesh(regenerated, sourceAsset.id, () => ({ ...regenerated, assetId: sourceAsset.id }));
+    const scan = scanFields(node.importedMesh);
+    importedMesh = sharedImportedMesh(regenerated, `${sourceAsset.id}|${JSON.stringify(scan)}`, () => ({ ...regenerated, assetId: sourceAsset.id, ...scan }));
   } else if (node.importedMesh?.meshAssetId) {
     const meshRecord = assetById.get(node.importedMesh.meshAssetId);
     if (!meshRecord) throw new Error(`Object '${node.objectId}' is missing its derived mesh`);
@@ -1989,6 +2017,7 @@ async function restoreShapeFromNode(
       sourceFormat: reference.sourceFormat,
       ...(Array.isArray(reference.sourceOrigin) && reference.sourceOrigin.length === 3 && reference.sourceOrigin.every(Number.isFinite) ? { sourceOrigin: reference.sourceOrigin } : {}),
       ...(reference.sourceTurned === true ? { sourceTurned: true } : {}),
+      ...scanFields(reference),
       ...(brepRecord ? { brepStep: strFromU8(files[brepRecord.path]) } : {}),
     }));
   }

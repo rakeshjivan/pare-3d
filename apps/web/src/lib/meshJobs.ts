@@ -165,6 +165,8 @@ function copiedInput(input: DentalStudioInput): DentalStudioInput {
     arches: input.arches.map((arch) => ({ id: arch.id, positions: Float32Array.from(arch.positions as ArrayLike<number>), ...(arch.area ? { area: Uint8Array.from(arch.area) } : {}) })),
     bite: input.bite ? Float32Array.from(input.bite as ArrayLike<number>) : null,
     roles: input.roles,
+    // Build 74: the bite locked into the arches goes along (dropping it here made the worker fit again).
+    ...(input.locked ? { locked: true } : {}),
   };
 }
 

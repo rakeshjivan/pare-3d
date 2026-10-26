@@ -676,7 +676,8 @@ declare global {
     /** Fork (build 48): turns the view to look along -direction (scene axes) and frames these parts. */
     layerlingShowParts?: (ids: string[], direction: [number, number, number]) => boolean;
     /** Fork (build 53): draws triangles (world, a soup) over the scene as a tinted highlight; null clears it. */
-    layerlingHighlight?: (triangles: Float32Array | null) => void;
+    /** `owners` (build 74): which part each run of triangles belongs to, in order - each run then moves with its part. */
+    layerlingHighlight?: (triangles: Float32Array | null, owners?: Array<{ shapeId: string; triangles: number }>) => void;
     /** Build 69: Sculpt's working copy of a part (world soup) drawn in its place while it is worked on; null puts the part back. */
     layerlingSculptPreview?: (shapeId: string, triangles: Float32Array | null, color?: string) => void;
     /** Build 73: live Sculpt - the engine's own geometry drawn in the part's place (it updates the buffers itself); null puts the part back. */
@@ -9365,22 +9366,49 @@ export function WorkplaneViewport({
     const clear = () => {
       const state = threeRef.current;
       if (mesh && state) state.scene.remove(mesh);
-      mesh?.geometry.dispose();
-      (mesh?.material as THREE.Material | undefined)?.dispose();
+      mesh?.traverse((object) => {
+        const part = object as THREE.Mesh;
+        if (!part.isMesh) return;
+        part.geometry.dispose();
+        (part.material as THREE.Material).dispose();
+      });
       mesh = null;
       if (state) state.needsRender = true;
     };
-    window.layerlingHighlight = (triangles) => {
+    window.layerlingHighlight = (triangles, owners) => {
       const state = threeRef.current;
       clear();
       if (!state || !triangles || !triangles.length) return;
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute("position", new THREE.BufferAttribute(triangles, 3));
-      geometry.computeVertexNormals();
-      const material = new THREE.MeshBasicMaterial({ color: 0xf2a33a, transparent: true, opacity: 0.7, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-      mesh = new THREE.Mesh(geometry, material);
-      mesh.renderOrder = 10;
-      state.scene.add(mesh);
+      // Build 74: each part's run follows that part while it is dragged or turned (before the move is
+      // committed and the tint drawn again), instead of staying where the part was.
+      const runs = owners?.length ? owners : [{ shapeId: "", triangles: triangles.length / 9 }];
+      const group = new THREE.Group();
+      let at = 0;
+      for (const run of runs) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.BufferAttribute(triangles.slice(at * 9, (at + run.triangles) * 9), 3));
+        at += run.triangles;
+        geometry.computeVertexNormals();
+        const material = new THREE.MeshBasicMaterial({ color: 0xf2a33a, transparent: true, opacity: 0.7, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+        const part = new THREE.Mesh(geometry, material);
+        part.renderOrder = 10;
+        part.frustumCulled = false;
+        let owner: THREE.Object3D | null = null;
+        if (run.shapeId) state.scene.traverse((object) => { if (!owner && (object as THREE.Mesh).isMesh && object.userData.shapeId === run.shapeId) owner = object; });
+        if (owner) {
+          const followed = owner as THREE.Object3D;
+          followed.updateMatrixWorld();
+          const drawnAt = followed.matrixWorld.clone().invert();
+          part.matrixAutoUpdate = false;
+          part.onBeforeRender = () => {
+            if (followed.parent) part.matrixWorld.multiplyMatrices(followed.matrixWorld, drawnAt);
+            part.visible = followed.visible || !followed.parent;
+          };
+        }
+        group.add(part);
+      }
+      mesh = group as unknown as THREE.Mesh;
+      state.scene.add(group);
       state.needsRender = true;
     };
     window.layerlingCameraPosition = () => {
