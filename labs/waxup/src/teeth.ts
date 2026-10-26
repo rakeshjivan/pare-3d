@@ -46,6 +46,8 @@ export type FoundTooth = {
   /** Height of the crown found (mm) and how clearly the contacts showed (0 none - 1 strong). */
   height: number;
   confidence: number;
+  /** Why this tooth should be checked (empty when it looks right). */
+  check: string;
 };
 
 export type FoundTeeth = {
@@ -54,7 +56,7 @@ export type FoundTeeth = {
   vertexTooth: Int16Array;
   /** Overall size relative to the mean widths. */
   size: number;
-  signal: { s: number[]; cost: number[]; width: number[]; height: number[] };
+  signal: { s: number[]; cost: number[]; width: number[]; height: number[]; crease?: number[]; sMid?: number };
 };
 
 const percentile = (values: number[], p: number) => {
@@ -175,7 +177,9 @@ export type FindOptions = {
 const CREASE_SHARE = 0.82;
 
 export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, rightSide: number, options: FindOptions = {}): FoundTeeth & { curve: ArchCurve } {
-  const lastPosition = options.lastPosition ?? 7, sizeRange = options.sizeRange ?? [0.8, 1.25];
+  const wanted = options.lastPosition ?? 7, sizeRange = options.sizeRange ?? [0.8, 1.25];
+  // One tooth further than wanted: the tooth beyond anchors the last wanted tooth's distal contact.
+  const lastPosition = Math.min(8, wanted + 1);
   const crease = options.crease;
   let CREASE = 0.06;
   if (crease) { const sample: number[] = []; for (let i = 0; i < crease.length; i += 7) sample.push(crease[i]); CREASE = Math.min(0.06, percentile(sample, CREASE_SHARE)); }
@@ -256,7 +260,9 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
       for (const [b0, state] of prev) {
         const pinned = pinAt(dir, k + 1);
         // A pinned contact may make its tooth any width from 40% to 200% of the usual.
-        const lo = pinned === null ? Math.round(w * 0.72) : 1, hi = pinned === null ? Math.round(w * 1.3) : Math.round(w * 2);
+        // Teeth vary from the means in proportion as well as size (large centrals, average canines), so
+        // each may be 0.6-1.5x its mean width; the contacts' own signal decides within that.
+        const lo = pinned === null ? Math.round(w * 0.6) : 1, hi = pinned === null ? Math.round(w * 1.5) : Math.round(w * 2);
         for (let len = lo; len <= hi; len += 1) {
           const b = b0 + dir * len;
           if (b < 0 || b >= bins || (pinned !== null && b !== pinned)) continue;
@@ -284,7 +290,7 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
   const midBin = Math.round(curve.sMid / STEP);
   let bestSize = 1, bestPaths: [number[], number[]] = [[midBin], [midBin]], bestScore = Infinity;
   const midPin = pinAt(0, 0);
-  const midFrom = midPin ?? Math.max(0, midBin - 24), midTo = midPin ?? Math.min(bins - 1, midBin + 24);
+  const midFrom = midPin ?? Math.max(0, midBin - 48), midTo = midPin ?? Math.min(bins - 1, midBin + 48);
   for (let mid = midFrom; mid <= midTo; mid += 1) {
     for (let size = sizeRange[0]; size <= sizeRange[1] + 0.001; size += 0.025) {
       const a = side(mid, -1, size), b = side(mid, 1, size);
@@ -295,12 +301,24 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
       const pairs = Math.min(a.path.length, b.path.length) - 1;
       for (let k = 1; k <= pairs; k += 1) {
         const wa = Math.abs(a.path[k] - a.path[k - 1]), wb = Math.abs(b.path[k] - b.path[k - 1]);
-        asym += ((wa - wb) / ((wa + wb) / 2)) ** 2;
+        // The two teeth either side of the midline are the most reliable pair: weigh them most.
+        asym += (k === 1 ? 6 : 1) * ((wa - wb) / ((wa + wb) / 2)) ** 2;
+      }
+      // Upper central incisors are wider than the laterals (8.5 against 6.5 mm on average): a midline
+      // one tooth off makes a lateral the "central" on one side.
+      if (jaw === "upper") {
+        for (const path of [a.path, b.path]) {
+          if (path.length < 3) continue;
+          const w1 = Math.abs(path[1] - path[0]), w2 = Math.abs(path[2] - path[1]);
+          asym += 4 * Math.max(0, (w2 - w1 * 0.95) / w1);
+        }
       }
       const score = (a.cost + b.cost + smoothCost[mid] + 3 * asym) / teethCount;
       if (score < bestScore) { bestScore = score; bestSize = size; bestPaths = [a.path, b.path]; }
     }
   }
+  // Keep the wanted teeth only (a path holds the midline and then one contact per tooth).
+  bestPaths = bestPaths.map((path) => path.slice(0, wanted + 1)) as [number[], number[]];
   const mid = bestPaths[0][0];
 
   const [rightQ, leftQ] = QUADRANTS[jaw];
@@ -381,15 +399,26 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
       const axis = nu && nl ? upper.divideScalar(nu).sub(lower.divideScalar(nl)).normalize() : new THREE.Vector3(0, 0, 1);
       if (axis.z < 0.5) axis.set(0, 0, 1);
       const confidence = Math.max(0, Math.min(1, -(smoothCost[b0] + smoothCost[b1]) / 2 + 0.5));
-      teeth.push({ fdi, position, side: sideSign as -1 | 1, sMesial: b0 * STEP, sDistal: b1 * STEP, width: Math.abs(b1 - b0) * STEP, mesial: mesialPoint, distal: distalPoint, centre, tip, axis, height: top - floor, confidence });
+      teeth.push({ check: "", fdi, position, side: sideSign as -1 | 1, sMesial: b0 * STEP, sDistal: b1 * STEP, width: Math.abs(b1 - b0) * STEP, mesial: mesialPoint, distal: distalPoint, centre, tip, axis, height: top - floor, confidence });
     }
+  }
+  // Teeth to check: width far from the mean for its type (at this arch's size), or centrals that differ.
+  for (const t of teeth) {
+    const expected = WIDTH[jaw][t.position - 1] * bestSize;
+    const ratio = t.width / expected;
+    if (ratio > 1.35) t.check = `${t.width.toFixed(1)} mm is wide for this tooth`;
+    else if (ratio < 0.7) t.check = `${t.width.toFixed(1)} mm is narrow for this tooth`;
+  }
+  const centrals = teeth.filter((t) => t.position === 1);
+  if (centrals.length === 2 && Math.abs(centrals[0].width - centrals[1].width) / ((centrals[0].width + centrals[1].width) / 2) > 0.15) {
+    for (const t of centrals) t.check ||= "the centrals differ in width: is the midline right?";
   }
   return {
     curve,
     teeth,
     vertexTooth,
     size: bestSize,
-    signal: { s: Array.from({ length: bins }, (_, b) => b * STEP), cost: Array.from(smoothCost), width: Array.from(width), height: Array.from(height) },
+    signal: { s: Array.from({ length: bins }, (_, b) => b * STEP), cost: Array.from(smoothCost), width: Array.from(width), height: Array.from(height), crease: Array.from(creaseShare), sMid: curve.sMid },
   };
 }
 

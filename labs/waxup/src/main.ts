@@ -277,7 +277,8 @@ async function loadScans(files: File[]) {
   findOn("lower", upperSize ? [Math.max(0.8, upperSize - 0.1), Math.min(1.25, upperSize + 0.1)] : undefined);
   const pair = prepared.analysis.pair;
   const fit = pair?.bite ? (pair.bite.fitted ? `fitted to the bite scan (RMS ${pair.bite.rms.toFixed(2)} mm)` : "the bite scan could not be fitted") : pair ? (pair.inOcclusion ? "in occlusion as scanned" : "not in occlusion") : "one arch";
-  status(`Scans set up in ${((performance.now() - started) / 1000).toFixed(1)} s: ${Object.keys(state.arches).join(" and ")}, ${fit}${frameNotes.length ? ` (${frameNotes.join("; ")})` : ""}.`);
+  const toCheck = (["upper", "lower"] as Jaw[]).flatMap((j) => state.arches[j]?.found?.teeth.filter((t) => t.check).map((t) => `${t.fdi} (${t.check})`) ?? []);
+  status(`Scans set up in ${((performance.now() - started) / 1000).toFixed(1)} s: ${Object.keys(state.arches).join(" and ")}, ${fit}${frameNotes.length ? ` (${frameNotes.join("; ")})` : ""}.${toCheck.length ? ` Check ${toCheck.join(", ")}: use Move a contact to correct it.` : ""}`);
   state.jaw = state.arches.upper ? "upper" : "lower";
   renderArchChoice();
   showArch();
@@ -408,14 +409,14 @@ function showFound(arch: ArchState, geometry: THREE.BufferGeometry) {
     for (const p of [tooth.mesial, tooth.distal]) { const m = new THREE.Mesh(dot, dotMaterial); m.position.copy(p); scanGroup.add(m); }
     const axis = new THREE.BufferGeometry().setFromPoints([tooth.tip.clone().addScaledVector(tooth.axis, -tooth.height), tooth.tip.clone().addScaledVector(tooth.axis, 2)]);
     scanGroup.add(new THREE.Line(axis, new THREE.LineBasicMaterial({ color: 0x1d2430 })));
-    scanGroup.add(label(String(tooth.fdi), tooth.tip.clone().add(new THREE.Vector3(0, 0, 3))));
+    scanGroup.add(label(tooth.check ? `${tooth.fdi}?` : String(tooth.fdi), tooth.tip.clone().add(new THREE.Vector3(0, 0, 3)), Boolean(tooth.check)));
   }
 }
-function label(text: string, at: THREE.Vector3) {
+function label(text: string, at: THREE.Vector3, warn = false) {
   const canvas = document.createElement("canvas");
   canvas.width = 64; canvas.height = 40;
   const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.fillRect(0, 0, 64, 40);
+  ctx.fillStyle = warn ? "rgba(255,226,140,0.95)" : "rgba(255,255,255,0.9)"; ctx.fillRect(0, 0, 64, 40);
   ctx.fillStyle = "#1d2430"; ctx.font = "bold 26px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(text, 32, 21);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }));
