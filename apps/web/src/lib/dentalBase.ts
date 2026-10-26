@@ -1261,13 +1261,14 @@ function rayExit(ring: Ring, from: [number, number], angle: number): [number, nu
  * Half-round notches cut into the foot of the outer wall - at the front and either side (front at
  * -y) - which a lab uses to seat the model the same way each time.
  */
-export function locatorNotches(runtime: ManifoldRuntime, outer: Ring, floor: number): ManifoldSolid {
+/** `grow` (build 74) widens and heightens each notch by that much: the collar a hollow model keeps solid round it. */
+export function locatorNotches(runtime: ManifoldRuntime, outer: Ring, floor: number, grow = 0): ManifoldSolid {
   const centre = ringCentroid(outer);
   const cuts: ManifoldSolid[] = [];
   for (const angle of [-90, -30, -150, 20, 160]) {
     const at = rayExit(outer, centre, angle);
     if (!at) continue;
-    cuts.push(runtime.Manifold.cylinder(NOTCH_HEIGHT + 0.01, NOTCH_RADIUS, NOTCH_RADIUS, 32).translate([at[0], at[1], floor - 0.01]));
+    cuts.push(runtime.Manifold.cylinder(NOTCH_HEIGHT + grow + 0.01, NOTCH_RADIUS + grow, NOTCH_RADIUS + grow, 32).translate([at[0], at[1], floor - 0.01]));
   }
   if (!cuts.length) return runtime.Manifold.cube([0.001, 0.001, 0.001]).translate([1e6, 1e6, 1e6]);
   const all = runtime.Manifold.union(cuts);
