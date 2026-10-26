@@ -147,7 +147,12 @@ export function centreCurve(points: Float32Array, curve: ArchCurve, passes = 2):
   return c;
 }
 
-export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, rightSide: number, lastPosition = 7): FoundTeeth & { curve: ArchCurve } {
+/**
+ * `sizeRange`: the overall size factor's range. For the second arch of a pair, pass the first arch's
+ * size +-0.1: tooth sizes are in proportion between the arches (Bolton's anterior ratio, 77.2%, which
+ * the two width tables already carry), and crowded lower incisors otherwise read as half or double size.
+ */
+export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, rightSide: number, lastPosition = 7, sizeRange: [number, number] = [0.8, 1.25]): FoundTeeth & { curve: ArchCurve } {
   const curve = centreCurve(points, rawCurve);
   const n = points.length / 3;
   const { s, d } = projectOnCurve(points, curve);
@@ -226,7 +231,7 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
   const midBin = Math.round(curve.sMid / STEP);
   let bestSize = 1, bestPaths: [number[], number[]] = [[midBin], [midBin]], bestScore = Infinity;
   for (let mid = Math.max(0, midBin - 24); mid <= Math.min(bins - 1, midBin + 24); mid += 1) {
-    for (let size = 0.8; size <= 1.251; size += 0.05) {
+    for (let size = sizeRange[0]; size <= sizeRange[1] + 0.001; size += 0.025) {
       const a = side(mid, -1, size), b = side(mid, 1, size);
       const teethCount = a.path.length + b.path.length - 2;
       if (teethCount < 2) continue;

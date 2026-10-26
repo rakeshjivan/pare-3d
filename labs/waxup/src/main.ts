@@ -52,7 +52,7 @@ const state: {
   colour: "wax" | "contact" | "off";
   showAntagonist: boolean;
   fitTeeth: boolean;
-} = { prepared: null, arches: {}, inOcclusion: false, library: null, libraries: [], jaw: "upper", selected: null, mirror: true, lastPosition: 7, rightSide: 1, colour: "wax", showAntagonist: false, fitTeeth: true };
+} = { prepared: null, arches: {}, inOcclusion: false, library: null, libraries: [], jaw: "upper", selected: null, mirror: true, lastPosition: 5, rightSide: 1, colour: "wax", showAntagonist: false, fitTeeth: true };
 
 let manifold: Awaited<ReturnType<typeof manifoldModule>> | null = null;
 async function runtime() {
@@ -256,8 +256,16 @@ async function loadScans(files: File[]) {
     const isPartial = !(Math.min(...ends) < -12 && Math.max(...ends) > 12);
     if (isPartial) frameNotes.push(`the ${jaw} is a partial scan, so it is shown but not waxed`);
     const geometry = soupGeometry(soup);
-    state.arches[jaw] = { jaw, frame, sharedSoup: shared, soup, points, curve, grid: new PointGrid2(points, 1), bvh: new MeshBVH(geometry), bite: arch.bite, partial: isPartial, found: isPartial ? null : findTeeth(points, curve, jaw, -1), faces: m.f, teeth: [], waxed: new Set() };
+    state.arches[jaw] = { jaw, frame, sharedSoup: shared, soup, points, curve, grid: new PointGrid2(points, 1), bvh: new MeshBVH(geometry), bite: arch.bite, partial: isPartial, found: null, faces: m.f, teeth: [], waxed: new Set() };
   }
+  // The patient's teeth, upper first: the lower's overall size is held near the upper's.
+  const findOn = (jaw: Jaw, range?: [number, number]) => {
+    const arch = state.arches[jaw];
+    if (arch && !arch.partial) arch.found = findTeeth(arch.points, arch.curve, jaw, -1, 5, range);
+  };
+  findOn("upper");
+  const upperSize = state.arches.upper?.found?.size;
+  findOn("lower", upperSize ? [Math.max(0.8, upperSize - 0.1), Math.min(1.25, upperSize + 0.1)] : undefined);
   const pair = prepared.analysis.pair;
   const fit = pair?.bite ? (pair.bite.fitted ? `fitted to the bite scan (RMS ${pair.bite.rms.toFixed(2)} mm)` : "the bite scan could not be fitted") : pair ? (pair.inOcclusion ? "in occlusion as scanned" : "not in occlusion") : "one arch";
   status(`Scans set up in ${((performance.now() - started) / 1000).toFixed(1)} s: ${Object.keys(state.arches).join(" and ")}, ${fit}${frameNotes.length ? ` (${frameNotes.join("; ")})` : ""}.`);
