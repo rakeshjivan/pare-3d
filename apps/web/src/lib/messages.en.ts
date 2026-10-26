@@ -4161,6 +4161,9 @@ export const MESSAGES_EN = {
   "loft.segmentsHint": "How many straight pieces a full circle or rounded corner is drawn with, in the view and in STL, OBJ and 3MF. More pieces look rounder and make larger files.",
   "editor.dropToImport": "Drop to import",
   "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG or JPG - or a .lyl design to open it",
+  "pareWhatsNew.subtitleOpened": "You're on build {build} - scroll down for the builds before it",
+  "pareWhatsNew.thisBuild": "This build",
+  "sculpt.preparing": "Getting the mesh ready to sculpt...",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

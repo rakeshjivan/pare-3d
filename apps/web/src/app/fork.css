@@ -1853,3 +1853,19 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 }
 .file-drop-card strong { font-size: 16px; }
 .file-drop-card span { font-size: 13px; opacity: 0.75; }
+
+/* Build 75: What's new on the start page, and its window scrolling through every build. */
+.dashboard-whats-new {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--panel, #fff);
+  color: var(--foreground); font: 600 13px var(--font-ui); cursor: pointer;
+}
+.dashboard-whats-new:hover { border-color: var(--primary); color: var(--primary); }
+.dashboard-whats-new svg { color: #d9822b; }
+.print-check.whats-new { display: flex; flex-direction: column; overflow: hidden; }
+.whats-new .whats-new-builds { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-bottom: 8px; overscroll-behavior: contain; }
+.whats-new-current {
+  margin-left: 8px; padding: 1px 8px; border-radius: 999px; font: 600 11px var(--font-ui);
+  color: #fff; background: var(--primary); vertical-align: 1px;
+}
+@media (max-width: 720px) { .dashboard-whats-new span { display: none; } }

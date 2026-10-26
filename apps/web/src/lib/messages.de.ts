@@ -4160,4 +4160,7 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "loft.segmentsHint": "Aus wie vielen geraden Stücken ein ganzer Kreis oder eine Rundung gezeichnet wird, in der Ansicht und in STL, OBJ und 3MF. Mehr Stücke wirken runder und machen größere Dateien.",
   "editor.dropToImport": "Zum Importieren ablegen",
   "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG oder JPG - oder ein .lyl-Design zum Öffnen",
+  "pareWhatsNew.subtitleOpened": "Sie nutzen Build {build} - weiter unten die Builds davor",
+  "pareWhatsNew.thisBuild": "Dieser Build",
+  "sculpt.preparing": "Das Netz wird zum Modellieren vorbereitet ...",
 };

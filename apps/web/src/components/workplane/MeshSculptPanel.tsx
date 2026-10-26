@@ -37,6 +37,7 @@ export function MeshSculptPanel({
   detail,
   amount,
   busy,
+  preparing = false,
   error,
   workspace,
   onTool,
@@ -65,6 +66,8 @@ export function MeshSculptPanel({
   detail: number;
   amount: number;
   busy: boolean;
+  /** Build 75: the live copy of the mesh is still being made. */
+  preparing?: boolean;
   error: string | null;
   workspace: WorkplaneWorkspaceSettings;
   onTool: (tool: SculptTool | null) => void;
@@ -97,7 +100,11 @@ export function MeshSculptPanel({
           <button type="button" aria-label={t("sculpt.done")} onClick={onClose}><X size={20} /></button>
         </div>
       </div>
-      <p className="edge-modifier-selection-help">{t("sculpt.help")}</p>
+      {preparing ? (
+        <p className="edge-modifier-selection-help sculpt-preparing" role="status"><LoaderCircle className="edge-modifier-spinner" size={16} aria-hidden="true" /> {t("sculpt.preparing")}</p>
+      ) : (
+        <p className="edge-modifier-selection-help">{t("sculpt.help")}</p>
+      )}
       <div className="dental-trim-mode dental-area-tools sculpt-tools" role="radiogroup" aria-label={t("sculpt.brushes")}>
         {SCULPT_TOOLS.map((value) => (
           <button key={value} type="button" role="radio" aria-checked={tool === value} className={tool === value ? "active" : ""} disabled={busy} onClick={() => onTool(tool === value ? null : value)}>

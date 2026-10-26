@@ -8953,7 +8953,9 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean } | null>(null);
+  const sculptToolRef = useRef(sculptTool);
+  sculptToolRef.current = sculptTool;
   const sculptState = useRef<SculptSession | null>(null);
   const flushSculptRef = useRef<() => void>(() => {});
   const sculptPreviewDone = useRef<string | null>(null);
@@ -8980,9 +8982,6 @@ export function LayerlingEditor({
   };
   const openSculpt = useCallback((shape: WorkplaneShape) => {
     if (shape.locked || shape.hole || isNonSolidShapeKind(shape.kind)) { setNotice(t("sculpt.selectOne")); return; }
-    const state = sculptMeshFor(shape);
-    const triangles = state.live.triangleCount();
-    if (triangles > 1_500_000) setNotice(t("sculpt.large", { count: triangles.toLocaleString() }));
     setMeshRoundTool(null);
     // Build 74: sculpting one of Dental Studio's scans, the other scans step aside until Sculpt closes.
     const studio = dentalStudioRef.current;
@@ -8990,7 +8989,29 @@ export function LayerlingEditor({
       sculptHidOthers.current = true;
       setDentalHidden(Object.values(studio.slots).filter((id): id is string => Boolean(id) && id !== shape.id));
     }
-    setSculptTool({ shapeId: shape.id, tool: "smooth", size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off", remeshMode: "remesh", detail: Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100), amount: 2, busy: false, error: null });
+    const settings = { shapeId: shape.id, tool: "smooth" as SculptTool, size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null };
+    const known = sculptState.current;
+    const ready = (state: SculptSession) => Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100);
+    if (known && known.shapeId === shape.id && known.key === projectShapesFingerprint([shape])) {
+      setSculptTool({ ...settings, detail: ready(known), busy: false });
+      return;
+    }
+    // Build 75: the panel shows at once, saying the mesh is being got ready; the live copy of a big
+    // scan (a second or so) is made just after, once the panel is on screen.
+    setSculptTool({ ...settings, detail: 0.1, busy: true, preparing: true });
+    // Two frames first, so the panel is painted before the work holds the page.
+    const afterPaint = (work: () => void) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => window.setTimeout(work, 0)));
+    afterPaint(() => {
+      const open = sculptToolRef.current;
+      if (!open || open.shapeId !== shape.id || !open.preparing) return;
+      const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
+      if (!current) { setSculptTool(null); return; }
+      const state = sculptMeshFor(current);
+      const triangles = state.live.triangleCount();
+      if (triangles > 1_500_000) setNotice(t("sculpt.large", { count: triangles.toLocaleString() }));
+      const detail = ready(state);
+      setSculptTool((latest) => latest && latest.shapeId === shape.id && latest.preparing ? { ...latest, detail, busy: false, preparing: false } : latest);
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleSculpt = useCallback(() => {
     if (sculptTool) { flushSculpt(); setSculptTool(null); return; }
@@ -16206,6 +16227,7 @@ export function LayerlingEditor({
           detail={sculptTool.detail}
           amount={sculptTool.amount}
           busy={sculptTool.busy}
+          preparing={Boolean(sculptTool.preparing)}
           error={sculptTool.error}
           workspace={workspaceSettings}
           onTool={(tool) => setSculptTool((current) => current ? { ...current, tool } : current)}

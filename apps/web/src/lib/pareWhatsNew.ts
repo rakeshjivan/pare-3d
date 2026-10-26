@@ -7,6 +7,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
     build: 75,
     items: [
       "Drag files from your desktop straight onto the editor to import them - no trip through the Import window. A frame shows while you hold them over it; a .lyl design dropped this way opens.",
+      "What's new has its own button on the start page, and opens with every build to scroll back through, newest first.",
+      "Sculpt opens at once: the panel shows straight away while a big scan is got ready, and getting it ready takes about half the time it did.",
     ],
   },
   {

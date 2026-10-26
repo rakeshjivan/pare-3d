@@ -4160,4 +4160,7 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "loft.segmentsHint": "Uit hoeveel rechte stukjes een hele cirkel of afronding wordt getekend, in het beeld en in STL, OBJ en 3MF. Meer stukjes ziet er ronder uit en maakt grotere bestanden.",
   "editor.dropToImport": "Loslaten om te importeren",
   "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG of JPG - of een .lyl-ontwerp om het te openen",
+  "pareWhatsNew.subtitleOpened": "U gebruikt build {build} - scroll omlaag voor de builds daarvoor",
+  "pareWhatsNew.thisBuild": "Deze build",
+  "sculpt.preparing": "Het net wordt klaargemaakt om te boetseren...",
 };

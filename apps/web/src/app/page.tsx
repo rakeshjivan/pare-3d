@@ -10,7 +10,7 @@ import { AppFooter } from "@/components/AppFooter";
 import { PareUpdateBanner } from "@/components/PareUpdateBanner";
 import { FirstRunCard, useFirstRunAnswered } from "@/components/FirstRunCard";
 import { SAVE_STATE_EVENT } from "@/components/SaveStatus";
-import { WhatsNew } from "@/components/WhatsNew";
+import { OPEN_WHATS_NEW_EVENT, WhatsNew } from "@/components/WhatsNew";
 import { starterParts, type StarterId } from "@/lib/starterDesigns";
 import { buildReadyPart } from "@/lib/readyPartsBuild";
 import { placeCustomShape } from "@/lib/customShapePackage";
@@ -3382,10 +3382,17 @@ function Dashboard({
           <input value={query} onChange={(event) => onQueryChange(event.currentTarget.value)} placeholder={t("dashboard.searchPlaceholder")} aria-label={t("dashboard.searchLabel")} />
         </div>
         <div className="dashboard-topbar-actions">
+          {/* Build 75: what this build brought, and every build before it, a click from the start page. */}
+          <button type="button" className="dashboard-whats-new" onClick={() => window.dispatchEvent(new Event(OPEN_WHATS_NEW_EVENT))}>
+            <Sparkles size={16} aria-hidden="true" />
+            <span>{t("helpMenu.whatsNew")}</span>
+          </button>
           <PareVersionStatus />
           <ThemeSwitch />
         </div>
       </header>
+      {/* Build 75: beside the top bar, so its button opens it whichever part of the start page is shown. */}
+      <WhatsNew />
 
       <div className="dashboard-layout">
         <section className={`dashboard-main${hasProjects ? " has-projects" : ""}`} aria-label={dashboardSection === "shared" ? t("shared.title") : t("dashboard.projects")}>
@@ -3766,7 +3773,6 @@ function Dashboard({
               ) : null}
               <PareUpdateBanner />
               <FirstRunCard />
-              <WhatsNew />
       <FeedbackDialog />
               {/* Fork: on a first visit the "New to 3D design?" question already offers the Tinkercad guide. */}
               {firstRunAnswered ? (

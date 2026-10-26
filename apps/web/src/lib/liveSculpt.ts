@@ -104,21 +104,40 @@ export class LiveMesh {
 
   /** A mesh from a triangle soup (9 numbers a triangle), corners welded within 1e-5 mm. */
   static fromSoup(soup: ArrayLike<number>): LiveMesh {
-    const key = new Map<string, number>();
-    const points: number[] = [];
-    const tris: number[] = [];
+    // Build 75: welded through a numeric hash table on the rounded corner, not a Map of text keys -
+    // a full-arch scan (a million corners) opens in a fraction of the time.
+    const corners = Math.floor(soup.length / 9) * 3;
+    let cap = 1024;
+    while (cap < corners * 2) cap *= 2;
+    const mask = cap - 1;
+    const table = new Int32Array(cap).fill(-1);
+    const keys = new Float64Array(corners * 3);
+    const points = new Float64Array(corners * 3);
+    const tris = new Int32Array(corners);
+    let count = 0, made = 0;
+    const ids = [0, 0, 0];
     for (let i = 0; i + 8 < soup.length; i += 9) {
-      const ids: number[] = [];
       for (let k = 0; k < 3; k += 1) {
         const x = soup[i + k * 3], y = soup[i + k * 3 + 1], z = soup[i + k * 3 + 2];
-        const name = `${Math.round(x * 1e5)},${Math.round(y * 1e5)},${Math.round(z * 1e5)}`;
-        let id = key.get(name);
-        if (id === undefined) { id = points.length / 3; key.set(name, id); points.push(x, y, z); }
-        ids.push(id);
+        const rx = Math.round(x * 1e5), ry = Math.round(y * 1e5), rz = Math.round(z * 1e5);
+        let h = (Math.imul(rx | 0, 73856093) ^ Math.imul(ry | 0, 19349663) ^ Math.imul(rz | 0, 83492791)) & mask;
+        let id = -1;
+        for (;;) {
+          const at = table[h];
+          if (at < 0) break;
+          if (keys[at * 3] === rx && keys[at * 3 + 1] === ry && keys[at * 3 + 2] === rz) { id = at; break; }
+          h = (h + 1) & mask;
+        }
+        if (id < 0) {
+          id = count; count += 1; table[h] = id;
+          keys[id * 3] = rx; keys[id * 3 + 1] = ry; keys[id * 3 + 2] = rz;
+          points[id * 3] = x; points[id * 3 + 1] = y; points[id * 3 + 2] = z;
+        }
+        ids[k] = id;
       }
-      if (ids[0] !== ids[1] && ids[1] !== ids[2] && ids[0] !== ids[2]) tris.push(ids[0], ids[1], ids[2]);
+      if (ids[0] !== ids[1] && ids[1] !== ids[2] && ids[0] !== ids[2]) { tris[made] = ids[0]; tris[made + 1] = ids[1]; tris[made + 2] = ids[2]; made += 3; }
     }
-    return new LiveMesh(points, tris);
+    return new LiveMesh(points.subarray(0, count * 3), tris.subarray(0, made));
   }
 
   // ---------------------------------------------------------------------------------------------

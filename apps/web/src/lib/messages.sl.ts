@@ -4138,4 +4138,7 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "loft.segmentsHint": "Iz koliko ravnih odsekov je narisan cel krog ali zaobljenje, v pogledu in v STL, OBJ in 3MF. Več odsekov izgleda bolj okroglo in naredi večje datoteke.",
   "editor.dropToImport": "Spustite za uvoz",
   "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG ali JPG - ali načrt .lyl, da ga odprete",
+  "pareWhatsNew.subtitleOpened": "Uporabljate različico {build} - spodaj so prejšnje različice",
+  "pareWhatsNew.thisBuild": "Ta različica",
+  "sculpt.preparing": "Mreža se pripravlja za kiparjenje ...",
 };

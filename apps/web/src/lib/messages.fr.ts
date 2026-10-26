@@ -4136,4 +4136,7 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "loft.segmentsHint": "Avec combien de segments droits un cercle entier ou un arrondi est dessiné, dans la vue et dans STL, OBJ et 3MF. Plus de segments donnent un rendu plus rond et des fichiers plus gros.",
   "editor.dropToImport": "Déposez pour importer",
   "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG ou JPG - ou un design .lyl pour l'ouvrir",
+  "pareWhatsNew.subtitleOpened": "Vous utilisez la version {build} - faites défiler pour les versions précédentes",
+  "pareWhatsNew.thisBuild": "Cette version",
+  "sculpt.preparing": "Préparation du maillage pour la sculpture...",
 };

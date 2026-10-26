@@ -4159,4 +4159,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "loft.segmentsHint": "Z kolika rovných úseků se kreslí celý kruh nebo zaoblení, v pohledu i v STL, OBJ a 3MF. Více úseků vypadá kulatěji a dělá větší soubory.",
   "editor.dropToImport": "Pusťte pro import",
   "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG nebo JPG - nebo návrh .lyl k otevření",
+  "pareWhatsNew.subtitleOpened": "Používáte sestavení {build} - níže najdete předchozí sestavení",
+  "pareWhatsNew.thisBuild": "Toto sestavení",
+  "sculpt.preparing": "Síť se připravuje k modelování...",
 };
