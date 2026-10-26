@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 74,
+    items: [
+      "Dental Studio locks the bite in: the first time a set is looked at, the bite the bite scan gives is stored with the two arches and never fitted again. Move the scans apart, trim them, sculpt them or cut the palate away - the models and the articulator keep the bite as scanned. Before, any trim or sculpt could lose it, and fitting again after cutting the palate away moved a real full-arch set by up to 0.3 mm.",
+      "Scans are laid out side by side on the plate, teeth up with the front towards you, the bite scan hidden; one click puts them in occlusion and back. Sculpting one scan hides the other, and the orange teeth area moves with its scan and can be switched off.",
+      "Restore original upper and lower put a scan back as it was imported, still in the locked bite - the original files stay in the design.",
+      "Hollow models are made faster with about 30% fewer triangles: the hidden cavity is simplified, and set a little further in so the wall is never thinner than you asked.",
+    ],
+  },
+  {
     build: 73,
     items: [
       "Sculpt works in real time, as in Meshmixer: the surface changes under the brush as you drag, also on a full-arch scan of 300,000 triangles. New brushes: Draw, Pinch, Crease and Move (grab the surface and pull it).",

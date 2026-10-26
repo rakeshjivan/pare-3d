@@ -23,6 +23,12 @@ Click **{{ui:dental.title}}** in the {{ui:editor.group.dental}} group of the too
 
 **As the panel opens** Pare 3D welds each scan, removes broken triangles and loose pieces, fills the small holes and sets each arch up teeth up, with the occlusal plane level and the midline straight. A quadrant is recognised as one and set up along its own length. With a bite scan the two arches are fitted onto it; without one they stay where the scanner put them, which is in occlusion when both came from the same scan. The panel says what it found for each scan and whether the arches are in occlusion.
 
+**The bite is locked in.** The first time a set is looked at, the bite the bite scan gives is stored with the two arches, and Pare 3D never fits it again. Move the scans apart, turn them, trim rough edges, cut the palate away or sculpt them - the models and the articulator are made in the bite as it was scanned. (Fitting again after an edit would move it: on a full-arch set, cutting the palate away and fitting again moved the upper up to 0.3 mm against the lower.) The panel shows {{ui:dental.biteLocked}}
+
+**Side by side.** The scans are then laid out side by side on the plate - the upper on the left, the lower on the right, each teeth up with its front towards you - and the bite scan is hidden: it is only needed for the fit. **{{ui:dental.scanOcclusion}}** puts the pair in occlusion to check the bite, **{{ui:dental.scanSide}}** back side by side for trimming. Neither changes the scans. Sculpting one of the scans hides the other until Sculpt closes, and the orange teeth area moves with its scan when you drag it.
+
+**The original scans stay in the design.** **{{ui:dental.restoreUpper}}** and **{{ui:dental.restoreLower}}** put the scan back as it was imported - every trim, sculpt and cut of it undone at once - still in the locked bite. Only the files themselves are kept (about the size of the STL files), not a copy after every edit.
+
 ## Step 2 · {{ui:dental.step2}}
 
 Leave it on **{{ui:dental.marginAuto}}** unless the scan needs help: Pare 3D finds the teeth, keeps a smooth band of gum below them and cuts the scan exactly along it. **{{ui:dental.marginManual}}** lets you check and correct what is kept as teeth, the way a lab's model builder does:
@@ -31,6 +37,7 @@ Leave it on **{{ui:dental.marginAuto}}** unless the scan needs help: Pare 3D fin
 
 - Pare 3D picks the teeth and tints them orange on the scan. Choose the arch and turn the view with the view buttons ({{ui:dental.view.occlusal}}, {{ui:dental.view.front}}, {{ui:dental.view.left}}, {{ui:dental.view.right}}, {{ui:dental.view.lingual}}).
 - **{{ui:dental.area.paint}}** paints more on, **{{ui:dental.area.erase}}** takes off tissue that was taken for teeth (a pad behind the last molar, a flap of cheek) - press and drag; the {{ui:dental.brushSize}} sets how wide. **{{ui:dental.area.lassoAdd}}** and **{{ui:dental.area.lassoRemove}}** take everything inside a line you draw. Only the side facing you is painted; turn the view between strokes. Esc puts the tool away.
+- **{{ui:dental.areaShown}}** hides the orange tint while you look at the scan or trim it; it comes back while you paint. It is never shown while a scan is being trimmed.
 - **{{ui:dental.expand}}** sets the band of gum kept round the area (3 mm by default). The model keeps the area and that band and nothing else, cut smoothly along the band's edge. **{{ui:dental.areaReset}}** starts the area again.
 
 What you approve is protected: nothing inside the area is ever cut.
