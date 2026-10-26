@@ -466,6 +466,8 @@ export type Cavity = { solid: ManifoldSolid; voxel: number; vents: Array<[number
  * gives where vent holes of `ventRadius` go up through it into each part of the cavity. Pockets
  * that would be shut inside a thick wall are left solid.
  */
+/** Build 74: how far (mm) the simplified cavity may stray from the marching-cubes one. */
+export const CAVITY_TOLERANCE = 0.05;
 export function hollowCavity(runtime: ManifoldRuntime, positions: Float32Array, floor: number, wall: number, open: boolean, ventRadius = 1.5, shift = 0): Cavity {
   let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
   for (let i = 0; i < positions.length; i += 3) {
@@ -498,7 +500,8 @@ export function hollowCavity(runtime: ManifoldRuntime, positions: Float32Array, 
   const field = new Float32Array(inside.length);
   // Voxel centres sit about half a voxel inside the faces they stand for; one voxel more keeps the
   // thinnest wall at about the thickness asked for rather than under it.
-  for (let i = 0; i < inside.length; i += 1) field[i] = (Math.sqrt(toOutside[i]) - 1) * h - wall;
+  // Build 74: CAVITY_TOLERANCE more, so the simplified cavity below never thins the wall under it.
+  for (let i = 0; i < inside.length; i += 1) field[i] = (Math.sqrt(toOutside[i]) - 1) * h - wall - CAVITY_TOLERANCE;
   const bounds = {
     min: [origin[0], origin[1], origin[2]] as [number, number, number],
     max: [origin[0] + nx * h, origin[1] + ny * h, origin[2] + nz * h] as [number, number, number],
@@ -510,8 +513,13 @@ export function hollowCavity(runtime: ManifoldRuntime, positions: Float32Array, 
   const reach = open ? floor : floor + wall + 3 * h;
   const kept = pieces.filter((piece) => piece.boundingBox().min[2] < reach);
   pieces.filter((piece) => !kept.includes(piece)).forEach((piece) => piece.delete());
-  const solid = runtime.Manifold.compose(kept);
+  const composed = runtime.Manifold.compose(kept);
   kept.forEach((piece) => piece.delete());
+  // Build 74: the cavity is marching cubes at a fifth of the wall - dense, and never seen. Its flat
+  // runs are collapsed to within CAVITY_TOLERANCE (a fortieth of a 2 mm wall), so the hollowing and
+  // everything after it handle a fraction of the triangles.
+  const solid = composed.simplify(CAVITY_TOLERANCE);
+  composed.delete();
   const vents: Array<[number, number]> = [];
   if (!open && !solid.isEmpty()) {
     // The cavity's lowest layers seen from above; vents go where there is room for them, spread out.
