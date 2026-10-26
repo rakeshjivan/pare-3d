@@ -43,8 +43,10 @@ export type FoundTooth = {
   centre: THREE.Vector3;
   tip: THREE.Vector3;
   axis: THREE.Vector3;
-  /** Height of the crown found (mm) and how clearly the contacts showed (0 none - 1 strong). */
+  /** Clinical crown height found (tip to the gingival margin, mm) and how clearly the contacts showed (0 none - 1 strong). */
   height: number;
+  /** Height of the gingival margin under the crown (the crown's lowest few per cent of vertices). */
+  margin: number;
   confidence: number;
   /** Why this tooth should be checked (empty when it looks right). */
   check: string;
@@ -396,10 +398,11 @@ export function findTeeth(points: Float32Array, rawCurve: ArchCurve, jaw: Jaw, r
         if (z < floor + 2.5) { lower.x += points[i * 3]; lower.y += points[i * 3 + 1]; lower.z += z; nl += 1; }
       }
       if (crown.length) centre.divideScalar(crown.length);
+      const margin = crown.length ? percentile(crown.map((i) => points[i * 3 + 2]), 0.03) : floor;
       const axis = nu && nl ? upper.divideScalar(nu).sub(lower.divideScalar(nl)).normalize() : new THREE.Vector3(0, 0, 1);
       if (axis.z < 0.5) axis.set(0, 0, 1);
       const confidence = Math.max(0, Math.min(1, -(smoothCost[b0] + smoothCost[b1]) / 2 + 0.5));
-      teeth.push({ check: "", fdi, position, side: sideSign as -1 | 1, sMesial: b0 * STEP, sDistal: b1 * STEP, width: Math.abs(b1 - b0) * STEP, mesial: mesialPoint, distal: distalPoint, centre, tip, axis, height: top - floor, confidence });
+      teeth.push({ check: "", fdi, position, side: sideSign as -1 | 1, sMesial: b0 * STEP, sDistal: b1 * STEP, width: Math.abs(b1 - b0) * STEP, mesial: mesialPoint, distal: distalPoint, centre, tip, axis, height: tip.z - margin, margin, confidence });
     }
   }
   // Teeth to check: width far from the mean for its type (at this arch's size), or centrals that differ.

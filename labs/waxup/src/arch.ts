@@ -27,8 +27,9 @@ export type PlacedTooth = {
   buccal: THREE.Vector3;
   occlusal: THREE.Vector3;
   centre: THREE.Vector3;
-  /** Uniform size from the arch fit. */
+  /** Size from the arch fit (mesiodistal and buccolingual), and the crown's height relative to that. */
   scale: number;
+  heightRatio?: number;
   /** Seat offsets found automatically, in the tooth's own frame (mm). */
   seat: { buccal: number; up: number };
   adjust: Adjust;
@@ -268,7 +269,7 @@ export function toothMatrix(tooth: PlacedTooth): THREE.Matrix4 {
   const basis = new THREE.Matrix4().makeBasis(tooth.mesial, tooth.buccal, tooth.occlusal);
   const offset = new THREE.Vector3(a.mesial, tooth.seat.buccal + a.buccal, tooth.seat.up + a.up).applyMatrix4(basis);
   const rot = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler((a.torque * Math.PI) / 180, (a.tip * Math.PI) / 180, (a.rotate * Math.PI) / 180, "ZYX"));
-  const size = new THREE.Matrix4().makeScale(tooth.scale * a.width, tooth.scale, tooth.scale * a.length);
+  const size = new THREE.Matrix4().makeScale(tooth.scale * a.width, tooth.scale, tooth.scale * (tooth.heightRatio ?? 1) * a.length);
   return tooth.fit.clone().multiply(new THREE.Matrix4().makeTranslation(tooth.centre.x + offset.x, tooth.centre.y + offset.y, tooth.centre.z + offset.z).multiply(basis).multiply(rot).multiply(size));
 }
 
@@ -560,7 +561,7 @@ export function frameCorrection(points: Float32Array, above: number, forceTurn?:
  * long axis, sits over its crown centre and reaches its incisal edge or cusp tip. Fitting and covering
  * (fitTooth, coverTooth) then adapt it to the scanned tooth.
  */
-export function placeOnFound(lib: ToothLibrary, jaw: Jaw, found: { teeth: Array<{ fdi: number; position: number; mesial: THREE.Vector3; distal: THREE.Vector3; centre: THREE.Vector3; tip: THREE.Vector3; axis: THREE.Vector3 }> }, curve: ArchCurve, lastPosition: number): PlacedTooth[] {
+export function placeOnFound(lib: ToothLibrary, jaw: Jaw, found: { teeth: Array<{ fdi: number; position: number; mesial: THREE.Vector3; distal: THREE.Vector3; centre: THREE.Vector3; tip: THREE.Vector3; axis: THREE.Vector3; height: number }> }, curve: ArchCurve, lastPosition: number): PlacedTooth[] {
   const files = lib.teeth[jaw];
   const out: PlacedTooth[] = [];
   for (const t of found.teeth) {
@@ -579,14 +580,18 @@ export function placeOnFound(lib: ToothLibrary, jaw: Jaw, found: { teeth: Array<
     const mid = t.mesial.clone().add(t.distal).multiplyScalar(0.5);
     if (buccal.x * (mid.x - curve.centre[0]) + buccal.y * (mid.y - curve.centre[1]) < 0) buccal.negate();
     const scale = chord / ext.width;
+    // Height on its own: the library crown spans the patient's clinical crown, incisal edge or cusp tip
+    // to the gingival margin (teeth differ from the library in proportion as well as size).
+    const heightScale = t.height > 2 ? t.height / ext.height : scale;
+    const heightRatio = Math.max(0.6, Math.min(1.5, heightScale / scale));
     // Across the arch: over the crown's centre. Along it: midway between the contacts. Height: the tip.
     const across = new THREE.Vector3(t.centre.x - mid.x, t.centre.y - mid.y, 0).dot(buccal);
     const target = mid.clone().addScaledVector(buccal, across);
     const centre = target
       .addScaledVector(mesial, -((x0 + x1) / 2) * scale)
       .addScaledVector(buccal, -((y0 + y1) / 2) * scale);
-    centre.z = t.tip.z - ext.top * scale;
-    out.push({ fdi: t.fdi, position: t.position, mesial, buccal, occlusal, centre, scale, seat: { buccal: 0, up: 0 }, adjust: { ...NO_ADJUST }, mesh, fit: new THREE.Matrix4(), fitError: null });
+    centre.z = t.tip.z - ext.top * scale * heightRatio;
+    out.push({ fdi: t.fdi, position: t.position, mesial, buccal, occlusal, centre, scale, heightRatio, seat: { buccal: 0, up: 0 }, adjust: { ...NO_ADJUST }, mesh, fit: new THREE.Matrix4(), fitError: null });
   }
   return out;
 }
