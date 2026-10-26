@@ -434,3 +434,95 @@ export function seatTooth(tooth: PlacedTooth, grid: PointGrid2, wax = 0.3) {
     if (sb.length > 10 && tb.length > 10) tooth.seat.buccal = Math.max(-1.5, Math.min(1.5, tooth.seat.buccal + percentile(sb, 0.97) - percentile(tb, 0.97) + wax));
   }
 }
+
+/**
+ * A correction for the arch frame when Dental Studio's is off: the occlusal plane tilted (a quadrant
+ * of cusps above the rest) or the arch turned (its open back not toward +y). Levels on the cusp tips
+ * of eight sectors around the arch, then turns the largest empty sector of the tooth band to the
+ * back. Small errors are left alone: only a tilt over 1.5 degrees or a turn over 20 degrees is
+ * corrected. Returns the matrix (to apply before the frame) and the cusp height above z = 0.
+ */
+export function frameCorrection(points: Float32Array, above: number, forceTurn?: number): { fix: THREE.Matrix4; above: number; note: string; turn: number; gap: number } {
+  // Height map: the highest point per 1 mm cell (below tall flaps).
+  const cells = new Map<string, [number, number, number]>();
+  for (let i = 0; i < points.length; i += 3) {
+    const z = points[i + 2];
+    if (z > above + 4) continue;
+    const key = `${Math.round(points[i])},${Math.round(points[i + 1])}`;
+    const c = cells.get(key);
+    if (!c || z > c[2]) cells.set(key, [points[i], points[i + 1], z]);
+  }
+  const list = [...cells.values()];
+  if (list.length < 200) return { fix: new THREE.Matrix4(), above, note: "", turn: 0, gap: 0 };
+  let cx = 0, cy = 0;
+  for (const [x, y] of list) { cx += x; cy += y; }
+  cx /= list.length; cy /= list.length;
+  const sectorOf = (x: number, y: number) => Math.min(7, Math.floor(((Math.atan2(y - cy, x - cx) + Math.PI) / (2 * Math.PI)) * 8));
+  // Cusp tips: the top 8% of cells in each sector, each sector weighted the same.
+  const tips: [number, number, number, number][] = [];
+  for (let s = 0; s < 8; s += 1) {
+    const inSector = list.filter(([x, y]) => sectorOf(x, y) === s);
+    if (inSector.length < 20) continue;
+    const top = percentile(inSector.map((c) => c[2]), 0.92);
+    const chosen = inSector.filter((c) => c[2] >= top);
+    for (const c of chosen) tips.push([c[0] - cx, c[1] - cy, c[2], 1 / chosen.length]);
+  }
+  // Least squares z = a x + b y + c.
+  let sxx = 0, sxy = 0, syy = 0, sx = 0, sy = 0, sw = 0, sxz = 0, syz = 0, sz = 0;
+  for (const [x, y, z, w] of tips) { sxx += w * x * x; sxy += w * x * y; syy += w * y * y; sx += w * x; sy += w * y; sw += w; sxz += w * x * z; syz += w * y * z; sz += w * z; }
+  const m = new THREE.Matrix3().set(sxx, sxy, sx, sxy, syy, sy, sx, sy, sw);
+  const sol = new THREE.Vector3(sxz, syz, sz).applyMatrix3(m.clone().invert());
+  let a = sol.x, b = sol.y;
+  const tilt = (Math.atan(Math.hypot(a, b)) * 180) / Math.PI;
+  const notes: string[] = [];
+  const fix = new THREE.Matrix4();
+  if (tilt > 1.5 && tilt < 20) {
+    const normal = new THREE.Vector3(-a, -b, 1).normalize();
+    fix.makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(normal, new THREE.Vector3(0, 0, 1)));
+    notes.push(`levelled ${tilt.toFixed(1)} degrees`);
+  } else { a = 0; b = 0; }
+  // The tooth band after levelling: cells within 3.5 mm of their sector's cusp height.
+  const p = new THREE.Vector3();
+  const level = list.map(([x, y, z]) => p.set(x, y, z).applyMatrix4(fix).toArray() as [number, number, number]);
+  const sectorTop = new Array<number>(8).fill(-Infinity);
+  for (let s = 0; s < 8; s += 1) {
+    const zs = level.filter(([x, y]) => sectorOf(x, y) === s).map((c) => c[2]);
+    if (zs.length >= 20) sectorTop[s] = percentile(zs, 0.92);
+  }
+  const band = level.filter(([x, y, z]) => z > sectorTop[sectorOf(x, y)] - 3.5);
+  let bx = 0, by = 0;
+  for (const [x, y] of band) { bx += x; by += y; }
+  bx /= band.length; by /= band.length;
+  // The largest run of empty 5-degree bins around the band's centre is the open back of the arch.
+  const bins = new Array<number>(72).fill(0);
+  for (const [x, y] of band) bins[Math.floor(((Math.atan2(y - by, x - bx) + Math.PI) / (2 * Math.PI)) * 72) % 72] += 1;
+  const empty = bins.map((n) => n < Math.max(2, band.length / 72 / 10));
+  let bestStart = -1, bestLen = 0;
+  for (let start = 0; start < 72; start += 1) {
+    if (!empty[start] || empty[(start + 71) % 72]) continue;
+    let len = 0;
+    while (len < 72 && empty[(start + len) % 72]) len += 1;
+    if (len > bestLen) { bestLen = len; bestStart = start; }
+  }
+  let turn = 0;
+  if (forceTurn !== undefined) turn = forceTurn;
+  else if (bestLen >= 3 && bestLen < 72) {
+    const backAngle = ((bestStart + bestLen / 2) / 72) * 2 * Math.PI - Math.PI;
+    // Turn the back to +y (angle pi/2).
+    turn = Math.PI / 2 - backAngle;
+    turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+  }
+  {
+    if (Math.abs(turn) > (20 * Math.PI) / 180) {
+      const rot = new THREE.Matrix4().makeRotationZ(turn);
+      // Centre the arch on x = 0 after turning (the midline runs through the band's centre).
+      const c = new THREE.Vector3(bx, by, 0).applyMatrix4(rot);
+      fix.premultiply(rot).premultiply(new THREE.Matrix4().makeTranslation(-c.x, 0, 0));
+      notes.push(`turned ${((turn * 180) / Math.PI).toFixed(0)} degrees`);
+    }
+  }
+  // Cusp height after the correction.
+  const tops = list.map(([x, y, z]) => p.set(x, y, z).applyMatrix4(fix).z);
+  const newAbove = notes.length ? percentile(tops, 0.97) : above;
+  return { fix, above: newAbove, note: notes.join(", "), turn, gap: bestLen };
+}

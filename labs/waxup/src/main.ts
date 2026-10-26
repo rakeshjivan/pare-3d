@@ -9,7 +9,7 @@ import manifoldModule from "manifold-3d";
 import manifoldWasm from "../../../node_modules/manifold-3d/manifold.wasm";
 import { preparedDental, type Prepared } from "@/lib/dentalModel";
 import { filesFromRar, libraryFromFiles, type Jaw, type LibraryFile, type ToothLibrary } from "./library";
-import { archCurve, coverTooth, fitTooth, NO_ADJUST, placeTeeth, PointGrid2, seatTooth, toothExtent, toothMatrix, type Adjust, type ArchCurve, type PlacedTooth } from "./arch";
+import { archCurve, coverTooth, frameCorrection, fitTooth, NO_ADJUST, placeTeeth, PointGrid2, seatTooth, toothExtent, toothMatrix, type Adjust, type ArchCurve, type PlacedTooth } from "./arch";
 import { archModel, closedTooth, modelWithTeeth, stlBytes, transformed } from "./solid";
 
 // ---------------------------------------------------------------------------------------------
@@ -21,6 +21,8 @@ type ArchState = {
   frame: THREE.Matrix4;
   /** The cleaned scan as triangles in shared coordinates. */
   sharedSoup: Float32Array;
+  /** A quadrant or sextant scan: a diagnostic wax-up needs the full arch, so none is placed. */
+  partial: boolean;
   /** The same in the arch frame. */
   soup: Float32Array;
   points: Float32Array;
@@ -210,24 +212,48 @@ async function loadScans(files: File[]) {
   state.prepared = prepared;
   state.arches = {};
   state.inOcclusion = Boolean(prepared.analysis.pair?.inOcclusion && !prepared.analysis.pair?.apart);
-  for (const arch of prepared.arches) {
+  const frameNotes: string[] = [];
+  // Each arch's frame correction. In a pair the turns mirror each other (the upper's frame is the
+  // lower's turned over), so when they disagree the arch with the clearer open back decides.
+  const studioPointsOf = (arch: (typeof prepared.arches)[number]) => {
+    const m = arch.clean.mesh, p = new THREE.Vector3(), out = new Float32Array(m.v.length);
+    for (let i = 0; i < m.v.length; i += 3) { p.set(m.v[i], m.v[i + 1], m.v[i + 2]).applyMatrix4(arch.frame); out[i] = p.x; out[i + 1] = p.y; out[i + 2] = p.z; }
+    return out;
+  };
+  const corrections = prepared.arches.map((arch) => frameCorrection(studioPointsOf(arch), Math.max(1, Math.min(4, arch.above))));
+  if (corrections.length === 2) {
+    const [c0, c1] = corrections;
+    const apart = Math.abs(Math.atan2(Math.sin(c0.turn + c1.turn), Math.cos(c0.turn + c1.turn)));
+    if (apart > (30 * Math.PI) / 180) {
+      // A partial scan (a quadrant or a sextant) has no open back to find: the full arch decides.
+      const score = (i: number) => (prepared.arches[i].partial ? -1 : corrections[i].gap);
+      const lead = score(0) >= score(1) ? 0 : 1, other = 1 - lead;
+      const arch = prepared.arches[other];
+      corrections[other] = frameCorrection(studioPointsOf(arch), Math.max(1, Math.min(4, arch.above)), -corrections[lead].turn);
+    }
+  }
+  for (const [index, arch] of prepared.arches.entries()) {
     const jaw: Jaw = arch.role === "upper" ? "upper" : "lower";
     const m = arch.clean.mesh;
     const shared = new Float32Array(m.f.length * 3);
     for (let t = 0; t < m.f.length; t += 1) { shared[t * 3] = m.v[m.f[t] * 3]; shared[t * 3 + 1] = m.v[m.f[t] * 3 + 1]; shared[t * 3 + 2] = m.v[m.f[t] * 3 + 2]; }
-    const soup = shared.slice();
     const p = new THREE.Vector3();
-    for (let i = 0; i < soup.length; i += 3) { p.set(soup[i], soup[i + 1], soup[i + 2]).applyMatrix4(arch.frame); soup[i] = p.x; soup[i + 1] = p.y; soup[i + 2] = p.z; }
-    const points = new Float32Array(m.v.length);
-    for (let i = 0; i < m.v.length; i += 3) { p.set(m.v[i], m.v[i + 1], m.v[i + 2]).applyMatrix4(arch.frame); points[i] = p.x; points[i + 1] = p.y; points[i + 2] = p.z; }
     // Cusps lie within a few mm of the occlusal plane; a taller "above" is a tissue flap or the tongue.
-    const curve = archCurve(points, Math.max(1, Math.min(4, arch.above)));
+    const correction = corrections[index];
+    const frame = correction.fix.clone().multiply(arch.frame);
+    if (correction.note) frameNotes.push(`${jaw} ${correction.note}`);
+    if (arch.partial) frameNotes.push(`the ${jaw} is a partial scan, so it is shown but not waxed`);
+    const soup = shared.slice();
+    for (let i = 0; i < soup.length; i += 3) { p.set(soup[i], soup[i + 1], soup[i + 2]).applyMatrix4(frame); soup[i] = p.x; soup[i + 1] = p.y; soup[i + 2] = p.z; }
+    const points = new Float32Array(m.v.length);
+    for (let i = 0; i < m.v.length; i += 3) { p.set(m.v[i], m.v[i + 1], m.v[i + 2]).applyMatrix4(frame); points[i] = p.x; points[i + 1] = p.y; points[i + 2] = p.z; }
+    const curve = archCurve(points, Math.max(1, Math.min(4, correction.above)));
     const geometry = soupGeometry(soup);
-    state.arches[jaw] = { jaw, frame: arch.frame.clone(), sharedSoup: shared, soup, points, curve, grid: new PointGrid2(points, 1), bvh: new MeshBVH(geometry), bite: arch.bite, teeth: [], waxed: new Set() };
+    state.arches[jaw] = { jaw, frame, sharedSoup: shared, soup, points, curve, grid: new PointGrid2(points, 1), bvh: new MeshBVH(geometry), bite: arch.bite, partial: arch.partial, teeth: [], waxed: new Set() };
   }
   const pair = prepared.analysis.pair;
   const fit = pair?.bite ? (pair.bite.fitted ? `fitted to the bite scan (RMS ${pair.bite.rms.toFixed(2)} mm)` : "the bite scan could not be fitted") : pair ? (pair.inOcclusion ? "in occlusion as scanned" : "not in occlusion") : "one arch";
-  status(`Scans set up in ${((performance.now() - started) / 1000).toFixed(1)} s: ${Object.keys(state.arches).join(" and ")}, ${fit}.`);
+  status(`Scans set up in ${((performance.now() - started) / 1000).toFixed(1)} s: ${Object.keys(state.arches).join(" and ")}, ${fit}${frameNotes.length ? ` (${frameNotes.join("; ")})` : ""}.`);
   state.jaw = state.arches.upper ? "upper" : "lower";
   renderArchChoice();
   showArch();
@@ -294,6 +320,7 @@ function autoPlace() {
   const arch = current();
   if (!arch || !state.library) return;
   if (!state.library.teeth[state.jaw].size) { status(`This library has no ${state.jaw} teeth.`); return; }
+  if (arch.partial) { arch.teeth = []; arch.waxed = new Set(); renderTeeth(); renderChips(); status(`The ${state.jaw} scan is a partial arch. A diagnostic wax-up needs a full-arch scan, so no teeth are placed on it.`); return; }
   const started = performance.now();
   arch.teeth = placeTeeth(state.library, state.jaw, arch.curve, { lastPosition: state.lastPosition, rightSide: state.rightSide });
   if (!arch.waxed.size || ![...arch.waxed].some((fdi) => arch.teeth.some((t) => t.fdi === fdi))) arch.waxed = new Set(arch.teeth.filter((t) => t.position <= 3).map((t) => t.fdi));
