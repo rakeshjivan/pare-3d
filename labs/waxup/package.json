@@ -1,0 +1,8 @@
+{
+  "name": "pare3d-waxup-lab",
+  "private": true,
+  "description": "Isolated test bench for a digital diagnostic wax-up. Not part of Pare 3D releases.",
+  "type": "module",
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": { "node-unrar-js": "2.0.2" }
+}

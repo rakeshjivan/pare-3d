@@ -123,8 +123,8 @@ export function looksLikeDentalScan(positions: ArrayLike<number>): boolean {
 // ---------------------------------------------------------------------------------------------
 // Analysis
 
-type Prepared = {
-  arches: Array<{ id: string; role: DentalRole; clean: CleanArch; frame: THREE.Matrix4; depth: number; teeth: number; above: number; palate: number; canines: number; partial: boolean }>;
+export type Prepared = {
+  arches: Array<{ id: string; role: DentalRole; clean: CleanArch; frame: THREE.Matrix4; depth: number; teeth: number; above: number; palate: number; canines: number; partial: boolean; /** Wax-up lab: how the bite fit moved this scan from its file's coordinates (absent: not moved). */ bite?: THREE.Matrix4 }>;
   analysis: DentalAnalysis;
 };
 
@@ -208,6 +208,7 @@ function zSpan(m: Mesh, frame: THREE.Matrix4) {
   return high - low;
 }
 
+const biteMoves = new WeakMap<CleanArch, THREE.Matrix4>();
 function prepare(input: DentalStudioInput): Prepared {
   if (!input.arches.length || input.arches.length > 2) throw new Error("Choose one or two arch scans");
   const cleaned = input.arches.map((arch) => ({ id: arch.id, clean: cleanScan(arch.positions) }));
@@ -251,6 +252,8 @@ function prepare(input: DentalStudioInput): Prepared {
     if (fitted) {
       applyMatrix(upper.mesh, fitUpper.matrix);
       applyMatrix(lower.mesh, fitLower.matrix);
+      biteMoves.set(upper, fitUpper.matrix);
+      biteMoves.set(lower, fitLower.matrix);
     }
     bite = { rms: Math.max(fitUpper.rms, fitLower.rms), overlap: Math.min(fitUpper.overlap, fitLower.overlap), fitted };
   }
@@ -281,7 +284,7 @@ function prepare(input: DentalStudioInput): Prepared {
   }
   const arches = cleaned.map(({ id, clean }, i) => {
     const frame = i === upperIndex ? upperFrame : lowerFrame;
-    return { id, role: roles[i], clean, frame, ...depthIn(clean.mesh, frame), palate: palates[i], canines: canines[i], partial: partials[i] };
+    return { id, role: roles[i], clean, frame, ...depthIn(clean.mesh, frame), palate: palates[i], canines: canines[i], partial: partials[i], ...(biteMoves.has(clean) ? { bite: biteMoves.get(clean) } : {}) };
   });
   return {
     arches,
@@ -313,6 +316,11 @@ function prepared(input: DentalStudioInput): Prepared {
     lastKey = key;
   }
   return lastPrepared;
+}
+
+/** Wax-up lab: the arches as Dental Studio sets them up (cleaned scans, frames, the bite fit). */
+export function preparedDental(input: DentalStudioInput): Prepared {
+  return prepared(input);
 }
 
 export function analyseDental(input: DentalStudioInput): DentalAnalysis {

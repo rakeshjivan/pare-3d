@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wax-up Lab</title>
+<style>
+:root { --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2430; --quiet: #5e6773; --line: #d8dde4; --accent: #2f6fde; --accent-soft: #e7effc; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #14171c; --panel: #1c2027; --ink: #e8ebf0; --quiet: #9aa3ae; --line: #2d333c; --accent: #6b9cf2; --accent-soft: #1f2a3d; } }
+:root[data-theme="dark"] { --bg: #14171c; --panel: #1c2027; --ink: #e8ebf0; --quiet: #9aa3ae; --line: #2d333c; --accent: #6b9cf2; --accent-soft: #1f2a3d; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+.app { display: grid; grid-template-columns: 340px 1fr; height: 100%; }
+aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 14px 16px 24px; }
+h1 { font-size: 16px; margin: 0 0 2px; }
+.sub { color: var(--quiet); margin: 0 0 12px; font-size: 12px; }
+section { border-top: 1px solid var(--line); padding: 12px 0; }
+h2 { font-size: 13px; margin: 0 0 8px; display: flex; gap: 8px; align-items: center; }
+h2 .n { width: 20px; height: 20px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: inline-grid; place-items: center; font-size: 11px; }
+.hint { color: var(--quiet); font-size: 12px; margin: 4px 0; }
+label.file { display: block; border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; margin: 4px 0; }
+label.file:hover { border-color: var(--accent); }
+label.file input { display: none; }
+button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+.seg button.active, #arch-choice button.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.lib { display: flex; gap: 8px; align-items: center; width: 100%; margin: 3px 0; text-align: left; }
+.lib img { width: 44px; height: 30px; object-fit: cover; border-radius: 4px; }
+.lib.active { border-color: var(--accent); background: var(--accent-soft); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { padding: 3px 6px; min-width: 32px; font-size: 12px; }
+.chip.on { background: #f4efe4; border-color: #c9b98f; color: #3d3320; font-weight: 600; }
+.chip.sel { outline: 2px solid var(--accent); }
+.slider { display: grid; grid-template-columns: 128px 1fr 56px; gap: 6px; align-items: center; margin: 3px 0; font-size: 12px; }
+.slider output { text-align: right; color: var(--quiet); font-variant-numeric: tabular-nums; }
+.sel-head { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.sel-head span { color: var(--quiet); font-size: 12px; }
+.buttons { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+main { position: relative; }
+#view { position: absolute; inset: 0; }
+#view canvas { width: 100%; height: 100%; display: block; }
+#status { position: absolute; left: 12px; right: 12px; bottom: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; }
+#status.busy::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.views { position: absolute; top: 12px; right: 12px; display: flex; gap: 4px; }
+.legend { position: absolute; top: 12px; left: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 11.5px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 8px; vertical-align: -1px; }
+@media (max-width: 760px) { .app { grid-template-columns: 1fr; grid-template-rows: auto 60vh; } aside { border-right: 0; border-bottom: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div class="app">
+<aside>
+  <h1>Wax-up Lab</h1>
+  <p class="sub">A test bench for a digital diagnostic wax-up. Files stay on this computer.</p>
+  <section>
+    <h2><span class="n">1</span>Scans</h2>
+    <label class="file"><input id="scans" type="file" accept=".stl" multiple>Choose the upper, lower and bite scans (STL)</label>
+    <p class="hint">Set up as in Pare 3D's Dental Studio: cleaned, levelled and fitted to the bite.</p>
+    <div class="row" id="arch-choice"></div>
+  </section>
+  <section>
+    <h2><span class="n">2</span>Tooth library</h2>
+    <label class="file"><input id="library" type="file" accept=".rar,.eoff,.xml,.stl" multiple>Choose a library .rar (exocad format)</label>
+    <label class="file"><input id="library-folder" type="file" webkitdirectory multiple>...or an unpacked library folder</label>
+    <div id="libraries"></div>
+  </section>
+  <section>
+    <h2><span class="n">3</span>Wax-up</h2>
+    <div class="row"><button class="primary" id="auto">Place teeth</button>
+      <select id="span" title="The last tooth at each end"><option value="5">to 2nd premolars</option><option value="6">to 1st molars</option><option value="7" selected>to 2nd molars</option></select>
+      <button id="swap" title="If the tooth numbers are on the wrong sides">Swap sides</button></div>
+    <div class="row"><label title="Each library crown is fitted onto the scanned tooth under it (up to 3 mm, 12 degrees), so the wax-up follows the patient's teeth."><input type="checkbox" id="fit" checked> Fit onto the scanned teeth</label></div>
+    <p class="hint">Teeth to wax (click to toggle; click a tooth in the view to adjust it):</p>
+    <div class="chips" id="chips"></div>
+    <div class="row"><button id="wax-anterior">Canine to canine</button><button id="wax-all">All</button><button id="wax-none">None</button></div>
+    <p class="hint">Whole wax-up:</p>
+    <div class="row"><span>Buccal</span><button id="w-buccal-minus">&minus;0.2</button><button id="w-buccal-plus">+0.2</button>
+      <span>Length</span><button id="w-up-minus">&minus;0.25</button><button id="w-up-plus">+0.25</button></div>
+    <div class="row"><span>Width</span><button id="w-size-minus">&minus;2%</button><button id="w-size-plus">+2%</button></div>
+    <div class="row"><label><input type="checkbox" id="mirror" checked> Mirror changes to the other side</label></div>
+    <div id="selected"><p class="hint">Click a tooth in the view to adjust it.</p></div>
+  </section>
+  <section>
+    <h2><span class="n">4</span>Check</h2>
+    <div class="row"><span>Colour</span><select id="colour"><option value="wax">Wax thickness over the tooth</option><option value="contact">Contacts with the antagonist</option><option value="off">Off</option></select></div>
+    <div class="row"><label><input type="checkbox" id="antagonist"> Show the antagonist</label><label><input type="checkbox" id="show-unwaxed"> Show unwaxed library teeth</label></div>
+  </section>
+  <section>
+    <h2><span class="n">5</span>Export</h2>
+    <div class="row"><button id="export-teeth">Wax-up teeth (STL)</button><button id="export-total">Model with wax-up</button></div>
+    <p class="hint">IMT: a total and a partial (alternate teeth) model for each waxed arch.</p>
+    <div class="row"><select id="imt-start"><option value="odd">Partial: centrals, canines, 1st premolars, 1st molars</option><option value="even">Partial: laterals, 2nd premolars, 2nd molars</option></select></div>
+    <div class="row"><button class="primary" id="export-imt">IMT models</button></div>
+  </section>
+</aside>
+<main>
+  <div id="view"></div>
+  <div class="legend"><b>Wax</b><i style="background:#a7a29a"></i>none<i style="background:#f2c94c"></i>&lt;0.3<i style="background:#7bc67e"></i>0.3&ndash;1<i style="background:#4a90d9"></i>&gt;1 mm</div>
+  <div class="views"><button id="v-occlusal">Occlusal</button><button id="v-front">Front</button><button id="v-left">Left</button><button id="v-right">Right</button></div>
+  <div id="status"></div>
+</main>
+</div>
+<script type="module">/*BUNDLE*/</script>
+</body>
+</html>
