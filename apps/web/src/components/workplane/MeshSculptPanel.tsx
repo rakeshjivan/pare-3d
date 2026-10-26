@@ -22,6 +22,10 @@ export type SculptSelectionAction = "delete" | "smooth" | "flatten" | "grow" | "
 export const WHOLE_PART_TOOLS = true;
 
 export const SCULPT_TOOLS: SculptTool[] = ["draw", "inflate", "deflate", "smooth", "flatten", "pinch", "crease", "move", "select", "unselect"];
+/** Build 75: Trim (Dental Studio's step 2a) - only selecting and deleting. */
+export const TRIM_TOOLS: SculptTool[] = ["select", "unselect"];
+const TRIM_ACTIONS = ["delete", "grow", "invert", "clear"] as const;
+const SCULPT_ACTIONS = ["delete", "smooth", "flatten", "grow", "invert", "clear"] as const;
 
 /** Build 69: Sculpt - brushes that shape a mesh, a brush that selects a patch of it, and the whole part rebuilt. */
 export function MeshSculptPanel({
@@ -38,6 +42,8 @@ export function MeshSculptPanel({
   amount,
   busy,
   preparing = false,
+  trim = false,
+  teethWarning = 0,
   error,
   workspace,
   onTool,
@@ -68,6 +74,10 @@ export function MeshSculptPanel({
   busy: boolean;
   /** Build 75: the live copy of the mesh is still being made. */
   preparing?: boolean;
+  /** Build 75: Trim - the selection brushes and Delete only, for cutting away what is not wanted. */
+  trim?: boolean;
+  /** Build 75: the chosen triangles hold this many of the teeth - Delete again cuts them anyway. */
+  teethWarning?: number;
   error: string | null;
   workspace: WorkplaneWorkspaceSettings;
   onTool: (tool: SculptTool | null) => void;
@@ -86,7 +96,7 @@ export function MeshSculptPanel({
   besideDental?: boolean;
 }) {
   useLanguage();
-  const title = t("sculpt.title");
+  const title = t(trim ? "sculpt.trimTitle" : "sculpt.title");
   return (
     <MovableToolPanel className={`edge-modifier-panel mesh-sculpt-panel${besideDental ? " beside-dental" : ""}`} ariaLabel={title}>
       {(handleProps) => (<>
@@ -103,10 +113,10 @@ export function MeshSculptPanel({
       {preparing ? (
         <p className="edge-modifier-selection-help sculpt-preparing" role="status"><LoaderCircle className="edge-modifier-spinner" size={16} aria-hidden="true" /> {t("sculpt.preparing")}</p>
       ) : (
-        <p className="edge-modifier-selection-help">{t("sculpt.help")}</p>
+        <p className="edge-modifier-selection-help">{t(trim ? "sculpt.trimHelp" : "sculpt.help")}</p>
       )}
       <div className="dental-trim-mode dental-area-tools sculpt-tools" role="radiogroup" aria-label={t("sculpt.brushes")}>
-        {SCULPT_TOOLS.map((value) => (
+        {(trim ? TRIM_TOOLS : SCULPT_TOOLS).map((value) => (
           <button key={value} type="button" role="radio" aria-checked={tool === value} className={tool === value ? "active" : ""} disabled={busy} onClick={() => onTool(tool === value ? null : value)}>
             {t(`sculpt.tool.${value}`)}
           </button>
@@ -153,16 +163,18 @@ export function MeshSculptPanel({
         </div>
       ) : null}
       <p className="blend-hint" role="status">{chosen ? t("sculpt.chosen", { count: chosen.toLocaleString() }) : t("sculpt.noneChosen")}</p>
+      {teethWarning > 0 ? <p className="dental-status warn sculpt-teeth-warning" role="alert">{t("sculpt.trimTeeth", { count: teethWarning.toLocaleString() })}</p> : null}
       <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.selection")}>
-        {(["delete", "smooth", "flatten", "grow", "invert", "clear"] as const).map((action) => (
-          <button key={action} type="button" disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
-            {t(`sculpt.selection.${action}`)}
+        {(trim ? TRIM_ACTIONS : SCULPT_ACTIONS).map((action) => (
+          <button key={action} type="button" className={trim && action === "delete" ? "danger" : undefined} disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
+            {teethWarning > 0 && action === "delete" ? t("sculpt.deleteAnyway") : t(`sculpt.selection.${action}`)}
           </button>
         ))}
       </div>
       {/* Build 69: Remesh, Offset and Thicken stay out of the panel until they keep a scan's detail
           (on a voxel grid the teeth come out lumpy); the code and tests are kept for that. */}
-      {WHOLE_PART_TOOLS ? (<>
+      {trim ? <p className="blend-hint">{t("sculpt.trimUndo")}</p> : null}
+      {WHOLE_PART_TOOLS && !trim ? (<>
       <div className="dental-section-divider" />
       <strong className="sculpt-subtitle">{t("sculpt.wholePart")}</strong>
       <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.wholePart")}>
@@ -192,7 +204,7 @@ export function MeshSculptPanel({
       </>) : null}
       {error ? <div className="edge-modifier-error" role="alert">{error}</div> : null}
       <div className="edge-modifier-footer">
-        {WHOLE_PART_TOOLS ? (<>
+        {WHOLE_PART_TOOLS && !trim ? (<>
         <button type="button" className="secondary" disabled={busy} onClick={onClose}>{t("sculpt.done")}</button>
         <button type="button" className="primary" disabled={busy} onClick={onRemesh}>
           {busy ? <LoaderCircle className="edge-modifier-spinner" size={17} /> : <Check size={17} />}

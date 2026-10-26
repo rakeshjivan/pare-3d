@@ -100,7 +100,7 @@ export const scenes = {
     await ctx.click(ctx.t("dental.hinge"), "label");
     await ctx.evaluate(`document.querySelector(".dental-studio-panel").style.maxHeight = "none"; true`);
     await ctx.wait(400);
-    await ctx.shot("dental-articulator", await rectOf(ctx, ".dental-studio-panel section", true));
+    await ctx.shot("dental-articulator", await rectOf(ctx, ".dental-studio-panel section.dental-card:nth-last-of-type(2)"));
     await ctx.click(ctx.t("dental.applyPair"));
     for (let i = 0; i < 600; i += 1) {
       if (!(await ctx.evaluate(`Boolean(document.querySelector(".dental-studio-panel"))`))) break;

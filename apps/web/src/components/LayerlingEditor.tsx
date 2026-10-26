@@ -8953,8 +8953,9 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number } | null>(null);
   const sculptToolRef = useRef(sculptTool);
+  const ensureDentalAreasRef = useRef<(force?: "upper" | "lower") => Promise<void>>(async () => {});
   sculptToolRef.current = sculptTool;
   const sculptState = useRef<SculptSession | null>(null);
   const flushSculptRef = useRef<() => void>(() => {});
@@ -8980,7 +8981,7 @@ export function LayerlingEditor({
     }
     return state.selection;
   };
-  const openSculpt = useCallback((shape: WorkplaneShape) => {
+  const openSculpt = useCallback((shape: WorkplaneShape, trim = false) => {
     if (shape.locked || shape.hole || isNonSolidShapeKind(shape.kind)) { setNotice(t("sculpt.selectOne")); return; }
     setMeshRoundTool(null);
     // Build 74: sculpting one of Dental Studio's scans, the other scans step aside until Sculpt closes.
@@ -8989,7 +8990,7 @@ export function LayerlingEditor({
       sculptHidOthers.current = true;
       setDentalHidden(Object.values(studio.slots).filter((id): id is string => Boolean(id) && id !== shape.id));
     }
-    const settings = { shapeId: shape.id, tool: "smooth" as SculptTool, size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null };
+    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null };
     const known = sculptState.current;
     const ready = (state: SculptSession) => Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100);
     if (known && known.shapeId === shape.id && known.key === projectShapesFingerprint([shape])) {
@@ -9265,6 +9266,29 @@ export function LayerlingEditor({
     }
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** Build 75: how many chosen triangles are teeth - the Studio's tooth area of this scan, matched by where they lie. */
+  const teethInSelection = (shape: WorkplaneShape, selection: { mesh: { points: ArrayLike<number>; triangles: ArrayLike<number> }; chosen: Uint8Array }) => {
+    const studio = dentalStudioRef.current;
+    if (!studio || !Object.values(studio.slots).includes(shape.id)) return 0;
+    const area = dentalAreaFor(shape);
+    if (!area) return 0;
+    const world = worldTriangles(shape);
+    const key = (x: number, y: number, z: number) => `${Math.round(x * 1000)},${Math.round(y * 1000)},${Math.round(z * 1000)}`;
+    const teeth = new Set<string>();
+    for (let t = 0; t < area.length; t += 1) {
+      if (!area[t]) continue;
+      const o = t * 9;
+      teeth.add(key((world[o] + world[o + 3] + world[o + 6]) / 3, (world[o + 1] + world[o + 4] + world[o + 7]) / 3, (world[o + 2] + world[o + 5] + world[o + 8]) / 3));
+    }
+    const { points, triangles } = selection.mesh;
+    let hit = 0;
+    for (let t = 0; t < selection.chosen.length; t += 1) {
+      if (!selection.chosen[t]) continue;
+      const a = triangles[t * 3] * 3, b = triangles[t * 3 + 1] * 3, c = triangles[t * 3 + 2] * 3;
+      if (teeth.has(key((points[a] + points[b] + points[c]) / 3, (points[a + 1] + points[b + 1] + points[c + 1]) / 3, (points[a + 2] + points[b + 2] + points[c + 2]) / 3))) hit += 1;
+    }
+    return hit;
+  };
   const applySculptSelection = useCallback((action: SculptSelectionAction) => {
     flushSculpt();
     const target = sculptTarget();
@@ -9280,10 +9304,20 @@ export function LayerlingEditor({
     if (!count()) return;
     if (action === "delete") {
       const removed = count();
+      // Build 75: Trim warns once before it cuts into the teeth (the area Dental Studio keeps).
+      if (target.tool.trim && target.tool.teethWarned !== removed) {
+        const hit = teethInSelection(shape, selection);
+        if (hit > 0) {
+          setSculptTool((current) => current ? { ...current, teethHit: hit, teethWarned: removed } : current);
+          return;
+        }
+      }
       const left = withoutTriangles(soupOf(selection.mesh), selection.chosen);
       if (!left.length) return;
       commitSculpt(shape, left, t("sculpt.deleted", { count: removed.toLocaleString() }), false);
-      setSculptTool((current) => current ? { ...current, chosen: 0 } : current);
+      setSculptTool((current) => current ? { ...current, chosen: 0, teethHit: 0, teethWarned: undefined } : current);
+      // Build 75: the trimmed scan's teeth area, ready for the next cut.
+      if (target.tool.trim) window.setTimeout(() => void ensureDentalAreasRef.current(), 0);
       return;
     }
     applyToSelection(selection.mesh, selection.chosen, action);
@@ -9849,6 +9883,7 @@ export function LayerlingEditor({
       setDentalAreaVersion((version) => version + 1);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  ensureDentalAreasRef.current = ensureDentalAreas;
   useEffect(() => {
     if (dentalAreaManual && dentalStudio?.analysis) void ensureDentalAreas();
   }, [dentalAreaManual, dentalStudio?.analysis, dentalStudio?.slots.upper, dentalStudio?.slots.lower, ensureDentalAreas]);
@@ -16131,13 +16166,15 @@ export function LayerlingEditor({
           onAreaTool={chooseDentalAreaTool}
           onBrushSize={setDentalBrush}
           onResetArea={(slot) => { void ensureDentalAreas(slot); }}
-          onSculpt={(slot) => {
+          onSculpt={(slot, mode) => {
             const id = dentalStudio.slots[slot];
             const shape = id ? shapesRef.current.find((candidate) => candidate.id === id) : undefined;
             if (!shape) return;
             chooseDentalAreaTool(slot, null);
             setSelectedIds([shape.id]);
-            openSculpt(shape);
+            openSculpt(shape, mode === "trim");
+            // Build 75: the teeth area, so Trim can warn before cutting into it (worked out in the background).
+            if (mode === "trim") void ensureDentalAreas();
           }}
           onView={showDentalView}
           layout={dentalStudio.layout}
@@ -16228,6 +16265,8 @@ export function LayerlingEditor({
           amount={sculptTool.amount}
           busy={sculptTool.busy}
           preparing={Boolean(sculptTool.preparing)}
+          trim={Boolean(sculptTool.trim)}
+          teethWarning={sculptTool.teethWarned === sculptTool.chosen && sculptTool.chosen > 0 ? sculptTool.teethHit ?? 0 : 0}
           error={sculptTool.error}
           workspace={workspaceSettings}
           onTool={(tool) => setSculptTool((current) => current ? { ...current, tool } : current)}

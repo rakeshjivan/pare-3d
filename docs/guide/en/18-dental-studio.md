@@ -1,6 +1,6 @@
 ---
 title: Dental Studio
-summary: Raw intraoral scans to printable study, ortho, aligner and crown-and-bridge models in four steps - with a printable articulator, and every setting explained with pictures.
+summary: Raw intraoral scans to printable study, ortho, aligner and crown-and-bridge models in six steps - with a printable articulator, and every setting explained with pictures.
 ---
 
 An intraoral scan comes out of the scanner as an open surface: the teeth and gum, with a ragged edge where the scan stops, often a few small holes and a loose piece of cheek or tongue. **{{ui:dental.title}}** turns raw scans into printable models - one arch, or an upper and a lower with their bite - in one or two clicks: the work Meshmixer needs a dozen steps for. Full arches and quadrants (sextants) both work.
@@ -13,9 +13,9 @@ For most cases you only need three clicks:
 2. Under **{{ui:dental.step3}}**, pick what the models are for: **{{ui:dental.study}}**, **{{ui:dental.ortho}}**, **{{ui:dental.aligner}}** or **{{ui:dental.crown}}**.
 3. Click **{{ui:dental.applyPair}}**.
 
-The panel leads you through four numbered steps, top to bottom. Each says in one line what to do and turns green when it is done; the line above the button says what comes next.
+The panel leads you through six numbered steps, top to bottom, each on a card of its own: add the scans, prepare them (trim, then check the teeth), choose the model, its base, the articulator (for a pair) and its name. Each says in one line what to do and turns green when it is done; the line above the button says what comes next. Click a step's title to fold it to one line that sums up its settings, and again to open it; the card you last worked in is marked on the left.
 
-![Dental Studio with an upper and a lower scan in: the four steps, each with its instruction, ticks on the steps that are done, the model's height and the button at the bottom.](shot:dental-studio-steps)
+![Dental Studio with an upper and a lower scan in: the steps, each on its card with its instruction, ticks on the steps that are done, the model's height and the button at the bottom.](shot:dental-studio-steps)
 
 ## Step 1 · {{ui:dental.step1}}
 
@@ -29,7 +29,17 @@ Click **{{ui:dental.title}}** in the {{ui:editor.group.dental}} group of the too
 
 **The original scans stay in the design.** **{{ui:dental.restoreUpper}}** and **{{ui:dental.restoreLower}}** put the scan back as it was imported - every trim, sculpt and cut of it undone at once - still in the locked bite. Only the files themselves are kept (about the size of the STL files), not a copy after every edit.
 
-## Step 2 · {{ui:dental.step2}}
+## Step 2 · {{ui:dental.step2Prepare}}
+
+### {{ui:dental.trimStep}}
+
+Cut away scan you do not want before the teeth are checked - a rough edge, excess gum, a tag of cheek or tongue, or the palate. **{{ui:dental.trimUpper}}** or **{{ui:dental.trimLower}}** opens **{{ui:sculpt.trimTitle}}** on that scan, with only what trimming needs: **{{ui:sculpt.tool.select}}** paints over what to cut (**{{ui:sculpt.tool.unselect}}** takes it back), and **{{ui:sculpt.selection.delete}}** cuts it away. **{{ui:sculpt.reach.front}}** selects only what faces you; **{{ui:sculpt.reach.through}}** right through the scan, which is the quick way to take a palate. **{{ui:sculpt.selection.grow}}**, **{{ui:sculpt.selection.invert}}** and **{{ui:sculpt.selection.clear}}** change the selection. The other scan steps aside while you trim, and the panel stands on the left of the work area, clear of Dental Studio.
+
+- **The teeth are guarded.** If what you selected takes in teeth, **{{ui:sculpt.selection.delete}}** says how many of its triangles are teeth and cuts nothing; unselect them, or press **{{ui:sculpt.deleteAnyway}}** to cut them too.
+- **Trim first, then check the teeth.** Trimming makes the scan anew, so the teeth area below starts again after it - paint it once the scan is trimmed.
+- **The bite stays locked** through every trim, and [[Ctrl]]+[[Z]] puts back what was cut. **{{ui:dental.restoreUpper}}** and **{{ui:dental.restoreLower}}** put the whole scan back as it was imported.
+
+### {{ui:dental.step2}}
 
 Leave it on **{{ui:dental.marginAuto}}** unless the scan needs help: Pare 3D finds the teeth, keeps a smooth band of gum below them and cuts the scan exactly along it. **{{ui:dental.marginManual}}** lets you check and correct what is kept as teeth, the way a lab's model builder does:
 
@@ -51,6 +61,14 @@ Choose what the models are for - each choice shows its base from above - and the
 - **{{ui:dental.aligner}}:** solid, about 18 mm tall in all - models for thermoforming should be 15-20 mm tall, as taller models stretch the sheet too thin.
 - **{{ui:dental.crown}}:** solid, with a plate across the palate or tongue space. Studies of printed models find solid models with a cross-arch plate the most accurate, and hollow ones the least.
 
+Each choice sets the base in step 4 too. Change the base there and the choice is marked {{ui:dental.custom}}; pick the model again to go back to its settings.
+
+**{{ui:dental.inside}}** sits under the choices: solid or hollow (open underneath, or closed with vent holes), the {{ui:dental.wall}} and **{{ui:dental.infill}}** ({{ui:dental.infillNone}}, a {{ui:dental.infillBase}} 6 mm high, or a full {{ui:dental.infillFull}}). A hollow model keeps its full wall round the locator notches.
+
+## Step 4 · {{ui:dental.stepBase}}
+
+Always open: the base's shape, each with a picture of it from above ({{ui:dental.cleanBase}}, {{ui:dental.follow}}, {{ui:dental.plate}}, {{ui:dental.orthoBase}} or {{ui:dental.articulatorBase}}), **{{ui:dental.bevel}}** (a 0.8 mm bevel round the foot so the model comes off the build plate easily; on unless you turn it off), {{ui:dental.notches}} and a **{{ui:dental.tieBar}}** (a bar joining the back ends of a full arch at the floor so it cannot spread while it prints; cut it off afterwards).
+
 ### How tall the model is
 
 The **{{ui:dental.heightTitle}}** box shows the model as it stacks up, with a picture of the three parts and their sizes. Both arches change together.
@@ -64,25 +82,13 @@ The **{{ui:dental.heightTitle}}** box shows the model as it stacks up, with a pi
 
 > **Tip:** If the wall between the gum and the base looks too tall, lower **{{ui:dental.gumHeight}}** first, then **{{ui:dental.base}}**. On the orthodontic base most of that height is the trimmed base itself.
 
-### Label
+### {{ui:dental.moreScan}}
 
-Type a **{{ui:dental.label}}** (a patient code or a date) to engrave it on the base: on the front of the orthodontic and articulator bases, under the floor on the others. A hollow model that is open underneath has nowhere to carry it, so with a label its floor is closed (with vent holes) for you.
+**{{ui:dental.moreScan}}**, under the height, holds the last two: **{{ui:dental.gumFollow}}** - a band of gum all round the teeth and nothing more, so the palate and the floor of the mouth go and the model is a horseshoe (its depth is then the {{ui:dental.gumHeight}} slider) - and **{{ui:dental.smooth}}** (smoothing the ragged edge where the scan stops, never the teeth).
 
-### {{ui:dental.patientDetails}}
+## Step 5 · {{ui:dental.step4}}
 
-**{{ui:dental.patientKeep}}** names the models after the scan files (often the patient's name) and engraves the label. **{{ui:dental.patientRemove}}** names them {{ui:dental.upperModelPlain}} and {{ui:dental.lowerModelPlain}}, renames the bite scan {{ui:dental.biteScanPlain}} and engraves no label, so the models and the files you export or send to a slicer carry nothing that identifies the patient. The design's own name is yours: give it a case number rather than a name. Pare 3D remembers the choice.
-
-### One patient per design
-
-Keep each patient's scans in a design of their own. **{{ui:dental.newPatient}}**, beside **{{ui:dental.import}}**, starts a new design with Dental Studio open, so the next patient's scans cannot mix with the last one's. Models already made are never offered as scans again, and once a design holds models the panel reminds you to start a new one.
-
-### {{ui:dental.more}}
-
-**{{ui:dental.more}}** holds the rest of what each choice sets, in three groups. *{{ui:dental.groupBase}}*: the base's shape, each with a picture of it from above ({{ui:dental.cleanBase}}, {{ui:dental.follow}}, {{ui:dental.plate}}, {{ui:dental.orthoBase}} or {{ui:dental.articulatorBase}}), **{{ui:dental.bevel}}** (a 0.8 mm bevel round the foot so the model comes off the build plate easily; on unless you turn it off), {{ui:dental.notches}} and a **{{ui:dental.tieBar}}** (a bar joining the back ends of a full arch at the floor so it cannot spread while it prints; cut it off afterwards). *{{ui:dental.groupScan}}*: **{{ui:dental.gumFollow}}** - a band of gum all round the teeth and nothing more, so the palate and the floor of the mouth go and the model is a horseshoe (its depth is then the {{ui:dental.gumHeight}} slider) - and **{{ui:dental.smooth}}** (smoothing the ragged edge where the scan stops, never the teeth). *{{ui:dental.inside}}*: solid or hollow (open underneath, or closed with vent holes), the {{ui:dental.wall}} and **{{ui:dental.infill}}** ({{ui:dental.infillNone}}, a {{ui:dental.infillBase}} 6 mm high, or a full {{ui:dental.infillFull}}).
-
-## Step 4 · {{ui:dental.step4}}
-
-With an upper and a lower, **{{ui:dental.hinge}}** joins the pair at the back so the printed models open and close on the bite. A side view of the articulator above its settings follows them as you change them: the joint, the protrusion path at its angle, the incisal pin and its table. Each joint has a picture of it in section.
+Only for a pair - with a single arch this step is left out. With an upper and a lower, **{{ui:dental.hinge}}** joins the pair at the back so the printed models open and close on the bite. A side view of the articulator above its settings follows them as you change them: the joint, the protrusion path at its angle, the incisal pin and its table. Each joint has a picture of it in section.
 
 ![The Articulator step: the joint choice, hinge fit and its test, the protrusion path, the incisal stop with its pin and table, and how the models are placed.](shot:dental-articulator)
 
@@ -93,6 +99,20 @@ With an upper and a lower, **{{ui:dental.hinge}}** joins the pair at the back so
 - Once an articulated pair is made, Pare 3D says how far it opens before the models meet, and warns if that is less than 30°.
 
 ![An articulated pair made from a scan, in occlusion: the ball joints behind the molars and the slim incisal pin in front.](shot:dental-articulated-models)
+
+## Step 6 · {{ui:dental.stepName}}
+
+### {{ui:dental.label}}
+
+Type a **{{ui:dental.label}}** (a patient code or a date) to engrave it on the base: on the front of the orthodontic and articulator bases, under the floor on the others. A hollow model that is open underneath has nowhere to carry it, so with a label its floor is closed (with vent holes) for you.
+
+### {{ui:dental.patientDetails}}
+
+**{{ui:dental.patientKeep}}** names the models after the scan files (often the patient's name) and engraves the label. **{{ui:dental.patientRemove}}** names them {{ui:dental.upperModelPlain}} and {{ui:dental.lowerModelPlain}}, renames the bite scan {{ui:dental.biteScanPlain}} and engraves no label, so the models and the files you export or send to a slicer carry nothing that identifies the patient. The design's own name is yours: give it a case number rather than a name. Pare 3D remembers the choice.
+
+### One patient per design
+
+Keep each patient's scans in a design of their own. **{{ui:dental.newPatient}}**, beside **{{ui:dental.import}}**, starts a new design with Dental Studio open, so the next patient's scans cannot mix with the last one's. Models already made are never offered as scans again, and once a design holds models the panel reminds you to start a new one.
 
 ## What Pare 3D always does
 

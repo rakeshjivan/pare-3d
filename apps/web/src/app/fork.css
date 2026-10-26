@@ -1783,7 +1783,9 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .inspector-size-line strong { font-weight: 700; color: var(--foreground, #1d2430); font-variant-numeric: tabular-nums; }
 
 /* Build 71: Sculpt opened from Dental Studio stands to the left of the Studio panel. */
-.mesh-sculpt-panel.beside-dental:not(.floating) { right: calc(14px + min(400px, calc(100vw - 32px)) + 12px); }
+/* Build 75: opened from Dental Studio it stands on the left of the work area, clear of the Studio on the right
+   whatever the window's width and the shapes panel. */
+.mesh-sculpt-panel.beside-dental:not(.floating) { right: auto; left: 78px; }
 
 /* Build 71: the Export window - where the file opens, its type, its name and folder. */
 .export-window { width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 24px); }
@@ -1869,3 +1871,32 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
   color: #fff; background: var(--primary); vertical-align: 1px;
 }
 @media (max-width: 720px) { .dashboard-whats-new span { display: none; } }
+
+/* Build 75: Dental Studio in step cards - one faint tint for all, the card last worked in marked on the left. */
+.dental-studio-panel .dental-card {
+  background: color-mix(in srgb, var(--primary, #1662b3) 3.5%, var(--panel, #fff));
+  border: 1px solid color-mix(in srgb, var(--primary, #1662b3) 10%, var(--border, #dde3ea));
+  border-left: 3px solid transparent;
+  border-radius: 10px; padding: 10px 12px 12px; margin: 0 0 10px;
+  transition: border-color 120ms ease;
+}
+.dental-studio-panel .dental-card.current { border-left-color: var(--primary, #1662b3); }
+.dental-studio-panel .dental-card.folded { padding-bottom: 8px; }
+.dental-card-head {
+  display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 0; margin: 0;
+  border: 0; background: none; color: inherit; text-align: left; cursor: pointer; font: inherit;
+}
+.dental-card-head .dental-step-head { flex: 1; margin: 0; }
+.dental-card-chevron { margin-top: 4px; flex: none; opacity: 0.55; transition: transform 140ms ease; }
+.dental-card.folded .dental-card-chevron { transform: rotate(-90deg); }
+.dental-card-summary { margin: 4px 0 0 32px; font-size: 12.5px; opacity: 0.8; }
+.dental-substep { padding: 8px 0 4px; }
+.dental-substep + .dental-substep { border-top: 1px dashed color-mix(in srgb, var(--foreground, #1d2433) 14%, transparent); margin-top: 6px; }
+.dental-substep-title { margin: 0 0 4px; font: 700 13px var(--font-ui); }
+.dental-presets button.active.custom { border-style: dashed; }
+.dental-custom { color: #b4690e; }
+.dental-trim-buttons button.danger:not(:disabled) { color: #c0392b; border-color: color-mix(in srgb, #c0392b 45%, var(--border, #dde3ea)); }
+.mesh-sculpt-panel .sculpt-teeth-warning {
+  margin: 4px 0 8px; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.4;
+  color: #8a4b0a; background: color-mix(in srgb, #f59f00 12%, var(--panel, #fff)); border: 1px solid color-mix(in srgb, #f59f00 40%, transparent);
+}

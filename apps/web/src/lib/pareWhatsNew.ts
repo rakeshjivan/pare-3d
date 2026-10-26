@@ -9,6 +9,9 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Drag files from your desktop straight onto the editor to import them - no trip through the Import window. A frame shows while you hold them over it; a .lyl design dropped this way opens.",
       "What's new has its own button on the start page, and opens with every build to scroll back through, newest first.",
       "Sculpt opens at once: the panel shows straight away while a big scan is got ready, and getting it ready takes about half the time it did.",
+      "Dental Studio in six steps, each on a card of its own that folds to one line: add the scans, prepare them, choose the model, its base (now always open), the articulator (for a pair only) and the name.",
+      "Prepare the scans starts with Trim: only Select and Delete, to cut away rough edges, excess gum, tags or the palate before the teeth are checked - the bite stays locked. If what you selected takes in teeth, Delete says so and cuts nothing until you press Delete anyway.",
+      "Change the base after choosing a model and the model is marked custom; solid or hollow is chosen with the model, not hidden under more settings.",
     ],
   },
   {
