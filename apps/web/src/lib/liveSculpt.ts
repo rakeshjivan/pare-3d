@@ -339,6 +339,53 @@ export class LiveMesh {
     if (patch.tris.length) { this.topologyChanged = true; this.topologyEdits += 1; }
   }
 
+  /**
+   * Build 76: closes an open loop of corners (in the order its edges run along the surface's rim) with
+   * a fan from a new corner at its middle, facing the way the surface round it does. Returns the new corner.
+   */
+  fillLoop(loop: number[]): number {
+    let x = 0, y = 0, z = 0;
+    for (const v of loop) { x += this.pos[v * 3]; y += this.pos[v * 3 + 1]; z += this.pos[v * 3 + 2]; }
+    const c = this.addVertex(x / loop.length, y / loop.length, z / loop.length);
+    // A rim edge a -> b belongs to a triangle on the surface; the patch takes it the other way round.
+    for (let i = 0; i < loop.length; i += 1) this.addTriangle(loop[(i + 1) % loop.length], loop[i], c);
+    return c;
+  }
+  /** Build 76: the corners on the open edges, as loops in the direction their triangles run (a loop's edge a -> b is a's triangle's). */
+  rimLoops(): number[][] {
+    const next = new Map<number, number>();
+    let broken = false;
+    for (let t = 0; t < this.tCount; t += 1) {
+      if (!this.tAlive[t]) continue;
+      for (let k = 0; k < 3; k += 1) {
+        const a = this.tri[t * 3 + k], b = this.tri[t * 3 + ((k + 1) % 3)];
+        if (this.edgeTriangles(a, b).length !== 1) continue;
+        if (next.has(a)) broken = true;
+        next.set(a, b);
+      }
+    }
+    void broken;
+    const loops: number[][] = [];
+    const seen = new Set<number>();
+    for (const start of next.keys()) {
+      if (seen.has(start)) continue;
+      const loop: number[] = [];
+      let v: number | undefined = start;
+      while (v !== undefined && !seen.has(v)) { seen.add(v); loop.push(v); v = next.get(v); }
+      if (v === start && loop.length >= 3) loops.push(loop);
+    }
+    return loops;
+  }
+  /** Build 76: the corners joined to v (the public form of the neighbour walk, for fairing). */
+  around(v: number): number[] { return this.neighbours(v); }
+  /** Build 76: moves corner v to (x, y, z), keeping the grids and drawing right. */
+  moveTo(v: number, x: number, y: number, z: number) {
+    this.pos[v * 3] = x; this.pos[v * 3 + 1] = y; this.pos[v * 3 + 2] = z;
+    this.moved(v);
+  }
+  /** Build 76: puts the triangles round these corners in their grid cells again after `moveTo`. */
+  settle(corners: number[]) { this.rebin(corners); }
+
   /** Whole-part work (Remesh, Offset): the grids are left alone while it runs and made again once at the end. */
   private bulk = false;
   beginBulk() { this.bulk = true; }
@@ -897,6 +944,7 @@ export class LiveMesh {
       if (work <= 0 || ((e & 63) === 0 && late())) break;
       if (!this.vAlive[a] || !this.vAlive[b]) continue;
       if (creaseCos !== null && isCrease(a, b)) continue;
+      if (options.fixed && options.fixed(a) && options.fixed(b)) continue;
       if (this.flipEdge(a, b)) work -= 1;
     }
     // Relax: each corner towards the middle of its neighbours, along the surface only.
