@@ -167,8 +167,12 @@ function depthIn(m: Mesh, frame: THREE.Matrix4): { depth: number; teeth: number;
   for (let i = 0; i < zone.length; i += 1) if (zone[i]) lowest = Math.min(lowest, turned.v[i * 3 + 2]);
   // 2 mm under the lowest tooth surface: clear of the fringe the cut's own edge may lose.
   const teeth = Number.isFinite(lowest) ? Math.max(1, -lowest + 2) : 1;
+  // Build 75: how far the teeth stand above the occlusal plane - the teeth's own top, not the scan's:
+  // a flap of cheek or tongue standing above the teeth is cut away with the scan's fringe, and taken
+  // into the height it made the predicted model up to 9 mm too tall.
   let above = 0;
-  for (let i = 2; i < turned.v.length; i += 3) above = Math.max(above, turned.v[i]);
+  for (let i = 0; i < zone.length; i += 1) if (zone[i]) above = Math.max(above, turned.v[i * 3 + 2]);
+  if (!Number.isFinite(lowest)) for (let i = 2; i < turned.v.length; i += 3) above = Math.max(above, turned.v[i]);
   return { depth: Math.max(robustDepth(m, frame), teeth), teeth, above };
 }
 
@@ -187,7 +191,7 @@ function archAxes(frame: THREE.Matrix4, role: DentalRole): DentalArchAxes {
 }
 
 /** How deep an arch is kept below the occlusal plane: never into the teeth; following the gum, no deeper than it. */
-function keptDepthFor(arch: { depth: number; teeth: number }, options: DentalStudioOptions) {
+export function keptDepthFor(arch: { depth: number; teeth: number }, options: DentalStudioOptions) {
   const keep = options.keep === null ? arch.depth : Math.max(arch.teeth, Math.min(options.keep, arch.depth));
   if (options.gum === null || options.gum === undefined) return keep;
   return Math.max(arch.teeth, Math.min(keep, arch.teeth + Math.max(0.5, options.gum)));

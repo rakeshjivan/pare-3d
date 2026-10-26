@@ -8,7 +8,7 @@ import { useState, type ReactNode } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
-import { ArticulatorPicture, BaseStylePicture, JointPicture } from "@/components/workplane/DentalPictures";
+import { ArticulatorPicture, BaseStylePicture, JointPicture, ModelHeightPicture } from "@/components/workplane/DentalPictures";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import {
@@ -153,6 +153,8 @@ export function DentalStudioPanel({
   const [chosenArch, setArch] = useState<"upper" | "lower">("upper");
   const [folded, setFolded] = useState<Record<number, boolean>>({});
   const [activeCard, setActiveCard] = useState(1);
+  // Build 75: a step after the first ticks once it has been worked in - its defaults alone are not a check.
+  const [visited, setVisited] = useState<Record<number, boolean>>({});
   const arch = trimming?.slot ?? (slots[chosenArch] ? chosenArch : slots.upper ? "upper" : "lower");
   const busy = stage !== "ready";
   const pair = Boolean(slots.upper && slots.lower);
@@ -224,9 +226,9 @@ export function DentalStudioPanel({
   const card = (number: number, label: string, done: boolean, hint: string | null, summary: string | null, body: ReactNode) => {
     const isFolded = Boolean(folded[number]);
     return (
-      <section className={`dental-section dental-card${isFolded ? " folded" : ""}${activeCard === number ? " current" : ""}`} aria-label={label} onPointerDownCapture={() => setActiveCard(number)}>
+      <section className={`dental-section dental-card${isFolded ? " folded" : ""}${activeCard === number ? " current" : ""}`} aria-label={label} onPointerDownCapture={() => { setActiveCard(number); if (!visited[number]) setVisited((state) => ({ ...state, [number]: true })); }}>
         <button type="button" className="dental-card-head" aria-expanded={!isFolded} onClick={() => setFolded((state) => ({ ...state, [number]: !isFolded }))}>
-          {step(number, label, done, isFolded ? null : hint)}
+          {step(number, label, done && (number === 1 || Boolean(visited[number])), isFolded ? null : hint)}
           <ChevronDown size={16} className="dental-card-chevron" aria-hidden="true" />
         </button>
         {isFolded ? (summary ? <p className="dental-card-summary">{summary}</p> : null) : body}
@@ -432,20 +434,7 @@ export function DentalStudioPanel({
         {/* Build 64: the model's height in one place, as it stacks up - the teeth (never cut), the gum
             kept below them, and the base - with a picture of the three and their sizes. Both arches. */}
         <div className="dental-height-box" role="group" aria-label={t("dental.heightTitle")}>
-          <svg className="dental-height-figure" viewBox="0 0 64 120" aria-hidden="true">
-            {(() => {
-              const total = Math.max(1, teethHeight + gumHeight + options.base);
-              const scale = 108 / total;
-              const tH = teethHeight * scale, gH = gumHeight * scale, bH = options.base * scale;
-              return (
-                <>
-                  <path className="teeth" d={`M8 ${6 + tH} L8 10 Q14 2 20 10 Q26 2 32 10 Q38 2 44 10 Q50 2 56 10 L56 ${6 + tH} Z`} />
-                  <rect className="gum" x="6" y={6 + tH} width="52" height={Math.max(0.5, gH)} />
-                  <rect className="base" x="2" y={6 + tH + gH} width="60" height={Math.max(0.5, bH)} />
-                </>
-              );
-            })()}
-          </svg>
+          <ModelHeightPicture teeth={teethHeight} gum={gumHeight} base={options.base} />
           <div className="dental-height-rows">
             <p className="dental-height-row teeth"><span>{t("dental.heightTeeth")}</span><strong>{`${teethHeight.toFixed(1)} mm`}</strong></p>
             <EdgeModifierSlider

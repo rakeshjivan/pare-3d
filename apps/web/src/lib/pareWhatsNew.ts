@@ -13,6 +13,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Prepare the scans starts with Trim: only Select and Delete, to cut away rough edges, excess gum, tags or the palate before the teeth are checked - the bite stays locked. If what you selected takes in teeth, Delete says so and cuts nothing until you press Delete anyway.",
       "Change the base after choosing a model and the model is marked custom; solid or hollow is chosen with the model, not hidden under more settings.",
       "The articulator picture is redrawn from the side as a dentist reads it: incisors in profile with overjet and overbite, canines and molars in Class I along a curve of Spee, the joint behind the last molar and the incisal pin on its table. With the pin raised the upper turns up about the joint - the front opens, the molars barely part.",
+      "The model height picture is a section through a molar in its gum on the base, with a bracket for the teeth, the gum kept below them and the base, each to scale.",
+      "The model's height shown before it is made is now right: it was measured from the tallest scrap of scan rather than the teeth, and took the depth and the height from different arches - on a real set it said 34 mm for models that came out 26 mm.",
     ],
   },
   {

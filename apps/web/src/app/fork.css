@@ -1742,8 +1742,8 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 .dental-studio-panel .link-button:disabled { opacity: 0.5; cursor: default; }
 html[data-theme="dark"] .dental-studio-panel .dental-hinge-options select { background: #1a1f26; }
 /* Build 64: the model's height, as it stacks up. */
-.dental-studio-panel .dental-height-box { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: start; margin: 0 0 6px; padding: 8px; border: 1px solid var(--border, #e3e7ee); border-radius: 8px; }
-.dental-height-figure { width: 56px; height: auto; }
+.dental-studio-panel .dental-height-box { display: grid; grid-template-columns: 84px 1fr; gap: 10px; align-items: center; margin: 0 0 6px; padding: 8px; border: 1px solid var(--border, #e3e7ee); border-radius: 8px; }
+.dental-height-figure { width: 84px; height: auto; flex: none; }
 .dental-height-figure .teeth { fill: #f3efe4; stroke: #8a8270; stroke-width: 1; }
 .dental-height-figure .gum { fill: #e9a3a8; }
 .dental-height-figure .base { fill: #9fb4c9; }
@@ -1906,3 +1906,13 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .dental-picture.articulator .opening .turn { fill: none; stroke: #1662b3; stroke-width: 1.2; stroke-linecap: round; }
 .dental-picture.articulator text.small { font-size: 7.5px; font-weight: 600; }
 .dental-studio-panel .dental-hinge-options > .dental-picture.articulator { max-width: 340px; }
+
+/* Build 75: the height picture's brackets in the colours of their parts, and the gum line under the teeth. */
+.dental-height-figure .teeth { stroke-width: 0.8; stroke-linejoin: round; }
+.dental-height-figure .gum { stroke: #c7777e; stroke-width: 0.5; }
+.dental-height-figure .base { stroke: #6f86a0; stroke-width: 0.6; }
+.dental-height-figure .bracket { fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.dental-height-figure .bracket.teeth { stroke: #8a8270; fill: none; }
+.dental-height-figure .bracket.gum { stroke: #d9737b; fill: none; }
+.dental-height-figure .bracket.base { stroke: #6f86a0; fill: none; }
+.dental-height-figure .cut-line { stroke: #8a8270; stroke-width: 0.6; stroke-dasharray: 2 1.5; }

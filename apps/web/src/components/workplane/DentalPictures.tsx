@@ -243,3 +243,38 @@ export function ArticulatorPicture({ joint, condyle, stop, pinRaise, table }: { 
     </svg>
   );
 }
+
+/**
+ * Build 75: the model's height as it stacks up, drawn as a section through a molar standing in its gum
+ * on the base - the crown and the gum right beside it (never cut), the band of gum kept below it, and
+ * the base - each with a bracket beside it, to scale with the numbers.
+ */
+export function ModelHeightPicture({ teeth, gum, base }: { teeth: number; gum: number; base: number }) {
+  const total = Math.max(1, teeth + gum + base);
+  const scale = 110 / total;
+  const top = 6;
+  const tH = Math.max(14, teeth * scale), gH = gum > 0 ? Math.max(3, gum * scale) : 0, bH = Math.max(3, base * scale);
+  const sum = tH + gH + bH, k = 110 / sum;
+  const t = tH * k, g = gH * k, b = bH * k;
+  const gumTop = top + t * 0.36; // the gum between the teeth (the papillae)
+  const dip = t * 0.11; // the margin dips mid-crown
+  const crownLow = gumTop + dip + t * 0.12; // the crown runs on under the gum
+  const y1 = top + t, y2 = y1 + g, y3 = y2 + b;
+  const bracket = (from: number, to: number, cls: string) => (
+    <path className={`bracket ${cls}`} d={`M10 ${f(from + 0.8)} H6 V${f(to - 0.8)} H10`} />
+  );
+  return (
+    <svg className="dental-height-figure" viewBox="0 0 80 122" aria-hidden="true">
+      <rect className="base" x="20" y={f(y2)} width="56" height={f(b)} rx="1.5" />
+      {g > 0 ? <rect className="gum" x="24" y={f(y1 - 0.5)} width="48" height={f(g + 0.5)} /> : null}
+      {/* The crown of a molar from the buccal side: two cusps either side of the buccal groove, widest at its contacts. */}
+      <path className="teeth" transform="translate(48 0) scale(1.2 1) translate(-48 0)" vectorEffect="non-scaling-stroke" d={`M35 ${f(crownLow)} C31.5 ${f(crownLow - t * 0.12)} 30.5 ${f(top + t * 0.14)} 32.5 ${f(top + 3.2)} Q40 ${f(top - 2.2)} 47 ${f(top + 3.4)} L48 ${f(top + 5.6)} L49 ${f(top + 3.4)} Q56 ${f(top - 2.2)} 63.5 ${f(top + 3.2)} C65.5 ${f(top + t * 0.14)} 64.5 ${f(crownLow - t * 0.12)} 61 ${f(crownLow)} Z`} />
+      {/* The gum over the neck: up between the teeth, down mid-crown, then down to the cut. */}
+      <path className="gum" d={`M24 ${f(y1)} V${f(gumTop + 4)} Q24 ${f(gumTop)} 29 ${f(gumTop)} Q48 ${f(gumTop + dip * 2)} 67 ${f(gumTop)} Q72 ${f(gumTop)} 72 ${f(gumTop + 4)} V${f(y1)} Z`} />
+      {g > 0 ? <line className="cut-line" x1="22" y1={f(y1)} x2="74" y2={f(y1)} /> : null}
+      {bracket(top, y1, "teeth")}
+      {g > 0 ? bracket(y1, y2, "gum") : null}
+      {bracket(y2, y3, "base")}
+    </svg>
+  );
+}
