@@ -1577,12 +1577,54 @@ function withoutSplinters<T extends { meshes: MeshData[]; gestutzt: boolean[] }>
   return { ...result, meshes, splinters };
 }
 
-export async function unionOverlappingExportMeshes(shapes: WorkplaneShape[], meshes: MeshData[], cut?: readonly boolean[]) {
-  return withoutSplinters(await unionOverlappingExportMeshesRaw(shapes, meshes, cut));
+type ExportJoin = { meshes: MeshData[]; quellen: number[]; verschmolzen: number; gescheitert: number; gestutzt: boolean[] };
+
+/**
+ * Build 71: models made in Dental Studio are never joined with each other. Placed in occlusion the
+ * upper and lower touch - cusps between cusps, the incisal pin on its table - and joining touching
+ * parts of a colour made the pair one body in the file. Each model is joined on its own, with the
+ * other parts that overlap it (a label put on its base, say: the model it overlaps most); the rest
+ * of the design is joined as before.
+ */
+async function keepingDentalModelsApart(shapes: WorkplaneShape[], meshes: MeshData[], cut: readonly boolean[] | undefined, join: (shapes: WorkplaneShape[], meshes: MeshData[], cut?: readonly boolean[]) => Promise<ExportJoin>): Promise<ExportJoin> {
+  const models = shapes.map((shape, index) => (shape.dental === "model" ? index : -1)).filter((index) => index >= 0);
+  if (models.length < 2) return join(shapes, meshes, cut);
+  const bounds = meshes.map((mesh) => meshBounds(mesh.vertices));
+  const shared = (a: number, b: number) => {
+    const ka = bounds[a], kb = bounds[b];
+    if (!ka || !kb || !boundsOverlap(ka, kb)) return 0;
+    const along = (lo: number, hi: number, lo2: number, hi2: number) => Math.max(0, Math.min(hi, hi2) - Math.max(lo, lo2));
+    return along(ka.minX, ka.maxX, kb.minX, kb.maxX) * along(ka.minY, ka.maxY, kb.minY, kb.maxY) * along(ka.minZ, ka.maxZ, kb.minZ, kb.maxZ);
+  };
+  const groups: number[][] = models.map((index) => [index]);
+  const rest: number[] = [];
+  shapes.forEach((shape, index) => {
+    if (shape.dental === "model") return;
+    let best = -1, most = 0;
+    models.forEach((model, g) => { const v = shared(index, model); if (v > most) { most = v; best = g; } });
+    if (best >= 0) groups[best].push(index);
+    else rest.push(index);
+  });
+  if (rest.length) groups.push(rest);
+  const out: ExportJoin = { meshes: [], quellen: [], verschmolzen: 0, gescheitert: 0, gestutzt: [] };
+  for (const group of groups) {
+    const part = await join(group.map((i) => shapes[i]), group.map((i) => meshes[i]), cut && group.map((i) => cut[i]));
+    out.meshes.push(...part.meshes);
+    out.quellen.push(...part.quellen.map((q) => group[q]));
+    out.gestutzt.push(...part.gestutzt);
+    out.verschmolzen += part.verschmolzen;
+    out.gescheitert += part.gescheitert;
+  }
+  return out;
 }
 
-export async function colorSeparatedExportMeshes(shapes: WorkplaneShape[], meshes: MeshData[], cut?: readonly boolean[]) {
-  return withoutSplinters(await colorSeparatedExportMeshesRaw(shapes, meshes, cut));
+/** Build 72: `joinAll` - the Export window's "Joined into one": Dental Studio's models are joined too. */
+export async function unionOverlappingExportMeshes(shapes: WorkplaneShape[], meshes: MeshData[], cut?: readonly boolean[], options: { joinAll?: boolean } = {}) {
+  return withoutSplinters(options.joinAll ? await unionOverlappingExportMeshesRaw(shapes, meshes, cut) : await keepingDentalModelsApart(shapes, meshes, cut, unionOverlappingExportMeshesRaw));
+}
+
+export async function colorSeparatedExportMeshes(shapes: WorkplaneShape[], meshes: MeshData[], cut?: readonly boolean[], options: { joinAll?: boolean } = {}) {
+  return withoutSplinters(options.joinAll ? await colorSeparatedExportMeshesRaw(shapes, meshes, cut) : await keepingDentalModelsApart(shapes, meshes, cut, colorSeparatedExportMeshesRaw));
 }
 
 export function disposeManifold(value: unknown) {

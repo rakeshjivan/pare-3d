@@ -1824,3 +1824,10 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .export-window footer button:disabled { opacity: 0.5; cursor: not-allowed; }
 @media (max-width: 480px) { .export-window-slicers, .export-window-formats { grid-template-columns: 1fr; } .export-window-first { flex-wrap: wrap; } }
 .export-window-scope { margin: 0 16px 8px; padding-top: 6px; padding-bottom: 6px; }
+/* Build 72: the Parts choice. */
+.export-window-parts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 6px; margin-top: 6px; }
+.export-window-parts .export-window-kind-label { grid-column: 1 / -1; }
+.export-window-parts .export-window-option { align-items: flex-start; border-color: var(--border); }
+.export-window-parts .export-window-option.active { border-color: var(--primary); }
+.export-window-parts input { margin-top: 2px; }
+@media (max-width: 480px) { .export-window-parts { grid-template-columns: 1fr; } }

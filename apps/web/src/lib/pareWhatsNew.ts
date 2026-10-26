@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 72,
+    items: [
+      "The Export window's slicers can always be chosen. Where the app could not say which slicers are installed - in a web browser, or in a Pare 3D app older than its pages - build 71 greyed them all out. Now the window says which it is: in a browser the file is downloaded for the slicer you pick; an older app is asked to be downloaded again once.",
+      "Export has a Parts choice for 3MF and STL: Separate (one file; parts that touch become one, the rest stay apart - the default), Joined (one body) or A file per part (an upper and a lower model as two files, say).",
+      "Dental models placed In occlusion export as two bodies again. The upper and lower touch there - cusps between cusps, the incisal pin on its table - and the export joined touching parts of one colour, so a 3MF or STL held the pair as one solid. Models made in Dental Studio are now never joined with each other; a part you put on a model (a label, say) still joins that model.",
+    ],
+  },
+  {
     build: 71,
     items: [
       "Dental Studio's incisal pin really opens the bite now. Before, a raised pin made the table taller and the pin shorter by the same amount, so the printed models still closed on the scanned bite. Now the pin is longer by the raise and the upper stands turned up about the hinge with the pin on its table - a rotation, as on an articulator, not a lift - also when placed In occlusion. The raise is a slider from 0 to 10 mm in half millimetres, read at the pin, and after Make models the note says how far the front and back teeth part.",

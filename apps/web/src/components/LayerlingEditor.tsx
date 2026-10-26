@@ -166,7 +166,7 @@ import { createLocalId } from "@/lib/localIds";
 import { canEditGroupAtLevel, mcpOpenGroupSummary, openGroupLevelsStillOpen, trackOpenGroupLevels, type OpenGroupLevel } from "@/lib/openGroupParts";
 import { projectExportFileName, stlNameAsksForNewFile } from "@/lib/exportNames";
 import { OPEN_EXPORT_WINDOW_EVENT, readSlicer, SEND_TO_BAMBU_EVENT, sendToSlicer, slicerName, type BambuSendFormat, type SlicerId } from "@/lib/bambuSend";
-import { ExportWindow } from "@/components/ExportWindow";
+import { ExportWindow, type ExportParts } from "@/components/ExportWindow";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { useEditorNotice } from "@/components/workplane/useEditorNotice";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
@@ -12983,6 +12983,8 @@ export function LayerlingEditor({
       return;
     }
     const label = format === "stl" ? "STL" : format === "3mf" ? "3MF" : "OBJ";
+    const parts = exportPartsRef.current;
+    exportPartsRef.current = "separate";
     // Loose holes cut the bodies they reach first (#203); a body cut away entirely drops out.
     let bodiesWritten: WorkplaneShape[] = exportable;
     // A group showing its parts in their own colours keeps them in 3MF and OBJ (#153).
@@ -13006,7 +13008,7 @@ export function LayerlingEditor({
     // Fork: "Send to Bambu Studio" never asks for a file; the file goes to the server or a download.
     let bambuNote = "";
     // Fork (build 22): in the app, the folder chosen in Settings > Files decides instead.
-    if (format === "stl" && lylFileAccessSupported() && !toBambu && !cachedFileSettings()) {
+    if (format === "stl" && lylFileAccessSupported() && !toBambu && parts !== "files" && !cachedFileSettings()) {
       try {
         const linkedBefore = linkedStlFile(designId);
         // A name typed in the window that is not the linked file's asks for a file of its own (reported by mail, 15.10.2026).
@@ -13028,10 +13030,32 @@ export function LayerlingEditor({
     void exportBodiesWithLooseHoles(sourceShapes)
       .then(async ({ solids: cutSolids, meshes, cut: wasCut, holeCutsFailed }) => {
         bodiesWritten = cutSolids;
-        const joined = await (format === "stl" ? unionOverlappingExportMeshes(cutSolids, meshes, wasCut) : colorSeparatedExportMeshes(cutSolids, meshes, wasCut));
+        const joinAll = parts === "joined";
+        const joined = await (format === "stl" ? unionOverlappingExportMeshes(cutSolids, meshes, wasCut, { joinAll }) : colorSeparatedExportMeshes(cutSolids, meshes, wasCut, { joinAll }));
         return { ...joined, gescheitert: joined.gescheitert + holeCutsFailed };
       })
       .then(async ({ meshes: fertig, quellen, verschmolzen, gescheitert, splinters }) => {
+        // Build 72: a file per part - each body in a file of its own, named after the part.
+        if (parts === "files" && (format === "stl" || format === "3mf") && fertig.length > 1) {
+          const used = new Set<string>();
+          for (let index = 0; index < fertig.length; index += 1) {
+            const source = bodiesWritten[quellen[index]];
+            let part = (source?.name || fertig[index].name || t("exportWindow.partName", { number: index + 1 })).trim();
+            for (let n = 2; used.has(part.toLowerCase()); n += 1) part = `${source?.name || part} ${n}`;
+            used.add(part.toLowerCase());
+            const fileName = projectExportFileName(`${exportName.trim() || projectName} - ${part}`, format);
+            if (format === "stl") {
+              await downloadBlobFile(fileName, new Blob([new Uint8Array(exportMeshesToStl([fertig[index]]))], { type: "model/stl" }));
+            } else {
+              const body = { ...fertig[index], name: source?.name || fertig[index].name, color: source?.color, faceColors: partFaceColors(fertig[index], quellen[index]) };
+              const bytes = await exportMeshesTo3mfOffThread([body], { title: part });
+              await downloadBlobFile(fileName, new Blob([bytes as BlobPart], { type: THREE_MF_MEDIA_TYPE }));
+            }
+          }
+          setTopPanel(null);
+          setNotice(t("exportWindow.savedFiles", { count: fertig.length, format: label }) + hiddenNote, true);
+          return;
+        }
         if (format === "stl") {
           const bytes = new Uint8Array(exportMeshesToStl(fertig));
           if (toBambu) {
@@ -13047,10 +13071,12 @@ export function LayerlingEditor({
             rememberStlFile(designId, target);
           }
         } else if (format === "3mf") {
-          const bodies = fertig.map((mesh, index) => {
+          let bodies = fertig.map((mesh, index) => {
             const source = bodiesWritten[quellen[index]];
             return { ...mesh, name: source?.name || mesh.name, color: source?.color, faceColors: partFaceColors(mesh, quellen[index]) };
           });
+          // Build 72: "Joined into one" - one object in the file, each face keeping its colour.
+          if (parts === "joined" && bodies.length > 1) bodies = [joinedExportBody(bodies, exportName.trim() || projectName)];
           const bytes = await exportMeshesTo3mfOffThread(bodies, { title: exportName.trim() || projectName });
           const blob3mf = new Blob([bytes as BlobPart], { type: THREE_MF_MEDIA_TYPE });
           if (toBambu) bambuNote = await sendToSlicer(sendTargetRef.current.slicer ?? readSlicer(), projectExportFileName(exportName, "3mf"), blob3mf, downloadBlobFile, { save: sendTargetRef.current.save });
@@ -13079,6 +13105,8 @@ export function LayerlingEditor({
   const exportDesignRef = useRef(exportDesign);
   // Build 71: the slicer the Export window chose for this export, and whether the file is kept in the export folder.
   const sendTargetRef = useRef<{ slicer: SlicerId | null; save: boolean }>({ slicer: null, save: false });
+  // Build 72: the Export window's Parts choice, for the next export only (the full panel keeps parts separate).
+  const exportPartsRef = useRef<ExportParts>("separate");
   exportDesignRef.current = exportDesign;
   const projectNameForBambuRef = useRef(projectName);
   projectNameForBambuRef.current = projectName;
@@ -13317,7 +13345,7 @@ export function LayerlingEditor({
     window.addEventListener(OPEN_EXPORT_WINDOW_EVENT, onOpen);
     return () => window.removeEventListener(OPEN_EXPORT_WINDOW_EVENT, onOpen);
   }, []);
-  type SendDetail = { format?: BambuSendFormat; skipCheck?: boolean; slicer?: SlicerId | null; name?: string; fromWindow?: boolean };
+  type SendDetail = { format?: BambuSendFormat; skipCheck?: boolean; slicer?: SlicerId | null; name?: string; fromWindow?: boolean; parts?: ExportParts };
   const [printCheck, setPrintCheck] = useState<{ issues: PrintIssue[]; sending: SendDetail | null } | null>(null);
   const runPrintCheck = useCallback(() => {
     const printer = printerPresetById(workspaceSettingsRef.current.printer);
@@ -13339,6 +13367,7 @@ export function LayerlingEditor({
         }
       }
       const name = detail.name ?? projectNameForBambuRef.current;
+      exportPartsRef.current = detail.parts ?? "separate";
       // Build 71: from the Export window with no slicer chosen, the file is only saved.
       if (detail.fromWindow && !detail.slicer) {
         sendTargetRef.current = { slicer: null, save: false };
@@ -15328,7 +15357,7 @@ export function LayerlingEditor({
           }}
           onExport={(choice) => {
             setExportWindowOpen(false);
-            window.dispatchEvent(new CustomEvent(SEND_TO_BAMBU_EVENT, { detail: { format: choice.format, name: choice.name, slicer: choice.target === "none" ? null : choice.target, fromWindow: true, skipCheck: !choice.checkFirst } }));
+            window.dispatchEvent(new CustomEvent(SEND_TO_BAMBU_EVENT, { detail: { format: choice.format, name: choice.name, slicer: choice.target === "none" ? null : choice.target, fromWindow: true, skipCheck: !choice.checkFirst, parts: choice.parts } }));
           }}
         />
       ) : null}
@@ -16085,4 +16114,21 @@ function storePatientDetails(value: "keep" | "remove") {
   } catch {
     // Holds for this visit.
   }
+}
+
+
+/** Build 72: bodies made one object for a 3MF, each face keeping the colour of the body it came from. */
+function joinedExportBody<T extends MeshData & { color?: string; faceColors?: string[] }>(bodies: T[], name: string): T {
+  const vertices: MeshData["vertices"] = [];
+  const faces: MeshData["faces"] = [];
+  const faceColors: string[] = [];
+  for (const body of bodies) {
+    const offset = vertices.length;
+    vertices.push(...body.vertices);
+    body.faces.forEach((face, f) => {
+      faces.push(face.map((index) => index + offset) as typeof face);
+      faceColors.push(body.faceColors?.[f] ?? body.color ?? bodies[0].color ?? "#9aa5b1");
+    });
+  }
+  return { ...bodies[0], name, vertices, faces, faceColors };
 }
