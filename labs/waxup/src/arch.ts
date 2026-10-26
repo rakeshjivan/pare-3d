@@ -553,3 +553,40 @@ export function frameCorrection(points: Float32Array, above: number, forceTurn?:
   const newAbove = notes.length ? percentile(tops, 0.97) : above;
   return { fix, above: newAbove, note: notes.join(", "), turn, gap: bestLen };
 }
+
+/**
+ * Library teeth placed onto the patient's own teeth (found on the scan): each library crown spans its
+ * tooth's mesial and distal contacts (scaled to the distance between them), stands on that tooth's
+ * long axis, sits over its crown centre and reaches its incisal edge or cusp tip. Fitting and covering
+ * (fitTooth, coverTooth) then adapt it to the scanned tooth.
+ */
+export function placeOnFound(lib: ToothLibrary, jaw: Jaw, found: { teeth: Array<{ fdi: number; position: number; mesial: THREE.Vector3; distal: THREE.Vector3; centre: THREE.Vector3; tip: THREE.Vector3; axis: THREE.Vector3 }> }, curve: ArchCurve, lastPosition: number): PlacedTooth[] {
+  const files = lib.teeth[jaw];
+  const out: PlacedTooth[] = [];
+  for (const t of found.teeth) {
+    if (t.position > lastPosition) continue;
+    const mesh = files.get(t.position);
+    if (!mesh) continue;
+    const ext = toothExtent(mesh);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let i = 0; i < mesh.v.length; i += 3) { x0 = Math.min(x0, mesh.v[i]); x1 = Math.max(x1, mesh.v[i]); y0 = Math.min(y0, mesh.v[i + 1]); y1 = Math.max(y1, mesh.v[i + 1]); }
+    const occlusal = t.axis.clone().normalize();
+    const md = t.mesial.clone().sub(t.distal);
+    md.addScaledVector(occlusal, -md.dot(occlusal));
+    const chord = Math.hypot(t.mesial.x - t.distal.x, t.mesial.y - t.distal.y);
+    const mesial = md.normalize();
+    const buccal = new THREE.Vector3().crossVectors(occlusal, mesial);
+    const mid = t.mesial.clone().add(t.distal).multiplyScalar(0.5);
+    if (buccal.x * (mid.x - curve.centre[0]) + buccal.y * (mid.y - curve.centre[1]) < 0) buccal.negate();
+    const scale = chord / ext.width;
+    // Across the arch: over the crown's centre. Along it: midway between the contacts. Height: the tip.
+    const across = new THREE.Vector3(t.centre.x - mid.x, t.centre.y - mid.y, 0).dot(buccal);
+    const target = mid.clone().addScaledVector(buccal, across);
+    const centre = target
+      .addScaledVector(mesial, -((x0 + x1) / 2) * scale)
+      .addScaledVector(buccal, -((y0 + y1) / 2) * scale);
+    centre.z = t.tip.z - ext.top * scale;
+    out.push({ fdi: t.fdi, position: t.position, mesial, buccal, occlusal, centre, scale, seat: { buccal: 0, up: 0 }, adjust: { ...NO_ADJUST }, mesh, fit: new THREE.Matrix4(), fitError: null });
+  }
+  return out;
+}

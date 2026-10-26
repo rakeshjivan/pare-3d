@@ -10,7 +10,7 @@ import manifoldWasm from "../../../node_modules/manifold-3d/manifold.wasm";
 import { preparedDental, type Prepared } from "@/lib/dentalModel";
 import { filesFromRar, libraryFromFiles, type Jaw, type LibraryFile, type ToothLibrary } from "./library";
 import { concavity, findTeeth, projectOnCurve, type FoundTeeth, type Pin } from "./teeth";
-import { archCurve, coverTooth, frameCorrection, fitTooth, NO_ADJUST, placeTeeth, PointGrid2, seatTooth, toothExtent, toothMatrix, type Adjust, type ArchCurve, type PlacedTooth } from "./arch";
+import { archCurve, coverTooth, frameCorrection, placeOnFound, fitTooth, NO_ADJUST, placeTeeth, PointGrid2, seatTooth, toothExtent, toothMatrix, type Adjust, type ArchCurve, type PlacedTooth } from "./arch";
 import { archModel, closedTooth, modelWithTeeth, stlBytes, transformed } from "./solid";
 
 // ---------------------------------------------------------------------------------------------
@@ -347,12 +347,15 @@ function autoPlace() {
   if (!state.library.teeth[state.jaw].size) { status(`This library has no ${state.jaw} teeth.`); return; }
   if (arch.partial) { arch.teeth = []; arch.waxed = new Set(); renderTeeth(); renderChips(); status(`The ${state.jaw} scan is a partial arch. A diagnostic wax-up needs a full-arch scan, so no teeth are placed on it.`); return; }
   const started = performance.now();
-  arch.teeth = placeTeeth(state.library, state.jaw, arch.curve, { lastPosition: state.lastPosition, rightSide: state.rightSide });
-  if (!arch.waxed.size || ![...arch.waxed].some((fdi) => arch.teeth.some((t) => t.fdi === fdi))) arch.waxed = new Set(arch.teeth.filter((t) => t.position <= 3).map((t) => t.fdi));
+  // On the patient's own teeth when they were found; along the arch curve otherwise.
+  arch.teeth = arch.found
+    ? placeOnFound(state.library, state.jaw, arch.found, arch.found.curve, state.lastPosition)
+    : placeTeeth(state.library, state.jaw, arch.curve, { lastPosition: state.lastPosition, rightSide: state.rightSide });
+  if (!arch.waxed.size || ![...arch.waxed].some((fdi) => arch.teeth.some((t) => t.fdi === fdi))) arch.waxed = new Set(arch.teeth.map((t) => t.fdi));
   let fitted = 0;
   for (const tooth of arch.teeth) if (settle(tooth, arch)) fitted += 1;
   state.selected = null;
-  status(`${arch.teeth.length} teeth placed along the arch (${arch.curve.length.toFixed(0)} mm, size ${(arch.teeth[0]?.scale * 100).toFixed(0)}%)${state.fitTeeth ? `, ${fitted} fitted onto the scanned teeth` : ""} in ${(performance.now() - started).toFixed(0)} ms. Waxing ${arch.waxed.size}.`);
+  status(`${arch.teeth.length} teeth placed ${arch.found ? "on the patient's teeth" : `along the arch (${arch.curve.length.toFixed(0)} mm, size ${(arch.teeth[0]?.scale * 100).toFixed(0)}%)`}${state.fitTeeth ? `, ${fitted} fitted onto the scanned teeth` : ""} in ${(performance.now() - started).toFixed(0)} ms. Waxing ${arch.waxed.size}.`);
   renderTeeth();
   renderChips();
   renderSelected();
@@ -760,6 +763,22 @@ async function modelFor(jaw: Jaw) {
   return builtModels.get(jaw)!;
 }
 
+/**
+ * The IMT partial wax-up: alternate teeth along the arch, across the midline (GC's IMT guide: 12, 21,
+ * 23 in the first series, 13, 11, 22 with the total index), so no two neighbours are injected together.
+ * "A" starts with the right lateral (12/42); "B" with the right central (11/41).
+ */
+function partialSet(jaw: Jaw): number[] {
+  const arch = state.arches[jaw];
+  const [right, left] = jaw === "upper" ? [1, 2] : [4, 3];
+  const startA = $<HTMLSelectElement>("imt-start").value !== "b";
+  return (arch?.teeth ?? []).map((t) => t.fdi).filter((fdi) => {
+    const q = Math.floor(fdi / 10), p = fdi % 10;
+    const even = p % 2 === 0;
+    return q === right ? even === startA : q === left ? even !== startA : false;
+  }).sort((a, b) => a - b);
+}
+
 async function exportModels(kind: "total" | "partial-odd" | "partial-even" | "imt") {
   const jaws: Jaw[] = kind === "imt" ? (["upper", "lower"] as Jaw[]).filter((j) => state.arches[j]?.teeth.length && state.arches[j]!.waxed.size) : [state.jaw];
   if (!jaws.length) { status("Place and wax teeth on an arch first."); return; }
@@ -773,7 +792,7 @@ async function exportModels(kind: "total" | "partial-odd" | "partial-even" | "im
     const sets: Array<[string, (t: PlacedTooth) => boolean]> = kind === "total" ? [["total", () => true]]
       : kind === "partial-odd" ? [["partial (odd teeth)", (t) => t.position % 2 === 1]]
         : kind === "partial-even" ? [["partial (even teeth)", (t) => t.position % 2 === 0]]
-          : [["total", () => true], [`partial (${$<HTMLSelectElement>("imt-start").value === "odd" ? "odd" : "even"} teeth)`, (t) => (t.position % 2 === 1) === ($<HTMLSelectElement>("imt-start").value === "odd")]];
+          : [["total", () => true], [`partial (${partialSet(jaw).join(", ")})`, (t) => partialSet(jaw).includes(t.fdi)]];
     for (const [label, filter] of sets) {
       status(`Joining the ${jaw} model with its ${label} wax-up...`, true);
       await later();
