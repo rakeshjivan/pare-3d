@@ -4145,4 +4145,6 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "workspace.useMyDefaultHint": "Применяет к этому проекту цвета, сетку и другие настройки, сохранённые кнопкой «Сделать по умолчанию». Размер стола, принтер и единицы остаются.",
   "prop.loftSegments": "Сегментов на окружность",
   "loft.segmentsHint": "Из скольких прямых отрезков рисуется целая окружность или скругление: в окне и в STL, OBJ и 3MF. Больше отрезков — круглее и крупнее файлы.",
+  "editor.dropToImport": "Отпустите для импорта",
+  "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG или JPG - или проект .lyl, чтобы открыть его",
 };

@@ -306,6 +306,8 @@ export function TopActionPanel({
             }}
             onDrop={(event) => {
               event.preventDefault();
+              // Build 75: the window's own drop import would take it too.
+              event.stopPropagation();
               if (event.dataTransfer.files.length > 0) {
                 onImportFiles(event.dataTransfer.files);
               }

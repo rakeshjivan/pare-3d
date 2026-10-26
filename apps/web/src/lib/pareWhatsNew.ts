@@ -4,6 +4,12 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 75,
+    items: [
+      "Drag files from your desktop straight onto the editor to import them - no trip through the Import window. A frame shows while you hold them over it; a .lyl design dropped this way opens.",
+    ],
+  },
+  {
     build: 74,
     items: [
       "Dental Studio locks the bite in: the first time a set is looked at, the bite the bite scan gives is stored with the two arches and never fitted again. Move the scans apart, trim them, sculpt them or cut the palate away - the models and the articulator keep the bite as scanned. Before, any trim or sculpt could lose it, and fitting again after cutting the palate away moved a real full-arch set by up to 0.3 mm.",

@@ -89,6 +89,8 @@ For STL, 3MF, OBJ and STEP the {{ui:export.estimateTitle}} box shows the volume,
 
 With {{ui:editor.import}} or [[Ctrl]]+[[I]] you bring foreign files into the design.
 
+Quicker still: drag files from your desktop or a folder straight onto the editor. A dashed frame shows while you hold them over it, and they come in as soon as you let go - the same as through the import window, colours and all. A `.lyl` design dropped this way opens as a new design.
+
 ![The import window: open or insert designs and drop geometry.](shot:import-panel)
 
 - **{{ui:import.openProject}}:** A Pare 3D design (`.lyl`, or an older `.skf`) comes back as a new design.

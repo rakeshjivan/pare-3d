@@ -4158,4 +4158,6 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "workspace.useMyDefaultHint": "Zet de kleuren, het raster en de andere instellingen die je met „Als standaard instellen” hebt bewaard op dit ontwerp. De grootte van het bed, de printer en de eenheden blijven.",
   "prop.loftSegments": "Segmenten per cirkel",
   "loft.segmentsHint": "Uit hoeveel rechte stukjes een hele cirkel of afronding wordt getekend, in het beeld en in STL, OBJ en 3MF. Meer stukjes ziet er ronder uit en maakt grotere bestanden.",
+  "editor.dropToImport": "Loslaten om te importeren",
+  "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG of JPG - of een .lyl-ontwerp om het te openen",
 };

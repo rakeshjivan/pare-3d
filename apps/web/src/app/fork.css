@@ -1836,3 +1836,20 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
    buttons stay above it, so the view can still be turned between strokes. */
 .workplane-stage:has(.dental-brush-overlay) .view-cube,
 .workplane-stage:has(.dental-brush-overlay) .camera-controls { z-index: 31; }
+
+/* Build 75: files dragged onto the window - a frame round it and a card saying they will be imported.
+   It takes no pointer events, so the drop still reaches whatever lies under it. */
+.file-drop-overlay {
+  position: fixed; inset: 0; z-index: 9000; pointer-events: none;
+  border: 3px dashed var(--accent, #1662b3); border-radius: 10px; margin: 6px;
+  background: color-mix(in srgb, var(--accent, #1662b3) 8%, transparent);
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 18vh;
+}
+.file-drop-card {
+  display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center;
+  padding: 16px 24px; border-radius: 10px; max-width: min(420px, 90vw);
+  background: var(--panel-bg, #fff); color: var(--text, #1d2433);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+}
+.file-drop-card strong { font-size: 16px; }
+.file-drop-card span { font-size: 13px; opacity: 0.75; }

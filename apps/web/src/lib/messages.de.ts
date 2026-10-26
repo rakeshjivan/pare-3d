@@ -4158,4 +4158,6 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "workspace.useMyDefaultHint": "Legt die Farben, das Raster und die übrigen Einstellungen, die du mit „Als Vorgabe sichern“ gespeichert hast, auf diesen Entwurf. Größe der Platte, Drucker und Einheiten bleiben.",
   "prop.loftSegments": "Segmente je Kreis",
   "loft.segmentsHint": "Aus wie vielen geraden Stücken ein ganzer Kreis oder eine Rundung gezeichnet wird, in der Ansicht und in STL, OBJ und 3MF. Mehr Stücke wirken runder und machen größere Dateien.",
+  "editor.dropToImport": "Zum Importieren ablegen",
+  "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG oder JPG - oder ein .lyl-Design zum Öffnen",
 };

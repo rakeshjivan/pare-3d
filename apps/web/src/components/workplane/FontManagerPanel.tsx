@@ -69,6 +69,8 @@ export function FontManagerPanel({
     onDrop: (event: DragEvent) => {
       if (!event.dataTransfer.files.length) return;
       event.preventDefault();
+      // Build 75: a font let go here is the font manager's, not an import into the design.
+      event.stopPropagation();
       setDropping(false);
       const file = event.dataTransfer.files[0];
       void add(async () => ({ bytes: await file.arrayBuffer(), name: file.name }));

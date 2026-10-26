@@ -14349,6 +14349,52 @@ export function LayerlingEditor({
     [importFiles],
   );
 
+  // Build 75: files dragged from the desktop onto the window are imported where they are let go - no
+  // trip through the Import window. Drop zones of their own (the Import window, the font manager) keep
+  // their drops; a design shown from its history takes none.
+  const [fileDragging, setFileDragging] = useState(false);
+  const fileDropBlockedRef = useRef(false);
+  fileDropBlockedRef.current = Boolean(historyViewState);
+  useEffect(() => {
+    const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
+    let depth = 0;
+    const enter = (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      depth += 1;
+      if (!fileDropBlockedRef.current) setFileDragging(true);
+    };
+    const over = (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      // Without this the browser would open the file in place of the editor.
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = fileDropBlockedRef.current ? "none" : "copy";
+    };
+    const leave = (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      depth = Math.max(0, depth - 1);
+      if (!depth) setFileDragging(false);
+    };
+    const drop = (event: DragEvent) => {
+      depth = 0;
+      setFileDragging(false);
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      if (!files.length || fileDropBlockedRef.current) return;
+      selectFiles(files);
+    };
+    window.addEventListener("dragenter", enter);
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragenter", enter);
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+  }, [selectFiles]);
+
   const selectShape = useCallback((id: string | string[] | null, mode: "replace" | "toggle" = "replace") => {
     setSelectedIds((current) => {
       if (Array.isArray(id)) {
@@ -16308,6 +16354,14 @@ export function LayerlingEditor({
       ) : null}
       {qrCodePanelOpen && !historyViewState ? (
         <QrCodePanel onClose={() => setQrCodePanelOpen(false)} onCreate={createQrCode} />
+      ) : null}
+      {fileDragging ? (
+        <div className="file-drop-overlay" aria-hidden="true">
+          <div className="file-drop-card">
+            <strong>{t("editor.dropToImport")}</strong>
+            <span>{t("editor.dropToImportHint")}</span>
+          </div>
+        </div>
       ) : null}
       {topPanel ? (
         <TopActionPanel

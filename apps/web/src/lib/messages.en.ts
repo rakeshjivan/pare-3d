@@ -4159,6 +4159,8 @@ export const MESSAGES_EN = {
   "workspace.useMyDefaultHint": "Puts the colours, grid and other settings you saved with “Make default” on this design. The size of the plate, the printer and the units stay.",
   "prop.loftSegments": "Segments per circle",
   "loft.segmentsHint": "How many straight pieces a full circle or rounded corner is drawn with, in the view and in STL, OBJ and 3MF. More pieces look rounder and make larger files.",
+  "editor.dropToImport": "Drop to import",
+  "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG or JPG - or a .lyl design to open it",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

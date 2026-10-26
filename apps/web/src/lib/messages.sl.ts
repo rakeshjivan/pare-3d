@@ -4136,4 +4136,6 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "workspace.useMyDefaultHint": "Na ta osnutek uporabi barve, mrežo in druge nastavitve, shranjene z „Nastavi kot privzeto“. Velikost plošče, tiskalnik in enote ostanejo.",
   "prop.loftSegments": "Odsekov na krog",
   "loft.segmentsHint": "Iz koliko ravnih odsekov je narisan cel krog ali zaobljenje, v pogledu in v STL, OBJ in 3MF. Več odsekov izgleda bolj okroglo in naredi večje datoteke.",
+  "editor.dropToImport": "Spustite za uvoz",
+  "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG ali JPG - ali načrt .lyl, da ga odprete",
 };

@@ -4134,4 +4134,6 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "workspace.useMyDefaultHint": "Applique à ce design les couleurs, la grille et les autres réglages enregistrés avec « Par défaut ». La taille du plateau, l’imprimante et les unités restent.",
   "prop.loftSegments": "Segments par cercle",
   "loft.segmentsHint": "Avec combien de segments droits un cercle entier ou un arrondi est dessiné, dans la vue et dans STL, OBJ et 3MF. Plus de segments donnent un rendu plus rond et des fichiers plus gros.",
+  "editor.dropToImport": "Déposez pour importer",
+  "editor.dropToImportHint": "STL, OBJ, 3MF, STEP, SVG, PNG ou JPG - ou un design .lyl pour l'ouvrir",
 };
