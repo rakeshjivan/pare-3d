@@ -138,6 +138,12 @@ function outward(curve: ArchCurve, p: Vec2, t: Vec2): Vec2 {
   return n;
 }
 
+/** Mean mesiodistal crown widths (mm), central incisor to third molar (Wheeler's Dental Anatomy). */
+const NATURAL_WIDTH: Record<Jaw, number[]> = {
+  upper: [8.5, 6.5, 7.5, 7.0, 6.5, 10.0, 9.0, 8.5],
+  lower: [5.0, 5.5, 7.0, 7.0, 7.0, 11.0, 10.5, 10.0],
+};
+
 const FDI_QUADRANTS: Record<Jaw, [number, number]> = { upper: [1, 2], lower: [4, 3] };
 
 /** Mesiodistal (local x) and buccolingual (local y) extent and the top (local z max) of a tooth file. */
@@ -212,11 +218,16 @@ export function placeTeeth(lib: ToothLibrary, jaw: Jaw, curve: ArchCurve, option
     }
   }
   if (!slots.length) return [];
-  // Spaced by width, scaled so the span fills the scanned arch from end to end.
+  // Size: the library brought to natural mean mesiodistal widths (libraries differ: M.O.D Round's
+  // upper teeth are ~1.35x natural). The arch's scanned length is not used: where a scan ends is
+  // unreliable (tissue tails, flanges), and the fit onto each scanned tooth adapts the crown anyway.
   const total = slots.reduce((sum, slot) => sum + slot.width, 0);
-  // Libraries differ: M.O.D Round's upper teeth are ~1.35x natural size, so the range is wide.
-  const scale = Math.max(0.6, Math.min(1.3, curve.length / total));
-  let s = (curve.length - total * scale) / 2;
+  const natural = slots.reduce((sum, slot) => sum + NATURAL_WIDTH[jaw][slot.position - 1], 0);
+  const scale = Math.max(0.6, Math.min(1.4, natural / total));
+  // Spaced by width from the midline outward: the contact between the centrals sits on the midline.
+  const firstQuadrant = Math.floor(slots[0].fdi / 10);
+  const sideA = slots.filter((slot) => Math.floor(slot.fdi / 10) === firstQuadrant).reduce((sum, slot) => sum + slot.width, 0);
+  let s = curve.sMid - sideA * scale;
   return slots.map((slot) => {
     const at = s + (slot.width * scale) / 2;
     s += slot.width * scale;
@@ -478,7 +489,11 @@ export function frameCorrection(points: Float32Array, above: number, forceTurn?:
   const fix = new THREE.Matrix4();
   if (tilt > 1.5 && tilt < 20) {
     const normal = new THREE.Vector3(-a, -b, 1).normalize();
-    fix.makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(normal, new THREE.Vector3(0, 0, 1)));
+    // About the middle of the cusp tips, so they stay at the height the rest of the lab expects.
+    const pivot = new THREE.Vector3(cx, cy, sol.z);
+    fix.makeTranslation(pivot.x, pivot.y, pivot.z)
+      .multiply(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(normal, new THREE.Vector3(0, 0, 1))))
+      .multiply(new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z));
     notes.push(`levelled ${tilt.toFixed(1)} degrees`);
   } else { a = 0; b = 0; }
   // The tooth band after levelling: cells within 3.5 mm of their sector's cusp height.

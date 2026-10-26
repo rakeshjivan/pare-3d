@@ -242,14 +242,17 @@ async function loadScans(files: File[]) {
     const correction = corrections[index];
     const frame = correction.fix.clone().multiply(arch.frame);
     if (correction.note) frameNotes.push(`${jaw} ${correction.note}`);
-    if (arch.partial) frameNotes.push(`the ${jaw} is a partial scan, so it is shown but not waxed`);
     const soup = shared.slice();
     for (let i = 0; i < soup.length; i += 3) { p.set(soup[i], soup[i + 1], soup[i + 2]).applyMatrix4(frame); soup[i] = p.x; soup[i + 1] = p.y; soup[i + 2] = p.z; }
     const points = new Float32Array(m.v.length);
     for (let i = 0; i < m.v.length; i += 3) { p.set(m.v[i], m.v[i + 1], m.v[i + 2]).applyMatrix4(frame); points[i] = p.x; points[i + 1] = p.y; points[i + 2] = p.z; }
     const curve = archCurve(points, Math.max(1, Math.min(4, correction.above)));
+    // A full arch reaches well out on both sides of the midline; a quadrant or sextant does not.
+    const ends = [curve.pts[0][0], curve.pts[curve.pts.length - 1][0]];
+    const isPartial = !(Math.min(...ends) < -12 && Math.max(...ends) > 12);
+    if (isPartial) frameNotes.push(`the ${jaw} is a partial scan, so it is shown but not waxed`);
     const geometry = soupGeometry(soup);
-    state.arches[jaw] = { jaw, frame, sharedSoup: shared, soup, points, curve, grid: new PointGrid2(points, 1), bvh: new MeshBVH(geometry), bite: arch.bite, partial: arch.partial, teeth: [], waxed: new Set() };
+    state.arches[jaw] = { jaw, frame, sharedSoup: shared, soup, points, curve, grid: new PointGrid2(points, 1), bvh: new MeshBVH(geometry), bite: arch.bite, partial: isPartial, teeth: [], waxed: new Set() };
   }
   const pair = prepared.analysis.pair;
   const fit = pair?.bite ? (pair.bite.fitted ? `fitted to the bite scan (RMS ${pair.bite.rms.toFixed(2)} mm)` : "the bite scan could not be fitted") : pair ? (pair.inOcclusion ? "in occlusion as scanned" : "not in occlusion") : "one arch";
