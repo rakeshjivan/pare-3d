@@ -176,7 +176,7 @@ export function MeshSculptPanel({
         </div>
       ) : null}
       <p className="blend-hint" role="status">{chosen ? t("sculpt.chosen", { count: chosen.toLocaleString() }) : t("sculpt.noneChosen")}</p>
-      {teethWarning > 0 ? <p className="dental-status warn sculpt-teeth-warning" role="alert">{t("sculpt.trimTeeth", { count: teethWarning.toLocaleString() })}</p> : null}
+      {teethWarning > 0 ? <p className="dental-status warn sculpt-teeth-warning" role="status" aria-live="assertive">{t("sculpt.trimTeeth", { count: teethWarning.toLocaleString() })}</p> : null}
       <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.selection")}>
         {(trim ? TRIM_ACTIONS : SCULPT_ACTIONS).map((action) => (
           <button key={action} type="button" className={trim && (action === "delete" || action === "fill") ? "danger" : undefined} title={action === "fill" ? t("sculpt.selection.fillHint") : undefined} disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>

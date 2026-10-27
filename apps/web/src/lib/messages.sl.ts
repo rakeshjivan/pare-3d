@@ -4192,4 +4192,6 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "largeMesh.keep": "Ne zdaj",
   "largeMesh.raise": "Dvigni na {proposed}",
   "largeMesh.raised": "Rezanje in združevanje v tem načrtu zdaj obdelata do {proposed} trikotnikov (Nastavitve, napredno).",
+  "dental.guidePdf": "Prenesi vodnik za izdelavo modelov (PDF)",
+  "dental.guidePdfFirst": "Prvič izdelujete modele? Prenesite vodnik (PDF, 28 strani, v angleščini)",
 };

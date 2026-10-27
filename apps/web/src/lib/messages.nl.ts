@@ -4214,4 +4214,6 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "largeMesh.keep": "Niet nu",
   "largeMesh.raise": "Verhogen naar {proposed}",
   "largeMesh.raised": "Snijden en groeperen verwerken in dit ontwerp nu tot {proposed} driehoeken (Instellingen, geavanceerd).",
+  "dental.guidePdf": "Handleiding modelbouw downloaden (PDF)",
+  "dental.guidePdfFirst": "Nieuw met modelbouw? Download de handleiding (PDF, 28 pagina's, Engels)",
 };

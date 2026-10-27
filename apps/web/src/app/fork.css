@@ -1916,3 +1916,8 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .dental-height-figure .bracket.gum { stroke: #d9737b; fill: none; }
 .dental-height-figure .bracket.base { stroke: #6f86a0; fill: none; }
 .dental-height-figure .cut-line { stroke: #8a8270; stroke-width: 0.6; stroke-dasharray: 2 1.5; }
+/* Build 77: the Model Builder Guide as a PDF, from Dental Studio's title bar and its first step. */
+.dental-studio-panel .dental-guide-download { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 6px; color: inherit; text-decoration: none; }
+.dental-studio-panel .dental-guide-download:hover { background: var(--hover, rgba(31, 111, 235, 0.08)); color: var(--primary, #1f6feb); }
+.dental-studio-panel .dental-guide-link { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--primary, #1f6feb); text-decoration: none; }
+.dental-studio-panel .dental-guide-link:hover { text-decoration: underline; }

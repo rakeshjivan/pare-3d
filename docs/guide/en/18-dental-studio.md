@@ -13,6 +13,8 @@ For most cases you only need three clicks:
 2. Under **{{ui:dental.step3}}**, pick what the models are for: **{{ui:dental.study}}**, **{{ui:dental.ortho}}**, **{{ui:dental.aligner}}** or **{{ui:dental.crown}}**.
 3. Click **{{ui:dental.applyPair}}**.
 
+The download button in the panel's title bar (and the link in step 1 before any scan is in) saves this guide as a PDF of 28 pages, with every screen and setting, to keep, print or pass on.
+
 The panel leads you through six numbered steps, top to bottom, each on a card of its own: add the scans, prepare them (trim, then check the teeth), choose the model, its base, the articulator (for a pair) and its name. Each says in one line what to do and turns green when it is done; the line above the button says what comes next. Click a step's title to fold it to one line that sums up its settings, and again to open it; the card you last worked in is marked on the left.
 
 ![Dental Studio with an upper and a lower scan in: the steps, each on its card with its instruction, ticks on the steps that are done, the model's height and the button at the bottom.](shot:dental-studio-steps)

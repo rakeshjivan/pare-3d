@@ -4215,6 +4215,8 @@ export const MESSAGES_EN = {
   "largeMesh.keep": "Not now",
   "largeMesh.raise": "Raise to {proposed}",
   "largeMesh.raised": "Cutting and grouping now handle up to {proposed} triangles on this design (Settings, advanced).",
+  "dental.guidePdf": "Download the Model Builder Guide (PDF)",
+  "dental.guidePdfFirst": "New to the model builder? Download the guide (PDF, 28 pages)",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

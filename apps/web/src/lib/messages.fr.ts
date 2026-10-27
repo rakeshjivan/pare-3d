@@ -4190,4 +4190,6 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "largeMesh.keep": "Pas maintenant",
   "largeMesh.raise": "Relever à {proposed}",
   "largeMesh.raised": "Découper et grouper traitent maintenant jusqu'à {proposed} triangles dans ce projet (Réglages, avancés).",
+  "dental.guidePdf": "Télécharger le guide de création de modèles (PDF)",
+  "dental.guidePdfFirst": "Nouveau dans la création de modèles ? Télécharger le guide (PDF, 28 pages, en anglais)",
 };

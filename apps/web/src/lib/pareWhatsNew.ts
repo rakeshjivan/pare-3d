@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 77,
+    items: [
+      "Dental Studio has the Model Builder Guide as a PDF to download, 28 pages with every screen and setting: the download button in its title bar, and a link in the first step before any scan is in.",
+      "Trim's crown warning no longer brings up \"Report this problem\": it is a caution, not a fault.",
+    ],
+  },
+  {
     build: 76,
     items: [
       "Right-click a selection for a new Align menu: centre parts on one another or on the workplane (X and Y) in one click, flip over or turn around 180° (set back down on the workplane), mirror left-right or front-back without picking an axis, and the Align, Mirror and Drop tools.",

@@ -4213,4 +4213,6 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "largeMesh.keep": "Teď ne",
   "largeMesh.raise": "Zvýšit na {proposed}",
   "largeMesh.raised": "Řezání a seskupování v tomto návrhu nyní zpracují až {proposed} trojúhelníků (Nastavení, pokročilé).",
+  "dental.guidePdf": "Stáhnout průvodce tvorbou modelů (PDF)",
+  "dental.guidePdfFirst": "Tvorbu modelů používáte poprvé? Stáhněte si průvodce (PDF, 28 stran, anglicky)",
 };

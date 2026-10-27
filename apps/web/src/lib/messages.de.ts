@@ -4214,4 +4214,6 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "largeMesh.keep": "Nicht jetzt",
   "largeMesh.raise": "Auf {proposed} anheben",
   "largeMesh.raised": "Schneiden und Gruppieren verarbeiten in diesem Entwurf jetzt bis zu {proposed} Dreiecke (Einstellungen, erweitert).",
+  "dental.guidePdf": "Anleitung zum Modellbau herunterladen (PDF)",
+  "dental.guidePdfFirst": "Neu im Modellbau? Anleitung herunterladen (PDF, 28 Seiten, Englisch)",
 };

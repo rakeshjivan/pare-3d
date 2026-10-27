@@ -3,7 +3,7 @@
 import { HINGE_CLEARANCE, HINGE_CONDYLE_ANGLES, HINGE_FITS, INCISAL_PIN_MAX, INCISAL_PIN_STEP } from "@/lib/dentalBase";
 import { readMyHingeFit, saveMyHingeFit } from "@/lib/hingeFitTest";
 
-import { ArrowLeftRight, Check, ChevronDown, FilePlus2, LoaderCircle, Upload, X } from "lucide-react";
+import { ArrowLeftRight, Check, ChevronDown, FileDown, FilePlus2, LoaderCircle, Upload, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
@@ -24,6 +24,10 @@ export type DentalSlot = "upper" | "lower" | "bite";
  * The settings each preset starts from (docs/plans/dental-scan-to-model.md, Clinical specifications).
  * `depth` is how deep the anatomy runs below the occlusal plane (flaps and scan tails ignored), mm.
  */
+/** Build 77: the Model Builder Guide, shipped with the app (made from the guide's own pages and screens). */
+export const DENTAL_GUIDE_FILE = "Pare-3D-Model-Builder-Guide.pdf";
+const DENTAL_GUIDE_PDF = `downloads/${DENTAL_GUIDE_FILE}`;
+
 export function dentalPreset(preset: DentalPreset, depth: number, pair: boolean, above = 0, teeth = 0): DentalStudioOptions {
   const common = { label: "", hinge: false, layout: "print" as const, wall: 2 };
   if (preset === "ortho") {
@@ -266,6 +270,8 @@ export function DentalStudioPanel({
           <span>{t("dental.subtitle")}</span>
         </div>
         <div className="panel-header-actions">
+          {/* Build 77: the Model Builder Guide as a PDF, to keep, print or pass on. */}
+          <a className="dental-guide-download" href={DENTAL_GUIDE_PDF} download={DENTAL_GUIDE_FILE} aria-label={t("dental.guidePdf")} title={t("dental.guidePdf")}><FileDown size={18} /></a>
           <GuideHelpLink section="dentalModel" />
           <button type="button" aria-label={t("common.cancel")} onClick={onCancel}><X size={20} /></button>
         </div>
@@ -277,6 +283,7 @@ export function DentalStudioPanel({
       {card(1, t("dental.step1"), scansDone, t("dental.step1Hint"), scansSummary, (<>
         <div className="dental-slots">
           {parts.length === 0 ? <p className="dental-status" role="status">{t("dental.noScans")}</p> : null}
+          {parts.length === 0 ? <a className="dental-guide-link" href={DENTAL_GUIDE_PDF} download={DENTAL_GUIDE_FILE}><FileDown size={15} aria-hidden="true" /> {t("dental.guidePdfFirst")}</a> : null}
           <div className={onNewPatient ? "dental-import-row" : undefined}>
             <button type="button" className="dental-import" disabled={stage === "making"} onClick={onImport}><Upload size={15} /> {t("dental.import")}</button>
             {onNewPatient ? <button type="button" className="dental-import dental-new-patient" disabled={stage === "making"} title={t("dental.newPatientHint")} onClick={onNewPatient}><FilePlus2 size={15} /> {t("dental.newPatient")}</button> : null}

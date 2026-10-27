@@ -4201,4 +4201,6 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "largeMesh.keep": "Не сейчас",
   "largeMesh.raise": "Поднять до {proposed}",
   "largeMesh.raised": "Вырезание и группировка в этом проекте теперь обрабатывают до {proposed} треугольников (Настройки, расширенные).",
+  "dental.guidePdf": "Скачать руководство по построению моделей (PDF)",
+  "dental.guidePdfFirst": "Впервые строите модели? Скачайте руководство (PDF, 28 страниц, на английском)",
 };
