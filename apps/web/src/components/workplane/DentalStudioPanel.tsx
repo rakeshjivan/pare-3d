@@ -3,7 +3,8 @@
 import { PIN_MAX, PIN_STEP, PIN_WARN } from "@/lib/dentalArticulator";
 
 /** Build 78: a bite scan further than this from the scanner's bite (mm RMS) is pointed out. */
-const BITE_KEPT_CHECK = 0.2;
+/** Build 79: the bite scan's own error is often 0.2-0.3 mm; only well beyond that is the kept bite questioned. */
+const BITE_KEPT_CHECK = 0.5;
 
 import { ArrowLeftRight, Check, ChevronDown, FileDown, FilePlus2, LoaderCircle, Upload, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -11,6 +12,7 @@ import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { ArticulatorPicture, BaseStylePicture, ModelHeightPicture } from "@/components/workplane/DentalPictures";
+import { WaxupCard, waxupSummary, type WaxupActions, type WaxupView } from "@/components/workplane/WaxupCard";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import {
@@ -20,7 +22,7 @@ import {
 import type { WorkplaneWorkspaceSettings } from "@/types/layerling";
 
 export type DentalPreset = "study" | "ortho" | "aligner" | "crown";
-export type DentalSlot = "upper" | "lower" | "bite";
+export type DentalSlot = "upper" | "lower" | "bite" | "bite2";
 
 /**
  * The settings each preset starts from (docs/plans/dental-scan-to-model.md, Clinical specifications).
@@ -103,10 +105,19 @@ export function DentalStudioPanel({
   onRestore,
   areaShown = true,
   onAreaShown,
+  waxup,
+  onEditDesign,
+  onDone,
+  editing = false,
 }: {
   parts: DentalPartChoice[];
   slots: Record<DentalSlot, string | null>;
-  stage: "analysing" | "ready" | "making" | "trimming";
+  stage: "analysing" | "ready" | "making" | "trimming" | "made";
+  /** Build 79: after Make - open the design again, or finish. */
+  onEditDesign?: () => void;
+  onDone?: () => void;
+  /** Build 79: a design opened again: Make makes the models anew, in place of the ones made before. */
+  editing?: boolean;
   trimming: { slot: "upper" | "lower"; mode: "keep" | "remove" } | null;
   trimMode: "keep" | "remove";
   onTrimModeChange: (mode: "keep" | "remove") => void;
@@ -154,6 +165,8 @@ export function DentalStudioPanel({
   onNewPatient?: () => void;
   /** Build 71: this design already holds models made here. */
   modelsHere?: boolean;
+  /** Build 79: the wax-up step. */
+  waxup?: { view: WaxupView; actions: WaxupActions };
 }) {
   useLanguage();
   const title = t("dental.title");
@@ -193,9 +206,11 @@ export function DentalStudioPanel({
     // Build 74: a locked bite has its own line (biteLocked) - nothing was fitted again.
     if (bite?.locked) return null;
     // Build 78: the scanner's bite, kept as it was exported; how far the bite scan stands from it.
-    if (bite?.kept) return { text: t(bite.rms > BITE_KEPT_CHECK ? "dental.biteKeptCheck" : "dental.biteKept", { error: bite.rms.toFixed(2) }), warn: bite.rms > BITE_KEPT_CHECK, fit: true };
+    // Build 79: no figure (a dentist cannot judge a residual in mm, and the bite scan's own error is in it);
+    // lining up again is offered only when the bite scan clearly disagrees.
+    if (bite?.kept) return bite.rms > BITE_KEPT_CHECK ? { text: t(slots.bite2 ? "dental.biteKeptCheck2" : "dental.biteKeptCheck"), warn: true, fit: true } : { text: t("dental.biteKept"), warn: false };
     if (bite && !bite.fitted) return { text: t("dental.biteFailed"), warn: true };
-    if (bite) return { text: t("dental.biteFitted", { error: bite.rms.toFixed(2) }), warn: false };
+    if (bite) return { text: t(slots.bite2 ? "dental.biteFitted2" : "dental.biteFitted"), warn: false };
     if (inOcclusion) return { text: t("dental.inOcclusion"), warn: false };
     return { text: t("dental.notTouching"), warn: true };
   };
@@ -234,8 +249,9 @@ export function DentalStudioPanel({
   // Build 75: each step a card that folds to a one-line summary; the card last worked in is marked.
   // Build 77: the step to do next has a green outline - once the scans are in, the first step not
   // yet worked in (a step may be left as it is: having been in it is enough, the articulator too).
-  const stepCount = pair ? 6 : 5;
-  const nextCard = scansDone ? Array.from({ length: stepCount - 1 }, (_, k) => k + 2).find((number) => !visited[number]) ?? null : null;
+  const stepCount = pair ? 7 : 6;
+  // Build 79: the wax-up (card 3) is optional - never the step pointed to next.
+  const nextCard = scansDone ? Array.from({ length: stepCount - 1 }, (_, k) => k + 2).find((number) => number !== 3 && !visited[number]) ?? null : null;
   const card = (number: number, label: string, done: boolean, hint: string | null, summary: string | null, body: ReactNode) => {
     const isFolded = Boolean(folded[number]);
     return (
@@ -253,7 +269,7 @@ export function DentalStudioPanel({
   const custom = options.baseStyle !== presetBase;
   const presetName = t(({ study: "dental.study", ortho: "dental.ortho", aligner: "dental.aligner", crown: "dental.crown" } as const)[preset]);
   const scansSummary = scansDone
-    ? [slots.upper ? t("dental.upper") : null, slots.lower ? t("dental.lower") : null, slots.bite ? t("dental.bite") : null].filter(Boolean).join(" + ") + (biteLocked ? ` - ${t("dental.summaryLocked")}` : "")
+    ? [slots.upper ? t("dental.upper") : null, slots.lower ? t("dental.lower") : null, slots.bite ? t("dental.bite") : null, slots.bite2 ? t("dental.bite2") : null].filter(Boolean).join(" + ") + (biteLocked ? ` - ${t("dental.summaryLocked")}` : "")
     : null;
   const prepareSummary = scansDone ? t((options.margin ?? "auto") === "auto" ? "dental.marginAuto" : "dental.marginManual") : null;
   const modelSummary = `${presetName}${custom ? ` (${t("dental.custom")})` : ""} - ${insideName}`;
@@ -286,6 +302,17 @@ export function DentalStudioPanel({
         </div>
       </div>
 
+      {/* Build 79: the models made - the studio stays open on them: open the design again, or finish. */}
+      {stage === "made" ? (
+        <div className="dental-made">
+          <p className="dental-status" role="status"><Check size={15} /> {t("dental.madeHere")}</p>
+          <p className="blend-hint">{t("dental.madeHint")}</p>
+          <div className="edge-modifier-footer">
+            <button type="button" className="secondary" onClick={onEditDesign}>{t("dental.editDesign")}</button>
+            <button type="button" className="primary" onClick={onDone}><Check size={17} /> {t("dental.doneButton")}</button>
+          </div>
+        </div>
+      ) : (<>
       {/* Build 75: the Studio in step cards - scans, preparing them (trim, then the teeth), what the model
           is for, its base, the articulator (a pair), its name. A card folds to one line; the one last
           worked in is marked. */}
@@ -302,8 +329,10 @@ export function DentalStudioPanel({
           <button type="button" className="dental-swap" title={t("dental.swap")} aria-label={t("dental.swap")} disabled={busy || (!slots.upper && !slots.lower)} onClick={onSwap}><ArrowLeftRight size={15} /></button>
           {slotRow("lower", t("dental.lower"), archInfo("lower"))}
           {slotRow("bite", t("dental.bite"), null)}
+          {/* Build 79: a second bite scan - one each side aligns the whole arch best. */}
+          {slots.bite || slots.bite2 ? slotRow("bite2", t("dental.bite2"), null) : null}
           {stage === "analysing" ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.analysing")}</p> : null}
-          {pairLine ? <p className={`dental-status ${pairLine.warn ? "warn" : ""}`} role="status">{pairLine.text}{"fit" in pairLine && onFitBite ? <>{" "}<button type="button" className="link-button" disabled={busy} onClick={onFitBite}>{t("dental.fitBite")}</button></> : null}</p> : null}
+          {pairLine ? <p className={`dental-status ${pairLine.warn ? "warn" : ""}`} role="status">{pairLine.text}{"fit" in pairLine && onFitBite ? <>{" "}<button type="button" className="link-button" disabled={busy} onClick={onFitBite}>{t(slots.bite2 ? "dental.fitBite2" : "dental.fitBite")}</button></> : null}</p> : null}
           {biteLocked ? <p className="dental-status" role="status">{t("dental.biteLocked")}</p> : null}
           {onLayout && analysis && slots.upper && slots.lower ? (
             <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.scanLayout")}>
@@ -387,7 +416,12 @@ export function DentalStudioPanel({
         </div>
       </>))}
 
-      {card(3, t("dental.step3"), scansDone, t("dental.step3Hint"), modelSummary, (<>
+      {/* Build 79: the digital wax-up - optional; a card of its own before the model is chosen. */}
+      {waxup ? card(3, t("waxup.step"), waxup.view.placed.length > 0, t("waxup.stepHint"), waxupSummary(waxup.view), (
+        <WaxupCard view={waxup.view} actions={waxup.actions} slots={{ upper: Boolean(slots.upper), lower: Boolean(slots.lower) }} busy={busy || !analysis} workspace={workspace} />
+      )) : null}
+
+      {card(4, t("dental.step3"), scansDone, t("dental.step3Hint"), modelSummary, (<>
         <div className="dental-presets" role="radiogroup" aria-label={t("dental.purpose")}>
           {([
             ["study", t("dental.study"), t("dental.studyHint")],
@@ -416,7 +450,7 @@ export function DentalStudioPanel({
         <p className="blend-hint">{t(options.inside === "solid" ? (options.baseStyle === "ortho" ? "dental.orthoNote" : options.baseStyle === "plate" ? "dental.crownNote" : "dental.solidNote") : options.inside === "open" ? "dental.hollowNote" : "dental.closedNote")}</p>
       </>))}
 
-      {card(4, t("dental.stepBase"), scansDone, t("dental.stepBaseHint"), baseSummary, (<>
+      {card(5, t("dental.stepBase"), scansDone, t("dental.stepBaseHint"), baseSummary, (<>
         {/* Build 66: each base as it looks from above. */}
         <div className="dental-picture-tiles" role="radiogroup" aria-label={t("dental.baseStyle")}>
           {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")], ["articulator", t("dental.articulatorBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
@@ -503,7 +537,7 @@ export function DentalStudioPanel({
         ) : null}
       </>))}
 
-      {pair ? card(5, t("dental.step4"), options.hinge, t("dental.step4Hint"), articSummary, (<>
+      {pair ? card(6, t("dental.step4"), options.hinge, t("dental.step4Hint"), articSummary, (<>
             <label className="edge-modifier-check dental-hinge-check" title={t("dental.hingeHint")}>
               <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => onOptionsChange({ hinge: event.currentTarget.checked })} />
               <span>{t("dental.hinge")}</span>
@@ -512,16 +546,22 @@ export function DentalStudioPanel({
               <div className="dental-hinge-options">
                 {/* Build 78: the one articulator - two seats on ball condyles and the incisal pin. */}
                 <ArticulatorPicture pinRaise={options.pinRaise ?? 0} />
-                <p className="blend-hint">{t("dental.articulatorHow")}</p>
+                <p className="blend-hint">{t((options.pinPlace ?? (waxup?.view.placed.length ? "sides" : "midline")) === "sides" ? "dental.articulatorHowSides" : "dental.articulatorHow")}</p>
                 {/* Build 71: 0 (the scanned bite) to 10 mm open at the pin, in half millimetres. */}
                 <EdgeModifierSlider label={t("dental.pinRaise")} value={options.pinRaise ?? 0} min={0} max={PIN_MAX} step={PIN_STEP} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ pinRaise: Math.max(0, Math.min(PIN_MAX, Math.round(value / PIN_STEP) * PIN_STEP)) })} />
                 <p className={`blend-hint ${(options.pinRaise ?? 0) > PIN_WARN ? "warn" : ""}`}>{(options.pinRaise ?? 0) > PIN_WARN ? t("dental.pinRaiseWarn", { max: PIN_WARN }) : (options.pinRaise ?? 0) > 0 ? t("dental.pinRaiseOpenHint") : t("dental.pinRaiseZeroHint")}</p>
+                {/* Build 79: the pin is part of the lower, at this opening (a removable set waits for a later build). */}
+                <p className="blend-hint">{t("dental.pinFusedHint")}</p>
+                {/* Build 79: one pin in front of the incisors, or a post each side in the premolar region - the
+                    front teeth clear; the default with a wax-up. */}
+                {choice(t("dental.pinPlace"), options.pinPlace ?? (waxup?.view.placed.length ? "sides" : "midline"), [["midline", t("dental.pinMidline")], ["sides", t("dental.pinSides")]], (pinPlace) => onOptionsChange({ pinPlace }))}
+                <p className="blend-hint">{t((options.pinPlace ?? (waxup?.view.placed.length ? "sides" : "midline")) === "sides" ? "dental.pinSidesHint" : "dental.pinMidlineHint")}</p>
               </div>
             ) : null}
             {choice(t("dental.layout"), options.layout, [["print", t("dental.layoutPrint")], ["occlusion", t("dental.layoutOcclusion")]], (layout) => onOptionsChange({ layout }))}
       </>)) : null}
 
-      {card(pair ? 6 : 5, t("dental.stepName"), Boolean(options.label.trim()) || patientDetails === "remove", t("dental.stepNameHint"), nameSummary, (<>
+      {card(pair ? 7 : 6, t("dental.stepName"), Boolean(options.label.trim()) || patientDetails === "remove", t("dental.stepNameHint"), nameSummary, (<>
         {onPatientDetails ? choice(t("dental.patientDetails"), patientDetails, [["keep", t("dental.patientKeep")], ["remove", t("dental.patientRemove")]], onPatientDetails, t("dental.patientDetailsHint")) : null}
         {patientDetails === "remove" ? <p className="blend-hint">{t("dental.patientRemoveHint")}</p> : (<>
         <label className="dental-label-field">
@@ -538,12 +578,14 @@ export function DentalStudioPanel({
       {error ? <p className="dental-status dental-error-help" role="status">{t("dental.errorHelp")}</p> : null}
       {nextStep ? <p className="dental-next" role="status">{nextStep}</p> : null}
       <div className="edge-modifier-footer">
-        <button type="button" className="secondary" onClick={onCancel}>{t("common.cancel")}</button>
+        {/* Build 79: while making, Cancel stops it. */}
+        <button type="button" className="secondary" onClick={onCancel}>{stage === "making" ? t("dental.stopMaking") : t("common.cancel")}</button>
         <button type="button" className="primary" disabled={!ready} onClick={onApply}>
           {stage === "making" ? <LoaderCircle className="edge-modifier-spinner" size={17} /> : <Check size={17} />}
-          {stage === "making" ? t("dental.working") : t(pair ? "dental.applyPair" : "dental.apply")}
+          {stage === "making" ? t("dental.working") : editing ? t("dental.updateModels") : t(pair ? "dental.applyPair" : "dental.apply")}
         </button>
       </div>
+      </>)}
       </>)}
     </MovableToolPanel>
   );

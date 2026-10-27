@@ -5,7 +5,6 @@ import { t } from "@/lib/i18n";
 import { MmField } from "@/components/ReadyPartsSection";
 import { EnclosurePartIcon, FitTestPartIcon } from "@/components/readyPartIcons";
 import { FIT_TEST_CLEARANCES, fitTestParts, readMyPrintFit, saveMyPrintFit } from "@/lib/fitTest";
-import { pinFitTestParts, PIN_FITS, readMyPinFit, saveMyPinFit } from "@/lib/pinFitTest";
 import { DEFAULT_ENCLOSURE, enclosureParts, normalizeEnclosure, PORT_SIZES, type EnclosureOptions, type EnclosurePort, type EnclosureSide, type PortPreset } from "@/lib/enclosure";
 import { METRIC_SIZES, type MetricSize, type ReadyPart } from "@/lib/readyParts";
 
@@ -51,43 +50,6 @@ export function FitTestCard({ onInsert }: { onInsert: Insert }) {
             ))}
           </div>
           {mine !== null ? <p className="ready-part-note">{t("fitTest.saved", { mm: String(mine) })}</p> : null}
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-/** Build 78: the incisal pin fit test - the Dental Studio articulator's pin socket, once for each fit. */
-export function HingeFitTestCard({ onInsert }: { onInsert: Insert }) {
-  const [open, setOpen] = useState(false);
-  const [mine, setMine] = useState<number | null>(() => (typeof window === "undefined" ? null : readMyPinFit()));
-  return (
-    <>
-      <div className="ready-part ready-part-box" data-ready-part="pin-test">
-        <FitTestPartIcon />
-        <div>
-          <strong>{t("pinTest.title")}</strong>
-          <span>{t("pinTest.hint")}</span>
-        </div>
-        <button type="button" className="ready-part-add" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? t("readyParts.hide") : t("readyParts.setUp")}
-        </button>
-      </div>
-      {open ? (
-        <div className="ready-part-form">
-          <p>{t("pinTest.steps")}</p>
-          <button type="button" className="ready-part-make" onClick={() => onInsert(pinFitTestParts({ block: t("pinTest.block"), pin: t("pinTest.pin") }))}>
-            {t("pinTest.make")}
-          </button>
-          <div className="ready-part-fit" role="group" aria-label={t("pinTest.which")}>
-            <span>{t("pinTest.which")}</span>
-            {PIN_FITS.map((fit) => (
-              <button type="button" key={fit} className={mine === fit ? "active" : ""} aria-pressed={mine === fit} onClick={() => { saveMyPinFit(fit); setMine(fit); }}>
-                {String(fit)}
-              </button>
-            ))}
-          </div>
-          {mine !== null ? <p className="ready-part-note">{t("pinTest.saved", { mm: String(mine) })}</p> : null}
         </div>
       ) : null}
     </>

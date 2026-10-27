@@ -65,6 +65,11 @@ scope.onmessage = async (event: MessageEvent<MeshJobRequest | { archPartFor: num
       delete (trim as { toothCorners?: Uint8Array }).toothCorners;
       const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalTrim", trim };
       scope.postMessage(reply, trim.positions ? [trim.keep.buffer, trim.positions.buffer] : [trim.keep.buffer]);
+    } else if (job.kind === "waxup") {
+      const { guessLandmarks, planWaxup } = await import("@/lib/dentalWaxup");
+      const plan = job.shells ? planWaxup(job.scan, job.shells, job.landmarks, job.options) : null;
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "waxup", plan, landmarks: plan ? plan.landmarks : guessLandmarks(job.scan) };
+      scope.postMessage(reply, plan ? plan.teeth.map((tooth) => tooth.positions.buffer as ArrayBuffer) : []);
     } else if (job.kind === "dentalArea") {
       const { autoDentalArea } = await import("@/lib/dentalArea");
       const crowns = new Uint8Array(Math.floor(job.positions.length / 9));

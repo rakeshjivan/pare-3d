@@ -8,7 +8,7 @@ import { CLICKER_DEFAULT_GAP, CLICKER_GAPS, CLICKER_TOP_HEIGHT, clickerBaseDepth
 import { ForkLithophaneIcon, ForkTraceIcon, ForkVoronoiIcon } from "@/components/forkToolbarIcons";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
-import { EnclosureCard, FitTestCard, HingeFitTestCard } from "@/components/ReadyPartsMore";
+import { EnclosureCard, FitTestCard } from "@/components/ReadyPartsMore";
 import {
   DEFAULT_BOX_WITH_LID,
   INSERT_HOLES,
@@ -315,7 +315,6 @@ export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: Read
           ) : null}
           <h4 className="ready-parts-category">{t("readyParts.cat.helpers")}</h4>
           <FitTestCard onInsert={onInsert} />
-          <HingeFitTestCard onInsert={onInsert} />
           <div className="ready-part">
             <ParaboloidPartIcon />
             <div>

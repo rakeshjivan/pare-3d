@@ -151,7 +151,7 @@ export function ArticulatorPicture({ pinRaise }: { pinRaise: number }) {
   const jx = JX, jy = JY, pinX = PIN_X;
   return (
     <svg className="dental-picture articulator" viewBox="0 -20 244 146" aria-hidden="true">
-      {/* Build 78: the lower model, its ball condyle and the incisal pin standing in its socket: these stay put. */}
+      {/* Build 78: the lower model, its ball condyle and the incisal pin on its boss: these stay put. */}
       <g className="lower-model">
         <path className="lower" d={`M42 ${PLANE + 26} H186 Q190 ${PLANE + 26} 190 ${PLANE + 30} V${PLANE + 48} H38 V${PLANE + 30} Q38 ${PLANE + 26} 42 ${PLANE + 26} Z`} />
         <path className="lower-gum" d={gumBand(LOWER_TEETH, false, PLANE + 28)} />
@@ -159,7 +159,7 @@ export function ArticulatorPicture({ pinRaise }: { pinRaise: number }) {
         <path className="lower" d={`M188 ${PLANE + 34} H${jx + 9} V${PLANE + 48} H188 Z`} />
         <rect className="lower" x={jx - 2.6} y={jy} width="5.2" height={PLANE + 36 - jy} />
         <circle className="lower" cx={jx} cy={jy} r={6.2} />
-        {/* The pin's socket on an arm along the bottom of the lower base, and the pin in it. */}
+        {/* The pin's boss on an arm along the bottom of the lower base, and the pin on it. */}
         <rect className="lower" x={pinX - 8} y={PLANE + 45} width={42} height="3" />
         <rect className="lower" x={pinX - 5} y={TABLE_TOP + 8} width="10" height={PLANE + 46 - TABLE_TOP - 8} />
         <rect className="upper pin" x={pinX - 1.8} y={TABLE_TOP - gap} width="3.6" height={8 + gap} rx="1.8" />
@@ -174,9 +174,9 @@ export function ArticulatorPicture({ pinRaise }: { pinRaise: number }) {
             the keeper's lip under the ball at the front, clear of it; the channel behind is open. */}
         <path className="upper" d={`M${jx - 11} ${PLANE - 42} H${jx + 11} V${jy - 2} H${jx + 4.4} L${jx} ${jy - 8.8} L${jx - 4.4} ${jy - 2} H${jx - 11} Z`} />
         <path className="upper" d={`M${jx - 11} ${jy - 2.5} H${jx - 5.4} A6.8 6.8 0 0 0 ${jx - 3.6} ${jy + 4.6} H${jx - 11} Z`} />
-        {/* The pad the pin's tip rests on. */}
+        {/* Build 79: the cup the pin's tip centres itself in, a cone opening downwards. */}
         <rect className="upper" x={pinX - 8} y={PIN_TOP - 2} width={42} height="3" />
-        <rect className="upper" x={pinX - 5} y={PIN_TOP} width="10" height={TABLE_TOP - PIN_TOP} />
+        <path className="upper" d={`M${pinX - 5} ${PIN_TOP} H${pinX + 5} V${TABLE_TOP + 1.8} H${pinX + 3.6} L${pinX} ${TABLE_TOP - 1.8} L${pinX - 3.6} ${TABLE_TOP + 1.8} H${pinX - 5} Z`} />
       </g>
       {raise > 0 ? (
         <g className="opening">

@@ -4,6 +4,27 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 79,
+    items: [
+      "Dental Studio has a digital diagnostic wax-up (step 3, optional): library teeth set over the front teeth, canine to canine, and joined to the model when you make it. Wax only adds, so a mock-up from the printed model seats over the teeth without preparing any.",
+      "The wax-up follows the order smile design does: you click the midline and the two canine tips; the incisal edges come first (the laterals 0.5 mm shorter, the canine tips following the patient's own smile arc); widths from the space between the midline and the canines; lengths from the central's width-to-length ratio (80%, adjustable). Each tooth stands at least 0.3 mm proud of the patient's.",
+      "A table gives every wax tooth's width, length and ratio, and where the design reaches above the gum: the crown lengthening it asks for. Select a tooth to move it in or out, along the arch, longer or shorter, wider or narrower, or turn it, in 0.25 mm and 2 degree steps - the same tooth on the other side follows unless you turn that off.",
+      "Nine anterior tooth sets from teethy.org come with Pare 3D, with their owner's permission; you can load your own sets too (OBJ or STL, a Meshmixer part, or one file per tooth).",
+      "Every crown point of the scan outside the wax is still checked to the micrometre when the model is made; the points under the wax are counted apart.",
+      "The wax-up blends rather than sitting on the teeth: the contacts are closed without changing any tooth's width, and each tooth's cervical third is feathered into the patient's tooth and gum, with no step, as a technician finishes wax.",
+      "For injection moulding (GC IMT): the table shows how far each design edge stands past the patient's own; the panel warns where unsupported composite would exceed 0.5 mm, and where the patient's edge would show through (reduction needed). An alternate-tooth model (12, 21, 23 first, as GC's sequence) can be made beside the full model for the two-index technique.",
+      "The articulator now locates like a lab articulator: the incisal pin's rounded tip sits in a cone-shaped cup under the upper, one condyle in a groove aimed at it and the other on a flat - six contacts, nothing held twice, so it cannot bind whatever the printer shrinks.",
+      "The incisal pin is now part of the lower model, set to the opening you choose (0 to 10 mm at the pin), so there is nothing to lose or fit. The separate pin set and the pin fit test have gone; to work at another opening, edit the design and make the models again.",
+      "After Make the panel stays open: Edit design brings back the scans, the wax-up and every setting, and Update models makes the models again in place of the old ones. The scans are kept, hidden, with the models: select a model and open Dental Studio to edit its design later.",
+      "Cancel now stops the models being made, at once, leaving everything as it was.",
+      "The pin can stand either side instead: a post each side in the premolar region leaves the front teeth clear to see, photograph and seat an index on (chosen for you with a wax-up). The condyles make a true hinge and the posts only stop it closing. Either way the pin and posts now always stand clear of the teeth - proclined incisors could meet the pin before.",
+      "A second bite scan: take one each side, as the literature recommends, and Dental Studio checks each against the scanner's bite on its own and lines up on both together, never one side alone.",
+      "Scans in Dental Studio, and the models made from them, are grey (#919191); the bite scan stays blue.",
+      "The bite message is plain: a tick when the scanner's bite is kept, with no figure; the warning and Line up on the bite scan appear only when the bite scan clearly disagrees. Line up on the bite scan also works again: the choice was dropped on its way to the background worker.",
+      "The Model Builder Guide covers the wax-up, injection moulding, the new articulator and pins, and editing a design after making it.",
+    ],
+  },
+  {
     build: 78,
     items: [
       "One articulator in Dental Studio, built so it cannot change the scanned bite: the upper rests on three supports and nothing else - a three-point seat on one ball condyle, a groove on the other and the incisal pin - so it closes to the same place every time and cannot rock. No bands or clips: a keeper under each ball, clear of it while closed, stops the upper lifting off. It opens to 90°. The three joint types, the hinge fit, the protrusion path and the guide table are gone.",

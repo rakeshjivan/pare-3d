@@ -489,7 +489,8 @@ describe("Build 60: the raised pin and the opening check", () => {
     const lower = syntheticArch();
     for (let i = 2; i < lower.length; i += 3) lower[i] -= 26.6;
     const inputOf = () => ({ arches: [{ id: "x", positions: Float32Array.from(lower) }, { id: "y", positions: Float32Array.from(upper) }] });
-    const options = { ...base, hinge: true, layout: "occlusion" as const };
+    // (Build 79: the removable pin set, so the lower is the same at every opening - a fused pin grows with it.)
+    const options = { ...base, hinge: true, layout: "occlusion" as const, pinStyle: "set" as const };
     const shut = await makeDentalStudio(inputOf(), options, runtime as never);
     const open = await makeDentalStudio(inputOf(), { ...options, pinRaise: 3 }, runtime as never);
     expect(shut.held).toBeUndefined();

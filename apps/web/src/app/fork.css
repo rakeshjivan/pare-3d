@@ -1925,3 +1925,25 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .dental-studio-panel .dental-card.next { border-color: #2e9e5b; box-shadow: 0 0 0 1px #2e9e5b inset; }
 .dental-studio-panel .dental-card.next:not(.current) { border-left-color: #2e9e5b; }
 .dental-studio-panel .dental-error-help { margin-top: 6px; }
+
+/* Build 79: the wax-up card - the placed teeth, by tooth number. */
+.waxup-card { display: grid; gap: 8px; }
+.waxup-teeth { display: flex; flex-wrap: wrap; gap: 6px; }
+.waxup-tooth { display: inline-flex; align-items: center; gap: 3px; min-width: 40px; justify-content: center; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border, #d4dae3); background: #f1e7d0; color: #3b3226; font-variant-numeric: tabular-nums; cursor: pointer; }
+.waxup-tooth.active { outline: 2px solid #1f6feb; outline-offset: 1px; }
+.waxup-tooth.warn { border-color: #c47a00; }
+.waxup-point-overlay { cursor: crosshair; }
+.waxup-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.waxup-table th, .waxup-table td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--border, #d4dae3); }
+.waxup-table th:first-child, .waxup-table td:first-child { text-align: left; }
+.waxup-table th { font-weight: 600; color: var(--muted, #5b6573); }
+.waxup-adjust { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--border, #d4dae3); border-radius: 8px; }
+.waxup-adjust h5 { margin: 0; font-size: 12px; font-weight: 600; }
+.waxup-adjust-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.waxup-adjust-row button { padding: 5px 8px; border: 1px solid var(--border, #d4dae3); border-radius: 6px; background: transparent; color: inherit; font-size: 12px; cursor: pointer; }
+.waxup-adjust-row button:hover:not(:disabled) { border-color: var(--primary, #1f6feb); }
+
+/* Build 79: Dental Studio after Make - the models made, Edit design or Done. */
+.dental-made { display: grid; gap: 8px; padding: 4px 0; }
+.dental-made .dental-status svg { vertical-align: -2px; color: var(--ok, #2e7d32); }
+.waxup-table td.warn { color: var(--warn, #b45309); font-weight: 600; }
