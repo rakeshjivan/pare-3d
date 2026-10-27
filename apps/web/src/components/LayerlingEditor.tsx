@@ -17,6 +17,7 @@ import { t, type MessageKey } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import { loftShapePatch } from "@/lib/loftGeometry";
 import { hingeWorldParts } from "@/lib/hingeParts";
+import { readMyPinFit } from "@/lib/pinFitTest";
 import { newestClipboard } from "@/lib/clipboardPayload";
 import { GRIDFINITY_CLEARANCE, GRIDFINITY_GRID, GRIDFINITY_HEIGHT_UNIT, MAX_GRIDFINITY_HEIGHT_UNITS, MAX_GRIDFINITY_UNITS, MIN_GRIDFINITY_FLOOR_HEIGHT, gridfinityListPatch, gridfinitySize } from "@/lib/gridfinityGeometry";
 import { DEFAULT_THREAD_PROFILE, defaultThreadHeadHeight, threadSettings } from "@/lib/threadGeometry";
@@ -135,7 +136,6 @@ import { addFreehandStroke } from "@/lib/freehandStroke";
 import { placeCustomShape } from "@/lib/customShapePackage";
 import { buildReadyPart } from "@/lib/readyPartsBuild";
 import { mouseEarsPart, type ReadyPart } from "@/lib/readyParts";
-import { ballFitTestParts, hingeFitTestParts } from "@/lib/hingeFitTest";
 import { MOUSE_EARS_EVENT, type MouseEarsRequest } from "./workplane/MouseEarsCard";
 import { CUT_CONNECTOR_LIMITS, DEFAULT_CUT_CONNECTORS, normalizeCutConnectors, type CutConnectorOptions } from "@/lib/cutConnectors";
 import { NO_SPLIT_ROTATION, modelSplitPlane, snapSplitPositionToVertices, splitOrientationForNormal, splitAxisFromLabel, splitAxisLabel, splitRotationAxes, type SplitRotation } from "@/lib/modelSplit";
@@ -9560,6 +9560,8 @@ export function LayerlingEditor({
     notes: string[];
     /** Build 74: how the scans stand on the plate - side by side (for trimming) or in occlusion. */
     layout?: "side" | "occlusion";
+    /** Build 78: "fit" lines the arches up on the bite scan; otherwise the scanner's bite is kept. */
+    biteMode?: "auto" | "fit";
   };
   const [dentalStudio, setDentalStudio] = useState<DentalStudioState | null>(null);
   const dentalStudioRef = useRef(dentalStudio);
@@ -9603,7 +9605,7 @@ export function LayerlingEditor({
     const known = dentalAreas.current.get(shape.id);
     return known && known.key === dentalAreaKey(shape) ? known.area : null;
   };
-  const dentalInput = useCallback((state: Pick<DentalStudioState, "slots" | "rolesChosen">): DentalStudioInput | null => {
+  const dentalInput = useCallback((state: Pick<DentalStudioState, "slots" | "rolesChosen" | "biteMode">): DentalStudioInput | null => {
     const find = (id: string | null) => (id ? shapesRef.current.find((shape) => shape.id === id) ?? null : null);
     const arches = (["upper", "lower"] as const).map((slot) => ({ slot, shape: find(state.slots[slot]) })).filter((entry) => entry.shape);
     if (!arches.length) return null;
@@ -9656,6 +9658,7 @@ export function LayerlingEditor({
       bite: bite ? scan(bite) : null,
       roles: state.rolesChosen ? roles : undefined,
       ...(locked && fromFile ? { locked: true } : {}),
+      ...(state.biteMode === "fit" ? { biteMode: "fit" as const } : {}),
     };
   }, []);
   /**
@@ -10107,7 +10110,10 @@ export function LayerlingEditor({
       try {
         // Build 71: without the patient's details, no label is engraved and the names are plain.
         const anonymous = state.patientDetails === "remove";
-        const result = await makeDentalStudioInBackground(input, anonymous ? { ...state.options, label: "" } : state.options);
+        // Build 78: the pin fit found with the pin fit test, when there is one.
+        const pinFit = state.options.pinFit ?? readMyPinFit() ?? undefined;
+        const makeOptions = { ...state.options, ...(pinFit !== undefined ? { pinFit } : {}), ...(anonymous ? { label: "" } : {}) };
+        const result = await makeDentalStudioInBackground(input, makeOptions);
         const current = shapesRef.current.filter((shape) => involved.includes(shape.id));
         if (projectShapesFingerprint(current) !== fingerprint) {
           setDentalStudio(null);
@@ -10131,7 +10137,15 @@ export function LayerlingEditor({
           if (lift) for (let i = 1; i < positions.length; i += 3) positions[i] += lift;
           made.set(part.id, canonicalizeShape({ ...shapeWithWorldPositions(shape, positions), name, dental: "model" }));
         });
-        const next = shapesRef.current.map((shape) => made.get(shape.id) ?? (shape.id === state.slots.bite ? { ...shape, hidden: true, dental: "used" as const, ...(anonymous ? { name: t("dental.biteScanPlain") } : {}) } : shape));
+        let next = shapesRef.current.map((shape) => made.get(shape.id) ?? (shape.id === state.slots.bite ? { ...shape, hidden: true, dental: "used" as const, ...(anonymous ? { name: t("dental.biteScanPlain") } : {}) } : shape));
+        // Build 78: the incisal pin set - a part of its own, printed with the models.
+        if (result.pins) {
+          const positions = fromZUp(result.pins.positions, offset);
+          if (lift) for (let i = 1; i < positions.length; i += 3) positions[i] += lift;
+          const pins = canonicalizeShape({ ...shapeWithWorldPositions(meshShapeFromPositions(t("dental.pinSet"), "#8b6fc9", positions), positions), dental: "model" as const });
+          next = [...next, pins];
+          made.set(pins.id, pins);
+        }
         const heights = result.parts.map((part) => part.height.toFixed(1)).join(" / ");
         const kind = t(state.options.inside === "solid" ? "dental.doneSolid" : state.options.inside === "open" ? "dental.doneHollow" : "dental.doneClosed", { wall: state.options.wall.toFixed(1) });
         commitShapes(next, [...made.keys()], t(result.parts.length > 1 ? "dental.donePair" : "dental.done", { height: heights, kind }));
@@ -10141,6 +10155,24 @@ export function LayerlingEditor({
         if (result.opening !== undefined && result.opening >= 30) notes.push(t(result.opening >= 90 ? "dental.opensFully" : "dental.opens", { angle: result.opening }));
         // Build 71: how far a raised pin holds the bite open, at the pin and at the teeth.
         if (result.held) notes.push(t("dental.heldOpen", { pin: result.held.pin.toFixed(1), front: result.held.front.toFixed(1), back: result.held.back.toFixed(1) }));
+        // Build 78: the trueness check on the teeth, the soft tissue relieved, and what the pins do.
+        if (result.trueness?.length) {
+          const points = result.trueness.reduce((sum, part) => sum + part.points, 0);
+          const removed = result.trueness.reduce((sum, part) => sum + part.removed, 0), moved = result.trueness.reduce((sum, part) => sum + part.moved, 0);
+          if (!removed && !moved) notes.push(t("dental.trueTeeth", { points: points.toLocaleString() }));
+          else {
+            const within = result.trueness.reduce((sum, part) => sum + part.within * part.points, 0) / Math.max(1, points);
+            notes.push(t("dental.trueTeethShort", { share: (Math.floor(within * 10000) / 100).toFixed(2), points: points.toLocaleString() }));
+            if (removed) notes.push(t("dental.trueTeethRemoved", { count: removed.toLocaleString() }));
+            if (moved) notes.push(t("dental.trueTeethMoved", { count: moved.toLocaleString(), worst: Math.max(...result.trueness.map((part) => part.worst)).toFixed(3) }));
+          }
+        }
+        const relievedArea = (result.relieved ?? []).reduce((sum, area) => sum + area, 0);
+        if (relievedArea >= 1) notes.push(t("dental.relieved", { area: Math.round(relievedArea) }));
+        const contactArea = (result.contactArea ?? []).reduce((sum, area) => sum + area, 0);
+        if (contactArea >= 1) notes.push(t("dental.toothOnGum", { area: Math.round(contactArea) }));
+        const pin3 = result.pinTable?.find((row) => row.pin === 3);
+        if (pin3) notes.push(t("dental.pinSetNote", { front: pin3.front.toFixed(1), back: pin3.back.toFixed(1) }));
         if (notes.length) setNotice(`${t(result.parts.length > 1 ? "dental.donePair" : "dental.done", { height: heights, kind })} ${notes.join(" ")}`);
         setDentalStudio(null);
       } catch (error) {
@@ -16328,6 +16360,7 @@ export function LayerlingEditor({
           onView={showDentalView}
           layout={dentalStudio.layout}
           onLayout={layOutDentalScans}
+          onFitBite={() => { if (dentalStudio) analyseDentalStudio({ ...dentalStudio, biteMode: "fit" }); }}
           biteLocked={Boolean(dentalStudio.analysis?.pair?.bite?.locked)}
           onRestore={(slot) => void restoreDentalScan(slot)}
           areaShown={dentalAreaShown}
@@ -16372,17 +16405,6 @@ export function LayerlingEditor({
           }}
           onNewPatient={onNewDentalDesign}
           modelsHere={shapes.some((shape) => shape.dental === "model")}
-          onHingeTest={() => {
-            // In front of what is on the plate (the scans), not on top of it: the test is 112 x 34 mm,
-            // so on most plates it fits beside a pair this way.
-            const origin = placementWorkplaneRef.current.origin;
-            const edge = shapesRef.current.filter((shape) => !shape.hidden).reduce((least, shape) => Math.min(least, shape.z - Math.max(shape.width, shape.depth) / 2), Infinity);
-            const at = Number.isFinite(edge) ? { ...origin, z: edge - 24 } : undefined;
-            // Build 63: the test for the joint chosen - ball condyles unless the clip and axle is.
-            const joint = dentalStudio?.options.hingeJoint ?? "ball";
-            const parts = joint === "axle" ? hingeFitTestParts({ strip: t("hingeTest.strip"), clip: t("hingeTest.clip") }) : ballFitTestParts({ strip: t("hingeTest.ballStrip"), clip: t("hingeTest.ballClip") }, joint);
-            void insertReadyParts(parts, at ? { at } : {});
-          }}
           onCancel={() => { stopDentalTrim(); setDentalStudio((current) => (current?.stage === "making" || current?.stage === "trimming" ? current : null)); }}
         />
       ) : null}

@@ -4,6 +4,19 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 78,
+    items: [
+      "One articulator in Dental Studio, built so it cannot change the scanned bite: the upper rests on three supports and nothing else - a three-point seat on one ball condyle, a groove on the other and the incisal pin - so it closes to the same place every time and cannot rock. No bands or clips: a keeper under each ball, clear of it while closed, stops the upper lifting off. It opens to 90°. The three joint types, the hinge fit, the protrusion path and the guide table are gone.",
+      "The incisal pins print with the models as a set - 0 (the scanned bite) to 6 mm, engraved - and drop into a keyed socket, one way only. Swap a pin to open the bite; the note after making says how far each pin parts the front and back teeth. Ready-made parts has a pin fit test to set the socket for your printer.",
+      "The bite is kept exactly as your scanner exported it: arches that arrive in occlusion are no longer fitted to the bite scan again (that moved the lower 0.2 to 0.7 mm on our test sets). The panel says how closely the bite scan agrees, warns when it is more than 0.2 mm off, and offers Line up on the bite scan.",
+      "Every model is checked against its scan before it is handed over: the note says how many crown points there were and that every one is where the scan put it, or, if not, how many and where to look.",
+      "Retromolar pads and tuberosities that would meet the other model's soft tissue in the bite are trimmed 0.5 mm, as a technician trims a cast's heels, so soft tissue cannot hold the models open. Gum that teeth meet, such as the palate under a deep overbite, is never trimmed, and the note says where it happens. The orthodontic records preset keeps the scans exactly as captured.",
+      "The Articulator plate base is now called Plate base (metal articulator), so it is not mistaken for the printed articulator.",
+      "The Model Builder Guide has an Accuracy section, how to print and use the articulator, and a protocol for checking how accurately a printed articulator closes.",
+      "English is now the master of the interface's wording: other languages show the English sentence wherever theirs has not caught up.",
+    ],
+  },
+  {
     build: 77,
     items: [
       "Dental Studio has the Model Builder Guide as a PDF to download, 28 pages with every screen and setting: the download button in its title bar, and a link in the first step before any scan is in.",

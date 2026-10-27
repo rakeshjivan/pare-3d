@@ -15,9 +15,10 @@
  */
 import * as THREE from "three";
 import { getManifoldRuntime } from "@/lib/editorMeshCore";
-import { alignToBite, archFrame, canineWidth, cleanScan, frontOf, isPartialArch, marginUp, pairFrame, palateScore, type CleanArch, type CleanReport } from "@/lib/dentalArch";
-import { blockOutline, cleanOutline, closeToFloor, distanceFrom, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, bevelCutter, hingeOpening, hingeParts, HINGE_CLEARANCE, withoutDebris, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
+import { alignToBite, archFrame, biteResidual, contacts, vertexNormals, canineWidth, cleanScan, frontOf, isPartialArch, marginUp, pairFrame, palateScore, type CleanArch, type CleanReport } from "@/lib/dentalArch";
+import { blockOutline, cleanOutline, closeToFloor, distanceFrom, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, bevelCutter, hingeOpening, withoutDebris, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
+import { articulatorParts, incisalPins, PIN_MAX, PIN_SET, restAngle } from "@/lib/dentalArticulator";
 import {
   applyMatrix, boundaryLoops, cloneMesh, convexHull, cutAlongField, cutBelow, dropFragments, smoothField, faceArea, loopLength, surfaceKept, pinchedEdges, PointGrid, solidPositions, toManifold, upwardness, weld,
   type ManifoldRuntime, type ManifoldSolid, type Mesh, type Ring,
@@ -51,6 +52,11 @@ export type DentalStudioInput = {
    * cutting the palate away cannot move the bite.
    */
   locked?: boolean;
+  /**
+   * Build 78: arches the scanner exported in occlusion keep that bite ("auto"); "fit" lines them up on
+   * the bite scan instead, as before build 78.
+   */
+  biteMode?: "auto" | "fit";
 };
 
 /** `depth`: how much of the scan is kept by default below the occlusal plane; `teeth`: the least that may be kept - 2 mm under the lowest tooth surface; `above`: how far the tallest tooth stands above the occlusal plane (mm). */
@@ -60,7 +66,7 @@ export type DentalArchInfo = { id: string; role: DentalRole; report: CleanReport
 export type DentalAnalysis = {
   arches: DentalArchInfo[];
   /** `apart`: the two scans do not share the scanner's coordinates, so each is set up on its own. */
-  pair: null | { inOcclusion: boolean; apart: boolean; contacts: number; bite: null | { rms: number; overlap: number; fitted: boolean; locked?: boolean; fit?: Record<string, number[]> } };
+  pair: null | { inOcclusion: boolean; apart: boolean; contacts: number; bite: null | { rms: number; overlap: number; fitted: boolean; locked?: boolean; /** Build 78: the scanner's own bite was kept; `rms` is then how far the arches stand from the bite scan as exported. */ kept?: boolean; fit?: Record<string, number[]> } };
 };
 
 export type DentalStudioOptions = {
@@ -71,22 +77,16 @@ export type DentalStudioOptions = {
   baseStyle: DentalBaseStyle;
   inside: DentalInside;
   wall: number;
-  /** A pair only: the printed snap-on hinge. */
+  /** A pair only: the printed articulator (build 78: kinematic seats and the incisal pin, lib/dentalArticulator). */
   hinge: boolean;
-  /** Build 58: the fit round the hinge's axle, mm (HINGE_FITS); 0.15 when left out. */
-  hingeFit?: number;
-  /** Build 58: the stop at the front that sets the closed bite; on when left out. */
-  incisalStop?: boolean;
-  /** Build 63: snap-in ball condyles (the default), drop-in ball condyles, or the clip and axle. */
-  hingeJoint?: "ball" | "dropin" | "axle";
+  /** Build 78: the fit round the incisal pin in its socket, mm a side (the pin fit test); PIN_FIT when left out. */
+  pinFit?: number;
+  /** Build 78: soft tissue that would meet the other model in the bite is cut back; on unless false. */
+  relief?: boolean;
   /** Build 62: a bevel round the foot of the base for the build plate; on when left out. */
   bevel?: boolean;
-  /** Build 60: the protrusion path, degrees (HINGE_CONDYLE_ANGLES); 0 or left out for a plain hinge. */
-  condyle?: number;
-  /** Build 60: the incisal pin raised this much, mm, at the pin (build 71: 0 to INCISAL_PIN_MAX); 0 when left out. */
+  /** Build 60: the incisal pin raised this much, mm, at the pin (build 71: 0 to PIN_MAX); the occlusion view stands on it and the pin set includes it. 0 when left out. */
   pinRaise?: number;
-  /** Build 60: a flat incisal table, or one sloped as a guide; flat when left out. */
-  incisalTable?: "flat" | "guide";
   /** A pair only: laid out base-down for printing, or upper on lower in occlusion. */
   layout: "print" | "occlusion";
   /** Engraved on the base; U or L goes in front for a pair. Empty for none. */
@@ -114,7 +114,7 @@ const SMOOTH_ROUNDS: Record<DentalSmooth, number> = { off: 0, low: 3, high: 10 }
 
 export type DentalPart = { id: string; role: DentalRole; positions: Float32Array; height: number; volume: number };
 /** `surface`: per part, the share of the scan's surface kept above each depth (mm below the occlusal plane). */
-export type DentalStudioResult = { parts: DentalPart[]; worn: number; keptDepth: number[]; voxel: number | null; warnings: string[]; surface: Array<Record<number, number>>; /** Build 60: how far the printed articulator opens, degrees. */ opening?: number; /** Build 65: the solid pieces each part is made of - 1 when it holds together. */ pieces?: number[]; /** Build 71: a raised pin holds the bite open this much, mm: at the pin, the front teeth and the back teeth. */ held?: { pin: number; front: number; back: number } };
+export type DentalStudioResult = { parts: DentalPart[]; worn: number; keptDepth: number[]; voxel: number | null; warnings: string[]; surface: Array<Record<number, number>>; /** Build 60: how far the printed articulator opens, degrees. */ opening?: number; /** Build 65: the solid pieces each part is made of - 1 when it holds together. */ pieces?: number[]; /** Build 71: a raised pin holds the bite open this much, mm: at the pin, the front teeth and the back teeth. */ held?: { pin: number; front: number; back: number }; /** Build 78: the incisal pin set, laid out to print, and what each pin does. */ pins?: { positions: Float32Array; raises: number[] }; pinTable?: Array<{ pin: number; front: number; back: number }>; /** Build 78: per part, how the scan's crowns came through (toothTrueness). */ trueness?: ToothTrueness[]; /** Build 78: per part, soft tissue cut back clear of the other model in the bite, mm². */ relieved?: number[]; /** Build 78: per part, soft tissue the other model's teeth meet in the bite (kept as a contact), mm². */ contactArea?: number[] };
 
 /** Whether a mesh looks like a raw scan: an open surface with one long open edge. */
 export function looksLikeDentalScan(positions: ArrayLike<number>): boolean {
@@ -277,7 +277,12 @@ function prepare(input: DentalStudioInput): Prepared {
   let upper = cleaned[upperIndex].clean, lower = cleaned[1 - upperIndex].clean;
   let bite: NonNullable<DentalAnalysis["pair"]>["bite"] = null;
   if (input.locked) bite = { rms: 0, overlap: 1, fitted: true, locked: true };
-  else if (input.bite && input.bite.length >= 9 * 100) {
+  else if (input.bite && input.bite.length >= 9 * 100 && input.biteMode !== "fit" && contacts(upper.mesh, lower.mesh).length >= 30) {
+    // Build 78: the scanner exported the arches in occlusion - its bite is kept exactly, never refitted.
+    const biteMesh = weld(input.bite);
+    const [u, l] = [biteResidual(upper.mesh, biteMesh), biteResidual(lower.mesh, biteMesh)];
+    bite = { rms: Math.max(u.rms, l.rms), overlap: Math.min(u.overlap, l.overlap), fitted: false, kept: true };
+  } else if (input.bite && input.bite.length >= 9 * 100) {
     const biteMesh = weld(input.bite);
     const fitUpper = alignToBite(upper.mesh, biteMesh);
     const fitLower = alignToBite(lower.mesh, biteMesh);
@@ -339,7 +344,7 @@ function inputKey(input: DentalStudioInput) {
     for (let i = 0; i < p.length; i += step) s += p[i] * ((i % 7) + 1);
     return `${p.length}:${s.toFixed(4)}`;
   };
-  return JSON.stringify([input.arches.map((a) => [a.id, sum(a.positions)]), input.bite ? sum(input.bite) : null, input.roles ?? {}, Boolean(input.locked)]);
+  return JSON.stringify([input.arches.map((a) => [a.id, sum(a.positions)]), input.bite ? sum(input.bite) : null, input.roles ?? {}, Boolean(input.locked), input.biteMode ?? "auto"]);
 }
 
 function prepared(input: DentalStudioInput): Prepared {
@@ -376,6 +381,53 @@ function teethFootprint(m: Mesh, frame: THREE.Matrix4, toCommon: THREE.Matrix4, 
   return out;
 }
 
+/**
+ * Build 78: how the scan's crowns came through into a finished model. `points`: crown points (the
+ * arch's frame); `turn`: from there to the model's frame. `within` is the share of them on the model's
+ * surface within TRUE_WITHIN mm; `worst` the furthest any lies from it, mm.
+ */
+/** Whether (x, y) lies inside the rings (even-odd) by at least `margin` from every edge. */
+function insideRings(rings: Ring[], x: number, y: number, margin: number) {
+  let inside = false;
+  for (const ring of rings) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+      const [ax, ay] = ring[j], [bx, by] = ring[i];
+      if ((by > y) !== (ay > y) && x < ((ax - bx) * (y - by)) / (ay - by) + bx) inside = !inside;
+      const dx = bx - ax, dy = by - ay, len = dx * dx + dy * dy;
+      const t = len ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len)) : 0;
+      if (Math.hypot(ax + t * dx - x, ay + t * dy - y) < margin) return false;
+    }
+  }
+  return inside;
+}
+export type ToothTrueness = { points: number; within: number; worst: number; /** Points with no surface near them: left out with a speck too small to print. */ removed: number; /** Points the surface is near but not on; `worst` is the furthest of these, mm. */ moved: number };
+export const TRUE_WITHIN = 0.001;
+export function toothTrueness(solid: ManifoldSolid, points: Float64Array, turn: THREE.Matrix4 | null): ToothTrueness {
+  const mesh = solid.getMesh();
+  const stride = mesh.numProp, props = mesh.vertProperties;
+  const verts = new Float64Array((props.length / stride) * 3);
+  for (let i = 0, j = 0; i < props.length; i += stride, j += 3) { verts[j] = props[i]; verts[j + 1] = props[i + 1]; verts[j + 2] = props[i + 2]; }
+  const grid = new PointGrid(verts, 0.5);
+  const p = new THREE.Vector3();
+  let within = 0, worst = 0, removed = 0, moved = 0;
+  const n = points.length / 3;
+  for (let i = 0; i < n; i += 1) {
+    p.set(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]);
+    if (turn) p.applyMatrix4(turn);
+    const hit = grid.nearest(p.x, p.y, p.z);
+    const d = hit ? hit[1] : Infinity;
+    if (d <= TRUE_WITHIN) within += 1;
+    else if (d > 0.5) removed += 1;
+    else { moved += 1; worst = Math.max(worst, d); }
+  }
+  return { points: n, within: n ? within / n : 1, worst, removed, moved };
+}
+
+/** Build 78: soft tissue is cut back this far from the other model in the bite, mm. */
+export const SOFT_TISSUE_CLEARANCE = 0.5;
+/** Build 78: soft tissue is trimmed only behind this arch's rearmost tooth, less this, mm. */
+export const SOFT_TISSUE_BEHIND = 2;
+
 /** Build 77: the horseshoe under a quadrant opposite a full arch - its band, how far it reaches past the full arch's base, its thickness (mm). */
 export const HORSESHOE_BAND = 8;
 export const HORSESHOE_MARGIN = 0.5;
@@ -396,7 +448,7 @@ function engrave(runtime: ManifoldRuntime, solid: ManifoldSolid, text: string, h
   return result;
 }
 
-type Built = { solid: ManifoldSolid; floor: number; top: number; footprint: Ring[]; worn: number; keptDepth: number; voxel: number | null; warnings: string[]; kept: Record<number, number> };
+type Built = { solid: ManifoldSolid; floor: number; top: number; footprint: Ring[]; worn: number; keptDepth: number; voxel: number | null; warnings: string[]; kept: Record<number, number>; /** Build 78: the scan's crown points, in the arch's frame, for the trueness check. */ crownPoints: Float64Array; /** Build 78: soft tissue cut back clear of the other model, mm². */ relieved: number; /** Build 78: soft tissue the other model's teeth meet in the bite, kept as a contact, mm². */ contactArea: number };
 
 function buildArch(
   runtime: ManifoldRuntime,
@@ -406,6 +458,7 @@ function buildArch(
   ortho: Ring | null,
   labelLine: string,
   area?: Uint8Array,
+  opponent?: { mesh: Mesh; teeth: Uint8Array; normals: Float64Array } | null,
 ): Built {
   const warnings: string[] = [];
   const m = cloneMesh(arch.clean.mesh);
@@ -469,6 +522,62 @@ function buildArch(
     teeth = grown;
     dropFragments(cut, 0.05, teeth);
   }
+  // Build 78: soft tissue that would stop the models closing, trimmed as a technician trims a cast's
+  // heels: only behind the last teeth (the retromolar pad, the tuberosity), and only where it would
+  // meet the other model's soft tissue - cut back SOFT_TISSUE_CLEARANCE clear of it.
+  // Soft tissue the other arch's teeth meet (the palate under a deep overbite) is never trimmed: that
+  // contact tells the dentist how far the bite can be opened. This arch's own teeth are never touched.
+  let relieved = 0, contactArea = 0;
+  if (opponent && opponent.mesh.v.length) {
+    const { mesh: other, teeth: otherTeeth, normals } = opponent;
+    const grid = new PointGrid(other.v, 2);
+    const field = new Float64Array(cut.v.length / 3);
+    const nearTooth = new Uint8Array(field.length);
+    // Behind the last teeth: further back (+y) than this arch's rearmost tooth, less a little.
+    let teethBack = -Infinity;
+    for (let i = 0; i < field.length; i += 1) if (teeth[i]) teethBack = Math.max(teethBack, cut.v[i * 3 + 1]);
+    const behind = teethBack - SOFT_TISSUE_BEHIND;
+    let any = false;
+    for (let i = 0; i < field.length; i += 1) {
+      field[i] = 10;
+      if (teeth[i]) continue;
+      const x = cut.v[i * 3], y = cut.v[i * 3 + 1], z = cut.v[i * 3 + 2];
+      const hit = grid.nearest(x, y, z);
+      if (!hit) continue;
+      const q = hit[0];
+      if (otherTeeth[q]) {
+        // The other arch's tooth on this gum: kept as it is, and counted.
+        const side = (x - other.v[q * 3]) * normals[q * 3] + (y - other.v[q * 3 + 1]) * normals[q * 3 + 1] + (z - other.v[q * 3 + 2]) * normals[q * 3 + 2];
+        if (side < 0 || hit[1] < 0.1) nearTooth[i] = 1;
+        continue;
+      }
+      if (y < behind) continue;
+      field[i] = hit[1] - SOFT_TISSUE_CLEARANCE;
+      if (field[i] < 0) any = true;
+    }
+    const area = (mesh: Mesh, mark?: Uint8Array) => {
+      let sum = 0;
+      for (let t = 0; t < mesh.f.length / 3; t += 1) if (!mark || mark[mesh.f[t * 3]] || mark[mesh.f[t * 3 + 1]] || mark[mesh.f[t * 3 + 2]]) sum += faceArea(mesh, t);
+      return sum;
+    };
+    contactArea = area(cut, nearTooth);
+    if (any) {
+      const before = area(cut);
+      const trimmed = cutAlongField(cut, field, teeth);
+      const grown = new Uint8Array(trimmed.v.length / 3);
+      grown.set(teeth.subarray(0, Math.min(teeth.length, grown.length)));
+      cut.v = trimmed.v;
+      cut.f = trimmed.f;
+      teeth = grown;
+      dropFragments(cut, 0.05, teeth);
+      relieved = Math.max(0, before - area(cut));
+    }
+  }
+  // Build 78: the crown points the cuts kept, for the trueness check (taken before the edge is smoothed).
+  // Points in the fringe at the scan's own ragged edge are not counted: that edge is worn smooth by design.
+  const keptKeys = new Set<string>();
+  const fringe = distanceFromEdge(cut, EDGE_FRINGE);
+  for (const i of new Set(cut.f)) if (fringe[i] > EDGE_FRINGE) keptKeys.add(`${cut.v[i * 3]},${cut.v[i * 3 + 1]},${cut.v[i * 3 + 2]}`);
   smoothEdge(cut, SMOOTH_ROUNDS[options.smooth ?? "low"], teeth);
   let closed;
   try {
@@ -497,20 +606,29 @@ function buildArch(
   const keepSolid = (solid: ManifoldSolid) => { made.push(solid); return solid; };
   let solid = keepSolid(toManifold(runtime, closed.mesh));
   let footprint: Ring[] = closed.outline;
+  // Build 78: the outline the scan itself is trimmed to (the trueness check counts only what lies inside it).
+  let trimRings: Ring[] = closed.outline;
+  // ... and the top of any block the base adds: scan below it is inside the base by design.
+  let buried = -Infinity;
   // The outline whose front face carries the label (orthodontic and articulator bases).
   let labelRing: Ring | null = options.baseStyle === "ortho" ? ortho : null;
   if (options.baseStyle === "ortho" && ortho) {
     const block = keepSolid(prism(runtime, ortho, floor, floor + Math.max(DENTAL_MIN_BASE, options.base)));
+    buried = floor + Math.max(DENTAL_MIN_BASE, options.base);
     solid = keepSolid(runtime.Manifold.union(solid, block));
     const trim = keepSolid(prism(runtime, ortho, floor - 0.001, top + 5));
     solid = keepSolid(runtime.Manifold.intersection(solid, trim));
     footprint = [ortho];
+    trimRings = [ortho];
+    trimRings = [ortho];
   } else if (options.baseStyle === "clean" || options.baseStyle === "articulator") {
     // The block fills the outline up to where the scan was cut; above it only the scan shows,
     // trimmed to the same outline.
     const rings = cleanOutline(runtime, cut, teeth, Math.max(0.5, options.gum ?? CLEAN_GUM), { mesh: m, crowns, partial: arch.partial });
     if (rings.length) {
+      trimRings = rings;
       const blockTop = Math.max(floor + Math.max(DENTAL_MIN_BASE, options.base), level);
+      buried = blockTop;
       if (options.baseStyle === "articulator") {
         // The scan trimmed to its outline, standing on a block for a magnetic articulator plate.
         const trim = keepSolid(prismOf(runtime, rings, floor - 0.001, top + 5));
@@ -537,6 +655,7 @@ function buildArch(
     const outer = new runtime.CrossSection([hull], "Positive");
     const inset = outer.offset(-0.3, "Round");
     outer.delete();
+    buried = floor + Math.min(DENTAL_PLATE_THICKNESS, Math.max(DENTAL_MIN_BASE, options.base));
     const slab = keepSolid(inset.extrude(Math.min(DENTAL_PLATE_THICKNESS, Math.max(DENTAL_MIN_BASE, options.base))).translate([0, 0, floor]));
     inset.delete();
     solid = keepSolid(runtime.Manifold.union(solid, slab));
@@ -645,7 +764,11 @@ function buildArch(
   for (let t = 0; t < m.f.length / 3; t += 1) if (scanTeeth[m.f[t * 3]] && scanTeeth[m.f[t * 3 + 1]] && scanTeeth[m.f[t * 3 + 2]]) toothArea += faceArea(m, t);
   kept[-2] = toothArea;
   if (kept[-1] < 0.999) warnings.push("teeth");
-  return { solid: result, floor, top, footprint, worn: closed.worn, keptDepth: Number.isFinite(keptLow) ? -keptLow : keep, voxel, warnings, kept };
+  const crownList: number[] = [];
+  crowns.forEach((inCrown, i) => {
+    if (inCrown && keptKeys.has(`${m.v[i * 3]},${m.v[i * 3 + 1]},${m.v[i * 3 + 2]}`) && m.v[i * 3 + 2] > buried + 0.05 && insideRings(trimRings, m.v[i * 3], m.v[i * 3 + 1], 0.05)) crownList.push(m.v[i * 3], m.v[i * 3 + 1], m.v[i * 3 + 2]);
+  });
+  return { solid: result, floor, top, footprint, worn: closed.worn, keptDepth: Number.isFinite(keptLow) ? -keptLow : keep, voxel, warnings, kept, crownPoints: Float64Array.from(crownList), relieved, contactArea };
 }
 
 /**
@@ -756,7 +879,21 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
       ortho = arch.role === "upper" && shared ? mirrorRing(common) : common;
     }
     const line = userLabel ? (pair ? `${arch.role === "upper" ? "U" : "L"} ${userLabel}` : userLabel) : "";
-    const made = buildArch(runtime, arch, { ...options, base }, -depth, ortho, line, areaOn(arch.id, arch.clean.mesh));
+    // Build 78: the other arch where it stands in the bite, in this arch's frame (the frames differ by FLIP).
+    let opponent: { mesh: Mesh; teeth: Uint8Array; normals: Float64Array } | null = null;
+    if (shared && prep.arches.length === 2 && options.relief !== false) {
+      const other = prep.arches[1 - index];
+      const mesh = cloneMesh(other.clean.mesh);
+      applyMatrix(mesh, other.frame);
+      const otherTeeth = toothZone(mesh, undefined, undefined, undefined, TIP_CEILING);
+      const normals = vertexNormals(mesh);
+      if (upwardness(mesh) < 0) for (let i = 0; i < normals.length; i += 1) normals[i] = -normals[i];
+      applyMatrix(mesh, FLIP);
+      // FLIP turns half a turn about y: x and z change sign.
+      for (let i = 0; i < normals.length; i += 3) { normals[i] = -normals[i]; normals[i + 2] = -normals[i + 2]; }
+      opponent = { mesh, teeth: otherTeeth, normals };
+    }
+    const made = buildArch(runtime, arch, { ...options, base }, -depth, ortho, line, areaOn(arch.id, arch.clean.mesh), opponent);
     if (mode.only !== undefined) {
       mode.take?.(archPartOf(made));
       made.solid.delete();
@@ -803,6 +940,9 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
   let opening: number | undefined;
   let rest: { degrees: number; axleY: number } | null = null;
   let held: { pin: number; front: number; back: number } | undefined;
+  let pinSet: { positions: Float32Array; raises: number[] } | undefined;
+  let pinGeometry: { axleY: number; pinY: number } | null = null;
+  let pinTable: Array<{ pin: number; front: number; back: number }> | undefined;
   let solids = built.map(({ arch, built: b }) => {
     if (!pair || arch.role === "lower") return b.solid;
     const moved = transformSolid(b.solid, FLIP);
@@ -849,9 +989,8 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
       return least;
     };
     const upperY = frontAt("upper"), lowerY = frontAt("lower");
-    // Build 77: on a horseshoe the pin is the third support, so it is always there.
-    const stop = (options.incisalStop !== false || horseshoe) && Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY } : null;
-    const motion = { condyle: options.condyle ?? 0, pinRaise: options.pinRaise ?? 0, table: options.incisalTable ?? "flat", joint: options.hingeJoint ?? "ball" } as const;
+    // Build 78: the incisal pin is one of the articulator's three supports, so it is always there.
+    const stop = Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY } : null;
     // Build 65: each model's heels - its rearmost point either side of the middle - so the hinge's
     // bar reaches both, however unevenly a horseshoe's two ends stop.
     const mid = (xMin + xMax) / 2;
@@ -866,7 +1005,16 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
       });
       return best.filter((heel): heel is { x: number; y: number } => heel !== null);
     };
-    const parts = hingeParts(runtime, back, xMin, xMax, depth, -depth, options.hingeFit ?? HINGE_CLEARANCE, stop, motion, { upper: heelsOf("upper"), lower: heelsOf("lower") });
+    // Build 78: the one articulator - kinematic seats and the incisal pin (lib/dentalArticulator).
+    const raise = Math.max(0, Math.min(PIN_MAX, options.pinRaise ?? 0));
+    const parts = articulatorParts(runtime, back, xMin, xMax, depth, -depth, stop, raise, { upper: heelsOf("upper"), lower: heelsOf("lower") }, options.pinFit);
+    if (stop && Number.isFinite(parts.pinY)) {
+      const raises = [...new Set([...PIN_SET, raise])].sort((a, b) => a - b);
+      const set = incisalPins(runtime, raises, parts.axleY, parts.pinY, parts.bossTop);
+      pinSet = { positions: solidPositions(set), raises };
+      set.delete();
+      pinGeometry = { axleY: parts.axleY, pinY: parts.pinY };
+    }
     solids = built.map(({ arch }, i) => {
       const joined = runtime.Manifold.union(solids[i], arch.role === "upper" ? parts.upper : parts.lower);
       toFree.push(solids[i]);
@@ -877,9 +1025,8 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     const upperIndex = built.findIndex(({ arch }) => arch.role === "upper");
     opening = hingeOpening(runtime, solids[upperIndex], solids[1 - upperIndex], parts.axleY, 90, parts.rest);
     // Build 71: on a raised pin the upper rests turned open about the axle; how far the teeth part.
-    if (parts.rest > 0 && stop) {
-      rest = { degrees: parts.rest, axleY: parts.axleY };
-      const sin = Math.sin(parts.rest * Math.PI / 180);
+    // Build 78: worked out for every pin in the set, so the panel can show what each one does.
+    if (stop && pinGeometry) {
       // At the teeth: the incisal edges and the last molars' cusps - the upper's points within
       // 1.5 mm of the occlusal plane, the furthest forward and (5 mm in) the furthest back.
       let teethFront = Infinity, teethBack = -Infinity;
@@ -888,11 +1035,23 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
         teethFootprint(upperArch.clean.mesh, upperArch.frame, shared ? FLIP : new THREE.Matrix4(), 1.5).forEach(([, y]) => { teethFront = Math.min(teethFront, y); teethBack = Math.max(teethBack, y); });
       }
       if (!Number.isFinite(teethFront)) { teethFront = stop.upperY; teethBack = Math.max(...heelsOf("upper").map((heel) => heel.y)); }
-      const at = (y: number) => Math.round(Math.max(0, parts.axleY - y) * sin * 10) / 10;
-      held = { pin: options.pinRaise ?? 0, front: at(teethFront), back: at(teethBack - 5) };
+      const geometry = pinGeometry;
+      const partsAt = (pin: number) => {
+        const sin = Math.sin(restAngle(pin, geometry.axleY, geometry.pinY));
+        const at = (y: number) => Math.round(Math.max(0, geometry.axleY - y) * sin * 10) / 10;
+        return { pin, front: at(teethFront), back: at(teethBack - 5) };
+      };
+      pinTable = (pinSet?.raises ?? []).map(partsAt);
+      if (parts.rest > 0) {
+        rest = { degrees: parts.rest, axleY: parts.axleY };
+        held = partsAt(raise);
+      }
     }
     if (opening < 30) warnings.push("opening");
   }
+  // Build 78: the trueness check - every crown point of the scan, where the scan put it, against the
+  // finished model's surface: the teeth must come through untouched.
+  const trueness = built.map(({ arch, built: b }, i) => toothTrueness(solids[i], b.crownPoints, pair && arch.role === "upper" ? FLIP : null));
   // Lay out: base down on the plate, the upper turned over beside the lower; or upper on lower.
   const out: DentalPart[] = [];
   const pieces: number[] = [];
@@ -950,6 +1109,16 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     const mid = (minX + maxX) / 2;
     out.forEach((part) => { for (let i = 0; i < part.positions.length; i += 3) part.positions[i] -= mid; });
   }
+  // Build 78: the pin set lies on the plate in front of the models, ready to print with them.
+  if (pinSet && out.length) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, minZ = Infinity;
+    out.forEach((part) => { for (let i = 0; i < part.positions.length; i += 3) { minX = Math.min(minX, part.positions[i]); maxX = Math.max(maxX, part.positions[i]); minY = Math.min(minY, part.positions[i + 1]); minZ = Math.min(minZ, part.positions[i + 2]); } });
+    const p = pinSet.positions;
+    let px0 = Infinity, px1 = -Infinity, py1 = -Infinity, pz0 = Infinity;
+    for (let i = 0; i < p.length; i += 3) { px0 = Math.min(px0, p[i]); px1 = Math.max(px1, p[i]); py1 = Math.max(py1, p[i + 1]); pz0 = Math.min(pz0, p[i + 2]); }
+    const dx = (minX + maxX) / 2 - (px0 + px1) / 2, dy = minY - 10 - py1, dz = minZ - pz0;
+    for (let i = 0; i < p.length; i += 3) { p[i] += dx; p[i + 1] += dy; p[i + 2] += dz; }
+  }
   toFree.forEach((solid) => { try { solid.delete(); } catch { /* gone */ } });
   return {
     parts: out,
@@ -960,6 +1129,11 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     warnings,
     ...(opening !== undefined ? { opening } : {}),
     ...(held ? { held } : {}),
+    ...(pinSet ? { pins: pinSet } : {}),
+    ...(pinTable ? { pinTable } : {}),
+    trueness,
+    relieved: built.map(({ built: b }) => Math.round(b.relieved)),
+    contactArea: built.map(({ built: b }) => Math.round(b.contactArea)),
     pieces,
   };
 }

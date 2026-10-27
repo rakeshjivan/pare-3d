@@ -44,41 +44,6 @@ export function BaseStylePicture({ style }: { style: DentalBaseStyle }) {
   );
 }
 
-/** Each articulator joint cut through the middle, the upper's part above, the lower's below (viewBox 0 0 48 40). */
-export function JointPicture({ joint }: { joint: "ball" | "dropin" | "axle" }) {
-  if (joint === "axle") {
-    return (
-      <svg className="dental-picture joint" viewBox="0 0 48 40" aria-hidden="true">
-        {/* The clip from the upper, round the axle, open below. */}
-        <path className="upper" d="M14 2 H34 V24 H28 A6 6 0 1 0 20 24 H14 Z" />
-        <rect className="lower" x="8" y="22" width="5" height="16" />
-        <rect className="lower" x="35" y="22" width="5" height="16" />
-        <circle className="lower" cx="24" cy="20" r="4" />
-        <rect className="lower" x="6" y="34" width="36" height="5" />
-      </svg>
-    );
-  }
-  return (
-    <svg className="dental-picture joint" viewBox="0 0 48 40" aria-hidden="true">
-      {joint === "ball" ? (
-        <>
-          {/* The cup, and the two tongues that reach under the ball. */}
-          <path className="upper" d="M10 2 H38 V18 H33 A9 9 0 0 0 15 18 H10 Z" />
-          <path className="upper tongue" d="M9 6 H12.5 V21 Q14 22 15 21.5 L15.5 23.5 Q12 25 9 23 Z" />
-          <path className="upper tongue" d="M39 6 H35.5 V21 Q34 22 33 21.5 L32.5 23.5 Q36 25 39 23 Z" />
-        </>
-      ) : (
-        <>
-          {/* The seat, with the channel the ball comes in by, slanting down and back. */}
-          <path className="upper" d="M8 2 H40 V22 L36 22 L40 34 L30 34 L28 26 A9 9 0 0 1 15 24 L8 24 Z" />
-        </>
-      )}
-      <circle className="lower" cx="24" cy="18" r="8" />
-      <rect className="lower" x="21.5" y="24" width="5" height="10" />
-      <rect className="lower" x="10" y="33" width="28" height="6" />
-    </svg>
-  );
-}
 
 /**
  * The articulator from the side, from its settings (viewBox 0 0 200 92): the upper above the lower,
@@ -179,62 +144,42 @@ export function articulatorOpening(raise: number) {
   return { degrees: (a * 180) / Math.PI, front: part(44, PLANE), back: part(186, PLANE) };
 }
 
-export function ArticulatorPicture({ joint, condyle, stop, pinRaise, table }: { joint: "ball" | "dropin" | "axle"; condyle: number; stop: boolean; pinRaise: number; table: "flat" | "guide" }) {
-  const raise = stop ? Math.max(0, Math.min(10, pinRaise)) : 0;
+export function ArticulatorPicture({ pinRaise }: { pinRaise: number }) {
+  const raise = Math.max(0, Math.min(10, pinRaise));
   const gap = raise * 2.6;
   const { degrees } = articulatorOpening(raise);
   const jx = JX, jy = JY, pinX = PIN_X;
-  const angle = (condyle * Math.PI) / 180;
-  const path = { x: jx - Math.cos(angle) * 20, y: jy + Math.sin(angle) * 20 };
   return (
     <svg className="dental-picture articulator" viewBox="0 -20 244 146" aria-hidden="true">
-      {/* The lower model and its half of the joint and the pin: these stay put. */}
+      {/* Build 78: the lower model, its ball condyle and the incisal pin standing in its socket: these stay put. */}
       <g className="lower-model">
         <path className="lower" d={`M42 ${PLANE + 26} H186 Q190 ${PLANE + 26} 190 ${PLANE + 30} V${PLANE + 48} H38 V${PLANE + 30} Q38 ${PLANE + 26} 42 ${PLANE + 26} Z`} />
         <path className="lower-gum" d={gumBand(LOWER_TEETH, false, PLANE + 28)} />
         {LOWER_TEETH.map((tooth, i) => <path key={`l${i}`} className="tooth" d={toothPath(tooth, tipOf(tooth), false)} />)}
-        {/* The joint's lower half: a post behind the last molar carrying the ball (or the axle). */}
         <path className="lower" d={`M188 ${PLANE + 34} H${jx + 9} V${PLANE + 48} H188 Z`} />
         <rect className="lower" x={jx - 2.6} y={jy} width="5.2" height={PLANE + 36 - jy} />
-        <circle className="lower" cx={jx} cy={jy} r={joint === "axle" ? 3.4 : 6.2} />
-        {stop ? (
-          <>
-            {/* The incisal table on a thin arm along the bottom of the lower base. */}
-            <rect className="lower" x={pinX - 8} y={PLANE + 45} width={42} height="3" />
-            {table === "guide"
-              ? <path className="lower" d={`M${pinX - 8} ${PLANE + 46} V${TABLE_TOP + 3} L${pinX + 8} ${TABLE_TOP - 3} V${PLANE + 46} Z`} />
-              : <rect className="lower" x={pinX - 8} y={TABLE_TOP} width="16" height={PLANE + 46 - TABLE_TOP} />}
-          </>
-        ) : null}
+        <circle className="lower" cx={jx} cy={jy} r={6.2} />
+        {/* The pin's socket on an arm along the bottom of the lower base, and the pin in it. */}
+        <rect className="lower" x={pinX - 8} y={PLANE + 45} width={42} height="3" />
+        <rect className="lower" x={pinX - 5} y={TABLE_TOP + 8} width="10" height={PLANE + 46 - TABLE_TOP - 8} />
+        <rect className="upper pin" x={pinX - 1.8} y={TABLE_TOP - gap} width="3.6" height={8 + gap} rx="1.8" />
       </g>
-      {/* The upper model, turned about the joint by the raise. */}
+      {/* The upper model, turned about the condyles by the pin's raise: its seats rest on the balls, its pad on the pin. */}
       <g className="upper-model" transform={degrees ? `rotate(${f(degrees)} ${jx} ${jy})` : undefined}>
         <path className="upper" d={`M42 ${PLANE - 28} H190 Q194 ${PLANE - 28} 194 ${PLANE - 32} V${PLANE - 52} H38 V${PLANE - 32} Q38 ${PLANE - 28} 42 ${PLANE - 28} Z`} />
         <path className="upper-gum" d={gumBand(UPPER_TEETH, true, PLANE - 30)} />
         {UPPER_TEETH.map((tooth, i) => <path key={`u${i}`} className="tooth" d={toothPath(tooth, tipOf(tooth), true)} />)}
-        {/* The joint's upper half: an arm from the back of the upper base to the cup (or the clip). */}
         <path className="upper" d={`M192 ${PLANE - 52} H${jx + 11} V${PLANE - 40} H192 Z`} />
-        {joint === "axle"
-          ? <path className="upper" d={`M${jx - 8} ${PLANE - 42} H${jx + 8} V${jy + 4} H${jx + 3.6} A4 4 0 1 0 ${jx - 3.6} ${jy + 4} H${jx - 8} Z`} />
-          : <path className="upper" d={`M${jx - 10} ${PLANE - 42} H${jx + 10} V${jy} H${jx + 6.6} A6.6 6.6 0 0 0 ${jx - 6.6} ${jy} H${jx - 10} Z`} />}
-        {stop ? (
-          <>
-            {/* The incisal pin, on a thin arm along the top of the upper base; longer by the raise. */}
-            <rect className="upper" x={pinX - 8} y={PIN_TOP - 2} width={42} height="3" />
-            <rect className="upper pin" x={pinX - 1.6} y={PIN_TOP} width="3.2" height={TABLE_TOP - PIN_TOP + gap} />
-          </>
-        ) : null}
+        {/* The seat: a block whose V rests on the ball at two points (the other side has three), with
+            the keeper's lip under the ball at the front, clear of it; the channel behind is open. */}
+        <path className="upper" d={`M${jx - 11} ${PLANE - 42} H${jx + 11} V${jy - 2} H${jx + 4.4} L${jx} ${jy - 8.8} L${jx - 4.4} ${jy - 2} H${jx - 11} Z`} />
+        <path className="upper" d={`M${jx - 11} ${jy - 2.5} H${jx - 5.4} A6.8 6.8 0 0 0 ${jx - 3.6} ${jy + 4.6} H${jx - 11} Z`} />
+        {/* The pad the pin's tip rests on. */}
+        <rect className="upper" x={pinX - 8} y={PIN_TOP - 2} width={42} height="3" />
+        <rect className="upper" x={pinX - 5} y={PIN_TOP} width="10" height={TABLE_TOP - PIN_TOP} />
       </g>
-      {condyle > 0 ? (
-        <g className="path">
-          <line x1={jx} y1={jy} x2={path.x} y2={path.y} />
-          <path d={`M${path.x} ${path.y} l${Math.cos(angle) * 5 + Math.sin(angle) * 3} ${-Math.sin(angle) * 5 + Math.cos(angle) * 3} M${path.x} ${path.y} l${Math.cos(angle) * 5 - Math.sin(angle) * 3} ${-Math.sin(angle) * 5 - Math.cos(angle) * 3}`} />
-          <text x={jx + 9} y={jy + 24}>{`${condyle}°`}</text>
-        </g>
-      ) : null}
       {raise > 0 ? (
         <g className="opening">
-          {/* The turn about the joint, and the pin's raise. */}
           <path className="turn" d={`M${jx - 13} ${jy - 18} A22 22 0 0 0 ${jx - 21} ${jy - 5}`} />
           <path className="turn" d={`M${jx - 13} ${jy - 18} l-4.4 0.4 M${jx - 13} ${jy - 18} l-0.2 4.4`} />
           <text className="raise" x={pinX - 8} y={PLANE + 58}>{`+${raise} mm`}</text>

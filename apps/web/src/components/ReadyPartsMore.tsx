@@ -5,8 +5,7 @@ import { t } from "@/lib/i18n";
 import { MmField } from "@/components/ReadyPartsSection";
 import { EnclosurePartIcon, FitTestPartIcon } from "@/components/readyPartIcons";
 import { FIT_TEST_CLEARANCES, fitTestParts, readMyPrintFit, saveMyPrintFit } from "@/lib/fitTest";
-import { ballFitTestParts, hingeFitTestParts, readMyHingeFit, saveMyHingeFit } from "@/lib/hingeFitTest";
-import { HINGE_TEST_FITS } from "@/lib/dentalBase";
+import { pinFitTestParts, PIN_FITS, readMyPinFit, saveMyPinFit } from "@/lib/pinFitTest";
 import { DEFAULT_ENCLOSURE, enclosureParts, normalizeEnclosure, PORT_SIZES, type EnclosureOptions, type EnclosurePort, type EnclosureSide, type PortPreset } from "@/lib/enclosure";
 import { METRIC_SIZES, type MetricSize, type ReadyPart } from "@/lib/readyParts";
 
@@ -58,17 +57,17 @@ export function FitTestCard({ onInsert }: { onInsert: Insert }) {
   );
 }
 
-/** Fork (build 60): the hinge fit test - the dental articulator's bearing, once for each fit. */
+/** Build 78: the incisal pin fit test - the Dental Studio articulator's pin socket, once for each fit. */
 export function HingeFitTestCard({ onInsert }: { onInsert: Insert }) {
   const [open, setOpen] = useState(false);
-  const [mine, setMine] = useState<number | null>(() => (typeof window === "undefined" ? null : readMyHingeFit()));
+  const [mine, setMine] = useState<number | null>(() => (typeof window === "undefined" ? null : readMyPinFit()));
   return (
     <>
-      <div className="ready-part ready-part-box" data-ready-part="hinge-test">
+      <div className="ready-part ready-part-box" data-ready-part="pin-test">
         <FitTestPartIcon />
         <div>
-          <strong>{t("hingeTest.title")}</strong>
-          <span>{t("hingeTest.hint")}</span>
+          <strong>{t("pinTest.title")}</strong>
+          <span>{t("pinTest.hint")}</span>
         </div>
         <button type="button" className="ready-part-add" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? t("readyParts.hide") : t("readyParts.setUp")}
@@ -76,25 +75,19 @@ export function HingeFitTestCard({ onInsert }: { onInsert: Insert }) {
       </div>
       {open ? (
         <div className="ready-part-form">
-          <p>{t("hingeTest.steps")}</p>
-          <button type="button" className="ready-part-make" onClick={() => onInsert(hingeFitTestParts({ strip: t("hingeTest.strip"), clip: t("hingeTest.clip") }))}>
-            {t("hingeTest.make")}
+          <p>{t("pinTest.steps")}</p>
+          <button type="button" className="ready-part-make" onClick={() => onInsert(pinFitTestParts({ block: t("pinTest.block"), pin: t("pinTest.pin") }))}>
+            {t("pinTest.make")}
           </button>
-          <button type="button" className="ready-part-make" onClick={() => onInsert(ballFitTestParts({ strip: t("hingeTest.ballStrip"), clip: t("hingeTest.ballClip") }))}>
-            {t("hingeTest.makeBall")}
-          </button>
-          <button type="button" className="ready-part-make" onClick={() => onInsert(ballFitTestParts({ strip: t("hingeTest.ballStrip"), clip: t("hingeTest.ballClip") }, "dropin"))}>
-            {t("hingeTest.makeDropIn")}
-          </button>
-          <div className="ready-part-fit" role="group" aria-label={t("hingeTest.which")}>
-            <span>{t("hingeTest.which")}</span>
-            {HINGE_TEST_FITS.map((fit) => (
-              <button type="button" key={fit} className={mine === fit ? "active" : ""} aria-pressed={mine === fit} onClick={() => { saveMyHingeFit(fit); setMine(fit); }}>
+          <div className="ready-part-fit" role="group" aria-label={t("pinTest.which")}>
+            <span>{t("pinTest.which")}</span>
+            {PIN_FITS.map((fit) => (
+              <button type="button" key={fit} className={mine === fit ? "active" : ""} aria-pressed={mine === fit} onClick={() => { saveMyPinFit(fit); setMine(fit); }}>
                 {String(fit)}
               </button>
             ))}
           </div>
-          {mine !== null ? <p className="ready-part-note">{t("hingeTest.saved", { mm: String(mine) })}</p> : null}
+          {mine !== null ? <p className="ready-part-note">{t("pinTest.saved", { mm: String(mine) })}</p> : null}
         </div>
       ) : null}
     </>

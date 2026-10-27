@@ -477,122 +477,11 @@ describe("Build 55: a quadrant's front is the end that bends", () => {
   });
 });
 
-describe("Build 58: the hinge sits on two wide bearings, fits close and stops at the bite", () => {
+describe("Build 60: the raised pin and the opening check", () => {
   let runtime: ManifoldToplevel;
   beforeAll(async () => {
     runtime = await manifoldModule();
     runtime.setup();
-  });
-  it("puts a bearing behind each side of a full arch and one in the middle of a quadrant", async () => {
-    const { hingeParts } = await import("@/lib/dentalBase");
-    const count = (solid: { decompose: () => Array<{ delete: () => void }> }) => { const parts = solid.decompose(); parts.forEach((p) => p.delete()); return parts.length; };
-    const wide = hingeParts(runtime, 25, -25, 25, 20, -20);
-    const narrow = hingeParts(runtime, 25, -10, 2, 20, -20);
-    // Upper: a bar with its clips - one piece either way; the clips are what differ.
-    const box = (solid: { boundingBox: () => { min: number[]; max: number[] } }) => solid.boundingBox();
-    expect(box(wide.lower).max[0] - box(wide.lower).min[0]).toBeCloseTo(50, 0);
-    expect(count(wide.upper)).toBe(1);
-    // Two clips under the upper's bar on a full arch: the upper, cut level with the axle, shows two pieces.
-    const slice = (solid: { slice: (z: number) => { toPolygons: () => unknown[]; delete?: () => void } }) => solid.slice(0).toPolygons().length;
-    expect(slice(wide.upper as never)).toBeGreaterThanOrEqual(2);
-    expect(slice(narrow.upper as never)).toBeLessThan(slice(wide.upper as never));
-    // The halves never overlap: the axle turns in the clip with room all round.
-    const overlap = runtime.Manifold.intersection(wide.upper, wide.lower);
-    expect(overlap.volume()).toBeLessThan(0.01);
-    overlap.delete();
-    [wide.upper, wide.lower, narrow.upper, narrow.lower].forEach((s) => s.delete());
-  });
-
-  it("closes the clip round the axle by the chosen fit, and the stop meets in the occlusal plane", async () => {
-    const { hingeParts } = await import("@/lib/dentalBase");
-    const tight = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { x: 0, upperY: -30, lowerY: -30 }, { joint: "axle" });
-    const loose = hingeParts(runtime, 25, -25, 25, 20, -20, 0.3, { x: 0, upperY: -30, lowerY: -30 }, { joint: "axle" });
-    // A looser fit takes more out of the clips.
-    expect(loose.upper.volume()).toBeLessThan(tight.upper.volume());
-    // The stop: the upper reaches down to z = 0 in front of the arch, the lower up to it.
-    const at = (solid: typeof tight.upper, y: number) => {
-      const piece = runtime.Manifold.intersection(solid, runtime.Manifold.cube([6, 2, 60]).translate([-3, y - 1, -30]));
-      const b = piece.boundingBox();
-      piece.delete();
-      return b;
-    };
-    expect(at(tight.upper, -35).min[2]).toBeCloseTo(0, 5);
-    expect(at(tight.lower, -35).max[2]).toBeCloseTo(0, 5);
-    [tight.upper, tight.lower, loose.upper, loose.lower].forEach((s) => s.delete());
-  });
-});
-
-describe("Build 60: protrusion path, incisal pin and guide table, opening check", () => {
-  let runtime: ManifoldToplevel;
-  beforeAll(async () => {
-    runtime = await manifoldModule();
-    runtime.setup();
-  });
-  /** Whether `solid` has material in a 0.4 mm cube round (x, y, z). */
-  const filled = (solid: { volume: () => number }, x: number, y: number, z: number) => {
-    const probe = runtime.Manifold.cube([0.4, 0.4, 0.4], true).translate([x, y, z]);
-    const piece = runtime.Manifold.intersection(solid as never, probe);
-    const v = piece.volume();
-    piece.delete(); probe.delete();
-    return v > 0.03;
-  };
-  it("opens the clip into a slot along the condylar path, and keeps a plain hinge a round bore", async () => {
-    const { hingeParts, hingeAxleY, HINGE_PATH_LENGTH } = await import("@/lib/dentalBase");
-    const plain = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, null, { joint: "axle" });
-    const path = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, null, { condyle: 30, joint: "axle" });
-    const ay = hingeAxleY(25, { condyle: 30, joint: "axle" });
-    expect(path.axleY).toBeCloseTo(ay, 6);
-    expect(plain.axleY).toBeCloseTo(31, 6);
-    // The far end of the path, in the upper's clip: open with the path, solid without it.
-    const c = -25 + 9.5;
-    const ey = ay - HINGE_PATH_LENGTH * Math.cos(Math.PI / 6), ez = -HINGE_PATH_LENGTH * Math.sin(Math.PI / 6);
-    expect(filled(path.upper, c, ey, ez)).toBe(false);
-    expect(filled(plain.upper, c, plain.axleY - HINGE_PATH_LENGTH * Math.cos(Math.PI / 6), ez)).toBe(true);
-    // Still a clip round the slot: material under it and the halves never overlap.
-    expect(filled(path.upper, c, ey, ez - 2.15 - 1)).toBe(true);
-    const overlap = runtime.Manifold.intersection(path.upper, path.lower);
-    expect(overlap.volume()).toBeLessThan(0.01);
-    overlap.delete();
-    [plain.upper, plain.lower, path.upper, path.lower].forEach((s) => s.delete());
-  });
-
-  it("opens the bite on a raised pin by turning the upper about the hinge axle, not lifting it (build 71)", async () => {
-    const { hingeParts } = await import("@/lib/dentalBase");
-    const front = { x: 0, upperY: -30, lowerY: -30 };
-    const flat = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, front, { pinRaise: 3 });
-    const guide = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, front, { pinRaise: 3, table: "guide" });
-    const closed = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, front, {});
-    // The rest angle: the raise over the pin's distance in front of the axle (the pin is 6 mm ahead of the teeth).
-    expect(flat.rest).toBeCloseTo((Math.atan2(3, flat.axleY + 36) * 180) / Math.PI, 6);
-    expect(closed.rest).toBe(0);
-    const overlapAt = (parts: typeof flat, degrees: number) => {
-      const turned = parts.upper.translate([0, -parts.axleY, 0]).rotate([-degrees, 0, 0]).translate([0, parts.axleY, 0]);
-      const both = runtime.Manifold.intersection(turned, parts.lower);
-      const volume = both.volume();
-      both.delete();
-      turned.delete();
-      return volume;
-    };
-    for (const parts of [flat, guide]) {
-      // In the scanned bite the pin runs into the table: it cannot close that far ...
-      expect(overlapAt(parts, 0)).toBeGreaterThan(1);
-      expect(overlapAt(parts, parts.rest - 0.5)).toBeGreaterThan(0.01);
-      // ... and turned up to its rest angle the pin just stands on the table, clear of it beyond.
-      expect(overlapAt(parts, parts.rest + 0.05)).toBeLessThan(0.01);
-      expect(overlapAt(parts, parts.rest + 5)).toBeLessThan(0.01);
-    }
-    // With no raise the halves close on the scanned bite as before.
-    expect(overlapAt(closed, 0)).toBeLessThan(0.01);
-    // The table stays at the occlusal plane; the guide still rises towards the back.
-    const top = (solid: typeof flat.lower, y: number) => {
-      const piece = runtime.Manifold.intersection(solid, runtime.Manifold.cube([2, 0.4, 60]).translate([-1, y - 0.2, -30]));
-      const b = piece.boundingBox();
-      piece.delete();
-      return b;
-    };
-    expect(top(flat.lower, -36).max[2]).toBeCloseTo(0, 4);
-    expect(top(guide.lower, -34).max[2]).toBeGreaterThan(1.5);
-    [flat, guide, closed].forEach((parts) => { parts.upper.delete(); parts.lower.delete(); });
   });
 
   it("stands the upper open on its raised pin in occlusion, more at the front than at the back (build 71)", async () => {
@@ -600,7 +489,7 @@ describe("Build 60: protrusion path, incisal pin and guide table, opening check"
     const lower = syntheticArch();
     for (let i = 2; i < lower.length; i += 3) lower[i] -= 26.6;
     const inputOf = () => ({ arches: [{ id: "x", positions: Float32Array.from(lower) }, { id: "y", positions: Float32Array.from(upper) }] });
-    const options = { ...base, hinge: true, layout: "occlusion" as const, incisalStop: true };
+    const options = { ...base, hinge: true, layout: "occlusion" as const };
     const shut = await makeDentalStudio(inputOf(), options, runtime as never);
     const open = await makeDentalStudio(inputOf(), { ...options, pinRaise: 3 }, runtime as never);
     expect(shut.held).toBeUndefined();
@@ -633,11 +522,12 @@ describe("Build 60: protrusion path, incisal pin and guide table, opening check"
   }, 120_000);
 
   it("finds how far the hinge opens before the parts meet", async () => {
-    const { hingeParts, hingeOpening } = await import("@/lib/dentalBase");
-    const parts = hingeParts(runtime, 25, -25, 25, 20, -20);
+    const { hingeOpening } = await import("@/lib/dentalBase");
+    const { articulatorParts } = await import("@/lib/dentalArticulator");
+    const parts = articulatorParts(runtime as never, 25, -25, 25, 20, -20, null);
     expect(hingeOpening(runtime, parts.upper, parts.lower, parts.axleY)).toBe(90);
     // A wall behind the axle on the lower, standing up into the way of the upper's back bar as it turns down.
-    const wall = runtime.Manifold.cube([50, 2, 22]).translate([-25, parts.axleY + 9, -20]);
+    const wall = runtime.Manifold.cube([50, 2, 22]).translate([-25, parts.axleY + 15, -20]);
     const blocked = runtime.Manifold.union(parts.lower, wall);
     const angle = hingeOpening(runtime, parts.upper, blocked, parts.axleY);
     expect(angle).toBeGreaterThan(0);
@@ -646,38 +536,7 @@ describe("Build 60: protrusion path, incisal pin and guide table, opening check"
   });
 });
 
-describe("Build 61: a slim incisal pin, each half joined to its own base", () => {
-  let runtime: ManifoldToplevel;
-  beforeAll(async () => {
-    runtime = await manifoldModule();
-    runtime.setup();
-  });
-  it("keeps the pin 3 mm across and in front of the further model, and joins a lower that stops short", async () => {
-    const { hingeParts } = await import("@/lib/dentalBase");
-    // The lower's base front is 7 mm behind the upper's: the lower's arm must still reach it.
-    const parts = hingeParts(runtime, 25, -25, 25, 20, -20, 0.15, { x: 0, upperY: -30, lowerY: -23 });
-    const pieces = (solid: typeof parts.lower, base: { delete: () => void } & typeof parts.lower) => {
-      const joined = runtime.Manifold.union(solid, base);
-      const list = joined.decompose();
-      const count = list.length;
-      list.forEach((p) => p.delete()); joined.delete(); base.delete();
-      return count;
-    };
-    const lowerBase = runtime.Manifold.cube([40, 50, 10]).translate([-20, -23, -20]);
-    const upperBase = runtime.Manifold.cube([40, 57, 10]).translate([-20, -30, 10]);
-    expect(pieces(parts.lower, lowerBase)).toBe(1);
-    expect(pieces(parts.upper, upperBase)).toBe(1);
-    // Slim: across the pin at the occlusal plane the upper is 3 mm wide, 6 mm in front of the upper's base.
-    const slab = runtime.Manifold.intersection(parts.upper, runtime.Manifold.cube([60, 30, 1]).translate([-30, -50, 1]));
-    const b = slab.boundingBox();
-    expect(b.max[0] - b.min[0]).toBeLessThan(3.1);
-    expect((b.min[1] + b.max[1]) / 2).toBeCloseTo(-36, 1);
-    slab.delete();
-    [parts.upper, parts.lower].forEach((s) => s.delete());
-  });
-});
-
-describe("Build 62: a bevel round the foot, no debris, and a 10 degree path", () => {
+describe("Build 62: a bevel round the foot, no debris", () => {
   let runtime: ManifoldToplevel;
   beforeAll(async () => {
     runtime = await manifoldModule();
@@ -715,125 +574,6 @@ describe("Build 62: a bevel round the foot, no debris, and a 10 degree path", ()
     [body, hollow, bubble, shelled, fleck, other, all, solid].forEach((s) => s.delete());
   });
 
-  it("offers a 10 degree protrusion path, as Medit's articulator does", async () => {
-    const { HINGE_CONDYLE_ANGLES } = await import("@/lib/dentalBase");
-    expect(HINGE_CONDYLE_ANGLES).toContain(10);
-    expect(HINGE_CONDYLE_ANGLES).toContain(45);
-  });
-});
-
-describe("Build 62: longer clips, end play the fit itself", () => {
-  let runtime: ManifoldToplevel;
-  beforeAll(async () => {
-    runtime = await manifoldModule();
-    runtime.setup();
-  });
-  it("makes each clip 14 mm long with only the fit between it and its posts", async () => {
-    const { hingeParts, HINGE_CLEARANCE } = await import("@/lib/dentalBase");
-    expect(HINGE_CLEARANCE).toBe(0.1);
-    for (const fit of [0.05, 0.1, 0.2]) {
-      const parts = hingeParts(runtime, 25, -25, 25, 20, -20, fit, null, { joint: "axle" });
-      // Level with the axle's top, behind it: the clip on the upper, the posts on the lower.
-      const at = (solid: typeof parts.upper) => {
-        const s = runtime.Manifold.intersection(solid, runtime.Manifold.cube([60, 0.4, 0.4]).translate([-30, parts.axleY + 3, 1]));
-        const polys = s.slice(1.2).toPolygons() as Array<Array<[number, number]>>;
-        s.delete();
-        return polys.map((ring) => [Math.min(...ring.map(([x]) => x)), Math.max(...ring.map(([x]) => x))]).sort((a, b) => a[0] - b[0]);
-      };
-      const clips = at(parts.upper), posts = at(parts.lower);
-      expect(clips).toHaveLength(2);
-      expect(clips[0][1] - clips[0][0]).toBeCloseTo(14, 3);
-      // The gap from the left clip's left end to the post outside it.
-      const gap = clips[0][0] - posts[0][1];
-      expect(gap).toBeCloseTo(fit, 3);
-      [parts.upper, parts.lower].forEach((s) => s.delete());
-    }
-  });
-});
-
-describe("Build 63: ball condyles held by flexing tongues", () => {
-  let runtime: ManifoldToplevel;
-  beforeAll(async () => {
-    runtime = await manifoldModule();
-    runtime.setup();
-  });
-  const filled = (solid: { volume: () => number }, x: number, y: number, z: number) => {
-    const probe = runtime.Manifold.cube([0.1, 0.1, 0.1], true).translate([x, y, z]);
-    const piece = runtime.Manifold.intersection(solid as never, probe);
-    const v = piece.volume();
-    piece.delete(); probe.delete();
-    return v > 0.0005;
-  };
-  it("is the default: two balls on a full arch, one piece each half, nothing touching at rest, opening 90 degrees", async () => {
-    const { hingeParts, hingeOpening, HINGE_BALL_RADIUS: R } = await import("@/lib/dentalBase");
-    const parts = hingeParts(runtime, 25, -25, 25, 20, -20, 0.1);
-    const pieces = (solid: typeof parts.upper) => { const list = solid.decompose(); const n = list.length; list.forEach((p) => p.delete()); return n; };
-    expect(pieces(parts.upper)).toBe(1);
-    expect(pieces(parts.lower)).toBe(1);
-    const overlap = runtime.Manifold.intersection(parts.upper, parts.lower);
-    expect(overlap.volume()).toBeLessThan(0.001);
-    overlap.delete();
-    // A ball either side, on the hinge line.
-    const ay = parts.axleY;
-    const balls = [-1, 1].map((side) => filled(parts.lower, side * (25 - (R + 0.1 + 2.2 + 0.2)), ay, R - 0.2));
-    expect(balls).toEqual([true, true]);
-    expect(hingeOpening(runtime, parts.upper, parts.lower, ay)).toBe(90);
-    [parts.upper, parts.lower].forEach((s) => s.delete());
-  });
-
-  it("holds the ball: the tongues reach in under its widest point, and the gap at the equator is the fit", async () => {
-    const { hingeParts, HINGE_BALL_RADIUS: R } = await import("@/lib/dentalBase");
-    for (const fit of [0.05, 0.1, 0.2]) {
-      const parts = hingeParts(runtime, 25, -25, 25, 20, -20, fit);
-      const c = 25 - (R + fit + 2.2 + 0.2), ay = parts.axleY;
-      // Under the equator, inside the ball's own radius seen from above: the tongue's lip (it goes
-      // as deep as the cup needs for the lip to reach 0.4 mm in from the ball's widest point).
-      const z = -Math.sqrt((R + fit) ** 2 - (R - 0.3) ** 2) - 0.08;
-      expect(filled(parts.upper, c + R - 0.3, ay, z)).toBe(true);
-      expect(filled(parts.upper, c - R + 0.3, ay, z)).toBe(true);
-      // At the equator: free just outside the ball, the tongue just beyond the fit.
-      expect(filled(parts.upper, c + R + fit * 0.5, ay, 0)).toBe(false);
-      expect(filled(parts.upper, c + R + fit + 0.1, ay, 0)).toBe(true);
-      [parts.upper, parts.lower].forEach((s) => s.delete());
-    }
-  });
-});
-
-describe("Build 63: drop-in ball condyles", () => {
-  let runtime: ManifoldToplevel;
-  beforeAll(async () => {
-    runtime = await manifoldModule();
-    runtime.setup();
-  });
-  it("seats each ball through a slanting channel: held in front, at the sides and above, free to lift out back and down", async () => {
-    const { hingeParts, hingeOpening, HINGE_BALL_RADIUS: R, DROP_IN_CHANNEL } = await import("@/lib/dentalBase");
-    const fit = 0.1;
-    const parts = hingeParts(runtime, 25, -25, 25, 20, -20, fit, null, { joint: "dropin" });
-    const pieces = (solid: typeof parts.upper) => { const list = solid.decompose(); const n = list.length; list.forEach((p) => p.delete()); return n; };
-    expect(pieces(parts.upper)).toBe(1);
-    expect(pieces(parts.lower)).toBe(1);
-    const overlap = runtime.Manifold.intersection(parts.upper, parts.lower);
-    expect(overlap.volume()).toBeLessThan(0.001);
-    overlap.delete();
-    expect(hingeOpening(runtime, parts.upper, parts.lower, parts.axleY)).toBe(90);
-    const c = 25 - (R + fit + 2.2 + 0.2), ay = parts.axleY;
-    // The ball, moved along the channel: it never meets the upper on the way out...
-    const tilt = (DROP_IN_CHANNEL * Math.PI) / 180;
-    for (const d of [2, 6, 12]) {
-      const ball = runtime.Manifold.sphere(R, 48).translate([c, ay + Math.sin(tilt) * d, -Math.cos(tilt) * d]);
-      const hit = runtime.Manifold.intersection(ball, parts.upper);
-      expect(hit.volume()).toBeLessThan(0.01);
-      hit.delete(); ball.delete();
-    }
-    // ...but moved any other way - forward, sideways, up, straight down - it does.
-    for (const [mx, my, mz] of [[0, -1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, -0.7, -0.7]]) {
-      const ball = runtime.Manifold.sphere(R, 48).translate([c + mx, ay + my, mz]);
-      const hit = runtime.Manifold.intersection(ball, parts.upper);
-      expect(hit.volume()).toBeGreaterThan(0.01);
-      hit.delete(); ball.delete();
-    }
-    [parts.upper, parts.lower].forEach((s) => s.delete());
-  });
 });
 
 describe("Build 65: the hinge reaches both heels of a horseshoe", () => {
@@ -843,19 +583,17 @@ describe("Build 65: the hinge reaches both heels of a horseshoe", () => {
     runtime.setup();
   });
   it("joins a heel that stops 8 mm short of the other to the hinge bar", async () => {
-    const { hingeParts } = await import("@/lib/dentalBase");
+    const { articulatorParts } = await import("@/lib/dentalArticulator");
     // A lower horseshoe's two heels: the left reaches y = 25, the right only y = 17.
     const left = runtime.Manifold.cube([8, 40, 6]).translate([-28, -15, -20]);
     const right = runtime.Manifold.cube([8, 32, 6]).translate([20, -15, -20]);
     const front = runtime.Manifold.cube([56, 8, 6]).translate([-28, -23, -20]);
     const base = runtime.Manifold.union([left, right, front]);
     const pieces = (solid: typeof base) => { const list = solid.decompose(); const n = list.length; list.forEach((p) => p.delete()); return n; };
-    for (const joint of ["ball", "dropin", "axle"] as const) {
-      const parts = hingeParts(runtime, 25, -28, 28, 20, -20, 0.1, null, { joint }, { upper: 25, lower: [{ x: -24, y: 25 }, { x: 24, y: 17 }] });
-      const joined = runtime.Manifold.union(base, parts.lower);
-      expect(pieces(joined)).toBe(1);
-      [joined, parts.upper, parts.lower].forEach((s) => s.delete());
-    }
+    const parts = articulatorParts(runtime as never, 25, -28, 28, 20, -20, null, 0, { upper: [{ x: -24, y: 25 }, { x: 24, y: 25 }], lower: [{ x: -24, y: 25 }, { x: 24, y: 17 }] });
+    const joined = runtime.Manifold.union(base, parts.lower);
+    expect(pieces(joined)).toBe(1);
+    [joined, parts.upper, parts.lower].forEach((s) => s.delete());
     [left, right, front, base].forEach((s) => s.delete());
   });
 });

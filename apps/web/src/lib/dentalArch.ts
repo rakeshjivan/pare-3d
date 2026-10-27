@@ -460,7 +460,7 @@ export function pairFrame(upper: CleanArch, lower: CleanArch): PairFrame {
 export type BiteFit = { matrix: THREE.Matrix4; rms: number; overlap: number };
 
 /** Area-weighted vertex normals. */
-function vertexNormals(m: Mesh): Float64Array {
+export function vertexNormals(m: Mesh): Float64Array {
   const n = new Float64Array(m.v.length);
   for (let t = 0; t < m.f.length; t += 3) {
     const a = m.f[t] * 3, b = m.f[t + 1] * 3, c = m.f[t + 2] * 3;
@@ -546,6 +546,31 @@ export function alignToBite(arch: Mesh, bite: Mesh): BiteFit {
     if (angle < 1e-6 && Math.hypot(x[3], x[4], x[5]) < 1e-5 && iteration > 25) break;
   }
   return { matrix: total, rms, overlap };
+}
+
+/**
+ * Build 78: how far an arch, left where the scanner put it, stands from the bite scan - the same
+ * measure as alignToBite's last steps (points facing the same way, within `reach` mm), without moving it.
+ */
+export function biteResidual(arch: Mesh, bite: Mesh, reach = 0.5): { rms: number; overlap: number } {
+  const grid = new PointGrid(bite.v, 2);
+  const biteNormals = vertexNormals(bite);
+  const archNormals = vertexNormals(arch);
+  const count = arch.v.length / 3;
+  const step = Math.max(1, Math.floor(count / 8000));
+  let pairs = 0, squared = 0, sampled = 0;
+  for (let i = 0; i < count; i += step) {
+    sampled += 1;
+    const hit = grid.nearest(arch.v[i * 3], arch.v[i * 3 + 1], arch.v[i * 3 + 2]);
+    if (!hit || hit[1] > reach) continue;
+    const q = hit[0] * 3;
+    const nx = biteNormals[q], ny = biteNormals[q + 1], nz = biteNormals[q + 2];
+    if (archNormals[i * 3] * nx + archNormals[i * 3 + 1] * ny + archNormals[i * 3 + 2] * nz < 0.6) continue;
+    const e = (arch.v[i * 3] - bite.v[q]) * nx + (arch.v[i * 3 + 1] - bite.v[q + 1]) * ny + (arch.v[i * 3 + 2] - bite.v[q + 2]) * nz;
+    pairs += 1;
+    squared += e * e;
+  }
+  return { rms: pairs ? Math.sqrt(squared / pairs) : Infinity, overlap: sampled ? pairs / sampled : 0 };
 }
 
 export { applyMatrix };

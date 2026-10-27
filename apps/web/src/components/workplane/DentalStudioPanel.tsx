@@ -1,14 +1,16 @@
 "use client";
 
-import { HINGE_CLEARANCE, HINGE_CONDYLE_ANGLES, HINGE_FITS, INCISAL_PIN_MAX, INCISAL_PIN_STEP } from "@/lib/dentalBase";
-import { readMyHingeFit, saveMyHingeFit } from "@/lib/hingeFitTest";
+import { PIN_MAX, PIN_STEP, PIN_WARN } from "@/lib/dentalArticulator";
+
+/** Build 78: a bite scan further than this from the scanner's bite (mm RMS) is pointed out. */
+const BITE_KEPT_CHECK = 0.2;
 
 import { ArrowLeftRight, Check, ChevronDown, FileDown, FilePlus2, LoaderCircle, Upload, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
-import { ArticulatorPicture, BaseStylePicture, JointPicture, ModelHeightPicture } from "@/components/workplane/DentalPictures";
+import { ArticulatorPicture, BaseStylePicture, ModelHeightPicture } from "@/components/workplane/DentalPictures";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import {
@@ -32,7 +34,8 @@ export function dentalPreset(preset: DentalPreset, depth: number, pair: boolean,
   const common = { label: "", hinge: false, layout: "print" as const, wall: 2 };
   if (preset === "ortho") {
     // The trimmed base is about a third of the model's height (the art portion), the anatomy two thirds.
-    return { ...common, keep: null, base: Math.round(Math.max(6, Math.min(15, depth / 2))), baseStyle: "ortho", inside: "solid", layout: pair ? "occlusion" : "print" };
+    // Build 78: records keep the scans whole - no soft tissue trimmed (the ABO counts any change as altered records).
+    return { ...common, keep: null, base: Math.round(Math.max(6, Math.min(15, depth / 2))), baseStyle: "ortho", inside: "solid", layout: pair ? "occlusion" : "print", relief: false };
   }
   if (preset === "aligner") {
     // Thermoforming: solid, 15-20 mm in all (Formlabs' thermoforming guide) - floor to the tallest
@@ -88,7 +91,6 @@ export function DentalStudioPanel({
   onAdvancedChange,
   onApply,
   onImport,
-  onHingeTest,
   onCancel,
   patientDetails = "keep",
   onPatientDetails,
@@ -96,6 +98,7 @@ export function DentalStudioPanel({
   modelsHere = false,
   layout,
   onLayout,
+  onFitBite,
   biteLocked = false,
   onRestore,
   areaShown = true,
@@ -120,6 +123,8 @@ export function DentalStudioPanel({
   /** Build 74: how the scans stand on the plate, and the button that changes it. */
   layout?: "side" | "occlusion";
   onLayout?: (layout: "side" | "occlusion") => void;
+  /** Build 78: line the arches up on the bite scan instead of keeping the scanner's bite. */
+  onFitBite?: () => void;
   /** Build 74: the bite is locked into the arches (edits can no longer move it). */
   biteLocked?: boolean;
   /** Build 74: puts an arch's original scan back. */
@@ -141,8 +146,6 @@ export function DentalStudioPanel({
   onAdvancedChange: (open: boolean) => void;
   onApply: () => void;
   onImport: () => void;
-  /** Build 60: put the hinge fit test in the design. */
-  onHingeTest?: () => void;
   onCancel: () => void;
   /** Build 71: whether the made models keep the patient's details (scan names, label) or lose them. */
   patientDetails?: "keep" | "remove";
@@ -189,6 +192,8 @@ export function DentalStudioPanel({
     if (apart) return { text: t("dental.apart"), warn: true };
     // Build 74: a locked bite has its own line (biteLocked) - nothing was fitted again.
     if (bite?.locked) return null;
+    // Build 78: the scanner's bite, kept as it was exported; how far the bite scan stands from it.
+    if (bite?.kept) return { text: t(bite.rms > BITE_KEPT_CHECK ? "dental.biteKeptCheck" : "dental.biteKept", { error: bite.rms.toFixed(2) }), warn: bite.rms > BITE_KEPT_CHECK, fit: true };
     if (bite && !bite.fitted) return { text: t("dental.biteFailed"), warn: true };
     if (bite) return { text: t("dental.biteFitted", { error: bite.rms.toFixed(2) }), warn: false };
     if (inOcclusion) return { text: t("dental.inOcclusion"), warn: false };
@@ -298,7 +303,7 @@ export function DentalStudioPanel({
           {slotRow("lower", t("dental.lower"), archInfo("lower"))}
           {slotRow("bite", t("dental.bite"), null)}
           {stage === "analysing" ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.analysing")}</p> : null}
-          {pairLine ? <p className={`dental-status ${pairLine.warn ? "warn" : ""}`} role="status">{pairLine.text}</p> : null}
+          {pairLine ? <p className={`dental-status ${pairLine.warn ? "warn" : ""}`} role="status">{pairLine.text}{"fit" in pairLine && onFitBite ? <>{" "}<button type="button" className="link-button" disabled={busy} onClick={onFitBite}>{t("dental.fitBite")}</button></> : null}</p> : null}
           {biteLocked ? <p className="dental-status" role="status">{t("dental.biteLocked")}</p> : null}
           {onLayout && analysis && slots.upper && slots.lower ? (
             <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.scanLayout")}>
@@ -482,6 +487,17 @@ export function DentalStudioPanel({
               <span>{t("dental.gumFollow")}</span>
             </label>
             {choice(t("dental.smooth"), options.smooth ?? "low", [["off", t("dental.smooth.off")], ["low", t("dental.smooth.low")], ["high", t("dental.smooth.high")]], (smooth) => onOptionsChange({ smooth }))}
+            {/* Build 78: soft tissue that would stop the models closing is trimmed, as on a cast's heels;
+                the orthodontic records preset keeps the scans whole. */}
+            {pair ? (
+              <>
+                <label className="edge-modifier-check" title={t("dental.reliefHint")}>
+                  <input type="checkbox" checked={options.relief !== false} disabled={busy} onChange={(event) => onOptionsChange({ relief: event.currentTarget.checked })} />
+                  <span>{t("dental.relief")}</span>
+                </label>
+                <p className="blend-hint">{t(options.relief !== false ? "dental.reliefOn" : "dental.reliefOff")}</p>
+              </>
+            ) : null}
 
           </div>
         ) : null}
@@ -489,60 +505,17 @@ export function DentalStudioPanel({
 
       {pair ? card(5, t("dental.step4"), options.hinge, t("dental.step4Hint"), articSummary, (<>
             <label className="edge-modifier-check dental-hinge-check" title={t("dental.hingeHint")}>
-              <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => {
-                const on = event.currentTarget.checked;
-                // Build 60: the fit found with the hinge fit test, once there is one.
-                const mine = readMyHingeFit();
-                onOptionsChange({ hinge: on, ...(on && options.hingeFit === undefined && mine !== null ? { hingeFit: mine } : {}) });
-              }} />
+              <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => onOptionsChange({ hinge: event.currentTarget.checked })} />
               <span>{t("dental.hinge")}</span>
             </label>
             {options.hinge ? (
               <div className="dental-hinge-options">
-                {/* Build 66: the articulator from the side, drawn from the settings below as they change. */}
-                <ArticulatorPicture joint={options.hingeJoint ?? "ball"} condyle={options.condyle ?? 0} stop={options.incisalStop !== false} pinRaise={options.incisalStop !== false ? options.pinRaise ?? 0 : 0} table={options.incisalTable ?? "flat"} />
-                <span className="edge-modifier-label">{t("dental.hingeJoint")}</span>
-                <div className="dental-picture-tiles joints" role="radiogroup" aria-label={t("dental.hingeJoint")} title={t("dental.hingeJointHint")}>
-                  {([["ball", t("dental.hingeJointBall")], ["dropin", t("dental.hingeJointDropIn")], ["axle", t("dental.hingeJointAxle")]] as const).map(([value, label]) => (
-                    <button key={value} type="button" role="radio" aria-checked={(options.hingeJoint ?? "ball") === value} className={(options.hingeJoint ?? "ball") === value ? "active" : ""} disabled={busy} onClick={() => onOptionsChange({ hingeJoint: value })}>
-                      <JointPicture joint={value} />
-                      <span>{label}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="blend-hint">{t("dental.hingeJointHint")}</p>
-                {/* Fork (build 58): how tight the hinge turns; build 60: and a test to find it. */}
-                <label className="dental-label-field" title={t("dental.hingeFitHint")}>
-                  <span>{t("dental.hingeFit")}</span>
-                  <select value={options.hingeFit ?? HINGE_CLEARANCE} disabled={busy} onChange={(event) => { const fit = Number(event.currentTarget.value); saveMyHingeFit(fit); onOptionsChange({ hingeFit: fit }); }}>
-                    {HINGE_FITS.map((fit) => <option key={fit} value={fit}>{t(fit === HINGE_CLEARANCE ? "dental.hingeFitDefault" : "dental.hingeFitOption", { fit: String(fit) })}</option>)}
-                  </select>
-                </label>
-                {onHingeTest ? (
-                  <p className="blend-hint dental-hinge-test">
-                    {t("dental.hingeTestHint")}{" "}
-                    <button type="button" className="link-button" disabled={busy} onClick={onHingeTest}>{t("dental.hingeTest")}</button>
-                  </p>
-                ) : null}
-                <label className="dental-label-field" title={t("dental.condyleHint")}>
-                  <span>{t("dental.condyle")}</span>
-                  <select value={options.condyle ?? 0} disabled={busy} onChange={(event) => onOptionsChange({ condyle: Number(event.currentTarget.value) })}>
-                    {HINGE_CONDYLE_ANGLES.map((angle) => <option key={angle} value={angle}>{angle === 0 ? t("dental.condyleOff") : t("dental.condyleOption", { angle })}</option>)}
-                  </select>
-                </label>
-                {(options.condyle ?? 0) > 0 ? <p className="blend-hint">{t("dental.condyleHint")}</p> : null}
-                <label className="edge-modifier-check" title={t("dental.incisalStopHint")}>
-                  <input type="checkbox" checked={options.incisalStop !== false} disabled={busy} onChange={(event) => onOptionsChange({ incisalStop: event.currentTarget.checked })} />
-                  <span>{t("dental.incisalStop")}</span>
-                </label>
-                {options.incisalStop !== false ? (
-                  <>
-                    {/* Build 71: 0 (the scanned bite) to 10 mm open at the pin, in half millimetres. */}
-                    <EdgeModifierSlider label={t("dental.pinRaise")} value={options.pinRaise ?? 0} min={0} max={INCISAL_PIN_MAX} step={INCISAL_PIN_STEP} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ pinRaise: Math.max(0, Math.min(INCISAL_PIN_MAX, Math.round(value / INCISAL_PIN_STEP) * INCISAL_PIN_STEP)) })} />
-                    <p className="blend-hint">{(options.pinRaise ?? 0) > 0 ? t("dental.pinRaiseOpenHint") : t("dental.pinRaiseZeroHint")}</p>
-                    {choice(t("dental.incisalTable"), options.incisalTable ?? "flat", [["flat", t("dental.incisalTableFlat")], ["guide", t("dental.incisalTableGuide")]], (incisalTable) => onOptionsChange({ incisalTable }), t("dental.incisalTableHint"))}
-                  </>
-                ) : null}
+                {/* Build 78: the one articulator - two seats on ball condyles and the incisal pin. */}
+                <ArticulatorPicture pinRaise={options.pinRaise ?? 0} />
+                <p className="blend-hint">{t("dental.articulatorHow")}</p>
+                {/* Build 71: 0 (the scanned bite) to 10 mm open at the pin, in half millimetres. */}
+                <EdgeModifierSlider label={t("dental.pinRaise")} value={options.pinRaise ?? 0} min={0} max={PIN_MAX} step={PIN_STEP} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ pinRaise: Math.max(0, Math.min(PIN_MAX, Math.round(value / PIN_STEP) * PIN_STEP)) })} />
+                <p className={`blend-hint ${(options.pinRaise ?? 0) > PIN_WARN ? "warn" : ""}`}>{(options.pinRaise ?? 0) > PIN_WARN ? t("dental.pinRaiseWarn", { max: PIN_WARN }) : (options.pinRaise ?? 0) > 0 ? t("dental.pinRaiseOpenHint") : t("dental.pinRaiseZeroHint")}</p>
               </div>
             ) : null}
             {choice(t("dental.layout"), options.layout, [["print", t("dental.layoutPrint")], ["occlusion", t("dental.layoutOcclusion")]], (layout) => onOptionsChange({ layout }))}

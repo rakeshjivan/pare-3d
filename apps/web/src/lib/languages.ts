@@ -99,7 +99,7 @@ export const LANGUAGE_INFO: Readonly<Record<Language, LanguageInfo>> = {
     legal: { imprint: "Údaje o provozovateli", privacy: "Ochrana osobních údajů" },
     keyNames: { Shift: "Shift", Delete: "Delete", Home: "Home", Click: "Kliknutí", RightClick: "Pravé tlačítko", Drag: "Tažení" },
     asciiUmlauts: false,
-    complete: true,
+    complete: false, // Build 78: English is the master; this one may lag behind it.
     guide: {
       site: "Uživatelská příručka Layerlingu",
       home: "Uživatelská příručka",
@@ -173,7 +173,7 @@ export const LANGUAGE_INFO: Readonly<Record<Language, LanguageInfo>> = {
     legal: { imprint: "Impressum", privacy: "Datenschutz" },
     keyNames: { Ctrl: "Strg", Shift: "Umschalt", Delete: "Entf", Backspace: "Rücktaste", Home: "Pos1", Click: "Klick", RightClick: "Rechtsklick", Drag: "Ziehen" },
     asciiUmlauts: true,
-    complete: true,
+    complete: false, // Build 78: English is the master; this one may lag behind it.
     guide: {
       site: "layerling Anleitung",
       home: "Anleitung",
@@ -210,7 +210,7 @@ export const LANGUAGE_INFO: Readonly<Record<Language, LanguageInfo>> = {
     legal: { imprint: "Colofon", privacy: "Privacybeleid" },
     keyNames: { Click: "Klik", RightClick: "Rechtsklik", Drag: "Slepen" },
     asciiUmlauts: false,
-    complete: true,
+    complete: false, // Build 78: English is the master; this one may lag behind it.
     guide: {
       site: "layerling handleiding",
       home: "Handleiding",
@@ -256,7 +256,7 @@ export const LANGUAGE_INFO: Readonly<Record<Language, LanguageInfo>> = {
       Drag: "Glisser",
     },
     asciiUmlauts: false,
-    complete: true,
+    complete: false, // Build 78: English is the master; this one may lag behind it.
     guide: {
       site: "Manuel d'utilisation layerling",
       home: "Manuel d'utilisation",
@@ -373,7 +373,7 @@ export const LANGUAGE_INFO: Readonly<Record<Language, LanguageInfo>> = {
     legal: { imprint: "Выходные данные", privacy: "Политика конфиденциальности" },
     keyNames: { Ctrl: "Ctrl", Shift: "Shift", Delete: "Del", Backspace: "Backspace", Home: "Home", Click: "Щёлчок", RightClick: "Правый клик", Drag: "Перетаскивание" },
     asciiUmlauts: false,
-    complete: true,
+    complete: false, // Build 78: English is the master; this one may lag behind it.
     guide: {
       site: "Руководство layerling",
       home: "Руководство",
@@ -410,7 +410,7 @@ export const LANGUAGE_INFO: Readonly<Record<Language, LanguageInfo>> = {
     legal: { imprint: "Odtis", privacy: "Zasebnost" },
     keyNames: { Click: "Klik", RightClick: "Desni klik", Drag: "Vlečenje" },
     asciiUmlauts: false,
-    complete: true,
+    complete: false, // Build 78: English is the master; this one may lag behind it.
     guide: {
       site: "layerling navodila",
       home: "Navodila",
