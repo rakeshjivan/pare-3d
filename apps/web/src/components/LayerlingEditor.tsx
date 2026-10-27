@@ -10,6 +10,7 @@ import { ObjectListPanel } from "@/components/workplane/ObjectListPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SAVED_VIEW_KEYS } from "@/lib/designView";
 import * as THREE from "three";
+import { eraseAndFill } from "@/lib/meshFill";
 import { carryScanFrame, localToWorld, placedBounds, placementFor, scanFileCoordinates, scanFrameOf, standUpright } from "@/lib/scanFrame";
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import { t, type MessageKey } from "@/lib/i18n";
@@ -8955,7 +8956,9 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; historyStart?: number; historyMoved?: boolean } | null>(null);
+  /** Build 76: bumped when a stroke is added or stepped back, so Undo and Redo show what they can do. */
+  const [, setSculptSteps] = useState(0);
   const sculptToolRef = useRef(sculptTool);
   const ensureDentalAreasRef = useRef<(force?: "upper" | "lower") => Promise<void>>(async () => {});
   sculptToolRef.current = sculptTool;
@@ -8992,7 +8995,7 @@ export function LayerlingEditor({
       sculptHidOthers.current = true;
       setDentalHidden(Object.values(studio.slots).filter((id): id is string => Boolean(id) && id !== shape.id));
     }
-    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null };
+    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, historyStart: historyIndexRef.current };
     const known = sculptState.current;
     const ready = (state: SculptSession) => Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100);
     if (known && known.shapeId === shape.id && known.key === projectShapesFingerprint([shape])) {
@@ -9027,6 +9030,7 @@ export function LayerlingEditor({
   const commitSculpt = (shape: WorkplaneShape, positions: ArrayLike<number>, message: string, keepCopy: boolean) => {
     const next = canonicalizeShape(shapeWithWorldPositions(shape, Array.from(positions)));
     commitShapes(shapesRef.current.map((candidate) => (candidate.id === shape.id ? next : candidate)), next.id, message);
+    setSculptTool((current) => current && !current.historyMoved ? { ...current, historyMoved: true } : current);
     if (keepCopy && sculptState.current) sculptState.current.key = projectShapesFingerprint([next]);
     else { sculptState.current?.live.dispose(); sculptState.current = null; }
     return next;
@@ -9260,6 +9264,7 @@ export function LayerlingEditor({
     state.redo = [];
     state.strokes += 1;
     state.lastBrush = stroke.brush;
+    setSculptSteps((n) => n + 1);
     sculptStat("end", performance.now() - ending, 0);
     // A selection is of triangles: one the stroke re-made is gone.
     if (state.selection) {
@@ -9309,20 +9314,31 @@ export function LayerlingEditor({
       return;
     }
     if (!count()) return;
+    // Build 75: Trim warns once before it cuts into the teeth (the crowns Dental Studio keeps);
+    // build 76: before Erase & Fill smooths them over too.
+    if ((action === "delete" || action === "fill") && target.tool.trim && (target.tool.teethWarned !== count() || target.tool.teethAction !== action)) {
+      const hit = teethInSelection(shape, selection);
+      if (hit > 0) {
+        const chosen = count();
+        setSculptTool((current) => current ? { ...current, teethHit: hit, teethWarned: chosen, teethAction: action } : current);
+        return;
+      }
+    }
+    if (action === "fill") {
+      // Build 76: Erase & Fill - the hole each selected area leaves is closed with a smooth patch.
+      const result = eraseAndFill(selection.mesh.points, selection.mesh.triangles, selection.chosen);
+      if (!result.positions.length) return;
+      commitSculpt(shape, result.positions, t(result.open ? "sculpt.filledOpen" : "sculpt.filled", { count: result.removed.toLocaleString(), holes: result.filled, open: result.open }), false);
+      setSculptTool((current) => current ? { ...current, chosen: 0, teethHit: 0, teethWarned: undefined, teethAction: undefined } : current);
+      if (target.tool.trim) window.setTimeout(() => void ensureDentalAreasRef.current(), 0);
+      return;
+    }
     if (action === "delete") {
       const removed = count();
-      // Build 75: Trim warns once before it cuts into the teeth (the area Dental Studio keeps).
-      if (target.tool.trim && target.tool.teethWarned !== removed) {
-        const hit = teethInSelection(shape, selection);
-        if (hit > 0) {
-          setSculptTool((current) => current ? { ...current, teethHit: hit, teethWarned: removed } : current);
-          return;
-        }
-      }
       const left = withoutTriangles(soupOf(selection.mesh), selection.chosen);
       if (!left.length) return;
       commitSculpt(shape, left, t("sculpt.deleted", { count: removed.toLocaleString() }), false);
-      setSculptTool((current) => current ? { ...current, chosen: 0, teethHit: 0, teethWarned: undefined } : current);
+      setSculptTool((current) => current ? { ...current, chosen: 0, teethHit: 0, teethWarned: undefined, teethAction: undefined } : current);
       // Build 75: the trimmed scan's teeth area, ready for the next cut.
       if (target.tool.trim) window.setTimeout(() => void ensureDentalAreasRef.current(), 0);
       return;
@@ -9395,7 +9411,28 @@ export function LayerlingEditor({
     window.layerlingRedraw?.();
     sculptStat(back ? "undo" : "redo", performance.now() - stepped, state.undo.length);
     setNotice(t(back ? "sculpt.undone" : "sculpt.redone"));
+    setSculptSteps((n) => n + 1);
     return true;
+  };
+  /**
+   * Build 76: Undo and Redo in the Sculpt and Trim panel - strokes not yet in the part first, then the
+   * steps (a delete, an Erase & Fill, strokes put in) taken since the panel opened, never earlier ones.
+   */
+  const sculptCanStep = (back: boolean) => {
+    const open = sculptTool;
+    if (!open) return false;
+    const state = sculptState.current;
+    if (state && state.shapeId === open.shapeId && (back ? state.undo.length : state.redo.length)) return true;
+    const start = open.historyStart ?? historyIndex;
+    return back ? historyIndex > start : historyIndex < history.length - 1 && historyIndex >= start && Boolean(open.historyMoved);
+  };
+  const stepSculptPanel = (back: boolean) => {
+    if (stepSculpt(back)) return;
+    if (!sculptCanStep(back)) return;
+    flushSculptRef.current();
+    if (back) undo(); else redo();
+    setSculptTool((current) => current ? { ...current, chosen: 0, teethHit: 0, teethWarned: undefined, teethAction: undefined, historyMoved: true } : current);
+    if (sculptTool?.trim) window.setTimeout(() => void ensureDentalAreasRef.current(), 0);
   };
   // While Sculpt is open: Ctrl+Z steps through its strokes; any other shortcut, or a click outside the
   // panel and the view, puts the strokes into the part first (Save, Export and the rest see them).
@@ -16274,6 +16311,11 @@ export function LayerlingEditor({
           preparing={Boolean(sculptTool.preparing)}
           trim={Boolean(sculptTool.trim)}
           teethWarning={sculptTool.teethWarned === sculptTool.chosen && sculptTool.chosen > 0 ? sculptTool.teethHit ?? 0 : 0}
+          warnedAction={sculptTool.teethAction ?? "delete"}
+          canUndo={sculptCanStep(true)}
+          canRedo={sculptCanStep(false)}
+          onUndo={() => stepSculptPanel(true)}
+          onRedo={() => stepSculptPanel(false)}
           error={sculptTool.error}
           workspace={workspaceSettings}
           onTool={(tool) => setSculptTool((current) => current ? { ...current, tool } : current)}

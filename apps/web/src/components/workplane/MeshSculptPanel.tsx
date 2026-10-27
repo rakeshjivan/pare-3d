@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LoaderCircle, X } from "lucide-react";
+import { Check, LoaderCircle, Redo2, Undo2, X } from "lucide-react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
@@ -16,7 +16,7 @@ export type SculptTool = "select" | "unselect" | LiveBrush;
 export type SculptRefine = "off" | "coarse" | "medium" | "fine";
 /** Build 73: a brush also works mirrored across the part's middle, left-right (x) or front-back (z). */
 export type SculptSymmetry = "off" | "x" | "z";
-export type SculptSelectionAction = "delete" | "smooth" | "flatten" | "grow" | "invert" | "clear";
+export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "grow" | "invert" | "clear";
 
 /** Remesh, Offset and Thicken in the panel: on again in build 73 (they keep the part's surface now). */
 export const WHOLE_PART_TOOLS = true;
@@ -24,8 +24,9 @@ export const WHOLE_PART_TOOLS = true;
 export const SCULPT_TOOLS: SculptTool[] = ["draw", "inflate", "deflate", "smooth", "flatten", "pinch", "crease", "move", "select", "unselect"];
 /** Build 75: Trim (Dental Studio's step 2a) - only selecting and deleting. */
 export const TRIM_TOOLS: SculptTool[] = ["select", "unselect"];
-const TRIM_ACTIONS = ["delete", "grow", "invert", "clear"] as const;
-const SCULPT_ACTIONS = ["delete", "smooth", "flatten", "grow", "invert", "clear"] as const;
+/** Build 76: Erase & Fill (fill) sits beside Delete in Trim and Sculpt. */
+const TRIM_ACTIONS = ["delete", "fill", "grow", "invert", "clear"] as const;
+const SCULPT_ACTIONS = ["fill", "delete", "smooth", "flatten", "grow", "invert", "clear"] as const;
 
 /** Build 69: Sculpt - brushes that shape a mesh, a brush that selects a patch of it, and the whole part rebuilt. */
 export function MeshSculptPanel({
@@ -44,6 +45,11 @@ export function MeshSculptPanel({
   preparing = false,
   trim = false,
   teethWarning = 0,
+  warnedAction = "delete",
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
   error,
   workspace,
   onTool,
@@ -78,6 +84,13 @@ export function MeshSculptPanel({
   trim?: boolean;
   /** Build 75: the chosen triangles hold this many of the teeth - Delete again cuts them anyway. */
   teethWarning?: number;
+  /** Build 76: which button the teeth warning is about (Delete or Erase & Fill). */
+  warnedAction?: SculptSelectionAction;
+  /** Build 76: Undo and Redo in the panel - strokes, deletes and fills made since it opened. */
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
   error: string | null;
   workspace: WorkplaneWorkspaceSettings;
   onTool: (tool: SculptTool | null) => void;
@@ -166,13 +179,19 @@ export function MeshSculptPanel({
       {teethWarning > 0 ? <p className="dental-status warn sculpt-teeth-warning" role="alert">{t("sculpt.trimTeeth", { count: teethWarning.toLocaleString() })}</p> : null}
       <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.selection")}>
         {(trim ? TRIM_ACTIONS : SCULPT_ACTIONS).map((action) => (
-          <button key={action} type="button" className={trim && action === "delete" ? "danger" : undefined} disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
-            {teethWarning > 0 && action === "delete" ? t("sculpt.deleteAnyway") : t(`sculpt.selection.${action}`)}
+          <button key={action} type="button" className={trim && (action === "delete" || action === "fill") ? "danger" : undefined} title={action === "fill" ? t("sculpt.selection.fillHint") : undefined} disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
+            {teethWarning > 0 && action === warnedAction ? t(action === "fill" ? "sculpt.fillAnyway" : "sculpt.deleteAnyway") : t(`sculpt.selection.${action}`)}
           </button>
         ))}
       </div>
       {/* Build 69: Remesh, Offset and Thicken stay out of the panel until they keep a scan's detail
           (on a voxel grid the teeth come out lumpy); the code and tests are kept for that. */}
+      {onUndo || onRedo ? (
+        <div className="dental-trim-buttons sculpt-history" role="group" aria-label={t("sculpt.history")}>
+          <button type="button" disabled={busy || !canUndo} title={t("sculpt.undoHint")} onClick={onUndo}><Undo2 size={16} aria-hidden="true" /> {t("sculpt.undo")}</button>
+          <button type="button" disabled={busy || !canRedo} title={t("sculpt.redoHint")} onClick={onRedo}><Redo2 size={16} aria-hidden="true" /> {t("sculpt.redo")}</button>
+        </div>
+      ) : null}
       {trim ? <p className="blend-hint">{t("sculpt.trimUndo")}</p> : null}
       {WHOLE_PART_TOOLS && !trim ? (<>
       <div className="dental-section-divider" />
