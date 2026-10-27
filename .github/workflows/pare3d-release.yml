@@ -38,6 +38,8 @@ jobs:
       - name: Static export
         env:
           NEXT_PUBLIC_PARE_BUILD: ${{ steps.build.outputs.number }}
+          # Build 80: features in development are on in test builds (native-preview) only.
+          NEXT_PUBLIC_PARE_WAXUP: ${{ github.ref_name == 'native-preview' && 'on' || 'off' }}
           NEXT_PUBLIC_SUPPORT_HINT: "off"
           NEXT_PUBLIC_SOURCE_CODE_URL: https://github.com/${{ github.repository }}
         run: node scripts/build-static-export.mjs

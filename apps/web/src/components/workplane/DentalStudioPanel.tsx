@@ -249,9 +249,11 @@ export function DentalStudioPanel({
   // Build 75: each step a card that folds to a one-line summary; the card last worked in is marked.
   // Build 77: the step to do next has a green outline - once the scans are in, the first step not
   // yet worked in (a step may be left as it is: having been in it is enough, the articulator too).
-  const stepCount = pair ? 7 : 6;
+  // Build 80: without the wax-up (test builds only) its card is left out and the cards after it move up.
+  const n = (k: number) => (waxup || k < 3 ? k : k - 1);
+  const stepCount = (pair ? 7 : 6) - (waxup ? 0 : 1);
   // Build 79: the wax-up (card 3) is optional - never the step pointed to next.
-  const nextCard = scansDone ? Array.from({ length: stepCount - 1 }, (_, k) => k + 2).find((number) => number !== 3 && !visited[number]) ?? null : null;
+  const nextCard = scansDone ? Array.from({ length: stepCount - 1 }, (_, k) => k + 2).find((number) => (!waxup || number !== 3) && !visited[number]) ?? null : null;
   const card = (number: number, label: string, done: boolean, hint: string | null, summary: string | null, body: ReactNode) => {
     const isFolded = Boolean(folded[number]);
     return (
@@ -421,7 +423,7 @@ export function DentalStudioPanel({
         <WaxupCard view={waxup.view} actions={waxup.actions} slots={{ upper: Boolean(slots.upper), lower: Boolean(slots.lower) }} busy={busy || !analysis} workspace={workspace} />
       )) : null}
 
-      {card(4, t("dental.step3"), scansDone, t("dental.step3Hint"), modelSummary, (<>
+      {card(n(4), t("dental.step3"), scansDone, t("dental.step3Hint"), modelSummary, (<>
         <div className="dental-presets" role="radiogroup" aria-label={t("dental.purpose")}>
           {([
             ["study", t("dental.study"), t("dental.studyHint")],
@@ -450,7 +452,7 @@ export function DentalStudioPanel({
         <p className="blend-hint">{t(options.inside === "solid" ? (options.baseStyle === "ortho" ? "dental.orthoNote" : options.baseStyle === "plate" ? "dental.crownNote" : "dental.solidNote") : options.inside === "open" ? "dental.hollowNote" : "dental.closedNote")}</p>
       </>))}
 
-      {card(5, t("dental.stepBase"), scansDone, t("dental.stepBaseHint"), baseSummary, (<>
+      {card(n(5), t("dental.stepBase"), scansDone, t("dental.stepBaseHint"), baseSummary, (<>
         {/* Build 66: each base as it looks from above. */}
         <div className="dental-picture-tiles" role="radiogroup" aria-label={t("dental.baseStyle")}>
           {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")], ["articulator", t("dental.articulatorBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
@@ -537,7 +539,7 @@ export function DentalStudioPanel({
         ) : null}
       </>))}
 
-      {pair ? card(6, t("dental.step4"), options.hinge, t("dental.step4Hint"), articSummary, (<>
+      {pair ? card(n(6), t("dental.step4"), options.hinge, t("dental.step4Hint"), articSummary, (<>
             <label className="edge-modifier-check dental-hinge-check" title={t("dental.hingeHint")}>
               <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => onOptionsChange({ hinge: event.currentTarget.checked })} />
               <span>{t("dental.hinge")}</span>
@@ -561,7 +563,7 @@ export function DentalStudioPanel({
             {choice(t("dental.layout"), options.layout, [["print", t("dental.layoutPrint")], ["occlusion", t("dental.layoutOcclusion")]], (layout) => onOptionsChange({ layout }))}
       </>)) : null}
 
-      {card(pair ? 7 : 6, t("dental.stepName"), Boolean(options.label.trim()) || patientDetails === "remove", t("dental.stepNameHint"), nameSummary, (<>
+      {card(n(pair ? 7 : 6), t("dental.stepName"), Boolean(options.label.trim()) || patientDetails === "remove", t("dental.stepNameHint"), nameSummary, (<>
         {onPatientDetails ? choice(t("dental.patientDetails"), patientDetails, [["keep", t("dental.patientKeep")], ["remove", t("dental.patientRemove")]], onPatientDetails, t("dental.patientDetailsHint")) : null}
         {patientDetails === "remove" ? <p className="blend-hint">{t("dental.patientRemoveHint")}</p> : (<>
         <label className="dental-label-field">

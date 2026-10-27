@@ -64,6 +64,7 @@ import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
 import { analyseDentalInBackground, stopMeshJobs, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground, waxupInBackground } from "@/lib/meshJobs";
 import { BUILT_IN_LIBRARIES, loadToothLibrary, loadToothSet, type ToothLibraryManifest } from "@/lib/toothLibrary";
+import { WAXUP_ENABLED } from "@/lib/pareFeatures";
 import { CENTRAL_RATIO, contralateral, imtFirstInjection, moveFrame, nudgeMatrix, rigidMoveBetween, type ToothNudge, fdiNumber, parseObj, splitShells, librarySet, type WaxLandmarks } from "@/lib/dentalWaxup";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { WaxupPointOverlay, markerTriangles, rayHit } from "./workplane/WaxupPointOverlay";
@@ -10357,7 +10358,7 @@ export function LayerlingEditor({
   const waxLibrary = useRef<ToothLibraryManifest | null>(null);
   // The sets that ship with Pare 3D, read once the Studio is open.
   useEffect(() => {
-    if (!dentalStudio || waxLibrary.current) return;
+    if (!WAXUP_ENABLED || !dentalStudio || waxLibrary.current) return;
     void loadToothLibrary(BUILT_IN_LIBRARIES[0]).then((library) => {
       waxLibrary.current = library;
       setWaxup((current) => ({ ...current, builtIn: library.sets.map((set) => ({ id: set.id, name: set.name })), builtInCredit: library.credit }));
@@ -16767,7 +16768,7 @@ export function LayerlingEditor({
           }}
           onNewPatient={onNewDentalDesign}
           modelsHere={shapes.some((shape) => shape.dental === "model")}
-          waxup={{
+          waxup={WAXUP_ENABLED ? {
             view: waxupView,
             actions: {
               onSet: (files) => void loadWaxSet(files),
@@ -16785,7 +16786,7 @@ export function LayerlingEditor({
               onMirror: setWaxMirror,
               onAlternate: (on) => setWaxup((current) => ({ ...current, alternate: on })),
             },
-          }}
+          } : undefined}
           onCancel={() => {
             stopDentalTrim();
             stopWaxPicking();

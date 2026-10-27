@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 80,
+    items: [
+      "The digital wax-up has been taken out of Dental Studio while it is developed further as a module of its own; it is in test builds only for now. Everything else from build 79 stays: the pin in a cup or posts either side, always clear of the teeth; one or two bite scans; Edit design after making; Stop while making; grey scans.",
+      "The Model Builder Guide (PDF and in-app) is updated to match.",
+    ],
+  },
+  {
     build: 79,
     items: [
       "Dental Studio has a digital diagnostic wax-up (step 3, optional): library teeth set over the front teeth, canine to canine, and joined to the model when you make it. Wax only adds, so a mock-up from the printed model seats over the teeth without preparing any.",
