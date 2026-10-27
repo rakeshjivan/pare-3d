@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 81,
+    items: [
+      "Sculpt has Meshmixer's edit tools for a selection: Extrude and Offset (a patch moved out or in, joined back by a wall), Bridge (two holes joined into a tube, or two open edges bridged) and Face down on the plate (the part turned so the selected surface sits on the plate).",
+      "The selection can be shrunk by a ring and its outline smoothed, as well as grown.",
+      "Make solid (under Whole part) rebuilds any part as one closed solid at a chosen detail - holes capped, overlapping shells joined - ready to print or combine.",
+    ],
+  },
+  {
     build: 80,
     items: [
       "The digital wax-up has been taken out of Dental Studio while it is developed further as a module of its own; it is in test builds only for now. Everything else from build 79 stays: the pin in a cup or posts either side, always clear of the teeth; one or two bite scans; Edit design after making; Stop while making; grey scans.",

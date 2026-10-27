@@ -16,7 +16,7 @@ export type SculptTool = "select" | "unselect" | LiveBrush;
 export type SculptRefine = "off" | "coarse" | "medium" | "fine";
 /** Build 73: a brush also works mirrored across the part's middle, left-right (x) or front-back (z). */
 export type SculptSymmetry = "off" | "x" | "z";
-export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "grow" | "invert" | "clear";
+export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "grow" | "shrink" | "smoothEdge" | "invert" | "clear" | "extrude" | "offset" | "bridge" | "align";
 
 /** Remesh, Offset and Thicken in the panel: on again in build 73 (they keep the part's surface now). */
 export const WHOLE_PART_TOOLS = true;
@@ -26,7 +26,10 @@ export const SCULPT_TOOLS: SculptTool[] = ["draw", "inflate", "deflate", "smooth
 export const TRIM_TOOLS: SculptTool[] = ["select", "unselect"];
 /** Build 76: Erase & Fill (fill) sits beside Delete in Trim and Sculpt. */
 const TRIM_ACTIONS = ["delete", "fill", "grow", "invert", "clear"] as const;
-const SCULPT_ACTIONS = ["fill", "delete", "smooth", "flatten", "grow", "invert", "clear"] as const;
+const SCULPT_ACTIONS = ["fill", "delete", "smooth", "flatten", "grow", "shrink", "smoothEdge", "invert", "clear"] as const;
+/** Build 81: Meshmixer's Edit tools on the selection. */
+const EDIT_ACTIONS = ["extrude", "offset", "bridge", "align"] as const;
+const HINTED: ReadonlyArray<SculptSelectionAction> = ["fill", "shrink", "smoothEdge", "extrude", "offset", "bridge", "align"];
 
 /** Build 69: Sculpt - brushes that shape a mesh, a brush that selects a patch of it, and the whole part rebuilt. */
 export function MeshSculptPanel({
@@ -65,6 +68,8 @@ export function MeshSculptPanel({
   onRemesh,
   onClose,
   besideDental = false,
+  editAmount = 1,
+  onEditAmount,
 }: {
   targetName: string;
   tool: SculptTool | null;
@@ -107,6 +112,9 @@ export function MeshSculptPanel({
   onClose: () => void;
   /** Build 71: opened from Dental Studio - stands beside its panel instead of over it. */
   besideDental?: boolean;
+  /** Build 81: Extrude and Offset's distance, mm. */
+  editAmount?: number;
+  onEditAmount?: (value: number) => void;
 }) {
   useLanguage();
   const title = t(trim ? "sculpt.trimTitle" : "sculpt.title");
@@ -179,11 +187,22 @@ export function MeshSculptPanel({
       {teethWarning > 0 ? <p className="dental-status warn sculpt-teeth-warning" role="status" aria-live="assertive">{t("sculpt.trimTeeth", { count: teethWarning.toLocaleString() })}</p> : null}
       <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.selection")}>
         {(trim ? TRIM_ACTIONS : SCULPT_ACTIONS).map((action) => (
-          <button key={action} type="button" className={trim && (action === "delete" || action === "fill") ? "danger" : undefined} title={action === "fill" ? t("sculpt.selection.fillHint") : undefined} disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
+          <button key={action} type="button" className={trim && (action === "delete" || action === "fill") ? "danger" : undefined} title={HINTED.includes(action) ? t(`sculpt.selection.${action}Hint` as "sculpt.selection.fillHint") : undefined} disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
             {teethWarning > 0 && action === warnedAction ? t(action === "fill" ? "sculpt.fillAnyway" : "sculpt.deleteAnyway") : t(`sculpt.selection.${action}`)}
           </button>
         ))}
       </div>
+      {!trim ? (<>
+        <strong className="sculpt-subtitle">{t("sculpt.edit")}</strong>
+        <EdgeModifierSlider label={t("sculpt.editDistance")} value={editAmount} min={-10} max={10} step={0.1} workspace={workspace} length disabled={busy} onChange={(value) => onEditAmount?.(value)} />
+        <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.edit")}>
+          {EDIT_ACTIONS.map((action) => (
+            <button key={action} type="button" title={t(`sculpt.selection.${action}Hint`)} disabled={busy || !chosen || ((action === "extrude" || action === "offset") && !editAmount)} onClick={() => onSelection(action)}>
+              {t(`sculpt.selection.${action}`)}
+            </button>
+          ))}
+        </div>
+      </>) : null}
       {/* Build 69: Remesh, Offset and Thicken stay out of the panel until they keep a scan's detail
           (on a voxel grid the teeth come out lumpy); the code and tests are kept for that. */}
       {onUndo || onRedo ? (
@@ -198,7 +217,7 @@ export function MeshSculptPanel({
       <strong className="sculpt-subtitle">{t("sculpt.wholePart")}</strong>
       <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.wholePart")}>
         <div className="shell-opening-options">
-          {(["remesh", "offset", "thicken"] as const).map((value) => (
+          {(["remesh", "offset", "thicken", "solid"] as const).map((value) => (
             <button key={value} type="button" role="radio" aria-checked={remeshMode === value} className={remeshMode === value ? "active" : ""} disabled={busy} onClick={() => onRemeshMode(value)}>
               {t(`sculpt.mode.${value}`)}
             </button>
@@ -207,7 +226,7 @@ export function MeshSculptPanel({
       </div>
       <p className="blend-hint">{t(`sculpt.mode.${remeshMode}Hint`)}</p>
       <EdgeModifierSlider label={t("sculpt.detail")} value={detail} min={0.05} max={5} step={0.05} workspace={workspace} length disabled={busy} onChange={onDetail} />
-      {remeshMode !== "remesh" ? (
+      {remeshMode === "offset" || remeshMode === "thicken" ? (
         <EdgeModifierSlider
           label={t(remeshMode === "offset" ? "sculpt.distance" : "sculpt.thickness")}
           value={amount}

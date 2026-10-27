@@ -65,6 +65,7 @@ import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
 import { analyseDentalInBackground, stopMeshJobs, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground, waxupInBackground } from "@/lib/meshJobs";
 import { BUILT_IN_LIBRARIES, loadToothLibrary, loadToothSet, type ToothLibraryManifest } from "@/lib/toothLibrary";
 import { WAXUP_ENABLED } from "@/lib/pareFeatures";
+import { alignToPlate, bridgeChoice, extrudeChoice, shrinkChoice, smoothChoice } from "@/lib/meshEditTools";
 import { CENTRAL_RATIO, contralateral, imtFirstInjection, moveFrame, nudgeMatrix, rigidMoveBetween, type ToothNudge, fdiNumber, parseObj, splitShells, librarySet, type WaxLandmarks } from "@/lib/dentalWaxup";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { WaxupPointOverlay, markerTriangles, rayHit } from "./workplane/WaxupPointOverlay";
@@ -8961,7 +8962,7 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
   /** Build 76: bumped when a stroke is added or stepped back, so Undo and Redo show what they can do. */
   const [, setSculptSteps] = useState(0);
   const sculptToolRef = useRef(sculptTool);
@@ -9314,8 +9315,8 @@ export function LayerlingEditor({
     const { shape, state } = target;
     const selection = sculptSelectionOf(state);
     const count = () => selection.chosen.reduce((a, b) => a + b, 0);
-    if (action === "clear" || action === "invert" || action === "grow") {
-      selection.chosen = action === "clear" ? new Uint8Array(selection.chosen.length) : action === "invert" ? invertChoice(selection.chosen) : growChoice(selection.mesh, selection.chosen);
+    if (action === "clear" || action === "invert" || action === "grow" || action === "shrink" || action === "smoothEdge") {
+      selection.chosen = action === "clear" ? new Uint8Array(selection.chosen.length) : action === "invert" ? invertChoice(selection.chosen) : action === "grow" ? growChoice(selection.mesh, selection.chosen) : action === "shrink" ? shrinkChoice(selection.mesh, selection.chosen) : smoothChoice(selection.mesh, selection.chosen);
       setSculptTool((current) => current ? { ...current, chosen: count() } : current);
       return;
     }
@@ -9361,6 +9362,29 @@ export function LayerlingEditor({
       if (target.tool.trim) window.setTimeout(() => void ensureDentalAreasRef.current(), 0);
       return;
     }
+    // Build 81: Meshmixer's Edit tools - Extrude, Offset, Bridge and face down on the plate.
+    if (action === "extrude" || action === "offset" || action === "bridge" || action === "align") {
+      const amount = target.tool.editAmount ?? 1;
+      let positions: number[] | null = null;
+      let message = "";
+      if (action === "extrude" || action === "offset") {
+        if (!amount) return;
+        positions = extrudeChoice(selection.mesh, selection.chosen, amount, action);
+        message = t(action === "extrude" ? "sculpt.extruded" : "sculpt.offsetSelection", { amount: amount.toFixed(1) });
+      } else if (action === "bridge") {
+        const bridged = bridgeChoice(selection.mesh, selection.chosen);
+        if ("error" in bridged) { setSculptTool((current) => current ? { ...current, error: t("sculpt.bridgeNeeds", { count: bridged.found }) } : current); return; }
+        positions = bridged.positions;
+        message = t(bridged.joined === "loops" ? "sculpt.bridgedLoops" : "sculpt.bridgedEdges", { count: bridged.added.toLocaleString() });
+      } else {
+        positions = alignToPlate(selection.mesh, selection.chosen);
+        if (!positions) { setSculptTool((current) => current ? { ...current, error: t("sculpt.alignFlat") } : current); return; }
+        message = t("sculpt.aligned");
+      }
+      commitSculpt(shape, positions, message, false);
+      setSculptTool((current) => current ? { ...current, chosen: 0, error: null } : current);
+      return;
+    }
     applyToSelection(selection.mesh, selection.chosen, action);
     const positions = soupOf(selection.mesh);
     commitSculpt(shape, positions, t("sculpt.selectionDone", { action: t(`sculpt.selection.${action}`) }), true);
@@ -9370,6 +9394,14 @@ export function LayerlingEditor({
     state.live = LiveMesh.fromSoup(positions);
     state.selection = { mesh: selection.mesh, chosen: kept, stale: false };
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Make solid on a coarse mesh: the triangles' size is too coarse a grid - about 160 voxels on the longest side instead. */
+  const solidDetailFor = () => {
+    const target = sculptTarget();
+    if (!target) return Infinity;
+    const box = target.state.live.bounds();
+    const longest = Math.max(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]);
+    return Number.isFinite(longest) && longest > 0 ? Math.max(0.05, Math.round((longest / 160) * 100) / 100) : Infinity;
+  };
   const applyRemesh = useCallback(() => {
     flushSculpt();
     const target = sculptTarget();
@@ -9383,7 +9415,8 @@ export function LayerlingEditor({
         const current = shapesRef.current.find((candidate) => candidate.id === shape.id);
         if (!current || projectShapesFingerprint([current]) !== fingerprint) throw new Error(t("sculpt.changed"));
         const amount = tool.amount.toFixed(1);
-        const message = tool.remeshMode === "remesh" ? t("sculpt.remeshed", { triangles: result.triangles.toLocaleString(), voxel: result.voxel.toFixed(2) })
+        const message = tool.remeshMode === "solid" ? t("sculpt.solidDone", { triangles: result.triangles.toLocaleString(), voxel: result.voxel.toFixed(2) })
+          : tool.remeshMode === "remesh" ? t("sculpt.remeshed", { triangles: result.triangles.toLocaleString(), voxel: result.voxel.toFixed(2) })
           : tool.remeshMode === "offset" ? t("sculpt.offsetDone", { amount }) : t("sculpt.thickened", { amount });
         window.layerlingSculptLive?.(shape.id, null);
         commitSculpt(current, result.positions, message + (result.coarse ? t("sculpt.coarse", { voxel: result.voxel.toFixed(2) }) : ""), false);
@@ -16863,7 +16896,9 @@ export function LayerlingEditor({
           onSymmetry={(symmetry) => setSculptTool((current) => current ? { ...current, symmetry } : current)}
           onStrength={(strength) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.05, Math.min(1, strength)) } : current)}
           onSelection={applySculptSelection}
-          onRemeshMode={(remeshMode) => setSculptTool((current) => current && !current.busy ? { ...current, remeshMode, amount: remeshMode === "thicken" ? Math.max(0.2, Math.abs(current.amount)) : current.amount, error: null } : current)}
+          editAmount={sculptTool.editAmount ?? 1}
+          onEditAmount={(editAmount) => setSculptTool((current) => current ? { ...current, editAmount } : current)}
+          onRemeshMode={(remeshMode) => { const solidDetail = remeshMode === "solid" ? solidDetailFor() : Infinity; setSculptTool((current) => current && !current.busy ? { ...current, remeshMode, detail: Math.min(current.detail, solidDetail), amount: remeshMode === "thicken" ? Math.max(0.2, Math.abs(current.amount)) : current.amount, error: null } : current); }}
           onDetail={(detail) => setSculptTool((current) => current && !current.busy ? { ...current, detail: Math.max(0.05, Math.min(5, detail)), error: null } : current)}
           onAmount={(amount) => setSculptTool((current) => current && !current.busy ? { ...current, amount: Math.max(current.remeshMode === "thicken" ? 0.2 : -10, Math.min(10, amount)), error: null } : current)}
           onRemesh={applyRemesh}
