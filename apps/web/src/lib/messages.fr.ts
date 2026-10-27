@@ -4185,4 +4185,9 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "status.centredTogether": "{count} pièces centrées les unes sur les autres",
   "status.centredOnPlate": "Centré sur le plan de travail",
   "status.alreadyCentred": "Déjà centré",
+  "largeMesh.title": "Un maillage volumineux",
+  "largeMesh.body": "Il compte {triangles} triangles ; découper, grouper et fusionner en traitent {limit} dans ce projet. Relever la limite à {proposed} pour qu'ils s'appliquent ? Sur un ordinateur ancien, une découpe peut alors bloquer l'éditeur quelques secondes. Vous pouvez la changer à tout moment dans les Réglages, sous Afficher les réglages avancés.",
+  "largeMesh.keep": "Pas maintenant",
+  "largeMesh.raise": "Relever à {proposed}",
+  "largeMesh.raised": "Découper et grouper traitent maintenant jusqu'à {proposed} triangles dans ce projet (Réglages, avancés).",
 };

@@ -213,7 +213,7 @@ import { importedShapeFromStl } from "@/lib/stlImport";
 import { exportMeshesToStl } from "@/lib/stlExport";
 import { THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
-import { DEFAULT_TAPER_DIMENSION_MAX, readWorkspaceDefault, saveWorkspaceDefault, keyboardNudgeCoarseFactor, keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
+import { DEFAULT_TAPER_DIMENSION_MAX, readWorkspaceDefault, saveWorkspaceDefault, keyboardNudgeCoarseFactor, keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, workplaneSettingsFingerprint, largerMeshLimit } from "@/lib/workplaneSettings";
 import { leaveGuardReleased } from "@/lib/leaveGuard";
 import { MCP_GRIDFINITY_LIST_KEYS, mcpGridfinityListParams, mcpGridfinityPaddingPatch, mcpThreadSizeParams } from "@/lib/mcpShapeSettings";
 import { createNoteId, normalizeNotes, NOTE_COUNT_LIMIT, patchNote, referencePoints } from "@/lib/workplaneNotes";
@@ -11265,6 +11265,20 @@ export function LayerlingEditor({
   }, [buildSectionSvg, projectName]);
 
   // Der Dateiimport steht weiter unten; die MCP-Aktion nimmt denselben Weg.
+  /**
+   * Build 76: a mesh imported with more triangles than cutting and grouping handle (Settings,
+   * advanced) brings a small notice offering to raise the limit for this design - once a session.
+   */
+  const [largeMeshOffer, setLargeMeshOffer] = useState<{ triangles: number; limit: number; proposed: number } | null>(null);
+  const largeMeshOffered = useRef(false);
+  const offerLargerMeshLimitRef = useRef((imported: WorkplaneShape[]) => {
+    if (largeMeshOffered.current) return;
+    const limit = workspaceSettingsRef.current.booleanTriangleLimit;
+    const triangles = imported.reduce((most, shape) => Math.max(most, shape.importedMesh?.triangleCount ?? 0), 0);
+    if (triangles <= limit) return;
+    largeMeshOffered.current = true;
+    setLargeMeshOffer({ triangles, limit, proposed: largerMeshLimit(triangles) });
+  });
   const importFilesRef = useRef<((files: File[], fileHandle?: LylFileHandle, options?: { keepSvgPage?: boolean; svgWidth?: number | null }) => Promise<{ importedIds: string[]; failures: Array<{ fileName: string; reason: string }> }>) | null>(null);
 
   const {
@@ -14443,6 +14457,7 @@ export function LayerlingEditor({
       [successSummary, ...notes].join(" ") + failureSummary,
     );
     setTopPanel(null);
+    offerLargerMeshLimitRef.current(importedShapes);
 
     return { importedIds: importedShapes.map((shape) => shape.id), failures };
   }, [commitShapes, onOpenLylProjectFile]);
@@ -16374,6 +16389,21 @@ export function LayerlingEditor({
           onApply={applyMeshRound}
           onCancel={() => setMeshRoundTool(null)}
         />
+      ) : null}
+      {largeMeshOffer ? (
+        <div className="new-version-notice large-mesh-notice" role="alertdialog" aria-labelledby="large-mesh-title" aria-describedby="large-mesh-body">
+          <strong id="large-mesh-title">{t("largeMesh.title")}</strong>
+          <p id="large-mesh-body">{t("largeMesh.body", { triangles: largeMeshOffer.triangles.toLocaleString(), limit: largeMeshOffer.limit.toLocaleString(), proposed: largeMeshOffer.proposed.toLocaleString() })}</p>
+          <div className="new-version-notice-actions">
+            <button type="button" className="secondary" onClick={() => setLargeMeshOffer(null)}>{t("largeMesh.keep")}</button>
+            <button type="button" className="primary" onClick={() => {
+              const proposed = largeMeshOffer.proposed;
+              setLargeMeshOffer(null);
+              updateProjectWorkspaceSettings({ workspace: { ...workspaceSettingsRef.current, booleanTriangleLimit: Math.max(workspaceSettingsRef.current.booleanTriangleLimit, proposed) }, snap: snapGridRef.current });
+              setNotice(t("largeMesh.raised", { proposed: proposed.toLocaleString() }));
+            }}>{t("largeMesh.raise", { proposed: largeMeshOffer.proposed.toLocaleString() })}</button>
+          </div>
+        </div>
       ) : null}
       {sculptTool ? (
         <MeshSculptPanel

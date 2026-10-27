@@ -4208,4 +4208,9 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "status.centredTogether": "{count} dílů vystředěno na sebe",
   "status.centredOnPlate": "Vystředěno na pracovní rovině",
   "status.alreadyCentred": "Již vystředěno",
+  "largeMesh.title": "Velká síť",
+  "largeMesh.body": "Má {triangles} trojúhelníků; řezání, seskupování a slučování v tomto návrhu zpracují {limit}. Zvýšit limit na {proposed}, aby s ní fungovaly? Na starším počítači pak může řez editor na několik sekund zdržet. Změnit to můžete kdykoli v Nastavení, pod Zobrazit pokročilá nastavení.",
+  "largeMesh.keep": "Teď ne",
+  "largeMesh.raise": "Zvýšit na {proposed}",
+  "largeMesh.raised": "Řezání a seskupování v tomto návrhu nyní zpracují až {proposed} trojúhelníků (Nastavení, pokročilé).",
 };

@@ -4187,4 +4187,9 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "status.centredTogether": "Delov poravnanih na sredino: {count}",
   "status.centredOnPlate": "Na sredini delovne ravnine",
   "status.alreadyCentred": "Že na sredini",
+  "largeMesh.title": "Velika mreža",
+  "largeMesh.body": "Ima {triangles} trikotnikov; rezanje, združevanje in spajanje v tem načrtu obdelajo {limit}. Dvignem mejo na {proposed}, da bodo delovali z njo? Na starejšem računalniku lahko rez nato urejevalnik zadrži nekaj sekund. Kadar koli jo lahko spremenite v Nastavitvah, pod Pokaži napredne nastavitve.",
+  "largeMesh.keep": "Ne zdaj",
+  "largeMesh.raise": "Dvigni na {proposed}",
+  "largeMesh.raised": "Rezanje in združevanje v tem načrtu zdaj obdelata do {proposed} trikotnikov (Nastavitve, napredno).",
 };

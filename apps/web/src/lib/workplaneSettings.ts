@@ -35,6 +35,16 @@ export const BOOLEAN_TRIANGLE_LIMIT_PRESETS = [
 ] as const;
 export type BooleanTriangleLimitPreset = (typeof BOOLEAN_TRIANGLE_LIMIT_PRESETS)[number]["id"];
 
+/**
+ * Build 76: the limit offered when a mesh larger than the current one is imported - room for twice
+ * its triangles (it and what it is cut or grouped with), in steps of 250,000, at least the "Fast
+ * computer" preset, at most the largest limit.
+ */
+export function largerMeshLimit(triangles: number) {
+  const step = 250_000;
+  return Math.min(MAX_BOOLEAN_TRIANGLE_LIMIT, Math.max(1_000_000, Math.ceil((triangles * 2) / step) * step));
+}
+
 export function booleanTriangleLimitPreset(limit: number): BooleanTriangleLimitPreset | null {
   return BOOLEAN_TRIANGLE_LIMIT_PRESETS.find((preset) => preset.limit === limit)?.id ?? null;
 }

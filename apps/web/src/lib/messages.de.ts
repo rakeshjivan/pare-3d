@@ -4209,4 +4209,9 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "status.centredTogether": "{count} Teile aufeinander zentriert",
   "status.centredOnPlate": "Auf der Arbeitsebene zentriert",
   "status.alreadyCentred": "Bereits zentriert",
+  "largeMesh.title": "Ein großes Netz",
+  "largeMesh.body": "Es hat {triangles} Dreiecke; Schneiden, Gruppieren und Verschmelzen verarbeiten in diesem Entwurf {limit}. Grenze auf {proposed} anheben, damit sie damit arbeiten? Auf einem älteren Computer kann ein Schnitt den Editor dann einige Sekunden aufhalten. Sie können das jederzeit in den Einstellungen unter Erweiterte Einstellungen zeigen ändern.",
+  "largeMesh.keep": "Nicht jetzt",
+  "largeMesh.raise": "Auf {proposed} anheben",
+  "largeMesh.raised": "Schneiden und Gruppieren verarbeiten in diesem Entwurf jetzt bis zu {proposed} Dreiecke (Einstellungen, erweitert).",
 };

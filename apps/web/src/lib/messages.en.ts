@@ -4210,6 +4210,11 @@ export const MESSAGES_EN = {
   "status.centredTogether": "Centred {count} parts on one another",
   "status.centredOnPlate": "Centred on the workplane",
   "status.alreadyCentred": "Already centred",
+  "largeMesh.title": "A large mesh",
+  "largeMesh.body": "It has {triangles} triangles; cutting, grouping and merging handle {limit} on this design. Raise the limit to {proposed} so they work on it? On an older computer a cut may then hold the editor for a few seconds. You can change it any time in Workspace settings, under Show advanced settings.",
+  "largeMesh.keep": "Not now",
+  "largeMesh.raise": "Raise to {proposed}",
+  "largeMesh.raised": "Cutting and grouping now handle up to {proposed} triangles on this design (Settings, advanced).",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

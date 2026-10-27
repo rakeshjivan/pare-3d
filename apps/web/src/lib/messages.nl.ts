@@ -4209,4 +4209,9 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "status.centredTogether": "{count} delen op elkaar gecentreerd",
   "status.centredOnPlate": "Op het werkvlak gecentreerd",
   "status.alreadyCentred": "Al gecentreerd",
+  "largeMesh.title": "Een groot net",
+  "largeMesh.body": "Het heeft {triangles} driehoeken; snijden, groeperen en samenvoegen verwerken er {limit} in dit ontwerp. De grens verhogen naar {proposed} zodat ze ermee werken? Op een oudere computer kan een snede de editor dan enkele seconden ophouden. U kunt dit altijd wijzigen in Instellingen, onder Geavanceerde instellingen tonen.",
+  "largeMesh.keep": "Niet nu",
+  "largeMesh.raise": "Verhogen naar {proposed}",
+  "largeMesh.raised": "Snijden en groeperen verwerken in dit ontwerp nu tot {proposed} driehoeken (Instellingen, geavanceerd).",
 };
