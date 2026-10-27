@@ -376,6 +376,10 @@ function teethFootprint(m: Mesh, frame: THREE.Matrix4, toCommon: THREE.Matrix4, 
   return out;
 }
 
+/** Build 77: the horseshoe under a quadrant opposite a full arch - its band, how far it reaches past the full arch's base, its thickness (mm). */
+export const HORSESHOE_BAND = 8;
+export const HORSESHOE_MARGIN = 0.5;
+export const HORSESHOE_THICKNESS = 3;
 const mirrorRing = (ring: Ring): Ring => ring.map(([x, y]) => [-x, y] as [number, number]).reverse();
 
 function engrave(runtime: ManifoldRuntime, solid: ManifoldSolid, text: string, height: number, origin: THREE.Vector3, right: THREE.Vector3, up: THREE.Vector3, into: THREE.Vector3, depth = 0.6): ManifoldSolid {
@@ -760,6 +764,39 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     }
     built.push({ arch, built: made });
   }
+  // Build 77: a quadrant opposite a full arch, articulated. The pair's frame is the full arch's
+  // (pairFrame), so the hinge has a condyle behind each side of it; the quadrant's base grows into a
+  // horseshoe following the full arch's base, which carries both condyle posts and the incisal
+  // table - hinge, hinge and pin hold the models in the bite, so nothing can rock.
+  let horseshoe = false;
+  // The full arch's base outline in the pair's frame: its two heels set the hinge's width.
+  let fullOutline: Ring[] = [];
+  if (pair && shared && options.hinge && built.length === 2 && built.some(({ arch }) => arch.partial) && built.some(({ arch }) => !arch.partial)) {
+    const part = built.find(({ arch }) => arch.partial)!, full = built.find(({ arch }) => !arch.partial)!;
+    const toPair = (role: DentalRole, ring: Ring) => (role === "upper" ? mirrorRing(ring) : ring);
+    const sections: Array<{ delete(): void }> = [];
+    const keep = <T extends { delete(): void }>(item: T) => { sections.push(item); return item; };
+    fullOutline = full.built.footprint.map((ring) => toPair(full.arch.role, ring));
+    const fullBase = keep(new runtime.CrossSection(fullOutline, "Positive"));
+    const partBase = keep(new runtime.CrossSection(part.built.footprint.map((ring) => toPair(part.arch.role, ring)), "Positive"));
+    const band = keep(keep(fullBase.offset(HORSESHOE_MARGIN, "Round", 2, 32)).subtract(keep(fullBase.offset(-HORSESHOE_BAND, "Round", 2, 32))));
+    // Closed and opened by 2.5 mm, so it has no pinholes or slivers where the base's outline wanders.
+    const plate2d = keep(keep(keep(keep(keep(band.add(keep(partBase.offset(0.5, "Round", 2, 32)))).offset(2.5, "Round", 2, 32)).offset(-2.5, "Round", 2, 32)).offset(-1.5, "Round", 2, 32)).offset(1.5, "Round", 2, 32));
+    const rings = (plate2d.toPolygons() as Array<Array<[number, number]>>).map((ring) => toPair(part.arch.role, ring.map(([x, y]) => [x, y] as [number, number])));
+    if (rings.length) {
+      const own = new runtime.CrossSection(rings, "EvenOdd");
+      const thickness = Math.max(HORSESHOE_THICKNESS, Math.min(options.base, 5));
+      const plate = own.extrude(thickness).translate([0, 0, part.built.floor]);
+      own.delete();
+      const joined = runtime.Manifold.union(part.built.solid, plate);
+      part.built.solid.delete();
+      plate.delete();
+      part.built.solid = joined;
+      part.built.footprint = rings;
+      horseshoe = true;
+    }
+    sections.forEach((section) => section.delete());
+  }
   const warnings = [...new Set([...(apart ? ["apart"] : []), ...built.flatMap(({ built: b }) => b.warnings)])];
   const voxel = built.find(({ built: b }) => b.voxel !== null)?.built.voxel ?? null;
   const toFree: ManifoldSolid[] = [];
@@ -779,6 +816,16 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     rings.forEach((ring) => ring.forEach(([, y]) => { back = Math.max(back, y); }));
     let xMin = Infinity, xMax = -Infinity;
     rings.forEach((ring) => ring.forEach(([x, y]) => { if (y > back - 8) { xMin = Math.min(xMin, x); xMax = Math.max(xMax, x); } }));
+    if (horseshoe && fullOutline.length) {
+      // Build 77: across the full arch's two heels - its rearmost point either side of its middle -
+      // however unevenly its two sides stop, so there is a condyle behind each.
+      let left = Infinity, right = -Infinity;
+      fullOutline.forEach((ring) => ring.forEach(([x]) => { left = Math.min(left, x); right = Math.max(right, x); }));
+      const middle = (left + right) / 2;
+      const heel: Array<[number, number] | null> = [null, null];
+      fullOutline.forEach((ring) => ring.forEach(([x, y]) => { const side = x < middle ? 0 : 1; if (!heel[side] || y > heel[side]![1]) heel[side] = [x, y]; }));
+      if (heel[0] && heel[1]) { xMin = Math.min(xMin, heel[0][0]); xMax = Math.max(xMax, heel[1][0]); }
+    }
     // Build 58: the incisal stop goes in front of the arch's front, in the middle of what is there.
     let front = Infinity;
     rings.forEach((ring) => ring.forEach(([, y]) => { front = Math.min(front, y); }));
@@ -802,7 +849,8 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
       return least;
     };
     const upperY = frontAt("upper"), lowerY = frontAt("lower");
-    const stop = options.incisalStop !== false && Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY } : null;
+    // Build 77: on a horseshoe the pin is the third support, so it is always there.
+    const stop = (options.incisalStop !== false || horseshoe) && Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY } : null;
     const motion = { condyle: options.condyle ?? 0, pinRaise: options.pinRaise ?? 0, table: options.incisalTable ?? "flat", joint: options.hingeJoint ?? "ball" } as const;
     // Build 65: each model's heels - its rearmost point either side of the middle - so the hinge's
     // bar reaches both, however unevenly a horseshoe's two ends stop.

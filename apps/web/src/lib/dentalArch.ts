@@ -165,7 +165,7 @@ export function teethAtMiddle(points: Ring): boolean {
   const near = points.reduce((count, [x, y]) => count + ((x - cx) ** 2 + (y - cy) ** 2 < 9 ? 1 : 0), 0);
   return near >= Math.max(10, points.length * MIDDLE_SHARE);
 }
-function teethShape(v: Float64Array, f: number[]): { partial: boolean; axis: number } | null {
+export function teethShape(v: Float64Array, f: number[]): { partial: boolean; axis: number } | null {
   const zone = toothZone({ v: v as unknown as number[], f });
   const points: Ring = [];
   for (let i = 0; i < zone.length; i += 1) if (zone[i]) points.push([v[i * 3], v[i * 3 + 1]]);
@@ -393,8 +393,24 @@ export function pairFrame(upper: CleanArch, lower: CleanArch): PairFrame {
   const inOcclusion = touching.length >= 30;
   // Level by the lower's cusp tips and incisal edges, as for a single arch; the contacts set the height.
   let turn = rotation(common, [0, 0, 1]);
-  const tilted = robustPlane(localTips(transformed(lower.mesh, turn), lower.mesh.f));
-  if (tilted && tilted.normal[2] > Math.cos((25 * Math.PI) / 180)) turn = rotation(tilted.normal, [0, 0, 1]).multiply(turn);
+  // Build 77: a quadrant opposite a full arch is levelled, laid front to back and centred by the full
+  // arch, so its occlusal plane holds across both sides (levelled by a quadrant alone it tilts, and
+  // the other side's teeth were taken for tissue and cut away) and the articulator goes on its
+  // midline, as for any full pair. The upper, turned teeth up, is read as a lower is.
+  const upperUp = (matrix: THREE.Matrix4, about = 0) => {
+    const u = transformed(upper.mesh, matrix);
+    for (let i = 2; i < u.length; i += 3) u[i] = 2 * about - u[i];
+    return u;
+  };
+  const byUpper = (() => {
+    if (!teethShape(transformed(lower.mesh, turn), lower.mesh.f)?.partial) return false;
+    const shape = teethShape(upperUp(turn), upper.mesh.f);
+    return Boolean(shape && !shape.partial);
+  })();
+  const tilted = byUpper ? robustPlane(localTips(upperUp(turn), upper.mesh.f)) : robustPlane(localTips(transformed(lower.mesh, turn), lower.mesh.f));
+  // The upper's plane, read teeth up, faces the other way along z.
+  const level: Vec3 | null = tilted ? (byUpper ? [-tilted.normal[0], -tilted.normal[1], tilted.normal[2]] : tilted.normal) : null;
+  if (level && level[2] > Math.cos((25 * Math.PI) / 180)) turn = rotation(level, [0, 0, 1]).multiply(turn);
   let height: number | null = null;
   if (inOcclusion) {
     const zs = touching.map((p) => new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(turn).z);
@@ -407,7 +423,13 @@ export function pairFrame(upper: CleanArch, lower: CleanArch): PairFrame {
     const tips = robustPlane(localTips(v, lower.mesh.f));
     height = tips ? tips.height : top;
   }
-  const yaw = yawToBack(v, top, height, teethShape(v, lower.mesh.f));
+  let yaw = yawToBack(v, top, height, teethShape(v, lower.mesh.f));
+  if (byUpper) {
+    const u = upperUp(turn, height);
+    let upperTop = -Infinity;
+    for (let i = 2; i < u.length; i += 3) upperTop = Math.max(upperTop, u[i]);
+    yaw = yawToBack(u, upperTop, height, teethShape(u, upper.mesh.f));
+  }
   const spin = new THREE.Matrix4().makeRotationZ(yaw.angle);
   const shift = new THREE.Matrix4().makeTranslation(-yaw.centreX, -yaw.centreY, -height);
   return { frame: shift.multiply(spin).multiply(turn), contacts: touching.length, inOcclusion };
