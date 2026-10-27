@@ -54,4 +54,18 @@ describe("gum cut without slivers (build 76)", () => {
     const after = cutAlongField(m, field, keep);
     for (let i = 0; i < corners; i += 1) if (keep[i]) for (let k = 0; k < 3; k += 1) expect(after.v[i * 3 + k]).toBe(m.v[i * 3 + k]);
   });
+  it("never pinches the kept surface to a point where the line passes a corner more than once", () => {
+    // A saddle centred just off a corner: the line crosses four times round it, close to it.
+    const g = grid(40, 0.25);
+    const n = g.v.length / 3;
+    const saddle = new Float64Array(n);
+    for (let i = 0; i < n; i += 1) saddle[i] = (g.v[i * 3] - 5.02) * (g.v[i * 3 + 1] - 4.97);
+    const after = cutAlongField(g, saddle);
+    // Round every corner, the open edges of its fan: two at most (one fan), never four (a bow-tie).
+    const open = new Map<string, number>();
+    for (let t = 0; t < after.f.length; t += 3) for (let k = 0; k < 3; k += 1) { const a = after.f[t + k], b = after.f[t + (k + 1) % 3]; const key = a < b ? `${a},${b}` : `${b},${a}`; open.set(key, (open.get(key) ?? 0) + 1); }
+    const rim = new Map<number, number>();
+    for (const [key, uses] of open) if (uses === 1) for (const c of key.split(",").map(Number)) rim.set(c, (rim.get(c) ?? 0) + 1);
+    expect(Math.max(...rim.values())).toBeLessThanOrEqual(2);
+  });
 });

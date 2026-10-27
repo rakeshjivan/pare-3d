@@ -60,7 +60,7 @@ The key is [[L]]. [[Esc]] cancels.
 
 Right-click a selection and choose **{{ui:contextMenu.groupArrange}} ›** for the moves that otherwise take several clicks:
 
-- **{{ui:contextMenu.centreTogether}}** (two or more parts) - every part on the middle of the whole selection, across the plate (X and Y); heights stay as they are. If one of the parts is locked, the others centre on it.
+- **{{ui:contextMenu.centreTogether}}** (two or more parts) - every part on the middle of the whole selection, across the plate (X and Y); heights stay as they are.
 - **{{ui:contextMenu.alignTool}}** opens Align with its dots, for edges and other alignments ([[L]]).
 - **{{ui:contextMenu.centrePlate}}** - the selection, as it stands, on the middle of the workplane.
 - **{{ui:contextMenu.flip}}** turns the selection upside down about its left-right axis; **{{ui:contextMenu.turnAround}}** turns it about the vertical, front to back. Something standing on the workplane is set back down on it, in the same step of undo - an upper model printed teeth up, say.

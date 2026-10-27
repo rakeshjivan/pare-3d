@@ -3,7 +3,7 @@
  * is closed with a smooth patch that meets the surface round it without a crease.
  *
  * The patch is made the way Liepa ("Filling Holes in Meshes", Eurographics SGP 2003) describes it:
- * an initial triangulation of the hole, refined until its triangles match the surface round it, then
+ * an initial triangulation of the hole with triangles the size of the rim's edges, then
  * faired - each new corner moved until the surface bends evenly across it (the bi-Laplacian "umbrella"
  * iteration of Kobbelt et al., "Interactive multi-resolution modeling on arbitrary meshes", 1998),
  * with the surface round the hole held still, so the patch carries on its curvature.
@@ -155,15 +155,20 @@ function dropSpecks(kept: number[], cut: Set<number>, key: (a: number, b: number
   for (let t = 0; t < m; t += 1) { join(kept[t * 3], kept[t * 3 + 1]); join(kept[t * 3 + 1], kept[t * 3 + 2]); }
   const uses = new Map<number, number>();
   for (let t = 0; t < m; t += 1) for (let k = 0; k < 3; k += 1) { const e = key(kept[t * 3 + k], kept[t * 3 + ((k + 1) % 3)]); uses.set(e, (uses.get(e) ?? 0) + 1); }
-  const size = new Map<number, number>(), original = new Set<number>();
+  const size = new Map<number, number>(), original = new Set<number>(), touched = new Set<number>();
   for (let t = 0; t < m; t += 1) {
     const r = find(kept[t * 3]);
     size.set(r, (size.get(r) ?? 0) + 1);
-    for (let k = 0; k < 3; k += 1) { const e = key(kept[t * 3 + k], kept[t * 3 + ((k + 1) % 3)]); if (uses.get(e) === 1 && !cut.has(e)) original.add(r); }
+    for (let k = 0; k < 3; k += 1) {
+      const e = key(kept[t * 3 + k], kept[t * 3 + ((k + 1) % 3)]);
+      if (uses.get(e) === 1 && !cut.has(e)) original.add(r);
+      if (cut.has(e)) touched.add(r);
+    }
   }
   let biggest = 0;
   for (const c of size.values()) biggest = Math.max(biggest, c);
-  const speck = (r: number) => !original.has(r) && size.get(r)! < biggest && size.get(r)! < Math.max(50, removed * 0.2);
+  // Build 76: only a piece the cut reached - a small closed part elsewhere (a letter, a loose piece) stays.
+  const speck = (r: number) => touched.has(r) && !original.has(r) && size.get(r)! < biggest && size.get(r)! < Math.max(50, removed * 0.2);
   const out: number[] = [];
   let dropped = 0;
   for (let t = 0; t < m; t += 1) { if (speck(find(kept[t * 3]))) { dropped += 1; continue; } out.push(kept[t * 3], kept[t * 3 + 1], kept[t * 3 + 2]); }

@@ -8956,7 +8956,7 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; historyStart?: number; historyMoved?: boolean } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
   /** Build 76: bumped when a stroke is added or stepped back, so Undo and Redo show what they can do. */
   const [, setSculptSteps] = useState(0);
   const sculptToolRef = useRef(sculptTool);
@@ -8995,7 +8995,7 @@ export function LayerlingEditor({
       sculptHidOthers.current = true;
       setDentalHidden(Object.values(studio.slots).filter((id): id is string => Boolean(id) && id !== shape.id));
     }
-    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, historyStart: historyIndexRef.current };
+    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, panelSteps: 0, panelRedo: 0 };
     const known = sculptState.current;
     const ready = (state: SculptSession) => Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100);
     if (known && known.shapeId === shape.id && known.key === projectShapesFingerprint([shape])) {
@@ -9030,7 +9030,8 @@ export function LayerlingEditor({
   const commitSculpt = (shape: WorkplaneShape, positions: ArrayLike<number>, message: string, keepCopy: boolean) => {
     const next = canonicalizeShape(shapeWithWorldPositions(shape, Array.from(positions)));
     commitShapes(shapesRef.current.map((candidate) => (candidate.id === shape.id ? next : candidate)), next.id, message);
-    setSculptTool((current) => current && !current.historyMoved ? { ...current, historyMoved: true } : current);
+    // Build 76: one more step the panel's Undo can take back; a new step ends what Redo could do again.
+    setSculptTool((current) => current ? { ...current, panelSteps: (current.panelSteps ?? 0) + 1, panelRedo: 0 } : current);
     if (keepCopy && sculptState.current) sculptState.current.key = projectShapesFingerprint([next]);
     else { sculptState.current?.live.dispose(); sculptState.current = null; }
     return next;
@@ -9423,17 +9424,22 @@ export function LayerlingEditor({
     if (!open) return false;
     const state = sculptState.current;
     if (state && state.shapeId === open.shapeId && (back ? state.undo.length : state.redo.length)) return true;
-    const start = open.historyStart ?? historyIndex;
-    return back ? historyIndex > start : historyIndex < history.length - 1 && historyIndex >= start && Boolean(open.historyMoved);
+    // Counted, not compared by index: a full history drops its oldest step at each new one, and the index stays put.
+    if (back) return (open.panelSteps ?? 0) > 0 && historyIndex > 0;
+    // Strokes not yet in the part would go in as a new step, which ends what could be done again.
+    if (state && state.shapeId === open.shapeId && state.strokes > 0) return false;
+    return (open.panelRedo ?? 0) > 0 && historyIndex < history.length - 1;
   };
   const stepSculptPanel = (back: boolean) => {
     if (stepSculpt(back)) return;
     if (!sculptCanStep(back)) return;
     flushSculptRef.current();
     if (back) undo(); else redo();
-    setSculptTool((current) => current ? { ...current, chosen: 0, teethHit: 0, teethWarned: undefined, teethAction: undefined, historyMoved: true } : current);
+    setSculptTool((current) => current ? { ...current, chosen: 0, teethHit: 0, teethWarned: undefined, teethAction: undefined, panelSteps: Math.max(0, (current.panelSteps ?? 0) + (back ? -1 : 1)), panelRedo: Math.max(0, (current.panelRedo ?? 0) + (back ? 1 : -1)) } : current);
     if (sculptTool?.trim) window.setTimeout(() => void ensureDentalAreasRef.current(), 0);
   };
+  const stepSculptPanelRef = useRef(stepSculptPanel);
+  stepSculptPanelRef.current = stepSculptPanel;
   // While Sculpt is open: Ctrl+Z steps through its strokes; any other shortcut, or a click outside the
   // panel and the view, puts the strokes into the part first (Save, Export and the rest see them).
   useEffect(() => {
@@ -9443,7 +9449,8 @@ export function LayerlingEditor({
       const key = event.key.toLowerCase();
       // Ctrl (or Cmd) on its own comes first, before the letter: nothing to do yet.
       if (key === "control" || key === "meta" || key === "shift" || key === "alt") return;
-      if ((key === "z" || key === "y") && stepSculpt(key === "z" && !event.shiftKey)) { event.preventDefault(); event.stopPropagation(); return; }
+      // Build 76: Ctrl+Z and Ctrl+Y do what the panel's Undo and Redo do - never back past its opening.
+      if (key === "z" || key === "y") { event.preventDefault(); event.stopPropagation(); stepSculptPanelRef.current(key === "z" && !event.shiftKey); return; }
       flushSculptRef.current();
     };
     const onPointer = (event: PointerEvent) => {
@@ -14606,6 +14613,7 @@ export function LayerlingEditor({
     const movable = selectedShapes.filter((shape) => !shape.locked);
     if (!movable.length) return;
     const before = worldBoxOf(movable);
+    if (![before.minX, before.maxX, before.minY, before.maxY, before.minZ, before.maxZ].every(Number.isFinite)) { setNotice(t("status.nothingMeasurable")); return; }
     const onPlate = placementWorkplaneIsBase(placementWorkplane) && Math.abs(before.minY) < 0.01;
     const axis = about === "flip" ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
     const delta = new THREE.Quaternion().setFromAxisAngle(axis, Math.PI);
@@ -14614,30 +14622,31 @@ export function LayerlingEditor({
     let turned = shapes.map((shape) => ids.has(shape.id) ? canonicalizeShape(bakeShapeTransformIntoMesh(canonicalizeShape({ ...shape, ...rotatedGeometryShapePatch(shape, delta, pivot) }))) : shape);
     if (onPlate) {
       const lift = -worldBoxOf(turned.filter((shape) => ids.has(shape.id))).minY;
-      if (Math.abs(lift) > 1e-6) turned = turned.map((shape) => ids.has(shape.id) ? { ...shape, elevation: cleanNearZero((shape.elevation ?? 0) + lift) } : shape);
+      if (Number.isFinite(lift) && Math.abs(lift) > 1e-6) turned = turned.map((shape) => ids.has(shape.id) ? { ...shape, elevation: cleanNearZero((shape.elevation ?? 0) + lift) } : shape);
     }
     commitShapes(turned, selectedIds, t(about === "flip" ? "status.flipped" : "status.turnedAround", { count: movable.length }));
   }, [refuseLockedSelection, commitShapes, hasSelection, placementWorkplane, selectedIds, selectedShapes, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
   /**
-   * Build 76 (right-click, Arrange): centre across the plate (X and Y as the rulers read; X and Z
-   * here). "together": every part on the middle of the whole selection; "plate": the selection,
-   * kept as it is, on the middle of the workplane.
+   * Build 76 (right-click, Align): every part on the middle of the whole selection, across the plate
+   * (X and Y as the rulers read; X and Z here). Centring on the workplane is the Centre command's.
    */
-  const centreSelected = useCallback((on: "together" | "plate") => {
+  const centreSelectedTogether = useCallback(() => {
     if (!hasSelection) { setNotice(t("status.selectShapeFirst")); return; }
     if (refuseLockedSelection()) return;
     const movable = selectedShapes.filter((shape) => !shape.locked);
-    if (!movable.length || (on === "together" && selectedShapes.length < 2)) return;
-    // A locked part stays where it is, and the others centre on it.
-    const locked = selectedShapes.find((shape) => shape.locked);
-    const moves = centringMoves(movable.map((shape) => ({ id: shape.id, box: worldBoxOf([shape]) })), on, worldBoxOf(locked ? [locked] : selectedShapes), { x: placementWorkplane.origin.x, z: placementWorkplane.origin.z });
+    if (movable.length < 2) return;
+    const boxes = movable.map((shape) => ({ id: shape.id, box: worldBoxOf([shape]) }));
+    const all = worldBoxOf(movable);
+    // A part with nothing to measure (a group of hidden parts) gives no box: nothing is moved.
+    if (![all, ...boxes.map((entry) => entry.box)].every((box) => Number.isFinite(box.minX) && Number.isFinite(box.maxX) && Number.isFinite(box.minZ) && Number.isFinite(box.maxZ))) { setNotice(t("status.nothingMeasurable")); return; }
+    const moves = centringMoves(boxes, "together", all);
     if ([...moves.values()].every((move) => Math.abs(move.x) < 1e-4 && Math.abs(move.z) < 1e-4)) { setNotice(t("status.alreadyCentred")); return; }
     commitShapes(
       shapes.map((shape) => { const move = moves.get(shape.id); return move ? { ...shape, x: cleanNearZero(shape.x + move.x), z: cleanNearZero(shape.z + move.z) } : shape; }),
       selectedIds,
-      t(on === "together" ? "status.centredTogether" : "status.centredOnPlate", { count: movable.length }),
+      t("status.centredTogether", { count: movable.length }),
     );
-  }, [refuseLockedSelection, commitShapes, hasSelection, placementWorkplane, selectedIds, selectedShapes, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refuseLockedSelection, commitShapes, hasSelection, selectedIds, selectedShapes, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
@@ -15292,11 +15301,11 @@ export function LayerlingEditor({
     const arrange: ShapeContextMenuItem[] = [];
     if (!selectionLocked) {
       if (selectedShapes.length >= 2) arrange.push(
-        { key: "centreTogether", label: t("contextMenu.centreTogether"), onSelect: () => centreSelected("together") },
+        { key: "centreTogether", label: t("contextMenu.centreTogether"), onSelect: centreSelectedTogether },
         { key: "alignTool", label: t("contextMenu.alignTool"), shortcut: "L", onSelect: toggleAlignMode },
       );
       arrange.push(
-        { key: "centrePlate", label: t("contextMenu.centrePlate"), onSelect: () => centreSelected("plate") },
+        { key: "centrePlate", label: t("contextMenu.centrePlate"), onSelect: centerSelectionOnWorkplane },
         { key: "flip", label: t("contextMenu.flip"), separated: true, onSelect: () => halfTurnSelected("flip") },
         { key: "turnAround", label: t("contextMenu.turnAround"), onSelect: () => halfTurnSelected("turn") },
         { key: "mirrorX", label: t("contextMenu.mirrorLeftRight"), separated: true, onSelect: () => mirrorSelectionAcross("x") },

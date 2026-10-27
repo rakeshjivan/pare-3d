@@ -10,7 +10,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Trim in Dental Studio warns only about the crowns of the teeth - within 6 mm of the cusp tips - not the gum, palate or flaps of tissue it counted before; a few triangles at the edge of a stroke are not warned about. A tall tag of tissue right behind the last molar can still be taken for a tooth.",
       "Erase & Fill, in Trim and in Sculpt: removes what you selected and closes the hole with a smooth patch that carries on the surface round it, for a bubble, spike or void on a scan. The crown warning covers it too.",
       "Undo and Redo buttons in the Trim and Sculpt panel step back through strokes, deletes and fills made since the panel opened - never further back than that.",
-      "The gum cut no longer splits thin slivers off along the margin: the line now moves a corner onto itself where it passes close by. On real scans, slivers fell by about a quarter; the rest are on the flat floor, where they make no difference to the print.",
+      "The gum cut no longer splits thin slivers off along the margin: the line now moves a corner onto itself where it passes close by. On real scans, slivers fell by about a fifth; the rest are on the flat floor, where they make no difference to the print.",
     ],
   },
   {

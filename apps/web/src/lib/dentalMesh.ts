@@ -1093,6 +1093,37 @@ export function cutAlongField(m: Mesh, field: Float64Array, keep?: Uint8Array, s
   // Corners moved onto the line: kept, and the cut passes through them.
   const onLine = new Uint8Array(corners);
   if (snapShare > 0) {
+    // The triangles round each corner.
+    const start = new Int32Array(corners + 1);
+    for (const c of m.f) start[c + 1] += 1;
+    for (let i = 0; i < corners; i += 1) start[i + 1] += start[i];
+    const fill = start.slice(0, corners), round = new Int32Array(m.f.length);
+    for (let t = 0; t < m.f.length; t += 3) for (let k = 0; k < 3; k += 1) round[fill[m.f[t + k]]++] = t;
+    const normal = (t: number, at: number, x: number, y: number, z: number) => {
+      const q = [0, 1, 2].map((k) => { const c = m.f[t + k]; return c === at ? [x, y, z] : [v[c * 3], v[c * 3 + 1], v[c * 3 + 2]]; });
+      const ux = q[1][0] - q[0][0], uy = q[1][1] - q[0][1], uz = q[1][2] - q[0][2], wx = q[2][0] - q[0][0], wy = q[2][1] - q[0][1], wz = q[2][2] - q[0][2];
+      return [uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx];
+    };
+    // A corner is moved only where the line passes it once (the corners round it change side
+    // twice, no more - else the kept surface would meet itself at a point there), it is not on the
+    // scan's own edge, and no triangle round it turns over.
+    const sound = (near: number, x: number, y: number, z: number) => {
+      let changes = 0;
+      const edges = new Map<number, number>();
+      for (let r = start[near]; r < start[near + 1]; r += 1) {
+        const t = round[r];
+        const others = [m.f[t], m.f[t + 1], m.f[t + 2]].filter((c) => c !== near);
+        if (others.length !== 2) return false;
+        if (above(others[0]) !== above(others[1])) changes += 1;
+        for (const c of others) edges.set(c, (edges.get(c) ?? 0) + 1);
+        if (onLine[others[0]] || onLine[others[1]]) return false;
+        const before = normal(t, -1, 0, 0, 0), after = normal(t, near, x, y, z);
+        if (before[0] * after[0] + before[1] * after[1] + before[2] * after[2] <= 0) return false;
+      }
+      // Round a corner inside the surface every neighbour is shared by two of its triangles.
+      for (const uses of edges.values()) if (uses !== 2) return false;
+      return changes === 2;
+    };
     for (let t = 0; t < m.f.length; t += 3) for (let k = 0; k < 3; k += 1) {
       const a = m.f[t + k], b = m.f[t + (k + 1) % 3];
       if (above(a) === above(b) || onLine[a] || onLine[b]) continue;
@@ -1100,7 +1131,9 @@ export function cutAlongField(m: Mesh, field: Float64Array, keep?: Uint8Array, s
       const share = fa / (fa - fb);
       const near = share < snapShare ? a : share > 1 - snapShare ? b : -1;
       if (near < 0 || keep?.[near]) continue;
-      for (let c = 0; c < 3; c += 1) v[near * 3 + c] = m.v[a * 3 + c] + (m.v[b * 3 + c] - m.v[a * 3 + c]) * share;
+      const x = m.v[a * 3] + (m.v[b * 3] - m.v[a * 3]) * share, y = m.v[a * 3 + 1] + (m.v[b * 3 + 1] - m.v[a * 3 + 1]) * share, z = m.v[a * 3 + 2] + (m.v[b * 3 + 2] - m.v[a * 3 + 2]) * share;
+      if (!sound(near, x, y, z)) continue;
+      v[near * 3] = x; v[near * 3 + 1] = y; v[near * 3 + 2] = z;
       onLine[near] = 1;
     }
   }

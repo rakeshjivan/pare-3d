@@ -99,4 +99,17 @@ describe("Erase & Fill (build 76)", () => {
     expect(result.positions.length).toBeGreaterThan(0);
     expect(edges(result.positions).more).toBe(0);
   }, 240_000);
+  it("leaves a small closed part elsewhere alone", () => {
+    const big = sculptMeshOf([...sphereSoup(10, 12), ...sphereSoup(1, 0).map((v, i) => (i % 3 === 0 ? v + 30 : v))]);
+    const chosen = new Uint8Array(big.triangles.length / 3);
+    for (let t = 0; t < chosen.length; t += 1) {
+      let y = 0, x = 0;
+      for (let k = 0; k < 3; k += 1) { y += big.points[big.triangles[t * 3 + k] * 3 + 1]; x += big.points[big.triangles[t * 3 + k] * 3]; }
+      if (y / 3 > 6 && x / 3 < 20) chosen[t] = 1;
+    }
+    const result = eraseAndFill(big.points, big.triangles, chosen);
+    let far = 0;
+    for (let i = 0; i < result.positions.length; i += 3) if (result.positions[i] > 25) far += 1;
+    expect(far / 3).toBe(sculptMeshOf(sphereSoup(1, 0)).triangles.length / 3);
+  });
 });
