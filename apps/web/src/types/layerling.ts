@@ -727,8 +727,16 @@ export type WorkplaneShape = {
   /**
    * Build 71: Dental Studio's mark - "model" on the models it made, "used" on the bite scan it used.
    * Neither is offered to Dental Studio again, so the next patient's models never pick them up.
+   * Build 79: "wax" on a wax-up tooth, `waxFor` the scan it waxes up (joined to it when the model is made).
    */
-  dental?: "model" | "used";
+  dental?: "model" | "used" | "wax";
+  waxFor?: string;
+  /**
+   * Build 79: a wax-up tooth's number (FDI), its width and length as designed (mm) and its own frame
+   * in the part's local coordinates - the middle of its incisal edge, and unit directions outward,
+   * towards the midline and towards the edge - so it can be adjusted along the arch.
+   */
+  waxTooth?: { fdi: number; width: number; length: number; frame: { origin: [number, number, number]; out: [number, number, number]; mesial: [number, number, number]; up: [number, number, number] } };
   name: string;
   kind: ShapeKind;
   color: string;

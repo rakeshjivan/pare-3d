@@ -18,9 +18,10 @@ import { getManifoldRuntime } from "@/lib/editorMeshCore";
 import { alignToBite, archFrame, biteResidual, contacts, vertexNormals, canineWidth, cleanScan, frontOf, isPartialArch, marginUp, pairFrame, palateScore, type CleanArch, type CleanReport } from "@/lib/dentalArch";
 import { blockOutline, cleanOutline, closeToFloor, distanceFrom, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, bevelCutter, hingeOpening, withoutDebris, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
+import { insideOf, splitShells } from "@/lib/dentalWaxup";
 import { articulatorParts, incisalPins, PIN_MAX, PIN_SET, restAngle } from "@/lib/dentalArticulator";
 import {
-  applyMatrix, boundaryLoops, cloneMesh, convexHull, cutAlongField, cutBelow, dropFragments, smoothField, faceArea, loopLength, surfaceKept, pinchedEdges, PointGrid, solidPositions, toManifold, upwardness, weld,
+  applyMatrix, boundaryLoops, cloneMesh, transformSoup, convexHull, cutAlongField, cutBelow, dropFragments, smoothField, faceArea, loopLength, surfaceKept, pinchedEdges, PointGrid, solidPositions, toManifold, upwardness, weld,
   type ManifoldRuntime, type ManifoldSolid, type Mesh, type Ring,
 } from "@/lib/dentalMesh";
 
@@ -40,7 +41,17 @@ export type DentalBaseStyle = "follow" | "plate" | "ortho" | "clean" | "articula
 export type DentalInside = "solid" | "open" | "closed";
 
 /** `area` (build 53): the tooth area the person approved - one flag per triangle of `positions`. */
-export type DentalArchInput = { id: string; positions: ArrayLike<number>; area?: Uint8Array };
+export type DentalArchInput = {
+  id: string;
+  positions: ArrayLike<number>;
+  area?: Uint8Array;
+  /**
+   * Build 79: wax-up teeth - closed shells, as a soup, in the same coordinates as `positions` -
+   * joined to the model. Wax only adds: every crown point of the scan stays where it was or lies
+   * under the wax (counted apart in the trueness check).
+   */
+  wax?: ArrayLike<number> | null;
+};
 export type DentalStudioInput = {
   arches: DentalArchInput[];
   bite?: ArrayLike<number> | null;
@@ -400,7 +411,7 @@ function insideRings(rings: Ring[], x: number, y: number, margin: number) {
   }
   return inside;
 }
-export type ToothTrueness = { points: number; within: number; worst: number; /** Points with no surface near them: left out with a speck too small to print. */ removed: number; /** Points the surface is near but not on; `worst` is the furthest of these, mm. */ moved: number };
+export type ToothTrueness = { points: number; within: number; worst: number; /** Build 79: crown points under the wax-up, left out of the count (covered on purpose). */ waxed?: number; /** Points with no surface near them: left out with a speck too small to print. */ removed: number; /** Points the surface is near but not on; `worst` is the furthest of these, mm. */ moved: number };
 export const TRUE_WITHIN = 0.001;
 export function toothTrueness(solid: ManifoldSolid, points: Float64Array, turn: THREE.Matrix4 | null): ToothTrueness {
   const mesh = solid.getMesh();
@@ -448,7 +459,7 @@ function engrave(runtime: ManifoldRuntime, solid: ManifoldSolid, text: string, h
   return result;
 }
 
-type Built = { solid: ManifoldSolid; floor: number; top: number; footprint: Ring[]; worn: number; keptDepth: number; voxel: number | null; warnings: string[]; kept: Record<number, number>; /** Build 78: the scan's crown points, in the arch's frame, for the trueness check. */ crownPoints: Float64Array; /** Build 78: soft tissue cut back clear of the other model, mm². */ relieved: number; /** Build 78: soft tissue the other model's teeth meet in the bite, kept as a contact, mm². */ contactArea: number };
+type Built = { solid: ManifoldSolid; floor: number; top: number; footprint: Ring[]; worn: number; keptDepth: number; voxel: number | null; warnings: string[]; kept: Record<number, number>; /** Build 78: the scan's crown points, in the arch's frame, for the trueness check. */ crownPoints: Float64Array; /** Build 78: soft tissue cut back clear of the other model, mm². */ relieved: number; /** Build 78: soft tissue the other model's teeth meet in the bite, kept as a contact, mm². */ contactArea: number; /** Build 79: the scan's crown points the wax-up covers. */ waxed: number };
 
 function buildArch(
   runtime: ManifoldRuntime,
@@ -459,6 +470,7 @@ function buildArch(
   labelLine: string,
   area?: Uint8Array,
   opponent?: { mesh: Mesh; teeth: Uint8Array; normals: Float64Array } | null,
+  wax?: ArrayLike<number> | null,
 ): Built {
   const warnings: string[] = [];
   const m = cloneMesh(arch.clean.mesh);
@@ -710,6 +722,15 @@ function buildArch(
     const cutter = bevelCutter(runtime, footprint, floor);
     if (cutter) solid = keepSolid(runtime.Manifold.difference(solid, keepSolid(cutter)));
   }
+  // Build 79: the wax-up, tooth by tooth (library teeth may overlap their neighbours).
+  const waxShells = wax && wax.length ? splitShells(transformSoup(wax, arch.frame), 4) : [];
+  for (const shell of waxShells) {
+    try {
+      solid = keepSolid(runtime.Manifold.union(solid, keepSolid(toManifold(runtime, weld(shell, 1e-6)))));
+    } catch {
+      warnings.push("wax");
+    }
+  }
   const text = labelText(labelLine);
   if (text) {
     if ((options.baseStyle === "ortho" || options.baseStyle === "articulator") && labelRing && options.base >= 3) {
@@ -754,7 +775,11 @@ function buildArch(
   // Build 50: the crowns (CROWN_REACH from their tips), not the gum or flaps of tissue beside them.
   // Build 51: the teeth as found on the whole scan - within TOOTH_REACH of every cusp tip and down
   // to TOOTH_CROWN below it - not the narrower crowns the outline is drawn round.
-  const promised = scanTeeth.map((inZone, i) => (inZone && fromEdge[i] > EDGE_FRINGE ? 1 : 0));
+  // Build 79: the scan's corners under the wax-up are covered on purpose, not lost.
+  const underWax = waxShells.map(insideOf);
+  const waxedCorner = new Uint8Array(m.v.length / 3);
+  if (underWax.length) for (let i = 0; i < waxedCorner.length; i += 1) if (scanTeeth[i] && underWax.some((inside) => inside(m.v[i * 3], m.v[i * 3 + 1], m.v[i * 3 + 2]))) waxedCorner[i] = 1;
+  const promised = scanTeeth.map((inZone, i) => (inZone && !waxedCorner[i] && fromEdge[i] > EDGE_FRINGE ? 1 : 0));
   for (const depth of [2, 4, 6, 8, 10, 12]) kept[depth] = surfaceKept(m, out, -depth, scanTeeth);
   kept[-3] = surfaceKept(m, out, -Infinity, scanTeeth);
   kept[-1] = surfaceKept(m, out, -Infinity, promised);
@@ -765,10 +790,14 @@ function buildArch(
   kept[-2] = toothArea;
   if (kept[-1] < 0.999) warnings.push("teeth");
   const crownList: number[] = [];
+  let waxed = 0;
   crowns.forEach((inCrown, i) => {
-    if (inCrown && keptKeys.has(`${m.v[i * 3]},${m.v[i * 3 + 1]},${m.v[i * 3 + 2]}`) && m.v[i * 3 + 2] > buried + 0.05 && insideRings(trimRings, m.v[i * 3], m.v[i * 3 + 1], 0.05)) crownList.push(m.v[i * 3], m.v[i * 3 + 1], m.v[i * 3 + 2]);
+    if (inCrown && keptKeys.has(`${m.v[i * 3]},${m.v[i * 3 + 1]},${m.v[i * 3 + 2]}`) && m.v[i * 3 + 2] > buried + 0.05 && insideRings(trimRings, m.v[i * 3], m.v[i * 3 + 1], 0.05)) {
+      if (waxedCorner[i]) waxed += 1;
+      else crownList.push(m.v[i * 3], m.v[i * 3 + 1], m.v[i * 3 + 2]);
+    }
   });
-  return { solid: result, floor, top, footprint, worn: closed.worn, keptDepth: Number.isFinite(keptLow) ? -keptLow : keep, voxel, warnings, kept, crownPoints: Float64Array.from(crownList), relieved, contactArea };
+  return { solid: result, floor, top, footprint, worn: closed.worn, keptDepth: Number.isFinite(keptLow) ? -keptLow : keep, voxel, warnings, kept, crownPoints: Float64Array.from(crownList), relieved, contactArea, waxed };
 }
 
 /**
@@ -893,7 +922,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
       for (let i = 0; i < normals.length; i += 3) { normals[i] = -normals[i]; normals[i + 2] = -normals[i + 2]; }
       opponent = { mesh, teeth: otherTeeth, normals };
     }
-    const made = buildArch(runtime, arch, { ...options, base }, -depth, ortho, line, areaOn(arch.id, arch.clean.mesh), opponent);
+    const made = buildArch(runtime, arch, { ...options, base }, -depth, ortho, line, areaOn(arch.id, arch.clean.mesh), opponent, input.arches.find((entry) => entry.id === arch.id)?.wax);
     if (mode.only !== undefined) {
       mode.take?.(archPartOf(made));
       made.solid.delete();
@@ -1051,7 +1080,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
   }
   // Build 78: the trueness check - every crown point of the scan, where the scan put it, against the
   // finished model's surface: the teeth must come through untouched.
-  const trueness = built.map(({ arch, built: b }, i) => toothTrueness(solids[i], b.crownPoints, pair && arch.role === "upper" ? FLIP : null));
+  const trueness = built.map(({ arch, built: b }, i) => ({ ...toothTrueness(solids[i], b.crownPoints, pair && arch.role === "upper" ? FLIP : null), waxed: b.waxed }));
   // Lay out: base down on the plate, the upper turned over beside the lower; or upper on lower.
   const out: DentalPart[] = [];
   const pieces: number[] = [];

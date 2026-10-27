@@ -1,6 +1,6 @@
 ---
 title: Dental Studio
-summary: Raw intraoral scans to printable study, ortho, aligner and crown-and-bridge models in six steps - with a printable kinematic articulator that keeps the scanned bite, and every setting explained with pictures.
+summary: Raw intraoral scans to printable study, ortho, aligner and crown-and-bridge models in seven steps - with a digital diagnostic wax-up, a printable kinematic articulator that keeps the scanned bite, and every setting explained with pictures.
 ---
 
 An intraoral scan comes out of the scanner as an open surface: the teeth and gum, with a ragged edge where the scan stops, often a few small holes and a loose piece of cheek or tongue. **{{ui:dental.title}}** turns raw scans into printable models - one arch, or an upper and a lower with their bite - in one or two clicks: the work Meshmixer needs a dozen steps for. Full arches and quadrants (sextants) both work.
@@ -15,7 +15,7 @@ For most cases you only need three clicks:
 
 The download button in the panel's title bar (and the link in step 1 before any scan is in) saves this guide as a PDF of 28 pages, with every screen and setting, to keep, print or pass on.
 
-The panel leads you through six numbered steps, top to bottom, each on a card of its own: add the scans, prepare them (trim, then check the teeth), choose the model, its base, the articulator (for a pair) and its name. Each says in one line what to do and turns green when it is done; the line above the button says what comes next. Once the scans are in, the step to do next is outlined in green until you have worked in it. Click a step's title to fold it to one line that sums up its settings, and again to open it; the card you last worked in is marked on the left.
+The panel leads you through seven numbered steps, top to bottom, each on a card of its own: add the scans, prepare them (trim, then check the teeth), an optional wax-up, choose the model, its base, the articulator (for a pair) and its name. Each says in one line what to do and turns green when it is done; the line above the button says what comes next. Once the scans are in, the step to do next is outlined in green until you have worked in it. Click a step's title to fold it to one line that sums up its settings, and again to open it; the card you last worked in is marked on the left.
 
 ![Dental Studio with an upper and a lower scan in: the steps, each on its card with its instruction, ticks on the steps that are done, the model's height and the button at the bottom.](shot:dental-studio-steps)
 
@@ -59,7 +59,24 @@ Leave it on **{{ui:dental.marginAuto}}** unless the scan needs help: Pare 3D fin
 
 What you approve is protected: nothing inside the area is ever cut.
 
-## Step 3 · {{ui:dental.step3}}
+## Step 3 · {{ui:waxup.step}}
+
+A diagnostic wax-up shows the patient - and the lab - the smile a treatment aims for, and gives you the model a mock-up is made from. This step sets library teeth over the scan's front teeth, canine to canine, the way smile design does it, and joins them to the model when you make it. It is optional: skip it and the model is the scan as it is.
+
+**Wax only adds.** Every tooth stands at least 0.3 mm proud of the patient's facial surface where it covers it, so a mock-up made from the model seats over the teeth without any being prepared first (a mock-up is only accurate from an additive wax-up). When the model is made, Pare 3D counts the scan's crown points that are under the wax apart from the rest: every point outside it is still checked to the micrometre.
+
+1. **{{ui:waxup.setStep}}.** Choose one of the tooth sets that come with Pare 3D (the Teethy library, from teethy.org, with its owner's permission), or **{{ui:waxup.loadSet}}**: front teeth as OBJ or STL - a Meshmixer part, one file holding the teeth as separate pieces, or one file per tooth. Pare 3D finds each tooth and which way the set faces, whatever way it was saved.
+2. **{{ui:waxup.markStep}}.** Click **{{ui:waxup.mark}}**, then click on the scan where the central incisors meet at their edges (the midline), then the tip of each canine. The view turns onto the biting edges, only that arch shows, and small diamonds mark your clicks; Esc stops. These three points set the teeth out about the patient's own midline, even when the scan sits turned in the scanner's frame.
+3. **{{ui:waxup.placeStep}}.** **{{ui:waxup.place}}** designs the teeth in the order smile design follows:
+   - **The incisal edges first.** The centrals at the patient's edges, longer by **{{ui:waxup.lengthen}}** if you set it; the laterals 0.5 mm shorter; the canine tips higher by **{{ui:waxup.arcDepth}}** - the patient's own step when it lies between 0.5 and 2 mm, otherwise 1 mm - so the edges follow a smile arc.
+   - **Then the widths.** The space between the midline and each canine tip, along the arch, sets the central's width; the laterals and canines take their share of it from **{{ui:waxup.propNatural}}** (mean crown widths, Magne 2003: lateral 79% and canine 87% of the central) or **{{ui:waxup.propLibrary}}**.
+   - **Then the lengths.** The central's length follows from its width and **{{ui:waxup.centralRatio}}** (80% by default, as Digital Smile Design uses; natural unworn centrals average 78%). The canines' gingival zeniths sit level with the centrals', the laterals' 1 mm coronal (Chu 2009). Where the patient's gum lies above that plan, the table shows how far (**{{ui:waxup.colLengthening}}**): the crown lengthening the design asks for - or choose a higher width/length ratio. Where the gum lies below it, the tooth runs down to the gum, so none of the patient's tooth shows below the wax.
+
+The table lists each tooth by its number with its width, length and width/length ratio. Click a tooth's number to select it, then move, turn or size it with the handles; **{{ui:waxup.placeAgain}}** starts the design over with the current settings, and **{{ui:waxup.remove}}** takes the wax-up away. The wax teeth are parts of their own until the model is made: then they are joined to it and hidden.
+
+**Check it in the mouth.** A wax-up is a proposal: make the mock-up from the printed model, then check the incisal edge with the lips at rest and in a smile, the F and V sounds, and the occlusion, before any tooth is prepared.
+
+## Step 4 · {{ui:dental.step3}}
 
 Choose what the models are for - each choice shows its base from above - and the line below the choices sums up what you will get (base, inside, height).
 
@@ -68,11 +85,11 @@ Choose what the models are for - each choice shows its base from above - and the
 - **{{ui:dental.aligner}}:** solid, about 18 mm tall in all - models for thermoforming should be 15-20 mm tall, as taller models stretch the sheet too thin.
 - **{{ui:dental.crown}}:** solid, with a plate across the palate or tongue space. Studies of printed models find solid models with a cross-arch plate the most accurate, and hollow ones the least.
 
-Each choice sets the base in step 4 too. Change the base there and the choice is marked {{ui:dental.custom}}; pick the model again to go back to its settings.
+Each choice sets the base in step 5 too. Change the base there and the choice is marked {{ui:dental.custom}}; pick the model again to go back to its settings.
 
 **{{ui:dental.inside}}** sits under the choices: solid or hollow (open underneath, or closed with vent holes), the {{ui:dental.wall}} and **{{ui:dental.infill}}** ({{ui:dental.infillNone}}, a {{ui:dental.infillBase}} 6 mm high, or a full {{ui:dental.infillFull}}). A hollow model keeps its full wall round the locator notches.
 
-## Step 4 · {{ui:dental.stepBase}}
+## Step 5 · {{ui:dental.stepBase}}
 
 Always open: the base's shape, each with a picture of it from above ({{ui:dental.cleanBase}}, {{ui:dental.follow}}, {{ui:dental.plate}}, {{ui:dental.orthoBase}} or {{ui:dental.articulatorBase}}), **{{ui:dental.bevel}}** (a 0.8 mm bevel round the foot so the model comes off the build plate easily; on unless you turn it off), {{ui:dental.notches}} and a **{{ui:dental.tieBar}}** (a bar joining the back ends of a full arch at the floor so it cannot spread while it prints; cut it off afterwards).
 
@@ -93,7 +110,7 @@ The **{{ui:dental.heightTitle}}** box shows the model as it stacks up, with a pi
 
 **{{ui:dental.moreScan}}**, under the height, holds the last two: **{{ui:dental.gumFollow}}** - a band of gum all round the teeth and nothing more, so the palate and the floor of the mouth go and the model is a horseshoe (its depth is then the {{ui:dental.gumHeight}} slider) - and **{{ui:dental.smooth}}** (smoothing the ragged edge where the scan stops, never the teeth).
 
-## Step 5 · {{ui:dental.step4}}
+## Step 6 · {{ui:dental.step4}}
 
 Only for a pair - with a single arch this step is left out. **{{ui:dental.hinge}}** prints the pair as an articulator built so that it cannot change the scanned bite. A side view above the slider follows the pin as you move it.
 
@@ -112,7 +129,7 @@ Only for a pair - with a single arch this step is left out. **{{ui:dental.hinge}
 - **{{ui:dental.pinRaise}}** chooses which pin the occlusion view stands on (0 to 10 mm in half millimetres); a pin that is not in the set is added to it.
 - Above 6 mm the arc is less like the patient's own: the condyles stand on an average hinge axis, not the patient's, and in a pilot study average-value mounting matched the patient's opening at 3 and 6 mm but not at 9 mm. Confirm the vertical dimension clinically.
 
-**What it does not do.** It is a hinge: no protrusive or lateral excursions, no condylar guidance and no facebow transfer. For gnathological work - a full-mouth rehabilitation, say - mount the models on an adjustable articulator with a facebow ({{ui:dental.articulatorBase}} in step 4 makes a base for a metal articulator's magnetic plate).
+**What it does not do.** It is a hinge: no protrusive or lateral excursions, no condylar guidance and no facebow transfer. For gnathological work - a full-mouth rehabilitation, say - mount the models on an adjustable articulator with a facebow ({{ui:dental.articulatorBase}} in step 5 makes a base for a metal articulator's magnetic plate).
 
 **Printing it.** Print the models flat, base down, as Pare 3D lays them out, with the pins beside them. Keep supports off the contact surfaces - the seat faces and pad under the upper, the top half of each ball, the pin's tip and the socket's top: a support mark there changes where the models close. Printed flat, these surfaces all face away from the build plate and need none.
 
@@ -125,7 +142,7 @@ Only for a pair - with a single arch this step is left out. **{{ui:dental.hinge}
 
 ![An articulated pair made from a scan, in occlusion: the ball condyles behind the molars and the incisal pin in front.](shot:dental-articulated-models)
 
-## Step 6 · {{ui:dental.stepName}}
+## Step 7 · {{ui:dental.stepName}}
 
 ### {{ui:dental.label}}
 

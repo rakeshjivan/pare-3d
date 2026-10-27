@@ -11,6 +11,7 @@ import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { ArticulatorPicture, BaseStylePicture, ModelHeightPicture } from "@/components/workplane/DentalPictures";
+import { WaxupCard, waxupSummary, type WaxupActions, type WaxupView } from "@/components/workplane/WaxupCard";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
 import {
@@ -103,6 +104,7 @@ export function DentalStudioPanel({
   onRestore,
   areaShown = true,
   onAreaShown,
+  waxup,
 }: {
   parts: DentalPartChoice[];
   slots: Record<DentalSlot, string | null>;
@@ -154,6 +156,8 @@ export function DentalStudioPanel({
   onNewPatient?: () => void;
   /** Build 71: this design already holds models made here. */
   modelsHere?: boolean;
+  /** Build 79: the wax-up step. */
+  waxup?: { view: WaxupView; actions: WaxupActions };
 }) {
   useLanguage();
   const title = t("dental.title");
@@ -234,8 +238,9 @@ export function DentalStudioPanel({
   // Build 75: each step a card that folds to a one-line summary; the card last worked in is marked.
   // Build 77: the step to do next has a green outline - once the scans are in, the first step not
   // yet worked in (a step may be left as it is: having been in it is enough, the articulator too).
-  const stepCount = pair ? 6 : 5;
-  const nextCard = scansDone ? Array.from({ length: stepCount - 1 }, (_, k) => k + 2).find((number) => !visited[number]) ?? null : null;
+  const stepCount = pair ? 7 : 6;
+  // Build 79: the wax-up (card 3) is optional - never the step pointed to next.
+  const nextCard = scansDone ? Array.from({ length: stepCount - 1 }, (_, k) => k + 2).find((number) => number !== 3 && !visited[number]) ?? null : null;
   const card = (number: number, label: string, done: boolean, hint: string | null, summary: string | null, body: ReactNode) => {
     const isFolded = Boolean(folded[number]);
     return (
@@ -387,7 +392,12 @@ export function DentalStudioPanel({
         </div>
       </>))}
 
-      {card(3, t("dental.step3"), scansDone, t("dental.step3Hint"), modelSummary, (<>
+      {/* Build 79: the digital wax-up - optional; a card of its own before the model is chosen. */}
+      {waxup ? card(3, t("waxup.step"), waxup.view.placed.length > 0, t("waxup.stepHint"), waxupSummary(waxup.view), (
+        <WaxupCard view={waxup.view} actions={waxup.actions} slots={{ upper: Boolean(slots.upper), lower: Boolean(slots.lower) }} busy={busy || !analysis} workspace={workspace} />
+      )) : null}
+
+      {card(4, t("dental.step3"), scansDone, t("dental.step3Hint"), modelSummary, (<>
         <div className="dental-presets" role="radiogroup" aria-label={t("dental.purpose")}>
           {([
             ["study", t("dental.study"), t("dental.studyHint")],
@@ -416,7 +426,7 @@ export function DentalStudioPanel({
         <p className="blend-hint">{t(options.inside === "solid" ? (options.baseStyle === "ortho" ? "dental.orthoNote" : options.baseStyle === "plate" ? "dental.crownNote" : "dental.solidNote") : options.inside === "open" ? "dental.hollowNote" : "dental.closedNote")}</p>
       </>))}
 
-      {card(4, t("dental.stepBase"), scansDone, t("dental.stepBaseHint"), baseSummary, (<>
+      {card(5, t("dental.stepBase"), scansDone, t("dental.stepBaseHint"), baseSummary, (<>
         {/* Build 66: each base as it looks from above. */}
         <div className="dental-picture-tiles" role="radiogroup" aria-label={t("dental.baseStyle")}>
           {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")], ["articulator", t("dental.articulatorBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
@@ -503,7 +513,7 @@ export function DentalStudioPanel({
         ) : null}
       </>))}
 
-      {pair ? card(5, t("dental.step4"), options.hinge, t("dental.step4Hint"), articSummary, (<>
+      {pair ? card(6, t("dental.step4"), options.hinge, t("dental.step4Hint"), articSummary, (<>
             <label className="edge-modifier-check dental-hinge-check" title={t("dental.hingeHint")}>
               <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => onOptionsChange({ hinge: event.currentTarget.checked })} />
               <span>{t("dental.hinge")}</span>
@@ -521,7 +531,7 @@ export function DentalStudioPanel({
             {choice(t("dental.layout"), options.layout, [["print", t("dental.layoutPrint")], ["occlusion", t("dental.layoutOcclusion")]], (layout) => onOptionsChange({ layout }))}
       </>)) : null}
 
-      {card(pair ? 6 : 5, t("dental.stepName"), Boolean(options.label.trim()) || patientDetails === "remove", t("dental.stepNameHint"), nameSummary, (<>
+      {card(pair ? 7 : 6, t("dental.stepName"), Boolean(options.label.trim()) || patientDetails === "remove", t("dental.stepNameHint"), nameSummary, (<>
         {onPatientDetails ? choice(t("dental.patientDetails"), patientDetails, [["keep", t("dental.patientKeep")], ["remove", t("dental.patientRemove")]], onPatientDetails, t("dental.patientDetailsHint")) : null}
         {patientDetails === "remove" ? <p className="blend-hint">{t("dental.patientRemoveHint")}</p> : (<>
         <label className="dental-label-field">

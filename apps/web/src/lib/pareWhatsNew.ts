@@ -4,6 +4,17 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 79,
+    items: [
+      "Dental Studio has a digital diagnostic wax-up (step 3, optional): library teeth set over the front teeth, canine to canine, and joined to the model when you make it. Wax only adds, so a mock-up from the printed model seats over the teeth without preparing any.",
+      "The wax-up follows the order smile design does: you click the midline and the two canine tips; the incisal edges come first (the laterals 0.5 mm shorter, the canine tips following the patient's own smile arc); widths from the space between the midline and the canines; lengths from the central's width-to-length ratio (80%, adjustable). Each tooth stands at least 0.3 mm proud of the patient's.",
+      "A table gives every wax tooth's width, length and ratio, and where the design reaches above the gum: the crown lengthening it asks for. Select a tooth to move it in or out, along the arch, longer or shorter, wider or narrower, or turn it, in 0.25 mm and 2 degree steps - the same tooth on the other side follows unless you turn that off.",
+      "Nine anterior tooth sets from teethy.org come with Pare 3D, with their owner's permission; you can load your own sets too (OBJ or STL, a Meshmixer part, or one file per tooth).",
+      "Every crown point of the scan outside the wax is still checked to the micrometre when the model is made; the points under the wax are counted apart.",
+      "Line up on the bite scan now works: the choice was dropped on its way to the background worker, so the scanner's bite was kept regardless.",
+    ],
+  },
+  {
     build: 78,
     items: [
       "One articulator in Dental Studio, built so it cannot change the scanned bite: the upper rests on three supports and nothing else - a three-point seat on one ball condyle, a groove on the other and the incisal pin - so it closes to the same place every time and cannot rock. No bands or clips: a keeper under each ball, clear of it while closed, stops the upper lifting off. It opens to 90°. The three joint types, the hinge fit, the protrusion path and the guide table are gone.",

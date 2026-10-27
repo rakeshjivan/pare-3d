@@ -6,6 +6,7 @@ import type { MeshRoundMode, MeshRoundResult } from "@/lib/meshRound";
 import type { FitReport } from "@/lib/partTools";
 import type { DentalAnalysis, DentalArchPart, DentalStudioInput, DentalStudioOptions, DentalStudioResult } from "@/lib/dentalModel";
 import type { DentalTrimMode, DentalTrimResult } from "@/lib/dentalTrim";
+import type { WaxLandmarks, WaxupOptions, WaxupPlan } from "@/lib/dentalWaxup";
 import type { WorkplaneShape } from "@/types/layerling";
 import type { SurfaceTextureOptions, SurfaceTextureResult } from "@/lib/surfaceTexture";
 import type { RemeshOptions, RemeshResult } from "@/lib/meshRemesh";
@@ -18,6 +19,7 @@ export type MeshJobRequest =
   | { id: number; base: string; kind: "dentalArch"; input: DentalStudioInput; options: DentalStudioOptions; index: number }
   | { id: number; base: string; kind: "dentalTrim"; positions: Float32Array; side: Float32Array; mode: DentalTrimMode; local: Float32Array }
   | { id: number; base: string; kind: "dentalArea"; positions: Float32Array }
+  | { id: number; base: string; kind: "waxup"; scan: Float32Array; shells: Float32Array[] | null; landmarks: WaxLandmarks | null; options: Omit<WaxupOptions, "landmarks"> }
   | { id: number; base: string; kind: "texture"; positions: Float32Array; options: SurfaceTextureOptions }
   | { id: number; base: string; kind: "remesh"; positions: Float32Array; options: RemeshOptions };
 export type MeshJobResponse =
@@ -28,6 +30,7 @@ export type MeshJobResponse =
   | { id: number; ok: true; kind: "dentalArch"; part: DentalArchPart }
   | { id: number; ok: true; kind: "dentalTrim"; trim: DentalTrimResult }
   | { id: number; ok: true; kind: "dentalArea"; area: Uint8Array; crowns: Uint8Array }
+  | { id: number; ok: true; kind: "waxup"; plan: WaxupPlan | null; landmarks: WaxLandmarks | null }
   | { id: number; ok: true; kind: "texture"; texture: SurfaceTextureResult }
   | { id: number; ok: true; kind: "remesh"; remesh: { positions: Float32Array; voxel: number; coarse: boolean; triangles: number } }
   | { id: number; ok: false; error: string };
@@ -54,6 +57,7 @@ function meshWorker(): Worker | null {
       else if (reply.kind === "dentalArch") waiting.resolve(reply.part);
       else if (reply.kind === "dentalTrim") waiting.resolve(reply.trim);
       else if (reply.kind === "dentalArea") waiting.resolve({ area: reply.area, crowns: reply.crowns });
+      else if (reply.kind === "waxup") waiting.resolve(reply.plan ?? reply.landmarks);
       else if (reply.kind === "texture") waiting.resolve(reply.texture);
       else if (reply.kind === "remesh") waiting.resolve({ ...reply.remesh, positions: Array.from(reply.remesh.positions) });
       else waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
@@ -162,11 +166,14 @@ function copiedInput(input: DentalStudioInput): DentalStudioInput {
   return {
     // Build 68: the tooth area fixed by hand goes along too - it was left behind, so in the worker a
     // corrected area was not used.
-    arches: input.arches.map((arch) => ({ id: arch.id, positions: Float32Array.from(arch.positions as ArrayLike<number>), ...(arch.area ? { area: Uint8Array.from(arch.area) } : {}) })),
+    // Build 79: and the arch's wax-up teeth.
+    arches: input.arches.map((arch) => ({ id: arch.id, positions: Float32Array.from(arch.positions as ArrayLike<number>), ...(arch.area ? { area: Uint8Array.from(arch.area) } : {}), ...(arch.wax?.length ? { wax: Float32Array.from(arch.wax) } : {}) })),
     bite: input.bite ? Float32Array.from(input.bite as ArrayLike<number>) : null,
     roles: input.roles,
     // Build 74: the bite locked into the arches goes along (dropping it here made the worker fit again).
     ...(input.locked ? { locked: true } : {}),
+    // Build 79: "Line up on the bite scan" goes along too - left behind, the worker kept the scanner's bite.
+    ...(input.biteMode ? { biteMode: input.biteMode } : {}),
   };
 }
 
@@ -316,6 +323,32 @@ export async function dentalAreaInBackground(positions: Float32Array): Promise<{
     return await new Promise<{ area: Uint8Array; crowns: Uint8Array }>((resolve, reject) => {
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
       target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "dentalArea", positions: data } satisfies MeshJobRequest, [data.buffer]);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "worker-unavailable") return here();
+    throw error;
+  }
+}
+
+/**
+ * Build 79: the wax-up of a tooth set on a scan (Z-up soup, the studio's input coordinates), from the
+ * landmarks in those coordinates; without `shells`, only the first guess at the landmarks.
+ */
+export function waxupInBackground(scan: Float32Array, shells: Float32Array[], landmarks: WaxLandmarks | null, options?: Omit<WaxupOptions, "landmarks">): Promise<WaxupPlan>;
+export function waxupInBackground(scan: Float32Array, shells: null): Promise<WaxLandmarks | null>;
+export async function waxupInBackground(scan: Float32Array, shells: Float32Array[] | null, landmarks: WaxLandmarks | null = null, options: Omit<WaxupOptions, "landmarks"> = {}): Promise<WaxupPlan | WaxLandmarks | null> {
+  const here = async () => {
+    const { guessLandmarks, planWaxup } = await import("@/lib/dentalWaxup");
+    return shells ? planWaxup(scan, shells, landmarks, options) : guessLandmarks(scan);
+  };
+  const target = meshWorker();
+  if (!target) return here();
+  const id = nextId;
+  nextId += 1;
+  try {
+    return await new Promise<WaxupPlan | WaxLandmarks | null>((resolve, reject) => {
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "waxup", scan, shells, landmarks, options } satisfies MeshJobRequest);
     });
   } catch (error) {
     if (error instanceof Error && error.message === "worker-unavailable") return here();

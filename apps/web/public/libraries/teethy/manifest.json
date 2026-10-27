@@ -1,0 +1,62 @@
+{
+  "id": "teethy",
+  "name": "Teethy",
+  "credit": "Tooth library by teethy.org, redistributed with written permission.",
+  "url": "https://teethy.org",
+  "sets": [
+    {
+      "id": "teethy-1",
+      "name": "Teethy 1",
+      "file": "set-01.ptl",
+      "teeth": 6
+    },
+    {
+      "id": "teethy-2",
+      "name": "Teethy 2",
+      "file": "set-02.ptl",
+      "teeth": 6
+    },
+    {
+      "id": "teethy-3",
+      "name": "Teethy 3",
+      "file": "set-03.ptl",
+      "teeth": 6
+    },
+    {
+      "id": "teethy-4",
+      "name": "Teethy 4",
+      "file": "set-04.ptl",
+      "teeth": 6
+    },
+    {
+      "id": "teethy-5",
+      "name": "Teethy 5",
+      "file": "set-05.ptl",
+      "teeth": 6
+    },
+    {
+      "id": "teethy-6",
+      "name": "Teethy 6",
+      "file": "set-06.ptl",
+      "teeth": 6
+    },
+    {
+      "id": "teethy-7",
+      "name": "Teethy 7",
+      "file": "set-07.ptl",
+      "teeth": 6
+    },
+    {
+      "id": "teethy-8",
+      "name": "Teethy 8",
+      "file": "set-08.ptl",
+      "teeth": 6
+    },
+    {
+      "id": "teethy-9",
+      "name": "Teethy 9",
+      "file": "set-09.ptl",
+      "teeth": 6
+    }
+  ]
+}
