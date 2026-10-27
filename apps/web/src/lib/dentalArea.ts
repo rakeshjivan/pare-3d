@@ -5,28 +5,44 @@
  * band's edge - so what is protected is exactly what the person approved.
  */
 import { archFrame, cleanScan, marginUp } from "@/lib/dentalArch";
-import { TIP_CEILING, toothZone } from "@/lib/dentalBase";
+import { CROWN_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
 import { applyMatrix, cloneMesh, PointGrid } from "@/lib/dentalMesh";
 
 export type TrimPointLike = [number, number];
 
-/** The teeth Pare 3D finds on a scan (Z-up soup): one flag per triangle. */
-export function autoDentalArea(positions: Float32Array): Uint8Array {
+/**
+ * Build 76: how far below its cusp tips a crown counts as tooth for Trim's warning, mm. Crowns show
+ * 7 to 11 mm above the gum; within 6 mm of the tips is crown on every tooth, and the gum below it,
+ * the flaps beside it and the palate are not.
+ */
+export const CROWN_DEPTH = 6;
+
+/**
+ * The teeth Pare 3D finds on a scan (Z-up soup): one flag per triangle.
+ * `crownsOut` (build 76), one flag per triangle too: the crowns alone - CROWN_REACH from their tips
+ * and CROWN_DEPTH below them - without the gum the teeth area takes in.
+ */
+export function autoDentalArea(positions: Float32Array, crownsOut?: Uint8Array): Uint8Array {
   const triangles = Math.floor(positions.length / 9);
   const clean = cleanScan(positions);
   const turned = cloneMesh(clean.mesh);
   applyMatrix(turned, archFrame(clean.mesh, marginUp(clean.mesh, clean.margin)));
   const zone = toothZone(turned, undefined, undefined, undefined, TIP_CEILING);
+  const crowns = crownsOut ? toothZone(turned, CROWN_DEPTH, CROWN_REACH, undefined, TIP_CEILING, TIP_FLOOR, TIP_LONELY) : null;
   const grid = new PointGrid(clean.mesh.v, 0.05);
   const area = new Uint8Array(triangles);
   for (let t = 0; t < triangles; t += 1) {
-    let inZone = 0;
+    let inZone = 0, inCrown = 0;
     for (let k = 0; k < 3; k += 1) {
       const i = t * 3 + k;
       const hit = grid.nearest(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-      if (hit && hit[1] < 1e-3 && zone[hit[0]]) inZone += 1;
+      if (hit && hit[1] < 1e-3 && zone[hit[0]]) {
+        inZone += 1;
+        if (crowns?.[hit[0]]) inCrown += 1;
+      }
     }
     if (inZone >= 2) area[t] = 1;
+    if (crownsOut && inCrown >= 2 && t < crownsOut.length) crownsOut[t] = 1;
   }
   return area;
 }

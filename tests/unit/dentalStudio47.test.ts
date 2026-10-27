@@ -8,7 +8,7 @@ import { weld } from "@/lib/dentalMesh";
 import { plyToStlBytes } from "@/lib/plyImport";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { cutDentalScan, trimDentalScan } from "@/lib/dentalTrim";
-import { autoDentalArea } from "@/lib/dentalArea";
+import { autoDentalArea, CROWN_DEPTH } from "@/lib/dentalArea";
 import { layerlingToZUp } from "@/lib/meshCoordinates";
 import { dentalPreset } from "@/components/workplane/DentalStudioPanel";
 
@@ -438,6 +438,26 @@ describe("Dental Studio (build 47)", () => {
     expect(less.parts[0].volume).toBeLessThan(made.parts[0].volume);
     expect(pinchedEdges(less.parts[0].positions)).toBe(0);
   }, 120_000);
+  it("finds the crowns alone for Trim's warning, not the gum round them (build 76)", () => {
+    const positions = syntheticArch();
+    const crowns = new Uint8Array(positions.length / 9);
+    const area = autoDentalArea(positions, crowns);
+    let marked = 0, crowned = 0, outside = 0, top = -Infinity, low = Infinity, areaLow = Infinity;
+    for (let t = 0; t < area.length; t += 1) {
+      marked += area[t];
+      if (area[t]) for (let k = 0; k < 3; k += 1) areaLow = Math.min(areaLow, positions[t * 9 + k * 3 + 2]);
+      if (!crowns[t]) continue;
+      crowned += 1;
+      if (!area[t]) outside += 1;
+      for (let k = 0; k < 3; k += 1) { const z = positions[t * 9 + k * 3 + 2]; top = Math.max(top, z); low = Math.min(low, z); }
+    }
+    expect(crowned).toBeGreaterThan(50);
+    expect(crowned).toBeLessThan(marked);
+    expect(outside).toBe(0);
+    // The gum the teeth area takes in below the crowns is left out: the crowns stop well above it.
+    expect(low - areaLow).toBeGreaterThan(10 - CROWN_DEPTH - 1.5);
+    expect(top).toBeGreaterThan(low);
+  });
 });
 
 describe("Build 55: a quadrant's front is the end that bends", () => {

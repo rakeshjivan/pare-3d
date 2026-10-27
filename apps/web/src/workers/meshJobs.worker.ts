@@ -67,9 +67,10 @@ scope.onmessage = async (event: MessageEvent<MeshJobRequest | { archPartFor: num
       scope.postMessage(reply, trim.positions ? [trim.keep.buffer, trim.positions.buffer] : [trim.keep.buffer]);
     } else if (job.kind === "dentalArea") {
       const { autoDentalArea } = await import("@/lib/dentalArea");
-      const area = autoDentalArea(job.positions);
-      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalArea", area };
-      scope.postMessage(reply, [area.buffer]);
+      const crowns = new Uint8Array(Math.floor(job.positions.length / 9));
+      const area = autoDentalArea(job.positions, crowns);
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalArea", area, crowns };
+      scope.postMessage(reply, [area.buffer, crowns.buffer]);
     } else if (job.kind === "remesh") {
       const { remeshPositions } = await import("@/lib/meshRemesh");
       const result = await remeshPositions(job.positions, job.options);

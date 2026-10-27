@@ -27,7 +27,7 @@ export type MeshJobResponse =
   | { id: number; ok: true; kind: "dentalStudio"; result: DentalStudioResult }
   | { id: number; ok: true; kind: "dentalArch"; part: DentalArchPart }
   | { id: number; ok: true; kind: "dentalTrim"; trim: DentalTrimResult }
-  | { id: number; ok: true; kind: "dentalArea"; area: Uint8Array }
+  | { id: number; ok: true; kind: "dentalArea"; area: Uint8Array; crowns: Uint8Array }
   | { id: number; ok: true; kind: "texture"; texture: SurfaceTextureResult }
   | { id: number; ok: true; kind: "remesh"; remesh: { positions: Float32Array; voxel: number; coarse: boolean; triangles: number } }
   | { id: number; ok: false; error: string };
@@ -53,7 +53,7 @@ function meshWorker(): Worker | null {
       else if (reply.kind === "dentalStudio") waiting.resolve(reply.result);
       else if (reply.kind === "dentalArch") waiting.resolve(reply.part);
       else if (reply.kind === "dentalTrim") waiting.resolve(reply.trim);
-      else if (reply.kind === "dentalArea") waiting.resolve(reply.area);
+      else if (reply.kind === "dentalArea") waiting.resolve({ area: reply.area, crowns: reply.crowns });
       else if (reply.kind === "texture") waiting.resolve(reply.texture);
       else if (reply.kind === "remesh") waiting.resolve({ ...reply.remesh, positions: Array.from(reply.remesh.positions) });
       else waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
@@ -298,16 +298,22 @@ export async function trimDentalScanInBackground(positions: Float32Array, side: 
   }
 }
 
-/** Dental Studio (build 53): the teeth Pare 3D finds on a scan (Z-up soup), one flag per triangle. */
-export async function dentalAreaInBackground(positions: Float32Array): Promise<Uint8Array> {
-  const here = async () => (await import("@/lib/dentalArea")).autoDentalArea(positions);
+/**
+ * Dental Studio (build 53): the teeth Pare 3D finds on a scan (Z-up soup), one flag per triangle;
+ * with (build 76) the crowns alone, for Trim's warning.
+ */
+export async function dentalAreaInBackground(positions: Float32Array): Promise<{ area: Uint8Array; crowns: Uint8Array }> {
+  const here = async () => {
+    const crowns = new Uint8Array(Math.floor(positions.length / 9));
+    return { area: (await import("@/lib/dentalArea")).autoDentalArea(positions, crowns), crowns };
+  };
   const target = meshWorker();
   if (!target) return here();
   const id = nextId;
   nextId += 1;
   const data = Float32Array.from(positions);
   try {
-    return await new Promise<Uint8Array>((resolve, reject) => {
+    return await new Promise<{ area: Uint8Array; crowns: Uint8Array }>((resolve, reject) => {
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
       target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "dentalArea", positions: data } satisfies MeshJobRequest, [data.buffer]);
     });

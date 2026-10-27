@@ -289,6 +289,8 @@ export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 /** Fork (build 24): the face tool's live preview, which can be grabbed and dragged again. */
 const FACE_TOOL_PREVIEW_ID = "face-tool-preview";
 const BLEND_PREVIEW_ID = "blend-preview";
+/** Build 76: Trim warns about the teeth only when at least this many crown triangles are chosen (not a few at a stroke's edge). */
+const TRIM_TEETH_NOISE = 25;
 
 /** MCP actions that only read or change the view, so they still work while the history view is open. */
 const HISTORY_VIEW_MCP_ACTIONS = new Set([
@@ -9266,17 +9268,22 @@ export function LayerlingEditor({
     }
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Build 75: how many chosen triangles are teeth - the Studio's tooth area of this scan, matched by where they lie. */
+  /**
+   * Build 75: how many chosen triangles are teeth, matched by where they lie. Build 76: the crowns
+   * only (within the Studio's tooth area), not the gum, flaps and palate that area takes in - and
+   * a few at the edge of a stroke are not counted.
+   */
   const teethInSelection = (shape: WorkplaneShape, selection: { mesh: { points: ArrayLike<number>; triangles: ArrayLike<number> }; chosen: Uint8Array }) => {
     const studio = dentalStudioRef.current;
     if (!studio || !Object.values(studio.slots).includes(shape.id)) return 0;
     const area = dentalAreaFor(shape);
-    if (!area) return 0;
+    const crowns = area ? dentalAreas.current.get(shape.id)?.crowns : undefined;
+    if (!area || !crowns || crowns.length !== area.length) return 0;
     const world = worldTriangles(shape);
     const key = (x: number, y: number, z: number) => `${Math.round(x * 1000)},${Math.round(y * 1000)},${Math.round(z * 1000)}`;
     const teeth = new Set<string>();
     for (let t = 0; t < area.length; t += 1) {
-      if (!area[t]) continue;
+      if (!area[t] || !crowns[t]) continue;
       const o = t * 9;
       teeth.add(key((world[o] + world[o + 3] + world[o + 6]) / 3, (world[o + 1] + world[o + 4] + world[o + 7]) / 3, (world[o + 2] + world[o + 5] + world[o + 8]) / 3));
     }
@@ -9287,7 +9294,7 @@ export function LayerlingEditor({
       const a = triangles[t * 3] * 3, b = triangles[t * 3 + 1] * 3, c = triangles[t * 3 + 2] * 3;
       if (teeth.has(key((points[a] + points[b] + points[c]) / 3, (points[a + 1] + points[b + 1] + points[c + 1]) / 3, (points[a + 2] + points[b + 2] + points[c + 2]) / 3))) hit += 1;
     }
-    return hit;
+    return hit >= TRIM_TEETH_NOISE ? hit : 0;
   };
   const applySculptSelection = useCallback((action: SculptSelectionAction) => {
     flushSculpt();
@@ -9525,7 +9532,7 @@ export function LayerlingEditor({
   // Build 71: never a model Dental Studio made, nor a bite scan it already used - those belong to an earlier patient.
   const dentalCandidates = useCallback(() => shapesRef.current.filter((shape) => shape.importedMesh && !shape.groupedShapes?.length && !shape.hole && !shape.locked && !shape.dental), []);
   // Fork (build 53): the tooth area of each scan (one flag per triangle), with the scan's fingerprint it was made for.
-  const dentalAreas = useRef(new Map<string, { key: string; area: Uint8Array }>());
+  const dentalAreas = useRef(new Map<string, { key: string; area: Uint8Array; crowns?: Uint8Array }>());
   // Fork (build 56): the area belongs to the scan's triangles, not to where the scan stands - turning
   // or moving the model keeps it; trimming the scan (new triangles) starts it again.
   const dentalAreaKey = (shape: WorkplaneShape) => {
@@ -9875,8 +9882,8 @@ export function LayerlingEditor({
     setDentalAreaBusy(true);
     try {
       for (const { shape } of missing) {
-        const area = await dentalAreaInBackground(Float32Array.from(toZUp(worldTriangles(shape!))));
-        dentalAreas.current.set(shape!.id, { key: dentalAreaKey(shape!), area });
+        const { area, crowns } = await dentalAreaInBackground(Float32Array.from(toZUp(worldTriangles(shape!))));
+        dentalAreas.current.set(shape!.id, { key: dentalAreaKey(shape!), area, crowns });
       }
     } finally {
       setDentalAreaBusy(false);
