@@ -46,9 +46,31 @@ export function cleanScan(positions: ArrayLike<number>): CleanArch {
 }
 
 /** The direction from the margin towards the teeth: the margin plane's normal, the way the far side of the surface lies. */
+/** Build 77: degrees the margin's plane may stand from its vector area before the vector area is used. */
+export const RIM_PLANE_LIMIT = 8;
+
 export function marginUp(m: Mesh, margin: number[]): Vec3 {
   const points = margin.map((i) => [m.v[i * 3], m.v[i * 3 + 1], m.v[i * 3 + 2]]);
   let normal = planeNormal(points);
+  // Build 77: the plane through the margin's points is the scan's level only when the margin runs
+  // round it near one height. A scan cut across the arch (a quadrant, or a half arch) has a margin
+  // that also climbs the cut face, and that plane can lie on its side (35-80° off on a cut arch).
+  // The margin's vector area - the area it closes, seen from each axis - leans far less on such a
+  // climb (12-23° off, which the levelling by cusp tips then takes out); where the two differ by
+  // more than RIM_PLANE_LIMIT the vector area is used.
+  const area: Vec3 = [0, 0, 0];
+  for (let k = 0; k < points.length; k += 1) {
+    const a = points[k], b = points[(k + 1) % points.length];
+    area[0] += a[1] * b[2] - a[2] * b[1];
+    area[1] += a[2] * b[0] - a[0] * b[2];
+    area[2] += a[0] * b[1] - a[1] * b[0];
+  }
+  const size = Math.hypot(area[0], area[1], area[2]);
+  if (size > 1e-9) {
+    const across: Vec3 = [area[0] / size, area[1] / size, area[2] / size];
+    const agree = Math.abs(across[0] * normal[0] + across[1] * normal[1] + across[2] * normal[2]);
+    if (agree < Math.cos((RIM_PLANE_LIMIT * Math.PI) / 180)) normal = across;
+  }
   const c = [0, 0, 0];
   points.forEach((p) => { c[0] += p[0]; c[1] += p[1]; c[2] += p[2]; });
   c[0] /= points.length; c[1] /= points.length; c[2] /= points.length;

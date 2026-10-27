@@ -8,6 +8,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
     items: [
       "Dental Studio has the Model Builder Guide as a PDF to download, 28 pages with every screen and setting: the download button in its title bar, and a link in the first step before any scan is in.",
       "A quadrant against a full arch is articulated as a full pair: the hinge has a condyle behind each side of the full arch, on its midline, and the quadrant's base grows into a horseshoe following the full arch's base, carrying both condyle posts and the incisal table. Hinge, hinge and pin hold the models in the bite, so they cannot rock, with or without the pin; the incisal stop is always on for such a pair.",
+      "A scan that stops partway round the arch - a quadrant, a half arch, a posterior segment - is set teeth up reliably: its up was read from the plane of its open edge, which also climbs the cut end, and on a cut lower that plane could lie on its side, so the pair was taken as moved apart and the lower came out empty. Tested on a full pair with either arch cut at the midline, past it, or to a posterior segment.",
       "A quadrant against a full arch is levelled and laid out by the full arch, not by the quadrant: levelled by the quadrant alone, the occlusal plane tilted and the other side's teeth of the full arch could be taken for tissue and cut away.",
       "Trim's crown warning no longer brings up \"Report this problem\": it is a caution, not a fault.",
     ],
