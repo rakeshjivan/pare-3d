@@ -4216,4 +4216,7 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "largeMesh.raised": "Snijden en groeperen verwerken in dit ontwerp nu tot {proposed} driehoeken (Instellingen, geavanceerd).",
   "dental.guidePdf": "Handleiding modelbouw downloaden (PDF)",
   "dental.guidePdfFirst": "Nieuw met modelbouw? Download de handleiding (PDF, 28 pagina's, Engels)",
+  "sculpt.tidied": "{count} driehoek(en) opgeruimd die een slicer niet-manifold zou noemen.",
+  "dental.errorHelp": "Wat te doen: druk nogmaals op de knop - een eenmalige fout kan voorbijgaan. Gebeurt het opnieuw, dan zet Ongedaan maken (of Origineel terugzetten) de scans terug; snijd een rafelige rand of los flardje weg en probeer het opnieuw. Nog steeds vast? Druk linksonder op Dit probleem melden en beschrijf wat u deed; de scans worden alleen verzonden als u ze bijvoegt.",
+  "sculpt.errorHelp": "Wat te doen: Ongedaan maken zet de scan terug zoals hij was. Probeer een kleinere selectie, of Erdoorheen in plaats van Zichtbaar oppervlak. Gebeurt het opnieuw, druk linksonder op Dit probleem melden en beschrijf wat u deed.",
 };

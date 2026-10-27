@@ -222,6 +222,7 @@ export function MeshSculptPanel({
       ) : null}
       </>) : null}
       {error ? <div className="edge-modifier-error" role="alert">{error}</div> : null}
+      {error ? <p className="blend-hint" role="status">{t("sculpt.errorHelp")}</p> : null}
       <div className="edge-modifier-footer">
         {WHOLE_PART_TOOLS && !trim ? (<>
         <button type="button" className="secondary" disabled={busy} onClick={onClose}>{t("sculpt.done")}</button>

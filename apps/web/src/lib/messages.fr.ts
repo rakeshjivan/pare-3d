@@ -4192,4 +4192,7 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "largeMesh.raised": "Découper et grouper traitent maintenant jusqu'à {proposed} triangles dans ce projet (Réglages, avancés).",
   "dental.guidePdf": "Télécharger le guide de création de modèles (PDF)",
   "dental.guidePdfFirst": "Nouveau dans la création de modèles ? Télécharger le guide (PDF, 28 pages, en anglais)",
+  "sculpt.tidied": "{count} triangle(s) qu'un trancheur signalerait comme non-manifold corrigé(s).",
+  "dental.errorHelp": "Que faire : appuyez de nouveau sur le bouton - un incident isolé peut passer. Si cela se reproduit, Annuler (ou Restaurer l'original) remet les scans ; découpez un bord irrégulier ou un lambeau libre et réessayez. Toujours bloqué ? Appuyez sur Signaler ce problème en bas à gauche et décrivez ce que vous avez fait ; les scans ne sont envoyés que si vous les joignez.",
+  "sculpt.errorHelp": "Que faire : Annuler remet le scan tel qu'il était. Essayez une sélection plus petite, ou À travers au lieu de Surface visible. Si cela se reproduit, appuyez sur Signaler ce problème en bas à gauche et décrivez ce que vous avez fait.",
 };

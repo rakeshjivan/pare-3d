@@ -4217,6 +4217,9 @@ export const MESSAGES_EN = {
   "largeMesh.raised": "Cutting and grouping now handle up to {proposed} triangles on this design (Settings, advanced).",
   "dental.guidePdf": "Download the Model Builder Guide (PDF)",
   "dental.guidePdfFirst": "New to the model builder? Download the guide (PDF, 28 pages)",
+  "sculpt.tidied": "Tidied {count} triangle(s) a slicer would call non-manifold.",
+  "dental.errorHelp": "What to do: press the button again - a one-off can pass. If it happens again, Undo (or Restore original upper or lower) puts the scans back; trim a ragged edge or a loose tag and try again. Still stuck? Press Report this problem at the bottom left and say what you did; the scans are only sent if you attach them.",
+  "sculpt.errorHelp": "What to do: Undo puts the scan back as it was. Try a smaller selection, or Through instead of Surface I see. If it happens again, press Report this problem at the bottom left and say what you did.",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

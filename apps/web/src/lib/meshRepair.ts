@@ -556,3 +556,128 @@ export async function fillHoleAt(positions: ArrayLike<number>, point: { x: numbe
     united?.delete();
   }
 }
+
+export type OpenSurfaceTidy = { positions: Float32Array; broken: number; pinched: number; specks: number };
+
+/**
+ * Build 77: after a trim, what a slicer reports as non-manifold, taken out of an open surface (a
+ * scan stays open - nothing is closed): triangles on an edge that more than two share; at a corner
+ * where the surface only touches itself (a bow-tie, left where a selection met itself at a point),
+ * the smaller fans; and loose specks of a few triangles cut free of the scan. Flat triangles go too.
+ */
+export function tidyOpenSurface(positions: ArrayLike<number>, speckShare = 0.002): OpenSurfaceTidy {
+  const total = Math.floor(positions.length / 9);
+  const { ids, count } = weldCornerIds(positions);
+  const alive = new Uint8Array(total).fill(1);
+  for (let t = 0; t < total; t += 1) {
+    const a = ids[t * 3], b = ids[t * 3 + 1], c = ids[t * 3 + 2];
+    if (a === b || b === c || a === c) alive[t] = 0;
+  }
+  // Edges in a typed hash table: each with the first two triangles on it and how many there are.
+  let size = 1024;
+  while (size < total * 3 * 2) size *= 2;
+  const mask = size - 1;
+  const span = count + 1;
+  const keys = new Float64Array(size).fill(-1);
+  const uses = new Int32Array(size);
+  const first = new Int32Array(size).fill(-1), second = new Int32Array(size).fill(-1);
+  const slotOf = (p: number, q: number) => {
+    const lo = p < q ? p : q, hi = p < q ? q : p;
+    const key = lo * span + hi;
+    let slot = (Math.imul(lo, 0x9e3779b1) ^ Math.imul(hi, 0x85ebca6b)) & mask;
+    for (;;) {
+      const at = keys[slot];
+      if (at === -1 || at === key) { keys[slot] = key; return slot; }
+      slot = (slot + 1) & mask;
+    }
+  };
+  const edgeSlot = new Int32Array(total * 3);
+  const link = () => {
+    uses.fill(0); first.fill(-1); second.fill(-1);
+    for (let t = 0; t < total; t += 1) {
+      if (!alive[t]) continue;
+      for (let k = 0; k < 3; k += 1) {
+        const slot = edgeSlot[t * 3 + k];
+        uses[slot] += 1;
+        if (first[slot] < 0) first[slot] = t; else if (second[slot] < 0) second[slot] = t;
+      }
+    }
+  };
+  for (let t = 0; t < total; t += 1) for (let k = 0; k < 3; k += 1) edgeSlot[t * 3 + k] = slotOf(ids[t * 3 + k], ids[t * 3 + ((k + 1) % 3)]);
+  link();
+  // Edges shared by three or more triangles: all the triangles on them go.
+  let broken = 0;
+  for (let t = 0; t < total; t += 1) {
+    if (!alive[t]) continue;
+    for (let k = 0; k < 3; k += 1) if (uses[edgeSlot[t * 3 + k]] > 2) { alive[t] = 0; broken += 1; break; }
+  }
+  if (broken) link();
+  const across = (t: number, k: number) => { const slot = edgeSlot[t * 3 + k]; const a = first[slot], b = second[slot]; return a === t ? b : a; };
+  // Corners whose fans do not join through shared edges (a bow-tie): the biggest fan stays.
+  const start = new Int32Array(count + 1);
+  for (let t = 0; t < total; t += 1) if (alive[t]) for (let k = 0; k < 3; k += 1) start[ids[t * 3 + k] + 1] += 1;
+  for (let v = 0; v < count; v += 1) start[v + 1] += start[v];
+  const fill = start.slice(0, count), fans = new Int32Array(start[count]);
+  for (let t = 0; t < total; t += 1) if (alive[t]) for (let k = 0; k < 3; k += 1) fans[fill[ids[t * 3 + k]]++] = t;
+  const mark = new Int32Array(total).fill(-1);
+  let pinched = 0;
+  for (let v = 0; v < count; v += 1) {
+    const from = start[v], to = start[v + 1];
+    if (to - from < 2) continue;
+    let groups = 0;
+    const sizes: number[] = [];
+    for (let r = from; r < to; r += 1) {
+      const seed = fans[r];
+      if (mark[seed] >= from) continue;
+      // Walk the fan across edges that meet at v.
+      const stack = [seed];
+      mark[seed] = from + groups;
+      let size = 0;
+      while (stack.length) {
+        const t = stack.pop()!;
+        size += 1;
+        for (let k = 0; k < 3; k += 1) {
+          if (ids[t * 3 + k] !== v && ids[t * 3 + ((k + 1) % 3)] !== v) continue;
+          const u = across(t, k);
+          if (u >= 0 && alive[u] && mark[u] < from) { mark[u] = from + groups; stack.push(u); }
+        }
+      }
+      sizes.push(size);
+      groups += 1;
+    }
+    if (groups < 2) continue;
+    const keep = sizes.indexOf(Math.max(...sizes));
+    for (let r = from; r < to; r += 1) { const t = fans[r]; if (alive[t] && mark[t] - from !== keep) { alive[t] = 0; pinched += 1; } }
+  }
+  if (pinched) link();
+  // Loose specks: pieces joined through edges, under speckShare of the surface (and under 2,000 triangles).
+  const piece = new Int32Array(total).fill(-1);
+  const sizes: number[] = [];
+  for (let t = 0; t < total; t += 1) {
+    if (!alive[t] || piece[t] >= 0) continue;
+    const id = sizes.length;
+    let size = 0;
+    const stack = [t];
+    piece[t] = id;
+    while (stack.length) {
+      const u = stack.pop()!;
+      size += 1;
+      for (let k = 0; k < 3; k += 1) { const w = across(u, k); if (w >= 0 && alive[w] && piece[w] < 0) { piece[w] = id; stack.push(w); } }
+    }
+    sizes.push(size);
+  }
+  let biggest = 0;
+  for (const n of sizes) biggest = Math.max(biggest, n);
+  const limit = Math.min(2000, Math.max(20, total * speckShare));
+  let specks = 0;
+  for (let t = 0; t < total; t += 1) if (alive[t] && sizes[piece[t]] < biggest && sizes[piece[t]] < limit) { alive[t] = 0; specks += 1; }
+  let kept = 0;
+  for (let t = 0; t < total; t += 1) kept += alive[t];
+  const out = new Float32Array(kept * 9);
+  let o = 0;
+  for (let t = 0; t < total; t += 1) {
+    if (!alive[t]) continue;
+    for (let k = 0; k < 9; k += 1) out[o++] = positions[t * 9 + k];
+  }
+  return { positions: out, broken, pinched, specks };
+}

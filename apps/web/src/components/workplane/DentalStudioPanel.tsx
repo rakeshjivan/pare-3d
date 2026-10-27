@@ -227,10 +227,14 @@ export function DentalStudioPanel({
     </div>
   );
   // Build 75: each step a card that folds to a one-line summary; the card last worked in is marked.
+  // Build 77: the step to do next has a green outline - once the scans are in, the first step not
+  // yet worked in (a step may be left as it is: having been in it is enough, the articulator too).
+  const stepCount = pair ? 6 : 5;
+  const nextCard = scansDone ? Array.from({ length: stepCount - 1 }, (_, k) => k + 2).find((number) => !visited[number]) ?? null : null;
   const card = (number: number, label: string, done: boolean, hint: string | null, summary: string | null, body: ReactNode) => {
     const isFolded = Boolean(folded[number]);
     return (
-      <section className={`dental-section dental-card${isFolded ? " folded" : ""}${activeCard === number ? " current" : ""}`} aria-label={label} onPointerDownCapture={() => { setActiveCard(number); if (!visited[number]) setVisited((state) => ({ ...state, [number]: true })); }}>
+      <section className={`dental-section dental-card${isFolded ? " folded" : ""}${activeCard === number ? " current" : ""}${nextCard === number ? " next" : ""}`} aria-label={label} onPointerDownCapture={() => { setActiveCard(number); if (!visited[number]) setVisited((state) => ({ ...state, [number]: true })); }}>
         <button type="button" className="dental-card-head" aria-expanded={!isFolded} onClick={() => setFolded((state) => ({ ...state, [number]: !isFolded }))}>
           {step(number, label, done && (number === 1 || Boolean(visited[number])), isFolded ? null : hint)}
           <ChevronDown size={16} className="dental-card-chevron" aria-hidden="true" />
@@ -557,6 +561,8 @@ export function DentalStudioPanel({
 
       {notes.map((note) => <p key={note} className="dental-status warn" role="status">{note}</p>)}
       {error ? <div className="edge-modifier-error" role="alert">{error}</div> : null}
+      {/* Build 77: an error never leaves the person without a next move. */}
+      {error ? <p className="dental-status dental-error-help" role="status">{t("dental.errorHelp")}</p> : null}
       {nextStep ? <p className="dental-next" role="status">{nextStep}</p> : null}
       <div className="edge-modifier-footer">
         <button type="button" className="secondary" onClick={onCancel}>{t("common.cancel")}</button>

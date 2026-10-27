@@ -4215,4 +4215,7 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "largeMesh.raised": "Řezání a seskupování v tomto návrhu nyní zpracují až {proposed} trojúhelníků (Nastavení, pokročilé).",
   "dental.guidePdf": "Stáhnout průvodce tvorbou modelů (PDF)",
   "dental.guidePdfFirst": "Tvorbu modelů používáte poprvé? Stáhněte si průvodce (PDF, 28 stran, anglicky)",
+  "sculpt.tidied": "Uklizeno {count} trojúhelníků, které by slicer hlásil jako nemanifoldní.",
+  "dental.errorHelp": "Co dělat: stiskněte tlačítko znovu - jednorázová chyba může projít. Stane-li se to znovu, Zpět (nebo Obnovit originál) vrátí skeny; odřízněte roztřepený okraj nebo volný cár a zkuste to znovu. Stále nic? Stiskněte vlevo dole Nahlásit tento problém a popište, co jste udělali; skeny se odešlou, jen pokud je přiložíte.",
+  "sculpt.errorHelp": "Co dělat: Zpět vrátí sken, jak byl. Zkuste menší výběr nebo Skrz místo Viditelný povrch. Stane-li se to znovu, stiskněte vlevo dole Nahlásit tento problém a popište, co jste udělali.",
 };

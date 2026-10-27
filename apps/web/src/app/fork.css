@@ -1921,3 +1921,7 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .dental-studio-panel .dental-guide-download:hover { background: var(--hover, rgba(31, 111, 235, 0.08)); color: var(--primary, #1f6feb); }
 .dental-studio-panel .dental-guide-link { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--primary, #1f6feb); text-decoration: none; }
 .dental-studio-panel .dental-guide-link:hover { text-decoration: underline; }
+/* Build 77: the step to do next, outlined green until it has been worked in. */
+.dental-studio-panel .dental-card.next { border-color: #2e9e5b; box-shadow: 0 0 0 1px #2e9e5b inset; }
+.dental-studio-panel .dental-card.next:not(.current) { border-left-color: #2e9e5b; }
+.dental-studio-panel .dental-error-help { margin-top: 6px; }

@@ -116,7 +116,7 @@ import { WhatsNew } from "./WhatsNew";
 import { FastModeHint } from "./FastModeHint";
 import { checkBeforeSending, CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, PrintCheckPanel, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
 import { belowBedCutter } from "@/lib/cutBelowBed";
-import { fillHoleAt, isManifoldSolid, makeSolidPositions, meshHealth, pendingMeshChecks, shapeWithWorldPositions } from "@/lib/meshRepair";
+import { fillHoleAt, isManifoldSolid, makeSolidPositions, meshHealth, pendingMeshChecks, shapeWithWorldPositions, tidyOpenSurface } from "@/lib/meshRepair";
 import { worldTriangles } from "@/lib/blend";
 import { repairStlPositions } from "@/lib/stlRepair";
 import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
@@ -8995,7 +8995,7 @@ export function LayerlingEditor({
       sculptHidOthers.current = true;
       setDentalHidden(Object.values(studio.slots).filter((id): id is string => Boolean(id) && id !== shape.id));
     }
-    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: 0.5, reach: readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, panelSteps: 0, panelRedo: 0 };
+    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: 0.5, reach: trim ? readTrimReach() : readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, panelSteps: 0, panelRedo: 0 };
     const known = sculptState.current;
     const ready = (state: SculptSession) => Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100);
     if (known && known.shapeId === shape.id && known.key === projectShapesFingerprint([shape])) {
@@ -9329,6 +9329,7 @@ export function LayerlingEditor({
       // Build 76: Erase & Fill - the hole each selected area leaves is closed with a smooth patch.
       const result = eraseAndFill(selection.mesh.points, selection.mesh.triangles, selection.chosen);
       if (!result.positions.length) return;
+      if (target.tool.trim) { const tidy = tidyOpenSurface(result.positions); if (tidy.positions.length) result.positions = tidy.positions; }
       commitSculpt(shape, result.positions, t(result.open ? "sculpt.filledOpen" : "sculpt.filled", { count: result.removed.toLocaleString(), holes: result.filled, open: result.open }), false);
       setSculptTool((current) => current ? { ...current, chosen: 0, teethHit: 0, teethWarned: undefined, teethAction: undefined } : current);
       if (target.tool.trim) window.setTimeout(() => void ensureDentalAreasRef.current(), 0);
@@ -9336,9 +9337,20 @@ export function LayerlingEditor({
     }
     if (action === "delete") {
       const removed = count();
-      const left = withoutTriangles(soupOf(selection.mesh), selection.chosen);
+      let left: ArrayLike<number> = withoutTriangles(soupOf(selection.mesh), selection.chosen);
       if (!left.length) return;
-      commitSculpt(shape, left, t("sculpt.deleted", { count: removed.toLocaleString() }), false);
+      // Build 77: a trim leaves no edge three triangles share, no corner where the scan only touches
+      // itself and no loose speck - what slicers call non-manifold - the scan staying open.
+      let tidied = "";
+      if (target.tool.trim) {
+        const tidy = tidyOpenSurface(left);
+        if (tidy.positions.length) {
+          left = tidy.positions;
+          const fixed = tidy.broken + tidy.pinched + tidy.specks;
+          if (fixed) tidied = " " + t("sculpt.tidied", { count: fixed.toLocaleString() });
+        }
+      }
+      commitSculpt(shape, left, t("sculpt.deleted", { count: removed.toLocaleString() }) + tidied, false);
       setSculptTool((current) => current ? { ...current, chosen: 0, teethHit: 0, teethWarned: undefined, teethAction: undefined } : current);
       // Build 75: the trimmed scan's teeth area, ready for the next cut.
       if (target.tool.trim) window.setTimeout(() => void ensureDentalAreasRef.current(), 0);
@@ -16429,7 +16441,7 @@ export function LayerlingEditor({
           onTool={(tool) => setSculptTool((current) => current ? { ...current, tool } : current)}
           onSize={(size) => setSculptTool((current) => current ? { ...current, size: Math.max(4, Math.min(150, size)) } : current)}
           reach={sculptTool.reach}
-          onReach={(reach) => { storeSculptReach(reach); setSculptTool((current) => current ? { ...current, reach } : current); }}
+          onReach={(reach) => { if (sculptTool.trim) storeTrimReach(reach); else storeSculptReach(reach); setSculptTool((current) => current ? { ...current, reach } : current); }}
           refine={sculptTool.refine}
           symmetry={sculptTool.symmetry}
           onRefine={(refine) => { storeSculptRefine(refine); setSculptTool((current) => current ? { ...current, refine } : current); }}
@@ -16796,6 +16808,22 @@ function readSculptReach(): SelectReach {
     return stored === "back" || stored === "through" ? stored : "front";
   } catch {
     return "front";
+  }
+}
+/** Build 77: Trim reaches right through the scan unless the person chose otherwise - a palate or a flap is cut in one stroke, with no hidden layer left behind. */
+function readTrimReach(): SelectReach {
+  try {
+    const stored = window.localStorage.getItem("pare3d.trimReach");
+    return stored === "back" || stored === "front" ? stored : "through";
+  } catch {
+    return "through";
+  }
+}
+function storeTrimReach(reach: SelectReach) {
+  try {
+    window.localStorage.setItem("pare3d.trimReach", reach);
+  } catch {
+    // Holds for this visit.
   }
 }
 function storeSculptReach(reach: SelectReach) {

@@ -4216,4 +4216,7 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "largeMesh.raised": "Schneiden und Gruppieren verarbeiten in diesem Entwurf jetzt bis zu {proposed} Dreiecke (Einstellungen, erweitert).",
   "dental.guidePdf": "Anleitung zum Modellbau herunterladen (PDF)",
   "dental.guidePdfFirst": "Neu im Modellbau? Anleitung herunterladen (PDF, 28 Seiten, Englisch)",
+  "sculpt.tidied": "{count} Dreieck(e) bereinigt, die ein Slicer als nicht-mannigfaltig melden würde.",
+  "dental.errorHelp": "Was tun: Drücken Sie die Schaltfläche erneut - ein Einzelfall kann vorbeigehen. Passiert es wieder, holt Rückgängig (oder Original wiederherstellen) die Scans zurück; schneiden Sie einen ausgefransten Rand oder einen losen Fetzen weg und versuchen Sie es erneut. Weiter fest? Drücken Sie unten links Report this problem und Beschreiben Sie, was Sie getan haben; die Scans werden nur gesendet, wenn Sie sie anhängen.",
+  "sculpt.errorHelp": "Was tun: Rückgängig holt den Scan zurück. Versuchen Sie eine kleinere Auswahl oder Durch alles statt Sichtbare Fläche. Passiert es wieder, drücken Sie unten links Report this problem und Beschreiben Sie, was Sie getan haben.",
 };

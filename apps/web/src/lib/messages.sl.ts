@@ -4194,4 +4194,7 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "largeMesh.raised": "Rezanje in združevanje v tem načrtu zdaj obdelata do {proposed} trikotnikov (Nastavitve, napredno).",
   "dental.guidePdf": "Prenesi vodnik za izdelavo modelov (PDF)",
   "dental.guidePdfFirst": "Prvič izdelujete modele? Prenesite vodnik (PDF, 28 strani, v angleščini)",
+  "sculpt.tidied": "Počiščenih {count} trikotnikov, ki bi jih rezalnik označil kot nemnogoterne.",
+  "dental.errorHelp": "Kaj storiti: znova pritisnite gumb - enkratna napaka lahko mine. Če se ponovi, Razveljavi (ali Obnovi izvirnik) vrne skene; odrežite razcefran rob ali prosto zaplato in poskusite znova. Še vedno ne gre? Spodaj levo pritisnite Prijavi to težavo in opišite, kaj ste naredili; skeni se pošljejo le, če jih priložite.",
+  "sculpt.errorHelp": "Kaj storiti: Razveljavi vrne sken, kot je bil. Poskusite manjši izbor ali Skozi namesto Vidna površina. Če se ponovi, spodaj levo pritisnite Prijavi to težavo in opišite, kaj ste naredili.",
 };
