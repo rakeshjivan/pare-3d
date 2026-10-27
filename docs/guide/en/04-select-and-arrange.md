@@ -56,9 +56,22 @@ A shape turned at an angle, say by 45°, has its box round it to line up with, n
 
 The key is [[L]]. [[Esc]] cancels.
 
+## The Align menu
+
+Right-click a selection and choose **{{ui:contextMenu.groupArrange}} ›** for the moves that otherwise take several clicks:
+
+- **{{ui:contextMenu.centreTogether}}** (two or more parts) - every part on the middle of the whole selection, across the plate (X and Y); heights stay as they are. If one of the parts is locked, the others centre on it.
+- **{{ui:contextMenu.alignTool}}** opens Align with its dots, for edges and other alignments ([[L]]).
+- **{{ui:contextMenu.centrePlate}}** - the selection, as it stands, on the middle of the workplane.
+- **{{ui:contextMenu.flip}}** turns the selection upside down about its left-right axis; **{{ui:contextMenu.turnAround}}** turns it about the vertical, front to back. Something standing on the workplane is set back down on it, in the same step of undo - an upper model printed teeth up, say.
+- **{{ui:contextMenu.mirrorLeftRight}}** and **{{ui:contextMenu.mirrorFrontBack}}** mirror at once, without choosing an axis; **{{ui:contextMenu.mirrorTool}}** opens Mirror with its arrows ([[M]]).
+- **{{ui:contextMenu.drop}}** sets the selection down on the workplane ([[D]]).
+
+Each is one step of undo.
+
 ## Mirroring
 
-{{ui:editor.tool.mirror}} ([[M]], or right-click the selection and choose it) flips the selection across a plane: {{ui:mirror.leftRight}}, {{ui:mirror.frontBack}} or {{ui:mirror.topBottom}}. Click the matching axis arrow. That is handy for symmetric parts: build one half, copy it and mirror the copy.
+{{ui:editor.tool.mirror}} ([[M]], or right-click the selection and choose {{ui:contextMenu.groupArrange}} ›) flips the selection across a plane: {{ui:mirror.leftRight}}, {{ui:mirror.frontBack}} or {{ui:mirror.topBottom}}. Click the matching axis arrow. That is handy for symmetric parts: build one half, copy it and mirror the copy.
 
 ## Rotating and setting the pivot
 

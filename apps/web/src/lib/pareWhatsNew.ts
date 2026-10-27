@@ -4,6 +4,16 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 76,
+    items: [
+      "Right-click a selection for a new Align menu: centre parts on one another or on the workplane (X and Y) in one click, flip over or turn around 180° (set back down on the workplane), mirror left-right or front-back without picking an axis, and the Align, Mirror and Drop tools.",
+      "Trim in Dental Studio warns only about the crowns of the teeth - within 6 mm of the cusp tips - not the gum, palate or flaps of tissue it counted before; a few triangles at the edge of a stroke are not warned about. A tall tag of tissue right behind the last molar can still be taken for a tooth.",
+      "Erase & Fill, in Trim and in Sculpt: removes what you selected and closes the hole with a smooth patch that carries on the surface round it, for a bubble, spike or void on a scan. The crown warning covers it too.",
+      "Undo and Redo buttons in the Trim and Sculpt panel step back through strokes, deletes and fills made since the panel opened - never further back than that.",
+      "The gum cut no longer splits thin slivers off along the margin: the line now moves a corner onto itself where it passes close by. On real scans, slivers fell by about a quarter; the rest are on the flat floor, where they make no difference to the print.",
+    ],
+  },
+  {
     build: 75,
     items: [
       "Drag files from your desktop straight onto the editor to import them - no trip through the Import window. A frame shows while you hold them over it; a .lyl design dropped this way opens.",
