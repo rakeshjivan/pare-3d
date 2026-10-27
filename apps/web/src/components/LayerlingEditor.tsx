@@ -282,7 +282,7 @@ import { DENTAL_MODEL_EVENT, OPEN_DENTAL_STUDIO_KEY, FILL_HOLE_EVENT, MESH_CHECK
 import { SecondaryToolbar, type SketchShapeOptions } from "@/components/EditorSecondaryToolbar";
 import { SHARED_CLIPBOARD_STORAGE_KEY, readSharedClipboard, readSystemClipboard, writeSharedClipboard } from "@/lib/editorClipboard";
 import { downloadBlobFile, downloadTextFile, footprintSvg, imagePlateDimensions, prepareImportedImage, toSvg } from "@/lib/editorFiles";
-import { alignedShapesForSelection, alignmentLabel, alignmentStatuses, effectiveAlignmentAnchorId, frameAabb, mirrorAxisLabel, mirroredShapesForSelection } from "@/lib/editorAlignMirror";
+import { alignedShapesForSelection, alignmentLabel, alignmentStatuses, centringMoves, effectiveAlignmentAnchorId, frameAabb, mirrorAxisLabel, mirroredShapesForSelection } from "@/lib/editorAlignMirror";
 import { MCP_BENT_TUBE_KEYS, applyMcpThreadSettings, mcpBentTubePatch, mcpExtrudeDeformPatch, mcpFiniteNumberArray, mcpLoftChange, mcpNumber, mcpNumberArray, mcpOptionalNumber, mcpPointInfo, mcpShapeCustomization, mcpString, mcpStringArray, mcpTaperPatch, readMcpEditorIdentity } from "@/lib/editorMcpParams";
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
@@ -14584,6 +14584,61 @@ export function LayerlingEditor({
     );
   }, [refuseLockedSelection, activeRotationPivot, commitShapes, hasSelection, placementWorkplane, selectedIds, selectedShapes, shapes]);
 
+  /** Build 76: the selection's box in world space (X and Z across the plate, Y up), from the drawn meshes. */
+  const worldBoxOf = (list: WorkplaneShape[]) => {
+    const box = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    for (const shape of list) for (const [x, y, z] of meshForShape(shape).vertices) {
+      box.minX = Math.min(box.minX, x); box.maxX = Math.max(box.maxX, x);
+      box.minY = Math.min(box.minY, y); box.maxY = Math.max(box.maxY, y);
+      box.minZ = Math.min(box.minZ, z); box.maxZ = Math.max(box.maxZ, z);
+    }
+    return box;
+  };
+  /**
+   * Build 76 (right-click, Arrange): turn the selection half a turn about the left-right axis
+   * ("flip") or the vertical ("turn"), round its middle. Something standing on the workplane is
+   * set back down on it, in the same step of undo.
+   */
+  const halfTurnSelected = useCallback((about: "flip" | "turn") => {
+    if (!hasSelection) { setNotice(t("status.selectShapeFirst")); return; }
+    if (refuseLockedSelection()) return;
+    if (projectInteractionActiveRef.current) { setNotice(t("status.finishBeforeRotate")); return; }
+    const movable = selectedShapes.filter((shape) => !shape.locked);
+    if (!movable.length) return;
+    const before = worldBoxOf(movable);
+    const onPlate = placementWorkplaneIsBase(placementWorkplane) && Math.abs(before.minY) < 0.01;
+    const axis = about === "flip" ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    const delta = new THREE.Quaternion().setFromAxisAngle(axis, Math.PI);
+    const pivot = new THREE.Vector3((before.minX + before.maxX) / 2, (before.minY + before.maxY) / 2, (before.minZ + before.maxZ) / 2);
+    const ids = new Set(movable.map((shape) => shape.id));
+    let turned = shapes.map((shape) => ids.has(shape.id) ? canonicalizeShape(bakeShapeTransformIntoMesh(canonicalizeShape({ ...shape, ...rotatedGeometryShapePatch(shape, delta, pivot) }))) : shape);
+    if (onPlate) {
+      const lift = -worldBoxOf(turned.filter((shape) => ids.has(shape.id))).minY;
+      if (Math.abs(lift) > 1e-6) turned = turned.map((shape) => ids.has(shape.id) ? { ...shape, elevation: cleanNearZero((shape.elevation ?? 0) + lift) } : shape);
+    }
+    commitShapes(turned, selectedIds, t(about === "flip" ? "status.flipped" : "status.turnedAround", { count: movable.length }));
+  }, [refuseLockedSelection, commitShapes, hasSelection, placementWorkplane, selectedIds, selectedShapes, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
+  /**
+   * Build 76 (right-click, Arrange): centre across the plate (X and Y as the rulers read; X and Z
+   * here). "together": every part on the middle of the whole selection; "plate": the selection,
+   * kept as it is, on the middle of the workplane.
+   */
+  const centreSelected = useCallback((on: "together" | "plate") => {
+    if (!hasSelection) { setNotice(t("status.selectShapeFirst")); return; }
+    if (refuseLockedSelection()) return;
+    const movable = selectedShapes.filter((shape) => !shape.locked);
+    if (!movable.length || (on === "together" && selectedShapes.length < 2)) return;
+    // A locked part stays where it is, and the others centre on it.
+    const locked = selectedShapes.find((shape) => shape.locked);
+    const moves = centringMoves(movable.map((shape) => ({ id: shape.id, box: worldBoxOf([shape]) })), on, worldBoxOf(locked ? [locked] : selectedShapes), { x: placementWorkplane.origin.x, z: placementWorkplane.origin.z });
+    if ([...moves.values()].every((move) => Math.abs(move.x) < 1e-4 && Math.abs(move.z) < 1e-4)) { setNotice(t("status.alreadyCentred")); return; }
+    commitShapes(
+      shapes.map((shape) => { const move = moves.get(shape.id); return move ? { ...shape, x: cleanNearZero(shape.x + move.x), z: cleanNearZero(shape.z + move.z) } : shape; }),
+      selectedIds,
+      t(on === "together" ? "status.centredTogether" : "status.centredOnPlate", { count: movable.length }),
+    );
+  }, [refuseLockedSelection, commitShapes, hasSelection, placementWorkplane, selectedIds, selectedShapes, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
       if (!(target instanceof HTMLElement)) {
@@ -15233,7 +15288,25 @@ export function LayerlingEditor({
         ...(referencePoints(notes).length > 0 ? [{ key: "removePoints", label: t("contextMenu.removeAllPoints", { count: referencePoints(notes).length }), danger: true, onSelect: removeAllReferencePoints }] : []),
       );
     }
+    // Build 76: Arrange - centring, half turns and mirroring in one click each.
+    const arrange: ShapeContextMenuItem[] = [];
+    if (!selectionLocked) {
+      if (selectedShapes.length >= 2) arrange.push(
+        { key: "centreTogether", label: t("contextMenu.centreTogether"), onSelect: () => centreSelected("together") },
+        { key: "alignTool", label: t("contextMenu.alignTool"), shortcut: "L", onSelect: toggleAlignMode },
+      );
+      arrange.push(
+        { key: "centrePlate", label: t("contextMenu.centrePlate"), onSelect: () => centreSelected("plate") },
+        { key: "flip", label: t("contextMenu.flip"), separated: true, onSelect: () => halfTurnSelected("flip") },
+        { key: "turnAround", label: t("contextMenu.turnAround"), onSelect: () => halfTurnSelected("turn") },
+        { key: "mirrorX", label: t("contextMenu.mirrorLeftRight"), separated: true, onSelect: () => mirrorSelectionAcross("x") },
+        { key: "mirrorZ", label: t("contextMenu.mirrorFrontBack"), onSelect: () => mirrorSelectionAcross("z") },
+        { key: "mirror", label: t("contextMenu.mirrorTool"), shortcut: "M", onSelect: toggleMirrorMode },
+        { key: "drop", label: t("contextMenu.drop"), shortcut: "D", separated: true, onSelect: dropSelectedToWorkplane },
+      );
+    }
     const groups = [
+      { id: "arrange", label: t("contextMenu.groupArrange"), items: arrange },
       { id: "edges", label: t("contextMenu.groupEdges"), items: edges },
       { id: "surface", label: t("contextMenu.groupSurface"), items: surface },
       { id: "mesh", label: t("contextMenu.groupMesh"), items: mesh },
@@ -15253,16 +15326,12 @@ export function LayerlingEditor({
       items.push({ key: `group-${group.id}`, label: `${group.label} ›`, keepOpen: true, separated: index === 0, onSelect: () => setShapeContextMenu((current) => current ? { ...current, submenu: group.id } : current) });
     });
     if (!selectionLocked) {
-      items.push(
-        { key: "mirror", label: t("editor.tool.mirror"), shortcut: "M", separated: true, onSelect: toggleMirrorMode },
-        { key: "scalePercent", label: t("scalePercent.title"), onSelect: toggleScalePercentTool },
-      );
+      items.push({ key: "scalePercent", label: t("scalePercent.title"), separated: true, onSelect: toggleScalePercentTool });
     }
     items.push(
       { key: "hide", label: t("contextMenu.hide"), shortcut: "Ctrl+H", separated: true, onSelect: toggleHidden },
       { key: "lock", label: t(allLocked ? "contextMenu.unlock" : "contextMenu.lock"), shortcut: "Ctrl+L", onSelect: toggleLocked },
       ...(selectionLocked ? [] : [{ key: "carry", label: t("contextMenu.carry"), shortcut: "C", onSelect: startCarry }]),
-      ...(selectionLocked ? [] : [{ key: "drop", label: t("contextMenu.drop"), shortcut: "D", onSelect: dropSelectedToWorkplane }]),
       ...(selectionLocked ? [] : [{ key: "delete", label: t("common.delete"), shortcut: t("contextMenu.deleteKey"), danger: true, separated: true, onSelect: deleteSelected }]),
     );
     return items;

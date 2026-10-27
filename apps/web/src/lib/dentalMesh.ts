@@ -1080,14 +1080,35 @@ export function smoothField(m: Mesh, field: Float64Array, rounds: number, hold?:
  * Build 52: what of the mesh lies where `field` is above zero, cut exactly along its zero line -
  * triangles that cross it are split there, not dropped whole - so the cut edge is a clean line.
  * Corners where `keep` is set are kept whatever the field says (the teeth).
+ * Build 76: where the line passes closer to a corner than SNAP_SHARE of the edge, the corner is
+ * moved onto the line instead of the edge being split there, which left slivers along the cut. A
+ * corner moves at most that share of one edge; the teeth (`keep`) never move.
  */
-export function cutAlongField(m: Mesh, field: Float64Array, keep?: Uint8Array): Mesh {
+export function cutAlongField(m: Mesh, field: Float64Array, keep?: Uint8Array, snapShare = SNAP_SHARE): Mesh {
   const v = m.v.slice();
   const f: number[] = [];
-  const inside = (i: number) => field[i] > 0 || Boolean(keep?.[i]);
+  const corners = m.v.length / 3;
   const level = (i: number) => (keep?.[i] ? Math.max(field[i], 1e-3) : field[i]);
+  const above = (i: number) => field[i] > 0 || Boolean(keep?.[i]);
+  // Corners moved onto the line: kept, and the cut passes through them.
+  const onLine = new Uint8Array(corners);
+  if (snapShare > 0) {
+    for (let t = 0; t < m.f.length; t += 3) for (let k = 0; k < 3; k += 1) {
+      const a = m.f[t + k], b = m.f[t + (k + 1) % 3];
+      if (above(a) === above(b) || onLine[a] || onLine[b]) continue;
+      const fa = level(a), fb = level(b);
+      const share = fa / (fa - fb);
+      const near = share < snapShare ? a : share > 1 - snapShare ? b : -1;
+      if (near < 0 || keep?.[near]) continue;
+      for (let c = 0; c < 3; c += 1) v[near * 3 + c] = m.v[a * 3 + c] + (m.v[b * 3 + c] - m.v[a * 3 + c]) * share;
+      onLine[near] = 1;
+    }
+  }
+  const inside = (i: number) => onLine[i] === 1 || above(i);
   const crossing = new Map<number, number>();
   const point = (a: number, b: number) => {
+    if (onLine[a]) return a;
+    if (onLine[b]) return b;
     const key = a < b ? a * 4294967296 + b : b * 4294967296 + a;
     const known = crossing.get(key);
     if (known !== undefined) return known;
@@ -1098,19 +1119,27 @@ export function cutAlongField(m: Mesh, field: Float64Array, keep?: Uint8Array): 
     crossing.set(key, id);
     return id;
   };
+  const push = (a: number, b: number, c: number) => { if (a !== b && b !== c && a !== c) f.push(a, b, c); };
   for (let t = 0; t < m.f.length; t += 3) {
     const c = [m.f[t], m.f[t + 1], m.f[t + 2]];
     const ins = c.map(inside);
     const count = ins.filter(Boolean).length;
-    if (count === 3) { f.push(...c); continue; }
+    if (count === 3) {
+      // Every corner on the line: kept if it lay inside before the corners moved.
+      if (c.every((i) => onLine[i]) && c.filter(above).length < 2) continue;
+      f.push(...c);
+      continue;
+    }
     if (count === 0) continue;
     // Rotate so the odd one out comes first.
     let r = 0;
     while (count === 1 ? !ins[r] : ins[r]) r += 1;
     const a = c[r], b = c[(r + 1) % 3], d = c[(r + 2) % 3];
     const ab = point(a, b), ad = point(a, d);
-    if (count === 1) f.push(a, ab, ad);
-    else f.push(ab, b, d, ab, d, ad);
+    if (count === 1) push(a, ab, ad);
+    else { push(ab, b, d); push(ab, d, ad); }
   }
   return { v, f };
 }
+/** Build 76: the line snaps onto a corner it passes closer to than this share of the edge. */
+export const SNAP_SHARE = 0.2;

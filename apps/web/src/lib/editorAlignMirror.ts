@@ -211,3 +211,21 @@ export function mirroredShapesForSelection(shapes: WorkplaneShape[], selectedIds
 
   return { nextShapes, moved };
 }
+
+/** Build 76: a part's (or a selection's) extent across the plate. */
+export type PlateBox = { minX: number; maxX: number; minZ: number; maxZ: number };
+
+/**
+ * Build 76 (right-click, Align): how far each part moves across the plate (X and Z) to be centred.
+ * "together": every part on the middle of `around` (the whole selection, or a locked part);
+ * "plate": all of them as one, kept as they stand, on `target` (the workplane's middle).
+ */
+export function centringMoves(parts: Array<{ id: string; box: PlateBox }>, on: "together" | "plate", around: PlateBox, target = { x: 0, z: 0 }) {
+  const middle = (box: PlateBox) => ({ x: (box.minX + box.maxX) / 2, z: (box.minZ + box.maxZ) / 2 });
+  const whole = parts.reduce<PlateBox>((all, { box }) => ({ minX: Math.min(all.minX, box.minX), maxX: Math.max(all.maxX, box.maxX), minZ: Math.min(all.minZ, box.minZ), maxZ: Math.max(all.maxZ, box.maxZ) }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+  const goal = on === "plate" ? target : middle(around);
+  return new Map(parts.map(({ id, box }) => {
+    const from = middle(on === "together" ? box : whole);
+    return [id, { x: goal.x - from.x, z: goal.z - from.z }] as const;
+  }));
+}

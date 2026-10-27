@@ -4196,6 +4196,20 @@ export const MESSAGES_EN = {
   "sculpt.undoHint": "Takes back the last stroke, delete or fill made in this panel (Ctrl+Z)",
   "sculpt.redoHint": "Does it again (Ctrl+Shift+Z)",
   "sculpt.fillAnyway": "Fill anyway",
+  "contextMenu.groupArrange": "Align",
+  "contextMenu.centreTogether": "Centre on one another",
+  "contextMenu.centrePlate": "Centre on the workplane",
+  "contextMenu.flip": "Flip over (180°)",
+  "contextMenu.turnAround": "Turn around (180°)",
+  "contextMenu.mirrorLeftRight": "Mirror left-right",
+  "contextMenu.mirrorFrontBack": "Mirror front-back",
+  "contextMenu.mirrorTool": "Mirror…",
+  "contextMenu.alignTool": "Align…",
+  "status.flipped": "Flipped over",
+  "status.turnedAround": "Turned around",
+  "status.centredTogether": "Centred {count} parts on one another",
+  "status.centredOnPlate": "Centred on the workplane",
+  "status.alreadyCentred": "Already centred",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;
