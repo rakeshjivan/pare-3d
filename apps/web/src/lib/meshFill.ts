@@ -76,7 +76,6 @@ function fillEvenly(mesh: LiveMesh, loop: number[]) {
   let total = 0;
   for (let i = 0; i < loop.length; i += 1) total += mesh.dist(loop[i], loop[(i + 1) % loop.length]);
   const spacing = Math.max(1e-6, total / loop.length);
-  const p = mesh.pos;
   const stack: number[][] = [loop];
   while (stack.length) {
     const ring = stack.pop()!;
@@ -97,6 +96,8 @@ function fillEvenly(mesh: LiveMesh, loop: number[]) {
     // give that edge three triangles: such a chord always gets a corner in its middle.
     const count = Math.max(mesh.edgeTriangles(a, b).length ? 1 : 0, Math.round(best / spacing) - 1);
     const chain: number[] = [];
+    // Read afresh: adding corners can move the mesh's position array.
+    const p = mesh.pos;
     for (let k = 1; k <= count; k += 1) {
       const f = k / (count + 1);
       chain.push(mesh.addCorner(p[a * 3] + (p[b * 3] - p[a * 3]) * f, p[a * 3 + 1] + (p[b * 3 + 1] - p[a * 3 + 1]) * f, p[a * 3 + 2] + (p[b * 3 + 2] - p[a * 3 + 2]) * f));
@@ -119,14 +120,25 @@ function fillEvenly(mesh: LiveMesh, loop: number[]) {
  */
 function fanRing(mesh: LiveMesh, ring: number[]) {
   const m = ring.length;
+  const p = mesh.pos;
+  // Build 76: twice the area of triangle (a, b, c), squared - a fan from a corner in line with two
+  // others (the corners along a chord are) would give a flat triangle, whose edge a later split
+  // puts a corner on top of another.
+  const flat = (a: number, b: number, c: number) => {
+    const ux = p[b * 3] - p[a * 3], uy = p[b * 3 + 1] - p[a * 3 + 1], uz = p[b * 3 + 2] - p[a * 3 + 2];
+    const vx = p[c * 3] - p[a * 3], vy = p[c * 3 + 1] - p[a * 3 + 1], vz = p[c * 3 + 2] - p[a * 3 + 2];
+    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+    const scale = (ux * ux + uy * uy + uz * uz) * (vx * vx + vy * vy + vz * vz);
+    return cx * cx + cy * cy + cz * cz <= scale * 1e-6;
+  };
   for (let r = 0; r < m; r += 1) {
     let clear = true;
     for (let k = 2; k < m - 1 && clear; k += 1) if (mesh.edgeTriangles(ring[r], ring[(r + k) % m]).length) clear = false;
+    for (let k = 1; k + 1 < m && clear; k += 1) if (flat(ring[r], ring[(r + k + 1) % m], ring[(r + k) % m])) clear = false;
     if (!clear) continue;
     for (let k = 1; k + 1 < m; k += 1) mesh.addFace(ring[r], ring[(r + k + 1) % m], ring[(r + k) % m]);
     return;
   }
-  const p = mesh.pos;
   let x = 0, y = 0, z = 0;
   for (const v of ring) { x += p[v * 3]; y += p[v * 3 + 1]; z += p[v * 3 + 2]; }
   const c = mesh.addCorner(x / m, y / m, z / m);
@@ -158,8 +170,9 @@ function dropSpecks(kept: number[], cut: Set<number>, key: (a: number, b: number
   if (!dropped) return;
   // The specks' edges count as cut too, so the hole round them is one.
   for (let t = 0; t < m; t += 1) if (speck(find(kept[t * 3]))) for (let k = 0; k < 3; k += 1) cut.add(key(kept[t * 3 + k], kept[t * 3 + ((k + 1) % 3)]));
-  kept.length = 0;
-  kept.push(...out);
+  // In place, without spreading: a scan's list runs to millions, beyond what a call can take.
+  kept.length = out.length;
+  for (let i = 0; i < out.length; i += 1) kept[i] = out[i];
   report(dropped);
 }
 
@@ -213,10 +226,10 @@ function fairPatches(mesh: LiveMesh, n: number, strength: number) {
   for (const v of patchCorners(mesh, n)) for (const w of mesh.around(v)) if (w < n) for (const u of mesh.around(w)) if (u < n) { sum += mesh.dist(w, u); count += 1; }
   const target = count ? sum / count : 1;
   const fixed = (v: number) => v < n;
-  fair(mesh, patchCorners(mesh, n), n, Math.round(400 * strength));
-  const corners = patchCorners(mesh, n);
-  mesh.refine(corners, target, { fixed, budget: corners.length * 3, relax: true });
-  fair(mesh, patchCorners(mesh, n), n, Math.round(200 * strength));
+  // Build 76: not tidied with Refine between - on a big patch its splits left corners on top of one
+  // another (the soup then has edges shared by three triangles); the patch is already even.
+  void target; void fixed;
+  fair(mesh, patchCorners(mesh, n), n, Math.round(600 * strength));
 }
 
 /**

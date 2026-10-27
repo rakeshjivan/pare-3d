@@ -10,7 +10,7 @@ function sphereSoup(r: number, detail: number) {
 /** Edge use counts of a soup, corners welded. */
 function edges(p: ArrayLike<number>) {
   const id = new Map<string, number>();
-  const at = (i: number) => { const k = `${p[i].toFixed(4)},${p[i + 1].toFixed(4)},${p[i + 2].toFixed(4)}`; let v = id.get(k); if (v === undefined) { v = id.size; id.set(k, v); } return v; };
+  const at = (i: number) => { const k = `${p[i].toFixed(5)},${p[i + 1].toFixed(5)},${p[i + 2].toFixed(5)}`; let v = id.get(k); if (v === undefined) { v = id.size; id.set(k, v); } return v; };
   const count = new Map<string, number>();
   for (let t = 0; t + 8 < p.length; t += 9) {
     const c = [at(t), at(t + 3), at(t + 6)];
@@ -85,4 +85,18 @@ describe("Erase & Fill (build 76)", () => {
     }
     expect(off).toBe(0);
   });
+  it("fills a big scan's worth of selection, an island left inside it too, without running out of stack", () => {
+    // About 1.3 million triangles; a band chosen round a patch, which is left standing as a speck.
+    const mesh = sculptMeshOf(sphereSoup(30, 180));
+    const chosen = new Uint8Array(mesh.triangles.length / 3);
+    for (let t = 0; t < chosen.length; t += 1) {
+      let y = 0;
+      for (let k = 0; k < 3; k += 1) y += mesh.points[mesh.triangles[t * 3 + k] * 3 + 1];
+      y /= 3;
+      if (y > 24 && y < 27) chosen[t] = 1;
+    }
+    const result = eraseAndFill(mesh.points, mesh.triangles, chosen);
+    expect(result.positions.length).toBeGreaterThan(0);
+    expect(edges(result.positions).more).toBe(0);
+  }, 240_000);
 });
