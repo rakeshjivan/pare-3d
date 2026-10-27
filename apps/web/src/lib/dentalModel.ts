@@ -197,6 +197,27 @@ export function keptDepthFor(arch: { depth: number; teeth: number }, options: De
   return Math.max(arch.teeth, Math.min(keep, arch.teeth + Math.max(0.5, options.gum)));
 }
 
+/** Build 75: a piece standing free of a model smaller than this (and than a twentieth of it) is a tag of scan, left out, mm³. */
+export const LOOSE_TAG_VOLUME = 150;
+/**
+ * Build 75: the solid without tags of scan standing free beside the model - a sliver of cheek or
+ * tongue at the end of an arch, walled down to the floor on its own. They hold no teeth worth keeping:
+ * each is under LOOSE_TAG_VOLUME and a twentieth of the biggest piece. Anything bigger stays, and is
+ * reported as loose.
+ */
+export function withoutTags(runtime: ManifoldRuntime, solid: ManifoldSolid): { solid: ManifoldSolid; dropped: number } {
+  const split = solid.decompose();
+  if (split.length < 2) { split.forEach((piece) => piece.delete()); return { solid, dropped: 0 }; }
+  const volumes = split.map((piece) => piece.volume());
+  const biggest = Math.max(...volumes);
+  const tag = volumes.map((volume) => volume > 0 && volume < Math.min(LOOSE_TAG_VOLUME, biggest * 0.05));
+  const dropped = tag.filter(Boolean).length;
+  if (!dropped) { split.forEach((piece) => piece.delete()); return { solid, dropped: 0 }; }
+  const kept = runtime.Manifold.compose(split.filter((_, i) => !tag[i]));
+  split.forEach((piece) => piece.delete());
+  return { solid: kept, dropped };
+}
+
 /** Gum kept below the teeth by a clean base when none is set, mm. */
 export const CLEAN_GUM = 3;
 /** Rounds of smoothing the margin's line gets along the surface before the cut (build 52). */
@@ -835,6 +856,12 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     if (clean.solid !== solid) { toFree.push(solid); solid = clean.solid; }
     // Build 65: a model must be one piece - a part of the hinge or the stop standing free of its
     // base would print loose. Counted, and said.
+    const tagged = withoutTags(runtime, solid);
+    if (tagged.dropped) {
+      toFree.push(solid);
+      solid = tagged.solid;
+      if (!warnings.includes("tag")) warnings.push("tag");
+    }
     const split = solid.decompose();
     const loose = split.filter((piece) => piece.volume() > 0).length;
     split.forEach((piece) => piece.delete());

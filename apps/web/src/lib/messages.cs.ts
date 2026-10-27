@@ -4182,4 +4182,6 @@ export const MESSAGES_CS: Record<MessageKey, string> = {
   "dental.trimStep": "Oříznutí (volitelné)",
   "sculpt.trimTeeth": "{count} z vybraných trojúhelníků jsou zuby. Zrušte jejich výběr, nebo stiskněte Přesto smazat a odřízněte je také.",
   "sculpt.deleteAnyway": "Přesto smazat",
+  "dental.warn.looseScan": "Část modelu se oddělila - kus skenu stojí volně vedle modelu: takto netiskněte - ořízněte tam sken (Příprava skenů) a vytvořte model znovu.",
+  "dental.warn.tag": "Malý cár skenu stojící volně vedle modelu byl vynechán - nenesl žádné zuby.",
 };

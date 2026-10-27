@@ -4183,4 +4183,6 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "dental.trimStep": "Beschneiden (optional)",
   "sculpt.trimTeeth": "{count} der ausgewählten Dreiecke sind Zähne. Wählen Sie sie ab oder drücken Sie Trotzdem löschen, um sie mitzuschneiden.",
   "sculpt.deleteAnyway": "Trotzdem löschen",
+  "dental.warn.looseScan": "Ein Teil eines Modells hat sich gelöst - ein Stück Scan, das frei neben dem Modell steht: so nicht drucken - den Scan dort beschneiden (Scans vorbereiten) und neu erstellen.",
+  "dental.warn.tag": "Ein kleiner Scanfetzen, der frei neben einem Modell stand, wurde weggelassen - er trug keine Zähne.",
 };

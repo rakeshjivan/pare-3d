@@ -4161,4 +4161,6 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "dental.trimStep": "Obrezovanje (neobvezno)",
   "sculpt.trimTeeth": "{count} izbranih trikotnikov je zob. Prekličite njihovo izbiro ali pritisnite Vseeno izbriši, da jih odrežete tudi.",
   "sculpt.deleteAnyway": "Vseeno izbriši",
+  "dental.warn.looseScan": "Del modela se je odlomil - kos skena stoji ločeno od modela: tako ne tiskajte - sken tam obrežite (Priprava skenov) in ga naredite znova.",
+  "dental.warn.tag": "Majhen kos skena, ki je stal ločeno ob modelu, je bil izpuščen - ni nosil zob.",
 };

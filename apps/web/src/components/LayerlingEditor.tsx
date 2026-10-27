@@ -10073,7 +10073,7 @@ export function LayerlingEditor({
         const kind = t(state.options.inside === "solid" ? "dental.doneSolid" : state.options.inside === "open" ? "dental.doneHollow" : "dental.doneClosed", { wall: state.options.wall.toFixed(1) });
         commitShapes(next, [...made.keys()], t(result.parts.length > 1 ? "dental.donePair" : "dental.done", { height: heights, kind }));
         setMeshCheck(null);
-        const notes = result.warnings.map((warning) => t(({ edge: "dental.warn.edge", vents: "dental.warn.vents", apart: "dental.warn.apart", teeth: "dental.warn.teeth", opening: "dental.warn.opening", loose: "dental.warn.loose" } as const)[warning as "edge"] ?? "dental.warn.label"));
+        const notes = result.warnings.map((warning) => t(({ edge: "dental.warn.edge", vents: "dental.warn.vents", apart: "dental.warn.apart", teeth: "dental.warn.teeth", opening: "dental.warn.opening", loose: state.options.hinge ? "dental.warn.loose" : "dental.warn.looseScan", tag: "dental.warn.tag" } as const)[warning as "edge"] ?? "dental.warn.label"));
         // Build 60: how far the printed articulator opens.
         if (result.opening !== undefined && result.opening >= 30) notes.push(t(result.opening >= 90 ? "dental.opensFully" : "dental.opens", { angle: result.opening }));
         // Build 71: how far a raised pin holds the bite open, at the pin and at the teeth.

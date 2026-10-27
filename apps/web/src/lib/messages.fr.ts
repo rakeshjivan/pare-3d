@@ -4159,4 +4159,6 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "dental.trimStep": "Découper (facultatif)",
   "sculpt.trimTeeth": "{count} des triangles sélectionnés sont des dents. Désélectionnez-les, ou appuyez sur Supprimer quand même pour les couper aussi.",
   "sculpt.deleteAnyway": "Supprimer quand même",
+  "dental.warn.looseScan": "Une partie d'un modèle s'en est détachée - un morceau de scan isolé du modèle : ne l'imprimez pas tel quel - découpez le scan à cet endroit (Préparer les scans) et refaites-le.",
+  "dental.warn.tag": "Un petit lambeau de scan isolé à côté d'un modèle a été retiré - il ne portait pas de dents.",
 };

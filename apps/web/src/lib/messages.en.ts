@@ -4184,6 +4184,8 @@ export const MESSAGES_EN = {
   "dental.trimStep": "Trim (optional)",
   "sculpt.trimTeeth": "{count} of the selected triangles are teeth. Unselect them, or press Delete anyway to cut them too.",
   "sculpt.deleteAnyway": "Delete anyway",
+  "dental.warn.looseScan": "Part of a model came out loose from it - a piece of scan standing free of the model: do not print it as it is - trim the scan there (Prepare the scans) and make it again.",
+  "dental.warn.tag": "A small tag of scan standing free beside a model was left out - it held no teeth.",
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES_EN;

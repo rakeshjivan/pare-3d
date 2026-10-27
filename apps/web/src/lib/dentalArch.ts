@@ -150,6 +150,21 @@ export function isPartialArch(m: Mesh, frame: THREE.Matrix4): boolean {
  * The shape of the teeth seen from above, from the teeth found tooth by tooth (toothZone) rather
  * than a band of height: a tilted arch, or tall front teeth, would leave only some teeth in a band.
  */
+/** Build 75: the share of an arch's tooth points within 3 mm of their middle that makes it a quadrant. */
+export const MIDDLE_SHARE = 0.02;
+/**
+ * Whether the teeth (seen from above) stand at their own middle, as a quadrant's do; a full arch's
+ * middle is the tongue or palate. Build 75: by a share of the teeth, not one point - 25 points of a
+ * scrap among 124,000 made a full upper a quadrant, and its every base a quadrant's block.
+ */
+export function teethAtMiddle(points: Ring): boolean {
+  if (!points.length) return false;
+  let cx = 0, cy = 0;
+  points.forEach(([x, y]) => { cx += x; cy += y; });
+  cx /= points.length; cy /= points.length;
+  const near = points.reduce((count, [x, y]) => count + ((x - cx) ** 2 + (y - cy) ** 2 < 9 ? 1 : 0), 0);
+  return near >= Math.max(10, points.length * MIDDLE_SHARE);
+}
 function teethShape(v: Float64Array, f: number[]): { partial: boolean; axis: number } | null {
   const zone = toothZone({ v: v as unknown as number[], f });
   const points: Ring = [];
@@ -158,11 +173,7 @@ function teethShape(v: Float64Array, f: number[]): { partial: boolean; axis: num
   const shape = bandShape(points);
   // A full arch is a U: its middle is the tongue or palate, with no tooth there. A quadrant or a
   // sextant has its teeth at its middle.
-  let cx = 0, cy = 0;
-  points.forEach(([x, y]) => { cx += x; cy += y; });
-  cx /= points.length; cy /= points.length;
-  const toothAtMiddle = points.some(([x, y]) => (x - cx) ** 2 + (y - cy) ** 2 < 9);
-  return { partial: shape.partial || toothAtMiddle, axis: shape.axis };
+  return { partial: shape.partial || teethAtMiddle(points), axis: shape.axis };
 }
 
 /** How far a curve may wander off straight (mm) before an end counts as bent, and how much more one end must bend than the other. */

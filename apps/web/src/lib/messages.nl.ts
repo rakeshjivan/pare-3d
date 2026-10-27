@@ -4183,4 +4183,6 @@ export const MESSAGES_NL: Record<MessageKey, string> = {
   "dental.trimStep": "Bijsnijden (optioneel)",
   "sculpt.trimTeeth": "{count} van de geselecteerde driehoeken zijn tanden. Deselecteer ze, of druk op Toch verwijderen om ze ook weg te snijden.",
   "sculpt.deleteAnyway": "Toch verwijderen",
+  "dental.warn.looseScan": "Een deel van een model is losgekomen - een stuk scan dat los van het model staat: zo niet printen - snijd de scan daar bij (Scans voorbereiden) en maak het opnieuw.",
+  "dental.warn.tag": "Een klein los flardje scan naast een model is weggelaten - er zaten geen tanden aan.",
 };

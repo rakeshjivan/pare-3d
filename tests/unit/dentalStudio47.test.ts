@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
 import { beforeAll, describe, expect, it } from "vitest";
 import { analyseDental, looksLikeDentalScan, makeDentalArchPart, labelledOptions, makeDentalStudio, pinchedEdges, type DentalStudioOptions } from "@/lib/dentalModel";
@@ -65,6 +66,45 @@ function closedVolume(runtime: ManifoldToplevel, positions: Float32Array) {
   solid.delete();
   return result;
 }
+
+describe("full arch or quadrant (build 75)", () => {
+  it("takes a scrap at a full arch's middle for a scrap, and a quadrant's teeth at its middle for a quadrant", async () => {
+    const { teethAtMiddle } = await import("@/lib/dentalArch");
+    // A full arch from above: tooth points along a U (front at -y), nothing in the middle.
+    const arch: Array<[number, number]> = [];
+    for (let k = 0; k <= 4000; k += 1) {
+      const s = (k / 4000) * 2 - 1, across = ((k * 7) % 11) / 10 - 0.5;
+      arch.push([24 * Math.sin(s * 1.35) + across * 4 * Math.sin(s * 1.35), -22 * Math.cos(s * 1.35) - across * 4 * Math.cos(s * 1.35)]);
+    }
+    expect(teethAtMiddle(arch)).toBe(false);
+    // The middle of those points, and a scrap of 25 points there: still a full arch.
+    const cx = arch.reduce((sum, [x]) => sum + x, 0) / arch.length, cy = arch.reduce((sum, [, y]) => sum + y, 0) / arch.length;
+    const scrap: Array<[number, number]> = Array.from({ length: 25 }, (_, k) => [cx + (k % 5) * 0.3 - 0.6, cy + Math.floor(k / 5) * 0.3 - 0.6]);
+    expect(teethAtMiddle([...arch, ...scrap])).toBe(false);
+    // A quadrant: a straight band of teeth, its middle full of them.
+    const quadrant: Array<[number, number]> = [];
+    for (let k = 0; k <= 2000; k += 1) quadrant.push([((k * 13) % 17) / 17 * 9 - 4.5, (k / 2000) * 30 - 15]);
+    expect(teethAtMiddle(quadrant)).toBe(true);
+  });
+});
+
+describe("tags of scan standing free (build 75)", () => {
+  it("leaves out a small piece standing free of a model, and keeps a big one", async () => {
+    const manifold = await manifoldModule();
+    manifold.setup();
+    const { withoutTags } = await import("@/lib/dentalModel");
+    const model = manifold.Manifold.cube([60, 40, 20]);
+    const tag = manifold.Manifold.cube([4, 1.6, 20]).translate([70, 0, 0]); // 128 mm³
+    const big = manifold.Manifold.cube([20, 20, 20]).translate([80, 0, 0]); // 8000 mm³
+    const withTag = manifold.Manifold.compose([model, tag]);
+    const out = withoutTags(manifold as never, withTag as never);
+    expect(out.dropped).toBe(1);
+    expect(out.solid.decompose().length).toBe(1);
+    expect(out.solid.volume()).toBeCloseTo(48000, 0);
+    const withBig = manifold.Manifold.compose([model, big]);
+    expect(withoutTags(manifold as never, withBig as never).dropped).toBe(0);
+  });
+});
 
 describe("Dental Studio (build 47)", () => {
   let runtime: ManifoldToplevel;
