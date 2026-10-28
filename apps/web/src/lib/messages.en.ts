@@ -3784,6 +3784,8 @@ export const MESSAGES_EN = {
   "sculpt.soft.scale": "Size",
   "sculpt.soft.apply": "Apply",
   "sculpt.soft.cancel": "Cancel",
+  "sculpt.tool.attract": "Attract",
+  "sculpt.attractNothing": "Attract pulls the surface onto another part - show the part to pull towards (the opposing arch, a tooth beside it).",
   "sculpt.tool.mask": "Freeze",
   "sculpt.freeze.title": "Freeze",
   "sculpt.freeze.keys": "Paint over what the brushes must leave alone - it turns blue. Hold Ctrl to free it again.",

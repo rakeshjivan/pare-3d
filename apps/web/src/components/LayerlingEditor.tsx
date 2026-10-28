@@ -126,6 +126,7 @@ import { checkBeforeSending, CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, PrintCheckP
 import { belowBedCutter } from "@/lib/cutBelowBed";
 import { fillHoleAt, isManifoldSolid, makeSolidPositions, meshHealth, pendingMeshChecks, shapeWithWorldPositions, tidyOpenSurface } from "@/lib/meshRepair";
 import { worldTriangles } from "@/lib/blend";
+import { NearestSurface } from "@/lib/nearestSurface";
 import { repairStlPositions } from "@/lib/stlRepair";
 import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
 import { toolLayout, toolPocketPositions, tracedSolidPositions, type ToolBinOptions, type TraceOptions, type TraceResult } from "@/lib/photoTrace";
@@ -9254,6 +9255,24 @@ export function LayerlingEditor({
       window.layerlingOnFrame(() => { const current = sculptStroke.current; if (current && current.frame === -1) sculptFrameRef.current(); });
     } else stroke.frame = requestAnimationFrame(() => sculptFrameRef.current());
   };
+  /** Build 92: the surface of every other part that is not hidden (within 4 mm reach), made once per version of them. */
+  const attractCache = useRef<{ key: string; target: NearestSurface | null } | null>(null);
+  const attractTargetFor = (shape: WorkplaneShape) => {
+    const others = shapesRef.current.filter((other) => other.id !== shape.id && !other.hidden && !other.hole && !isNonSolidShapeKind(other.kind));
+    const key = `${shape.id}|${projectShapesFingerprint(others)}`;
+    if (attractCache.current?.key === key) return attractCache.current.target;
+    const soups = others.map((other) => worldTriangles(other));
+    const total = soups.reduce((sum, soup) => sum + soup.length, 0);
+    let target: NearestSurface | null = null;
+    if (total) {
+      const all = new Float32Array(total);
+      let at = 0;
+      for (const soup of soups) { all.set(soup, at); at += soup.length; }
+      target = new NearestSurface(all, 4);
+    }
+    attractCache.current = { key, target };
+    return target;
+  };
   const startSculptStroke = useCallback((x: number, y: number, keys?: { ctrl: boolean; shift: boolean }) => {
     const opened = performance.now();
     const target = sculptTarget();
@@ -9273,6 +9292,9 @@ export function LayerlingEditor({
       pending: [], last: null, frame: 0, balls: [], touched: false,
       edits: state.live.topologyEdits,
     };
+    // Build 92: Attract pulls towards the other parts on the plate (the opposing arch, a tooth beside it).
+    state.live.attractTarget = brush === "attract" ? attractTargetFor(shape) : null;
+    if (brush === "attract" && !state.live.attractTarget) { setNotice(t("sculpt.attractNothing")); return; }
     state.live.beginPatch();
     if (brush === "move") {
       const radius = brushRadiusAt(x, y, tool.size, hit.point);

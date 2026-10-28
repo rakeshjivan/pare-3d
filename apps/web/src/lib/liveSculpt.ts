@@ -23,7 +23,7 @@ import * as THREE from "three";
  * and keeps the volume (bumps round off rather than sink); "drag" pulls the surface along the stroke;
  * "draw2" raises the surface to a set height above where it was when the stroke began, and no further.
  */
-export type LiveBrush = "draw" | "draw2" | "drag" | "inflate" | "deflate" | "smooth" | "shrinkSmooth" | "bubbleSmooth" | "flatten" | "pinch" | "crease" | "move" | "mask";
+export type LiveBrush = "draw" | "draw2" | "drag" | "inflate" | "deflate" | "smooth" | "shrinkSmooth" | "bubbleSmooth" | "flatten" | "pinch" | "crease" | "move" | "mask" | "attract";
 type DabBrush = Exclude<LiveBrush, "move" | "mask">;
 export type Vec3 = [number, number, number];
 
@@ -1007,6 +1007,16 @@ export class LiveMesh {
         if (step >= 0 ? gap <= 0 : gap >= 0) continue;
         const rise = gap * 0.35;
         dx = base[3] * rise; dy = base[4] * rise; dz = base[5] * rise;
+      } else if (brush === "attract") {
+        // Build 92: Attract - towards the nearest point of the other part (attractTarget), a share of the
+        // way each dab, so the surface comes to rest on it without passing through.
+        const target = this.attractTarget;
+        if (!target) continue;
+        const q = this.attractPoint;
+        const d = target.nearest(x, y, z, q);
+        if (!(d < Infinity) || d < 1e-4) continue;
+        const k = Math.min(1, w * 0.45);
+        dx = (q[0] - x) * k; dy = (q[1] - y) * k; dz = (q[2] - z) * k;
       } else if (brush === "drag") {
         // Along the stroke: the corners under the brush follow the brush's move since the last dab.
         const prev = this.dragPrev;
@@ -1095,6 +1105,9 @@ export class LiveMesh {
     out.set(sx / sw, sy / sw, sz / sw);
     return true;
   }
+  /** Build 92: the surface Attract pulls towards (another part), set by the editor for the stroke. */
+  attractTarget: { nearest: (x: number, y: number, z: number, out: Float64Array) => number } | null = null;
+  private attractPoint = new Float64Array(3);
   private layerBase = new Map<number, [number, number, number, number, number, number]>();
   private dragPrev: Vec3 | null = null;
   /** Starts a stroke for the brushes that remember it (Draw2, Drag). beginPatch does this too. */
@@ -1686,7 +1699,7 @@ export function brushResponse(brush: LiveBrush, strength: number): { strength: n
   // build 82 figures. Build 86: twice that again (3.34 times) - a hand stroke on a trackpad or a fast
   // mouse sends Meshmixer far more events than the test did, and side by side Pare 3D still felt weak.
   if (brush === "draw" || brush === "crease" || brush === "draw2") return { strength: s, step: BRUSH_PACE * 0.031 * s, passes: 1 };
-  if (brush === "drag" || brush === "mask") return { strength: s, step: 0, passes: 1 };
+  if (brush === "drag" || brush === "mask" || brush === "attract") return { strength: s, step: 0, passes: 1 };
   // Build 89: Flatten as Meshmixer's - one stroke over 0.3 mm ridges took away 16 / 44 / 84% at Strength
   // 25 / 51 / 100 there (a quick stroke); here about 25 / 60 / 88%, at a person's pace (it took away
   // 84% even at 25 before, far too strong at low settings).

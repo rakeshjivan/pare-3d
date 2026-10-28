@@ -58,3 +58,30 @@ describe("Build 92: Soft Transform", () => {
     expect(mesh.cornersAt(soup.subarray(0, 9)).length).toBe(3);
   });
 });
+
+import { NearestSurface } from "@/lib/nearestSurface";
+import { stampBrush } from "@/lib/liveSculpt";
+
+describe("Build 92: Attract", () => {
+  it("finds the nearest point of a surface within reach, and nothing beyond it", () => {
+    const target = new NearestSurface(Float32Array.from([-5, -5, 2, 5, -5, 2, 0, 5, 2]), 3);
+    const q = new Float64Array(3);
+    expect(target.nearest(0, 0, 0, q)).toBeCloseTo(2, 9);
+    expect(q[2]).toBeCloseTo(2, 9);
+    expect(target.nearest(0, 0, -2, q)).toBe(Infinity);
+  });
+
+  it("pulls the surface onto the other part and stops there, never through it", () => {
+    const mesh = plate(60, 20);
+    const sheet = plate(10, 30, () => 1).soup();
+    mesh.attractTarget = new NearestSurface(sheet, 4);
+    for (let k = 0; k < 30; k += 1) for (let x = -3; x <= 3; x += 0.5) {
+      const hit = mesh.pick([x, 0, 0.5], [0, 0, -1]) ?? mesh.pick([x, 0, 5], [0, 0, -1]);
+      if (hit) stampBrush(mesh, "attract", hit.point, [0, 0, 1], 2.5, hit.triangle, 1);
+    }
+    let top = -Infinity;
+    for (let v = 0; v < mesh.vCount; v += 1) top = Math.max(top, mesh.pos[v * 3 + 2]);
+    expect(top).toBeGreaterThan(0.95);
+    expect(top).toBeLessThanOrEqual(1 + 1e-6);
+  });
+});
