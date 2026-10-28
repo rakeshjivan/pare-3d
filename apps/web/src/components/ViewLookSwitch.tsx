@@ -3,12 +3,17 @@
 import { Grid3x3, Moon, Square } from "lucide-react";
 import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
-import { readViewLook, storeViewLook, type ViewLook } from "@/lib/viewLook";
+import { readViewLook, storeViewLook, VIEW_LOOK_EVENT, type ViewLook } from "@/lib/viewLook";
 
 /** Build 85: the three-way switch for the view's look, beside Simple mode. */
 export function ViewLookSwitch() {
   const [look, setLook] = useState<ViewLook>("plate");
-  useEffect(() => { setLook(readViewLook()); }, []);
+  useEffect(() => {
+    setLook(readViewLook());
+    const follow = (event: Event) => setLook((event as CustomEvent<ViewLook>).detail);
+    window.addEventListener(VIEW_LOOK_EVENT, follow);
+    return () => window.removeEventListener(VIEW_LOOK_EVENT, follow);
+  }, []);
   const choose = (next: ViewLook) => {
     setLook(next);
     storeViewLook(next);

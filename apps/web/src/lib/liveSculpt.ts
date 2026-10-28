@@ -1278,12 +1278,13 @@ function sampleCorners(mesh: LiveMesh, count: number) {
  *   - passes: how many times each dab is applied (Smooth: more passes, not a bigger move)
  */
 /** Build 85: how much more a stroke does than build 82's calibration - Meshmixer at a person's pace. */
-export const BRUSH_PACE = 1.67;
+export const BRUSH_PACE = 3.34;
 export function brushResponse(brush: LiveBrush, strength: number): { strength: number; step: number; passes: number } {
   const s = Math.max(0, Math.min(1, strength));
   // Build 85: matched to Meshmixer at an ordinary, unhurried stroke (its slow stroke, a dab at each of
   // about 80 pointer events over 16 mm) rather than between its quick and slow ones - 1.67 times the
-  // build 82 figures. At a person's pace Meshmixer's brushes build up that much, and Pare 3D's felt weak.
+  // build 82 figures. Build 86: twice that again (3.34 times) - a hand stroke on a trackpad or a fast
+  // mouse sends Meshmixer far more events than the test did, and side by side Pare 3D still felt weak.
   if (brush === "draw" || brush === "crease") return { strength: s, step: BRUSH_PACE * 0.031 * s, passes: 1 };
   if (brush === "inflate" || brush === "deflate") return { strength: s, step: BRUSH_PACE * 0.021 * Math.pow(s, 0.3), passes: 1 };
   if (brush === "smooth") {

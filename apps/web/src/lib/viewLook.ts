@@ -15,3 +15,10 @@ export function readViewLook(): ViewLook {
 export function storeViewLook(look: ViewLook) {
   try { window.localStorage.setItem(KEY, look); } catch { /* holds for this visit */ }
 }
+/** Build 86: sets the look from the app (Dental Studio opening): remembered, drawn, and the switch follows. */
+export const VIEW_LOOK_EVENT = "pare3d-view-look";
+export function setViewLook(look: ViewLook) {
+  storeViewLook(look);
+  window.layerlingViewLook?.(look);
+  window.dispatchEvent(new CustomEvent(VIEW_LOOK_EVENT, { detail: look }));
+}

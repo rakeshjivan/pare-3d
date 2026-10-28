@@ -216,6 +216,7 @@ import {
 } from "@/lib/lylFileAccess";
 import { displayShapeName, iconTagAsset, qrCodeAsset, libraryShapeAssets, makeShapeFromAsset, nameTagAsset, shapeAssetLabel, toolbarShapeAssets } from "@/lib/shapeCatalog";
 import { importedShapeFromStl, SCAN_GREY } from "@/lib/stlImport";
+import { setViewLook } from "@/lib/viewLook";
 import { exportMeshesToStl } from "@/lib/stlExport";
 import { THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
@@ -10065,6 +10066,10 @@ export function LayerlingEditor({
     const { slots, rolesChosen } = guessDentalSlots(pool);
     analyseDentalStudio(freshDentalState(slots, rolesChosen));
   }, [analyseDentalStudio, dentalCandidates, editDentalDesign, leaveDentalEdit, selectedShapes]);
+  // Build 86: Dental Studio opens on Meshmixer's dark background, so scans read as they do there from the
+  // start (the switch at the top of the window changes it back).
+  const dentalOpen = Boolean(dentalStudio);
+  useEffect(() => { if (dentalOpen) setViewLook("dark"); }, [dentalOpen]);
   // A scan in a slot that changes (a trim, Undo, Redo) is looked at again.
   const dentalSlotKey = dentalStudio ? (Object.values(dentalStudio.slots).filter(Boolean) as string[]).map((id) => { const shape = shapes.find((candidate) => candidate.id === id); return shape ? `${id}:${shape.importedMesh?.positions.length ?? 0}:${scanFrameOf(shape.importedMesh) ? `f${shape.importedMesh?.biteLocked ? "L" : ""}` : `${shape.x}:${shape.z}`}` : `${id}:gone`; }).join("|") : "";
   const dentalSlotSeen = useRef("");

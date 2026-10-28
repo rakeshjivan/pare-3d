@@ -83,7 +83,7 @@ While a workplane sits on a face, an eye appears next to {{ui:camera.placeWorkpl
 
 ### The look of the view
 
-The switch at the top of the window, beside {{ui:workspace.simpleMode}}, sets how the view looks: **{{ui:view.look.plate}}** (the plate and its grid), **{{ui:view.look.clear}}** (the same light background with nothing under the parts, for a clean look or a screenshot) or a **dark grey background, as Meshmixer's**, with a light that follows the camera so the surface of a scan reads the same whichever way it is turned - the best for sculpting. The workplane still works when it is hidden; only its picture goes. The choice is remembered.
+The switch at the top of the window, beside {{ui:workspace.simpleMode}}, sets how the view looks: **{{ui:view.look.plate}}** (the plate and its grid), **{{ui:view.look.clear}}** (the same light background with nothing under the parts, for a clean look or a screenshot) or a **dark grey background, as Meshmixer's**, with a light that follows the camera so the surface of a scan reads the same whichever way it is turned - the best for sculpting. Dental Studio switches to the dark background when it opens. The workplane still works when it is hidden; only its picture goes. The choice is remembered.
 
 An imported STL comes in light grey and a little glossy, as in Meshmixer, so the bumps and hollows of a scan show (it was blue). Give it any colour you like in its properties.
 

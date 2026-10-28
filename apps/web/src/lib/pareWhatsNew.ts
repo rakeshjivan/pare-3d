@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 86,
+    items: [
+      "Sculpt's brushes are twice as strong again: side by side with Meshmixer they still did too little at the same setting, because a hand stroke sends Meshmixer far more dabs than a quick test does. At Strength 29 a Draw stroke with a 3 mm brush now raises the surface about 0.14 mm.",
+      "Dental Studio opens on Meshmixer's dark background, so scans read as they do there from the start; the switch at the top of the window changes it back.",
+      "The speed readout has a button (the gauge at the top of the Sculpt panel), and the key also works where ` is § or an accent key.",
+    ],
+  },
+  {
     build: 85,
     items: [
       "Sculpt is quicker: each dab of the brush takes a fraction of the time it did (finding the surface under the cursor no longer walks the whole scan), Refine only reworks the triangles when there is something to split or merge, far less throwaway memory is made (fewer pauses to clean it up), and the changes go to the graphics card in a few larger pieces - on a full-arch scan a Coarse stroke now does a frame's work in about a third of the time.",
