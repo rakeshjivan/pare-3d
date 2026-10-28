@@ -463,7 +463,7 @@ export function DentalStudioPanel({
       </>))}
 
       {/* Build 79: the digital wax-up - optional; a card of its own before the model is chosen. */}
-      {waxup ? card(3, t("waxup.step"), waxup.view.placed.length > 0, t("waxup.stepHint"), waxupSummary(waxup.view), (
+      {waxup ? card(3, t(waxStudio ? "waxup.stepStudio" : "waxup.step"), waxup.view.placed.length > 0, t(waxStudio ? "waxup.stepStudioHint" : "waxup.stepHint"), waxupSummary(waxup.view), (
         <WaxupCard view={waxup.view} actions={waxup.actions} slots={{ upper: Boolean(slots.upper) && waxStudio?.arches !== "lower", lower: Boolean(slots.lower) && waxStudio?.arches !== "upper" }} imt={waxStudio?.flow === "imt"} busy={busy || !analysis} workspace={workspace} />
       )) : null}
 

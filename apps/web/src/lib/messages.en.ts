@@ -4467,6 +4467,8 @@ export const MESSAGES_EN = {
   "waxStudio.both": "Both",
   "waxStudio.waxupHint": "Load the scans, trim them, find and choose the teeth, place a tooth set, adjust it tooth by tooth, then make the model with the wax-up joined to it.",
   "waxStudio.imtHint": "As a wax-up, and Make also makes the IMT models for each arch waxed: the pre-op model, the full wax-up (series 2 index) and the alternate-tooth wax-up (series 1 index). Make the index chairside on the printed models.",
+  "waxup.stepStudio": "Wax-up",
+  "waxup.stepStudioHint": "Find the teeth, choose those to wax up, place a tooth set and adjust it tooth by tooth.",
   "waxup.findStep": "Teeth",
   "waxup.find": "Find the teeth",
   "waxup.findAgain": "Find them again",

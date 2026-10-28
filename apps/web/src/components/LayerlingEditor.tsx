@@ -10910,6 +10910,8 @@ export function LayerlingEditor({
       setWaxup((latest) => ({
         ...latest,
         busy: false,
+        // Build 94: the teeth's colours go once the wax is on them (they would show through it).
+        teethShown: false,
         placed: teeth.map((tooth) => ({ id: tooth.shape.id, fdi: tooth.fdi, clearance: tooth.clearance, width: tooth.width, length: tooth.length, lengthening: tooth.lengthening, extension: tooth.extension })),
         arcUsed: plan.arcDepth,
         // Guessed landmarks are kept, so placing again (a new length, say) puts the teeth where they were.
