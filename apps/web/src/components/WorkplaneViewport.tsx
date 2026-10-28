@@ -14402,7 +14402,7 @@ function holeOpacity(shape: WorkplaneShape) {
 
 /** Build 85: an imported mesh (a scan) a little glossy, as Meshmixer draws one, so its surface reads. */
 function shapeRoughness(shape: WorkplaneShape) {
-  return shape.hole ? 0.88 : shape.importedMesh ? 0.36 : 0.57;
+  return shape.hole ? 0.88 : shape.importedMesh ? 0.45 : 0.57;
 }
 
 function sharedShapeMaterial(shape: WorkplaneShape, vertexColors = false) {
