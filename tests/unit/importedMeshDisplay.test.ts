@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { acceleratedRaycast, MeshBVH } from "three-mesh-bvh";
 import type { WorkplaneShape } from "@/types/layerling";
-import { buildImportedMeshGeometry, computeImportedBoundsTree, IMPORTED_MESH_BVH_OPTIONS, prepareImportedMeshDisplay, rememberPreparedDisplay, takePreparedImportedMeshGeometry } from "@/lib/importedMeshDisplay";
+import { smoothNormals, buildImportedMeshGeometry, computeImportedBoundsTree, IMPORTED_MESH_BVH_OPTIONS, prepareImportedMeshDisplay, rememberPreparedDisplay, takePreparedImportedMeshGeometry } from "@/lib/importedMeshDisplay";
 
 /**
  * The geometry worker prepares the view's geometry and raycasting index of a mesh it made
@@ -64,16 +64,16 @@ describe("the view's geometry prepared in the worker", () => {
     });
   }
 
-  it("works the normals out once, with the same result as the old way that did it twice", () => {
+  it("works the normals out once - smooth since build 87 - and stands the mesh on the plate as before", () => {
     const mesh = sphereMesh(false);
     const old = new THREE.BufferGeometry();
     old.setAttribute("position", new THREE.Float32BufferAttribute(mesh.positions, 3));
-    old.computeVertexNormals();
-    old.computeVertexNormals();
     old.computeBoundingBox();
     old.translate(0, -(old.boundingBox?.min.y ?? 0), 0);
     const now = buildImportedMeshGeometry(mesh);
-    expect(Array.from(now.getAttribute("normal").array)).toEqual(Array.from(old.getAttribute("normal").array));
+    const got = now.getAttribute("normal").array, want = smoothNormals(Float32Array.from(mesh.positions));
+    expect(got.length).toBe(want.length);
+    for (let i = 0; i < want.length; i += 1) expect(Math.abs(got[i] - want[i])).toBeLessThan(1e-5);
     expect(Array.from(now.getAttribute("position").array)).toEqual(Array.from(old.getAttribute("position").array));
   });
 

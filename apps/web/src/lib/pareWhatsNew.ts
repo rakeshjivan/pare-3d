@@ -6,6 +6,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
   {
     build: 87,
     items: [
+      "Scans and every other mesh are drawn smooth, as Meshmixer draws them: the light flows across the surface instead of showing every triangle (sharp edges, such as a model's base, stay sharp). Sculpted surfaces look as smooth as they are.",
       "Sculpt strokes show in the same frame as your hand moves - they were drawn a frame late (about 17 ms behind).",
       "While you sculpt, the handles, measures and other on-screen marks are not worked out again every frame, and the brush ring moves without redrawing the panel around it.",
       "No change of sharpness at the start and end of a stroke (build 85 drew strokes at a lower resolution; switching cost a hitch).",
