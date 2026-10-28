@@ -59,6 +59,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        // Build 87: an app's web view is held to 60 frames a second even on a 120 Hz ProMotion screen
+        // (WebKit bug 294338); this WebKit setting lifts that, where this macOS has it. Set only when the
+        // setting exists, so an older or newer WebKit without it is left alone.
+        if configuration.preferences.responds(to: NSSelectorFromString("_setPreferPageRenderingUpdatesNear60FPSEnabled:")) {
+            configuration.preferences.setValue(false, forKey: "preferPageRenderingUpdatesNear60FPSEnabled")
+        }
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
         webView.uiDelegate = self

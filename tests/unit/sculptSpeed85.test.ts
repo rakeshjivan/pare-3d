@@ -47,6 +47,27 @@ describe("Sculpt speed (build 85)", () => {
     expect(mesh.topologyEdits).toBeGreaterThan(edits);
   });
 
+  it("undoes stroke after stroke with the start-of-stroke copy kept between strokes (build 87)", () => {
+    const mesh = LiveMesh.fromSoup(sheetSoup(30, 0.5));
+    mesh.geometry;
+    const snapshot = () => Array.from(mesh.pos.subarray(0, mesh.vCount * 3));
+    const start = snapshot();
+    const stroke = (x: number) => {
+      mesh.beginPatch();
+      const hit = mesh.pick([x, 7.5, 20], [0, 0, -1])!;
+      stampBrush(mesh, "draw", hit.point, [0, 0, 1], 2, hit.triangle, 1);
+      return mesh.endPatch()!;
+    };
+    const first = stroke(5);
+    const middle = snapshot();
+    const second = stroke(10);
+    expect(snapshot()).not.toEqual(middle);
+    mesh.applyPatch(second.undo);
+    expect(snapshot()).toEqual(middle);
+    mesh.applyPatch(first.undo);
+    expect(snapshot()).toEqual(start);
+  });
+
   it("remembers the view's look, the workplane by default", () => {
     const store = new Map<string, string>();
     (globalThis as unknown as { window: unknown }).window = { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } } };

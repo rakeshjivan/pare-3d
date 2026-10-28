@@ -9198,7 +9198,12 @@ export function LayerlingEditor({
       // own, so dabs bunched or spread with the speed). Past this frame's time the rest waits for the next
       // frame instead of being dropped, so a quick stroke trails a frame but never leaves gaps.
       const spacing = Math.max(2, stroke.sizePx * 0.2);
-      const budget = drain ? Infinity : 12;
+      // Build 87: the time a frame allows follows the screen - about 12 ms at 60 Hz, 6 ms at 120 Hz.
+      const now = performance.now();
+      if (stroke.lastFrameAt) { const gap = now - stroke.lastFrameAt; if (gap > 4 && gap < 50) stroke.frameMs = stroke.frameMs ? stroke.frameMs * 0.8 + gap * 0.2 : gap; }
+      stroke.lastFrameAt = now;
+      const frameMs = Math.max(8, Math.min(16.7, stroke.frameMs ?? 16.7));
+      const budget = drain ? Infinity : frameMs * 0.72;
       let i = 0, outOfTime = false;
       for (; i < pending.length && !outOfTime; i += 1) {
         const [x, y] = pending[i];
@@ -9217,7 +9222,7 @@ export function LayerlingEditor({
         stroke.pending = pending.slice(i - 1).concat(stroke.pending);
         scheduleSculptFrame(stroke);
       }
-      sculptRefineBalls(stroke, Math.max(2, 14 - (performance.now() - started)));
+      sculptRefineBalls(stroke, Math.max(2, (drain ? 14 : Math.max(8, Math.min(16.7, stroke.frameMs ?? 16.7)) * 0.84) - (performance.now() - started)));
     }
     const worked = performance.now();
     if (state.live.flushGpu()) { if (window.layerlingStrokeMotion) window.layerlingStrokeMotion(); else window.layerlingRedraw?.(); }
@@ -17319,6 +17324,9 @@ type SculptSession = {
 /** Build 85: the speed readout's figures for the last stroke. */
 type SculptSpeed = { brush: LiveBrush; refine: SculptRefine; seconds: number; fps: number; longest: number; work: number; workMost: number; gpu: number; end: number; triangles: number };
 type SculptStroke = {
+  /** Build 87: when the last frame's work ran, and the frame interval seen so far (ms). */
+  lastFrameAt?: number;
+  frameMs?: number;
   brush: LiveBrush;
   sizePx: number;
   strength: number;

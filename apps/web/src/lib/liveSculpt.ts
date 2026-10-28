@@ -286,9 +286,17 @@ export class LiveMesh {
     this.journal = new Map();
     this.journalT = this.tCount;
     this.journalV = this.vCount;
-    this.journalPos = this.pos.slice(0, this.vCount * 3);
-    this.journalAlive = this.vAlive.slice(0, this.vCount);
+    // Build 87: the copy goes into buffers kept from stroke to stroke - a fresh 5 MB copy at every
+    // stroke's start (on a full-arch scan) was garbage the browser then had to clear up.
+    if (this.patchPos.length < this.vCount * 3) this.patchPos = new Float64Array(Math.ceil(this.vCount * 1.25) * 3);
+    if (this.patchAlive.length < this.vCount) this.patchAlive = new Uint8Array(Math.ceil(this.vCount * 1.25));
+    this.patchPos.set(this.pos.subarray(0, this.vCount * 3));
+    this.patchAlive.set(this.vAlive.subarray(0, this.vCount));
+    this.journalPos = this.patchPos;
+    this.journalAlive = this.patchAlive;
   }
+  private patchPos = new Float64Array(0);
+  private patchAlive = new Uint8Array(0);
   /** Ends recording: the patches that take the mesh back to the start and forward again, or null if nothing changed. */
   endPatch(): { undo: LivePatch; redo: LivePatch } | null {
     const journal = this.journal, oldPos = this.journalPos, oldAlive = this.journalAlive;

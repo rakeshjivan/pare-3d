@@ -4,6 +4,16 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 87,
+    items: [
+      "Sculpt strokes show in the same frame as your hand moves - they were drawn a frame late (about 17 ms behind).",
+      "While you sculpt, the handles, measures and other on-screen marks are not worked out again every frame, and the brush ring moves without redrawing the panel around it.",
+      "No change of sharpness at the start and end of a stroke (build 85 drew strokes at a lower resolution; switching cost a hitch).",
+      "On a 120 Hz ProMotion screen the Mac app can now draw at 120 frames a second where macOS allows it, and the brush paces its work to the screen.",
+      "Less memory thrown away at the start of each stroke.",
+    ],
+  },
+  {
     build: 86,
     items: [
       "Sculpt's brushes are twice as strong again: side by side with Meshmixer they still did too little at the same setting, because a hand stroke sends Meshmixer far more dabs than a quick test does. At Strength 29 a Draw stroke with a 3 mm brush now raises the surface about 0.14 mm.",
