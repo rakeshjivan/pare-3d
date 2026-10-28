@@ -23,6 +23,9 @@ export type SoftTransform = { x: number; y: number; z: number; out: number; tilt
 const SOFT_MOVES = [["x", "sculpt.soft.x"], ["y", "sculpt.soft.y"], ["z", "sculpt.soft.z"], ["out", "sculpt.soft.out"]] as const;
 const SOFT_TURNS = [["tilt", "sculpt.soft.tilt"], ["turn", "sculpt.soft.turn"], ["roll", "sculpt.soft.roll"]] as const;
 
+/** Build 92: the brushes' options, as Meshmixer's brush properties. */
+export type SculptBrushOptions = { falloff: "smooth" | "sharp" | "flat"; lazy: number; hold: boolean; depth: number };
+
 /** Build 90: Freeze (Meshmixer's mask) - from the selection, turned the other way round, or cleared. */
 export type SculptFreezeAction = "selection" | "invert" | "clear";
 const FREEZE_ACTIONS: SculptFreezeAction[] = ["selection", "invert", "clear"];
@@ -88,6 +91,8 @@ export function MeshSculptPanel({
   frozen = 0,
   onFreeze,
   soft = null,
+  brushOptions,
+  onBrushOptions,
   onSoftStart,
   onSoft,
   onSoftEnd,
@@ -147,6 +152,8 @@ export function MeshSculptPanel({
   onFreeze?: (action: SculptFreezeAction) => void;
   /** Build 92: Soft Transform of the selection - open while `soft` is set. */
   soft?: SoftTransform | null;
+  brushOptions?: SculptBrushOptions;
+  onBrushOptions?: (value: SculptBrushOptions) => void;
   onSoftStart?: () => void;
   onSoft?: (value: SoftTransform) => void;
   onSoftEnd?: (keep: boolean) => void;
@@ -196,6 +203,28 @@ export function MeshSculptPanel({
         <EdgeModifierSlider label={t("sculpt.strength")} value={Math.round(strength * 100)} min={1} max={100} step={1} workspace={workspace} disabled={busy} onChange={(value) => onStrength(value / 100)} />
       ) : null}
       {tool && tool !== "select" && tool !== "unselect" ? <p className="blend-hint sculpt-keys">{t(tool === "mask" ? "sculpt.freeze.keys" : "sculpt.keysHint")}</p> : null}
+      {tool && tool !== "select" && tool !== "unselect" && brushOptions && onBrushOptions ? (
+        // Build 92: Meshmixer's brush properties - falloff, lazy mouse, hold boundary, Flatten's depth.
+        <details className="sculpt-brush-options">
+          <summary>{t("sculpt.options.title")}</summary>
+          <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.options.falloff")}>
+            <span className="sculpt-reach-label">{t("sculpt.options.falloff")}</span>
+            <div className="shell-opening-options">
+              {(["smooth", "sharp", "flat"] as const).map((value) => (
+                <button key={value} type="button" role="radio" aria-checked={brushOptions.falloff === value} className={brushOptions.falloff === value ? "active" : ""} disabled={busy} title={t(`sculpt.options.falloff.${value}Hint`)} onClick={() => onBrushOptions({ ...brushOptions, falloff: value })}>
+                  {t(`sculpt.options.falloff.${value}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <EdgeModifierSlider label={t("sculpt.options.lazy")} value={brushOptions.lazy} min={0} max={60} step={1} unit="px" workspace={workspace} disabled={busy} onChange={(value) => onBrushOptions({ ...brushOptions, lazy: value })} />
+          {tool === "flatten" ? <EdgeModifierSlider label={t("sculpt.options.depth")} value={brushOptions.depth} min={-2} max={2} step={0.05} workspace={workspace} length disabled={busy} onChange={(value) => onBrushOptions({ ...brushOptions, depth: value })} /> : null}
+          <label className="edge-modifier-check" title={t("sculpt.options.holdHint")}>
+            <input type="checkbox" checked={brushOptions.hold} disabled={busy} onChange={(event) => onBrushOptions({ ...brushOptions, hold: event.currentTarget.checked })} />
+            <span>{t("sculpt.options.hold")}</span>
+          </label>
+        </details>
+      ) : null}
       {!trim && onFreeze ? (<>
         <p className="blend-hint" role="status">{frozen ? t("sculpt.freeze.count", { count: frozen.toLocaleString() }) : t("sculpt.freeze.none")}</p>
         <div className="dental-trim-buttons sculpt-selection sculpt-freeze" role="group" aria-label={t("sculpt.freeze.title")}>

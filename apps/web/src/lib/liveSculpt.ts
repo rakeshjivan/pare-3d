@@ -937,9 +937,15 @@ export class LiveMesh {
     let total = 0;
     if (this.dabW.length < size) this.dabW = new Float64Array(size * 2);
     const weights = this.dabW;
+    const falloff = this.falloff;
     for (let i = 0; i < size; i += 1) {
       const v = list[i], x = 1 - dist[i] * dist[i] * inv;
-      const w = x > 0 ? x * x * strength : 0;
+      // Build 92: the brush's falloff (Meshmixer's brush shapes) - smooth (as before), sharp (a narrow
+      // peak, for fine lines) or flat (full strength over most of the brush, a short soft edge).
+      let f = x > 0 ? x * x : 0;
+      if (falloff === "sharp") f *= f;
+      else if (falloff === "flat") { const t = dist[i] / radius; f = t <= 0.6 ? 1 : t >= 1 ? 0 : (1 - (t - 0.6) / 0.4) ** 2 * (1 + 2 * ((t - 0.6) / 0.4)); }
+      const w = f * strength;
       weights[i] = w;
       this.vertexNormal(v, n);
       area.addScaledVector(n, w);
@@ -956,10 +962,13 @@ export class LiveMesh {
     const moves = this.dabMoves, corners = this.dabCorners, cornerW = this.dabCornerW;
     let count = 0;
     const mask = this.mask;
+    const hold = this.holdBoundary;
     for (let r = 0; r < size; r += 1) {
       const v = list[r];
       const w = weights[r] * (1 - mask[v]);
       if (!(w > 0)) continue;
+      // Build 92: Hold boundary - a scan's open edge stays where it is.
+      if (hold && this.onBoundary(v)) continue;
       const x = p[v * 3], y = p[v * 3 + 1], z = p[v * 3 + 2];
       let dx = 0, dy = 0, dz = 0;
       if (brush === "smooth" || brush === "shrinkSmooth" || brush === "bubbleSmooth" || brush === "pinch" || brush === "crease") {
@@ -993,7 +1002,8 @@ export class LiveMesh {
           if (brush === "crease") { dx -= area.x * step * w * 0.6; dy -= area.y * step * w * 0.6; dz -= area.z * step * w * 0.6; }
         }
       } else if (brush === "flatten") {
-        const off = (x - cen.x) * area.x + (y - cen.y) * area.y + (z - cen.z) * area.z;
+        // Build 92: Depth - the plane raised (+) or sunk (-) from the surface's middle, mm.
+        const off = (x - cen.x) * area.x + (y - cen.y) * area.y + (z - cen.z) * area.z - this.flattenDepth;
         const k = Math.min(1, w * 1.2);
         dx = -area.x * off * k; dy = -area.y * off * k; dz = -area.z * off * k;
       } else if (brush === "draw") {
@@ -1105,6 +1115,10 @@ export class LiveMesh {
     out.set(sx / sw, sy / sw, sz / sw);
     return true;
   }
+  /** Build 92: the brushes' options - falloff shape, a scan's open edge held, Flatten's plane offset (mm). */
+  falloff: "smooth" | "sharp" | "flat" = "smooth";
+  holdBoundary = false;
+  flattenDepth = 0;
   /** Build 92: the surface Attract pulls towards (another part), set by the editor for the stroke. */
   attractTarget: { nearest: (x: number, y: number, z: number, out: Float64Array) => number } | null = null;
   private attractPoint = new Float64Array(3);

@@ -85,3 +85,40 @@ describe("Build 92: Attract", () => {
     expect(top).toBeLessThanOrEqual(1 + 1e-6);
   });
 });
+
+describe("Build 92: brush options", () => {
+  const raiseProfile = (falloff: "smooth" | "sharp" | "flat") => {
+    const mesh = plate(80, 20);
+    mesh.falloff = falloff;
+    const hit = mesh.pick([0, 0, 5], [0, 0, -1])!;
+    mesh.dab("draw", hit.point, [0, 0, 1], 4, mesh.region(hit.point, 4, hit.triangle), 1, 0.5);
+    const at = (r: number) => { let best = 0, bd = Infinity; for (let v = 0; v < mesh.vCount; v += 1) { const d = Math.abs(Math.hypot(mesh.pos[v * 3], mesh.pos[v * 3 + 1]) - r); if (d < bd) { bd = d; best = mesh.pos[v * 3 + 2]; } } return best; };
+    return [at(0), at(2), at(3.5)];
+  };
+  it("falloff: sharp narrower than smooth, flat fuller", () => {
+    const smooth = raiseProfile("smooth"), sharp = raiseProfile("sharp"), flat = raiseProfile("flat");
+    expect(sharp[1] / sharp[0]).toBeLessThan(smooth[1] / smooth[0] - 0.1);
+    expect(flat[1] / flat[0]).toBeGreaterThan(0.95);
+    expect(flat[2]).toBeGreaterThan(0);
+  });
+  it("hold boundary keeps a scan's open edge where it is", () => {
+    for (const hold of [false, true]) {
+      const mesh = plate(40, 10);
+      mesh.holdBoundary = hold;
+      const hit = mesh.pick([4.6, 0, 5], [0, 0, -1])!;
+      for (let k = 0; k < 5; k += 1) mesh.dab("draw", hit.point, [0, 0, 1], 2, mesh.region(hit.point, 2, hit.triangle), 1, 0.3);
+      let edge = 0;
+      for (let v = 0; v < mesh.vCount; v += 1) if (mesh.pos[v * 3] > 4.99) edge = Math.max(edge, Math.abs(mesh.pos[v * 3 + 2]));
+      if (hold) expect(edge).toBe(0); else expect(edge).toBeGreaterThan(0.01);
+    }
+  });
+  it("Flatten's depth sets the plane above or below the surface's middle", () => {
+    const mesh = plate(60, 20);
+    mesh.flattenDepth = 0.5;
+    const hit = mesh.pick([0, 0, 5], [0, 0, -1])!;
+    for (let k = 0; k < 20; k += 1) mesh.dab("flatten", hit.point, [0, 0, 1], 3, mesh.region(hit.point, 3, hit.triangle), 0.5, 0.06);
+    let mid = 0, bd = Infinity;
+    for (let v = 0; v < mesh.vCount; v += 1) { const d = Math.hypot(mesh.pos[v * 3], mesh.pos[v * 3 + 1]); if (d < bd) { bd = d; mid = mesh.pos[v * 3 + 2]; } }
+    expect(mid).toBeGreaterThan(0.1);
+  });
+});

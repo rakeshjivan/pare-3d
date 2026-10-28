@@ -75,7 +75,7 @@ import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
 import { applyToSelection, brushChoice, lassoChoice, type LassoMode, cornerPositions, growChoice, soupFloat32, invertChoice, sculptMeshOf, soupOf, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
 import { LiveMesh, averageEdgeOf, stampBrush, type LiveBrush, type LivePatch } from "@/lib/liveSculpt";
 import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
-import { MeshSculptPanel, type SoftTransform, type SculptFreezeAction, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
+import { MeshSculptPanel, type SculptBrushOptions, type SoftTransform, type SculptFreezeAction, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
@@ -8963,7 +8963,7 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso"; frozen?: number; soft?: SoftTransform | null; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso"; frozen?: number; soft?: SoftTransform | null; brushOptions?: SculptBrushOptions; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
   /** Build 76: bumped when a stroke is added or stepped back, so Undo and Redo show what they can do. */
   const [, setSculptSteps] = useState(0);
   // Build 85: the speed readout (the ` key in Sculpt): the last stroke's frames, timed.
@@ -9013,7 +9013,7 @@ export function LayerlingEditor({
       sculptHidOthers.current = true;
       setDentalHidden(Object.values(studio.slots).filter((id): id is string => Boolean(id) && id !== shape.id));
     }
-    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: SCULPT_STRENGTH, reach: trim ? readTrimReach() : readSculptReach(), selectShape: readSelectShape(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, panelSteps: 0, panelRedo: 0 };
+    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: SCULPT_STRENGTH, reach: trim ? readTrimReach() : readSculptReach(), selectShape: readSelectShape(), chosen: 0, refine: readSculptRefine(), brushOptions: readBrushOptions(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, panelSteps: 0, panelRedo: 0 };
     const known = sculptState.current;
     const ready = (state: SculptSession) => Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100);
     if (known && known.shapeId === shape.id && known.key === projectShapesFingerprint([shape])) {
@@ -9291,7 +9291,13 @@ export function LayerlingEditor({
       brush, sizePx: tool.size, strength: tool.strength, refine: brush === "move" || brush === "mask" ? "off" : tool.refine, symmetry: tool.symmetry,
       pending: [], last: null, frame: 0, balls: [], touched: false,
       edits: state.live.topologyEdits,
+      lazy: tool.brushOptions?.lazy ?? 0, lazyAt: [x, y],
     };
+    // Build 92: the brush options, for this stroke.
+    const options = tool.brushOptions ?? BRUSH_OPTIONS_DEFAULT;
+    state.live.falloff = options.falloff;
+    state.live.holdBoundary = options.hold;
+    state.live.flattenDepth = options.depth;
     // Build 92: Attract pulls towards the other parts on the plate (the opposing arch, a tooth beside it).
     state.live.attractTarget = brush === "attract" ? attractTargetFor(shape) : null;
     if (brush === "attract" && !state.live.attractTarget) { setNotice(t("sculpt.attractNothing")); return; }
@@ -9327,7 +9333,16 @@ export function LayerlingEditor({
   const moveSculptStroke = useCallback((x: number, y: number) => {
     const stroke = sculptStroke.current;
     if (!stroke) return;
-    stroke.pending.push([x, y]);
+    if (stroke.lazy > 0 && stroke.brush !== "move") {
+      // Build 92: lazy mouse (Meshmixer's) - the brush stays put until the pointer is a string's length
+      // away, then is pulled along behind it: a steady line from an unsteady hand.
+      const [lx, ly] = stroke.lazyAt;
+      const d = Math.hypot(x - lx, y - ly);
+      if (d <= stroke.lazy) return;
+      const k = (d - stroke.lazy) / d;
+      stroke.lazyAt = [lx + (x - lx) * k, ly + (y - ly) * k];
+      stroke.pending.push(stroke.lazyAt);
+    } else stroke.pending.push([x, y]);
     scheduleSculptFrame(stroke);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const endSculptStroke = useCallback(() => {
@@ -17179,6 +17194,8 @@ export function LayerlingEditor({
           onSelection={applySculptSelection}
           frozen={sculptTool.frozen ?? 0}
           soft={sculptTool.soft ?? null}
+          brushOptions={sculptTool.brushOptions ?? BRUSH_OPTIONS_DEFAULT}
+          onBrushOptions={(brushOptions) => { storeBrushOptions(brushOptions); setSculptTool((current) => current ? { ...current, brushOptions } : current); }}
           onSoftStart={softStart}
           onSoft={softChange}
           onSoftEnd={softEnd}
@@ -17550,6 +17567,9 @@ type SculptStroke = {
   balls: Array<{ centre: Vec3; radius: number }>;
   touched: boolean;
   edits: number;
+  /** Build 92: lazy mouse - the brush follows the pointer on a string this many pixels long. */
+  lazy: number;
+  lazyAt: [number, number];
   /** Build 82: Ctrl held at the start - Draw and Crease dig in instead (Meshmixer's opposite). */
   dig?: boolean;
   grab?: { plane: { point: Vec3; normal: Vec3 }; corners: Array<[number, number, number, number, number]>; mirrored: Array<[number, number, number, number, number]> | null; radius: number; centre: Vec3 };
@@ -17572,6 +17592,26 @@ function readSculptRefine(): SculptRefine {
   } catch {
     return "coarse";
   }
+}
+/** Build 92: the brush options (falloff, lazy mouse, hold boundary, Flatten's depth), kept between visits. */
+const BRUSH_OPTIONS_KEY = "pare3d.brushOptions92";
+const BRUSH_OPTIONS_DEFAULT: SculptBrushOptions = { falloff: "smooth", lazy: 0, hold: false, depth: 0 };
+function readBrushOptions(): SculptBrushOptions {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(BRUSH_OPTIONS_KEY) ?? "null") as Partial<SculptBrushOptions> | null;
+    if (!stored) return BRUSH_OPTIONS_DEFAULT;
+    return {
+      falloff: stored.falloff === "sharp" || stored.falloff === "flat" ? stored.falloff : "smooth",
+      lazy: Math.max(0, Math.min(60, Number(stored.lazy) || 0)),
+      hold: Boolean(stored.hold),
+      depth: 0,
+    };
+  } catch {
+    return BRUSH_OPTIONS_DEFAULT;
+  }
+}
+function storeBrushOptions(options: SculptBrushOptions) {
+  try { window.localStorage.setItem(BRUSH_OPTIONS_KEY, JSON.stringify(options)); } catch { /* holds for this session */ }
 }
 function storeSculptRefine(refine: SculptRefine) {
   try { window.localStorage.setItem(SCULPT_REFINE_KEY, refine); } catch { /* holds for this session */ }
