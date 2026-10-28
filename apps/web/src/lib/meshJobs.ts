@@ -2,6 +2,7 @@
  * Fork (build 35): runs heavy mesh work in a worker (workers/meshJobs.worker.ts). Where a worker
  * cannot start - an old browser, the tests - the same work runs here as before.
  */
+import type { BiteContactMap } from "@/lib/biteContacts";
 import type { MeshRoundMode, MeshRoundResult } from "@/lib/meshRound";
 import type { FitReport } from "@/lib/partTools";
 import type { DentalAnalysis, DentalArchPart, DentalStudioInput, DentalStudioOptions, DentalStudioResult } from "@/lib/dentalModel";
@@ -21,7 +22,8 @@ export type MeshJobRequest =
   | { id: number; base: string; kind: "dentalArea"; positions: Float32Array }
   | { id: number; base: string; kind: "waxup"; scan: Float32Array; shells: Float32Array[] | null; landmarks: WaxLandmarks | null; options: Omit<WaxupOptions, "landmarks"> }
   | { id: number; base: string; kind: "texture"; positions: Float32Array; options: SurfaceTextureOptions }
-  | { id: number; base: string; kind: "remesh"; positions: Float32Array; options: RemeshOptions };
+  | { id: number; base: string; kind: "remesh"; positions: Float32Array; options: RemeshOptions }
+  | { id: number; base: string; kind: "biteContacts"; upper: Float32Array; lower: Float32Array };
 export type MeshJobResponse =
   | { id: number; ok: true; kind?: "round"; result: { positions: Float32Array; voxel: number; coarse: boolean } }
   | { id: number; ok: true; kind: "fit"; report: FitReport }
@@ -32,6 +34,7 @@ export type MeshJobResponse =
   | { id: number; ok: true; kind: "dentalArea"; area: Uint8Array; crowns: Uint8Array }
   | { id: number; ok: true; kind: "waxup"; plan: WaxupPlan | null; landmarks: WaxLandmarks | null }
   | { id: number; ok: true; kind: "texture"; texture: SurfaceTextureResult }
+  | { id: number; ok: true; kind: "biteContacts"; map: BiteContactMap }
   | { id: number; ok: true; kind: "remesh"; remesh: { positions: Float32Array; voxel: number; coarse: boolean; triangles: number } }
   | { id: number; ok: false; error: string };
 
@@ -59,6 +62,7 @@ function meshWorker(): Worker | null {
       else if (reply.kind === "dentalArea") waiting.resolve({ area: reply.area, crowns: reply.crowns });
       else if (reply.kind === "waxup") waiting.resolve(reply.plan ?? reply.landmarks);
       else if (reply.kind === "texture") waiting.resolve(reply.texture);
+      else if (reply.kind === "biteContacts") waiting.resolve(reply.map);
       else if (reply.kind === "remesh") waiting.resolve({ ...reply.remesh, positions: Array.from(reply.remesh.positions) });
       else waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
     };
@@ -326,6 +330,25 @@ export async function trimDentalScanInBackground(positions: Float32Array, side: 
  * Dental Studio (build 53): the teeth Pare 3D finds on a scan (Z-up soup), one flag per triangle;
  * with (build 76) the crowns alone, for Trim's warning.
  */
+/** Build 84: the bite contacts & clearance map of two arches in the bite (world triangle soups), off the page. */
+export async function biteContactsInBackground(upper: Float32Array, lower: Float32Array): Promise<BiteContactMap> {
+  const here = async () => (await import("@/lib/biteContacts")).biteContactMap(upper, lower);
+  const target = meshWorker();
+  if (!target) return here();
+  const id = nextId;
+  nextId += 1;
+  const a = Float32Array.from(upper), b = Float32Array.from(lower);
+  try {
+    return await new Promise<BiteContactMap>((resolve, reject) => {
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "biteContacts", upper: a, lower: b } satisfies MeshJobRequest, [a.buffer, b.buffer]);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "worker-unavailable") return here();
+    throw error;
+  }
+}
+
 export async function dentalAreaInBackground(positions: Float32Array): Promise<{ area: Uint8Array; crowns: Uint8Array }> {
   const here = async () => {
     const crowns = new Uint8Array(Math.floor(positions.length / 9));

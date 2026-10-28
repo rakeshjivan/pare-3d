@@ -1,5 +1,6 @@
 "use client";
 
+import { CONTACT_BANDS, type BiteContactStats } from "@/lib/biteContacts";
 import { PIN_MAX, PIN_STEP, PIN_WARN, articulatorPinPatch } from "@/lib/dentalArticulator";
 
 /** Build 78: a bite scan further than this from the scanner's bite (mm RMS) is pointed out. */
@@ -100,6 +101,8 @@ export function DentalStudioPanel({
   modelsHere = false,
   layout,
   onLayout,
+  biteMap = null,
+  onBiteMap,
   onFitBite,
   biteLocked = false,
   onRestore,
@@ -134,6 +137,9 @@ export function DentalStudioPanel({
   /** Build 74: how the scans stand on the plate, and the button that changes it. */
   layout?: "side" | "occlusion";
   onLayout?: (layout: "side" | "occlusion") => void;
+  /** Build 84: the bite contacts & clearance map (in occlusion). */
+  biteMap?: { on: boolean; busy: boolean; upper?: BiteContactStats; lower?: BiteContactStats; error?: string } | null;
+  onBiteMap?: (on: boolean) => void;
   /** Build 78: line the arches up on the bite scan instead of keeping the scanner's bite. */
   onFitBite?: () => void;
   /** Build 74: the bite is locked into the arches (edits can no longer move it). */
@@ -343,6 +349,32 @@ export function DentalStudioPanel({
                   {t(value === "side" ? "dental.scanSide" : "dental.scanOcclusion")}
                 </button>
               ))}
+            </div>
+          ) : null}
+          {/* Build 84: the bite contacts & clearance map, in occlusion. */}
+          {onBiteMap && analysis && slots.upper && slots.lower && layout === "occlusion" ? (
+            <div className="dental-bite-map">
+              <label className="edge-modifier-check" title={t("dental.biteMapHint")}>
+                <input type="checkbox" checked={Boolean(biteMap?.on)} disabled={busy} onChange={(event) => onBiteMap(event.currentTarget.checked)} />
+                <span>{t("dental.biteMap")}</span>
+              </label>
+              {biteMap?.on ? (<>
+                <ul className="dental-bite-legend" aria-label={t("dental.biteMapLegend")}>
+                  {CONTACT_BANDS.map((band) => (
+                    <li key={band.key}><span className="swatch" style={{ background: band.color }} aria-hidden="true" />{t(`dental.biteBand.${band.key}` as "dental.biteBand.close")}</li>
+                  ))}
+                </ul>
+                {biteMap.busy ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.biteMapWorking")}</p> : null}
+                {biteMap.error ? <p className="dental-status warn" role="status">{biteMap.error}</p> : null}
+                {!biteMap.busy && biteMap.upper && biteMap.lower ? (() => {
+                  const overlap = Math.max(biteMap.upper.maxOverlap, biteMap.lower.maxOverlap);
+                  const contact = (biteMap.upper.contactArea + biteMap.lower.contactArea) / 2;
+                  return <p className={`dental-status ${overlap > 0.1 ? "warn" : ""}`} role="status">{overlap > 0.005
+                    ? t("dental.biteMapOverlap", { overlap: overlap.toFixed(2), area: contact.toFixed(1) })
+                    : t("dental.biteMapClear", { area: contact.toFixed(1) })}</p>;
+                })() : null}
+                <p className="blend-hint">{t("dental.biteMapNote")}</p>
+              </>) : null}
             </div>
           ) : null}
         </div>
