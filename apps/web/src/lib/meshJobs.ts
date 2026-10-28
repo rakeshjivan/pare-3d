@@ -9,6 +9,7 @@ import type { DentalAnalysis, DentalArchPart, DentalStudioInput, DentalStudioOpt
 import type { DentalTrimMode, DentalTrimResult } from "@/lib/dentalTrim";
 import type { WaxLandmarks, WaxupOptions, WaxupPlan } from "@/lib/dentalWaxup";
 import type { ScanTeeth } from "@/lib/toothSegment";
+import type { OcclusionInput, OcclusionResult } from "@/lib/waxOcclusion";
 /** Build 94: fit the set tooth by tooth to the teeth found: each scan triangle's FDI, the teeth chosen. */
 export type WaxTeethFit = { fdi: Uint8Array; chosen: number[]; arch: "upper" | "lower"; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number };
 import type { WorkplaneShape } from "@/types/layerling";
@@ -27,7 +28,8 @@ export type MeshJobRequest =
   | { id: number; base: string; kind: "texture"; positions: Float32Array; options: SurfaceTextureOptions }
   | { id: number; base: string; kind: "remesh"; positions: Float32Array; options: RemeshOptions }
   | { id: number; base: string; kind: "biteContacts"; upper: Float32Array; lower: Float32Array }
-  | { id: number; base: string; kind: "findTeeth"; scan: Float32Array; arch: "upper" | "lower"; weights: ArrayBuffer | null };
+  | { id: number; base: string; kind: "findTeeth"; scan: Float32Array; arch: "upper" | "lower"; weights: ArrayBuffer | null }
+  | { id: number; base: string; kind: "occlusion"; input: OcclusionInput };
 export type MeshJobResponse =
   | { id: number; ok: true; kind?: "round"; result: { positions: Float32Array; voxel: number; coarse: boolean } }
   | { id: number; ok: true; kind: "fit"; report: FitReport }
@@ -42,6 +44,7 @@ export type MeshJobResponse =
   | { id: number; ok: true; kind: "remesh"; remesh: { positions: Float32Array; voxel: number; coarse: boolean; triangles: number } }
   | { id: number; ok: true; kind: "findTeeth"; teeth: ScanTeeth }
   | { id: number; ok: true; kind: "progress"; share: number }
+  | { id: number; ok: true; kind: "occlusion"; result: OcclusionResult }
   | { id: number; ok: false; error: string };
 
 let worker: Worker | null = null;
@@ -73,6 +76,7 @@ function meshWorker(): Worker | null {
       else if (reply.kind === "texture") waiting.resolve(reply.texture);
       else if (reply.kind === "biteContacts") waiting.resolve(reply.map);
       else if (reply.kind === "findTeeth") waiting.resolve(reply.teeth);
+      else if (reply.kind === "occlusion") waiting.resolve(reply.result);
       else if (reply.kind === "remesh") waiting.resolve({ ...reply.remesh, positions: Array.from(reply.remesh.positions) });
       else waiting.resolve({ positions: Array.from(reply.result.positions), voxel: reply.result.voxel, coarse: reply.result.coarse });
     };
@@ -456,3 +460,21 @@ export async function findTeethInBackground(scan: Float32Array, arch: "upper" | 
 
 /** Build 94: new weights loaded - the next finding sends them. */
 export function resetToothFinder() { finderHere = null; finderSent = false; }
+
+/** Build 94: the wax-up's occlusion (lib/waxOcclusion, in the studio's coordinates), in the worker when one runs. */
+export async function occlusionInBackground(input: OcclusionInput): Promise<OcclusionResult> {
+  const here = async () => (await import("@/lib/waxOcclusion")).occlusionInScanFrame(input);
+  const target = meshWorker();
+  if (!target) return here();
+  const id = nextId;
+  nextId += 1;
+  try {
+    return await new Promise<OcclusionResult>((resolve, reject) => {
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "occlusion", input } satisfies MeshJobRequest);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "worker-unavailable") return here();
+    throw error;
+  }
+}

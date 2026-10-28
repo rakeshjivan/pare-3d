@@ -1285,10 +1285,14 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
     for (let i = 0; i < crown.points.length; i += 3) if ((crown.points[i] - me.c[0]) * pOut.x + (crown.points[i + 1] - me.c[1]) * pOut.y > 0) facialZ.push(crown.points[i + 2]);
     facialZ.sort((a, b) => a - b);
     const margin = facialZ.length ? facialZ[Math.floor(facialZ.length * 0.05)] : me.top - 8;
+    // Too little of the crown scanned (or found) to fit a tooth to: left out.
+    if (me.top - margin < CROWN_MIN_HEIGHT) continue;
     // The edge covered by the wax too (minWax over the patient's), plus any lengthening.
     const edge = me.top + minWax + (options.lengthen ?? 0);
     const k = Math.max(0.3, (edge - margin) / Math.max(1, match.top - match.bottom));
-    const s = lw.size > 0 ? pw.size / lw.size : 1;
+    // The library tooth scaled to the patient's width - within WIDTH_SCALE of its own, so a crown the
+    // finder ran into its neighbour (or the gum) cannot stretch it out of shape.
+    const s = lw.size > 0 ? Math.max(1 / WIDTH_SCALE, Math.min(WIDTH_SCALE, pw.size / lw.size)) : 1;
     // Library frame: middle of its width on its line, top at z = 0, axes mesial/out/up -> patient's.
     const lMid = [lc[0] + mMes.x * (lw.lo + lw.hi) / 2, lc[1] + mMes.y * (lw.lo + lw.hi) / 2];
     const pMid = [me.c[0] + pMes.x * (pw.lo + pw.hi) / 2, me.c[1] + pMes.y * (pw.lo + pw.hi) / 2];
@@ -1298,7 +1302,15 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
     // Build 94: then the library tooth's surface registered onto the patient's crown (ICP: turn,
     // move and scale), from the cervical two-thirds and the proximal surfaces - so tip, torque,
     // rotation and position follow the patient's tooth, and a worn edge does not pull the tooth up.
-    const fit = registerCrown(transformSoup(lp, base), crown.points, margin + FIT_SHARE * (me.top - margin));
+    let fit = registerCrown(transformSoup(lp, base), crown.points, margin + FIT_SHARE * (me.top - margin));
+    // A fit that turns the tooth far (a crown only partly scanned, a tooth the finder took in part)
+    // is not believed: the measured placement stands.
+    {
+      const r = new THREE.Matrix4().extractRotation(fit).elements;
+      const angle = Math.acos(Math.max(-1, Math.min(1, (r[0] + r[5] + r[10] - 1) / 2))) * 180 / Math.PI;
+      const scale = new THREE.Vector3().setFromMatrixColumn(fit, 0).length();
+      if (angle > FIT_TURN_MAX || Math.abs(scale - 1) > 0.15) fit = new THREE.Matrix4();
+    }
     const fit0 = fit.clone();
     base = fit.multiply(base);
     let positions = transformSoup(lp, base);
@@ -1470,6 +1482,12 @@ function widenToContacts(placed: PlacedTooth[], widenOnly = false) {
 
 /** Build 94: the share of a crown's height, from its margin, that the fit to the patient's tooth uses. */
 export const FIT_SHARE = 0.67;
+/** How far a fitted library tooth may be widened or narrowed from its own width. */
+export const WIDTH_SCALE = 1.25;
+/** A crown less tall than this, as found, is too little to fit a library tooth to, mm. */
+export const CROWN_MIN_HEIGHT = 3.5;
+/** A fit turning a tooth more than this is not believed, degrees. */
+export const FIT_TURN_MAX = 15;
 /** How far a fit may scale a library tooth, either way. */
 const FIT_SCALE = 1.2;
 

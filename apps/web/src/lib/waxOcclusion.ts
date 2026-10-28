@@ -16,7 +16,8 @@
  * pass through each other: the teeth that touch then are the guidance.
  */
 import * as THREE from "three";
-import { PointGrid } from "@/lib/dentalMesh";
+import { cleanScan, pairFrame } from "@/lib/dentalArch";
+import { PointGrid, transformSoup } from "@/lib/dentalMesh";
 
 export type Articulator = { intercondylar: number; bonwill: number; balkwill: number; condylarGuidance: number; bennett: number };
 export const AVERAGE_ARTICULATOR: Articulator = { intercondylar: 105, bonwill: 105, balkwill: 25, condylarGuidance: 30, bennett: 15 };
@@ -397,4 +398,13 @@ export function occlusionWork(input: OcclusionInput): OcclusionResult {
     sweep: { findings, guidanceMissing },
     carved: [...lowerDone.map((x, k) => ({ fdi: lowerWax[k].fdi, mm: x.mm })), ...upperDone.map((x, k) => ({ fdi: upperWax[k].fdi, mm: x.mm }))].filter((x) => x.mm > 0),
   };
+}
+
+/** Build 94: occlusionWork on soups in any one frame (the studio's): into the pair frame and back. */
+export function occlusionInScanFrame(input: OcclusionInput): OcclusionResult {
+  const { frame } = pairFrame(cleanScan(input.upperScan), cleanScan(input.lowerScan));
+  const back = frame.clone().invert();
+  const move = (list: WaxTooth[], m: THREE.Matrix4) => list.map((t) => ({ fdi: t.fdi, positions: transformSoup(t.positions, m) }));
+  const result = occlusionWork({ ...input, upperScan: transformSoup(input.upperScan, frame), lowerScan: transformSoup(input.lowerScan, frame), upperWax: move(input.upperWax, frame), lowerWax: move(input.lowerWax, frame) });
+  return { ...result, upperWax: move(result.upperWax, back), lowerWax: move(result.lowerWax, back) };
 }

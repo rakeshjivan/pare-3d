@@ -63,6 +63,12 @@ export type WaxupView = {
   red: number | null;
   /** Build 94: the smile checked after placing (fitted on the teeth found). */
   checks: SmileCheck[] | null;
+  /** Build 94: occlusion at the opened bite - shown when both arches are in the studio. */
+  occlusion: {
+    ready: boolean; busy: boolean;
+    raise: number; scheme: "canine" | "group"; guidance: number; bennett: number;
+    result: { rest: Array<{ fdi: number; gap: number }>; openings: Array<{ fdi: number; mm: number }>; findings: Array<{ text: string; count: number; nonworking: boolean }>; carved: Array<{ fdi: number; mm: number }>; missing: number } | null;
+  };
 };
 
 export type WaxupActions = {
@@ -89,6 +95,8 @@ export type WaxupActions = {
   onGhost: (opacity: number) => void;
   onIdeal: (share: number) => void;
   onRed: (red: number | null) => void;
+  onOcclusion: (patch: Partial<{ raise: number; scheme: "canine" | "group"; guidance: number; bennett: number }>) => void;
+  onWorkOcclusion: () => void;
 };
 
 /** One click of an adjusting button: mm, or degrees for a turn. */
@@ -342,6 +350,40 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
           </>
         ) : null}
       </div>
+      {view.occlusion.ready ? (
+        <div className="dental-substep">
+          <h4 className="dental-substep-title">{t("waxup.occlusionStep")}</h4>
+          <p className="blend-hint">{t("waxup.occlusionHint")}</p>
+          <EdgeModifierSlider label={t("waxup.raise")} value={view.occlusion.raise} min={0} max={5} step={0.25} workspace={workspace} length disabled={working || view.occlusion.busy} onChange={(value) => actions.onOcclusion({ raise: Math.max(0, Math.min(5, Math.round(value / 0.25) * 0.25)) })} />
+          <div className="dental-trim-mode" role="radiogroup" aria-label={t("waxup.scheme")}>
+            {(["canine", "group"] as const).map((value) => (
+              <button key={value} type="button" role="radio" aria-checked={view.occlusion.scheme === value} className={view.occlusion.scheme === value ? "active" : ""} disabled={working || view.occlusion.busy} onClick={() => actions.onOcclusion({ scheme: value })}>{t(value === "canine" ? "waxup.schemeCanine" : "waxup.schemeGroup")}</button>
+            ))}
+          </div>
+          <details className="sculpt-brush-options">
+            <summary>{t("waxup.articulator")}</summary>
+            <EdgeModifierSlider label={t("waxup.condylar")} value={view.occlusion.guidance} min={15} max={55} step={1} unit="°" workspace={workspace} disabled={working || view.occlusion.busy} onChange={(value) => actions.onOcclusion({ guidance: Math.max(15, Math.min(55, Math.round(value))) })} />
+            <EdgeModifierSlider label={t("waxup.bennett")} value={view.occlusion.bennett} min={0} max={30} step={1} unit="°" workspace={workspace} disabled={working || view.occlusion.busy} onChange={(value) => actions.onOcclusion({ bennett: Math.max(0, Math.min(30, Math.round(value))) })} />
+            <p className="blend-hint">{t("waxup.articulatorHint")}</p>
+          </details>
+          <div className="dental-trim-buttons">
+            <button type="button" className="active" disabled={working || view.occlusion.busy} onClick={actions.onWorkOcclusion}>{view.occlusion.busy ? <LoaderCircle className="edge-modifier-spinner" size={15} /> : <Check size={15} />} {t("waxup.workOcclusion")}</button>
+          </div>
+          {view.occlusion.result ? (
+            <div className="waxup-occlusion">
+              <p className="blend-hint">{t("waxup.openings", { list: view.occlusion.result.openings.filter((o) => o.fdi).map((o) => `${o.fdi} ${o.mm.toFixed(1)}`).join(", ") })}</p>
+              <p className="blend-hint">{t("waxup.restContacts", { list: view.occlusion.result.rest.map((r) => `${r.fdi} ${r.gap.toFixed(2)}`).join(", ") })}</p>
+              {view.occlusion.result.findings.length ? (
+                <ul className="waxup-checks">
+                  {view.occlusion.result.findings.map((f, i) => <li key={i} className="warn"><AlertTriangle size={12} aria-hidden="true" /> {f.text} ({f.count})</li>)}
+                </ul>
+              ) : <p className="dental-status" role="status"><Check size={15} /> {t("waxup.sweepClear")}</p>}
+              {view.occlusion.result.missing ? <p className="dental-status warn" role="status">{t("waxup.guidanceMissing", { count: view.occlusion.result.missing })}</p> : null}
+              {view.occlusion.result.carved.length ? <p className="blend-hint">{t("waxup.carved", { list: view.occlusion.result.carved.map((c) => `${c.fdi} ${c.mm.toFixed(2)}`).join(", ") })}</p> : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {view.error ? <div className="edge-modifier-error" role="alert">{view.error}</div> : null}
     </div>
   );

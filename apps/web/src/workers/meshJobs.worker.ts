@@ -81,6 +81,11 @@ scope.onmessage = async (event: MessageEvent<MeshJobRequest | { archPartFor: num
       const teeth = await findTeethOnScan(job.scan, job.arch, finder, (share) => scope.postMessage({ id: job.id, ok: true, kind: "progress", share } satisfies MeshJobResponse));
       const reply: MeshJobResponse = { id: job.id, ok: true, kind: "findTeeth", teeth };
       scope.postMessage(reply, [teeth.fdi.buffer]);
+    } else if (job.kind === "occlusion") {
+      const { occlusionInScanFrame } = await import("@/lib/waxOcclusion");
+      const result = occlusionInScanFrame(job.input);
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "occlusion", result };
+      scope.postMessage(reply, [...result.upperWax, ...result.lowerWax].map((t) => t.positions.buffer as ArrayBuffer));
     } else if (job.kind === "dentalArea") {
       const { autoDentalArea } = await import("@/lib/dentalArea");
       const crowns = new Uint8Array(Math.floor(job.positions.length / 9));

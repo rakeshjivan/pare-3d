@@ -62,7 +62,8 @@ import { faceComponents } from "@/lib/meshComponents";
 import { movedPointIds, solveSketchConstraints } from "@/lib/sketchConstraints";
 import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
-import { analyseDentalInBackground, biteContactsInBackground, stopMeshJobs, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground, waxupInBackground, findTeethInBackground, resetToothFinder } from "@/lib/meshJobs";
+import { analyseDentalInBackground, biteContactsInBackground, stopMeshJobs, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground, waxupInBackground, findTeethInBackground, resetToothFinder, occlusionInBackground } from "@/lib/meshJobs";
+import { AVERAGE_ARTICULATOR } from "@/lib/waxOcclusion";
 import { loadStoredFinder, storeFinder } from "@/lib/toothFinderStore";
 import { toothColour, transferLabels, type ScanTeeth } from "@/lib/toothSegment";
 import { transformSoup } from "@/lib/dentalMesh";
@@ -10769,7 +10770,7 @@ export function LayerlingEditor({
   // Build 79: the digital wax-up - a tooth set over an arch's anterior teeth, from three landmarks.
   const WAX_COLOR = "#f1e7d0";
   type WaxupState = Omit<WaxupView, "marked" | "selected" | "mirror" | "found" | "chosen"> & { landmarks: WaxLandmarks | null; guessed: boolean; marks: Array<[number, number, number]> };
-  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: null, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 0, red: null, checks: null });
+  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: null, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 0, red: null, checks: null, occlusion: { ready: false, busy: false, raise: 2, scheme: "canine", guidance: 30, bennett: 15, result: null } });
   // Build 94: the teeth found on each scan (by its part id): each scan triangle's FDI (as the studio
   // reads the scan), the teeth, the landmarks from them, and the teeth chosen for the wax-up.
   type FoundTeeth = { key: string; input: Float32Array; fdi: Uint8Array; teeth: ScanTeeth["teeth"]; landmarks: WaxLandmarks | null; chosen: number[] };
@@ -11061,6 +11062,53 @@ export function LayerlingEditor({
     toothOverlay.current = items.length ? items : null;
     if (!biteMap?.on) window.layerlingColorOverlay?.(toothOverlay.current);
   }, [dentalStudio?.waxStudio, dentalStudio?.slots.upper, dentalStudio?.slots.lower, waxFound, waxup.teethShown, shapes, dentalHidden, biteMap?.on]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Build 94: the occlusion of the wax-up at the opened bite (both arches), in the worker.
+  const workOcclusion = useCallback(async () => {
+    const state = dentalStudioRef.current;
+    if (!state?.slots.upper || !state.slots.lower) return;
+    const input = dentalInput(state);
+    const arch = (slot: "upper" | "lower") => {
+      const shape = shapesRef.current.find((candidate) => candidate.id === state.slots[slot]);
+      const scan = shape ? input?.arches.find((a) => a.id === shape.id) : undefined;
+      const toInput = shape ? waxArchInput(shape) : null;
+      if (!shape || !scan || !toInput) return null;
+      const soup = Float32Array.from(scan.positions);
+      const found = waxFound[shape.id];
+      const wax = shapesRef.current.filter((candidate) => candidate.dental === "wax" && candidate.waxFor === shape.id && !candidate.hidden && candidate.waxTooth);
+      return { shape, soup, toInput, fdi: found && found.input.length === soup.length ? found.fdi : null, wax, waxSoups: wax.map((w) => ({ fdi: w.waxTooth!.fdi, positions: transformSoup(Float32Array.from(worldTriangles(w)), toInput) })) };
+    };
+    const up = arch("upper"), low = arch("lower");
+    if (!up || !low) return;
+    const current = waxupRef.current.occlusion;
+    setWaxup((latest) => ({ ...latest, occlusion: { ...latest.occlusion, busy: true }, error: null }));
+    try {
+      const result = await occlusionInBackground({ upperScan: up.soup, upperFdi: up.fdi, lowerScan: low.soup, lowerFdi: low.fdi, upperWax: up.waxSoups, lowerWax: low.waxSoups, raise: current.raise, scheme: current.scheme, articulator: { ...AVERAGE_ARTICULATOR, condylarGuidance: current.guidance, bennett: current.bennett } });
+      // The wax teeth as worked out, back into the scene.
+      const changed = new Map<string, WorkplaneShape>();
+      for (const [side, list] of [[up, result.upperWax], [low, result.lowerWax]] as const) {
+        const back = side.toInput.clone().invert();
+        list.forEach((tooth, k) => {
+          const shape = side.wax[k];
+          if (!shape) return;
+          const positions = transformSoup(tooth.positions, back);
+          changed.set(shape.id, canonicalizeShape({ ...shapeWithWorldPositions(shape, Array.from(positions)), waxTooth: shape.waxTooth }));
+        });
+      }
+      if (changed.size) commitShapes(shapesRef.current.map((shape) => changed.get(shape.id) ?? shape), [], t("waxup.occlusionDone"));
+      // The findings summed by movement, teeth and kind.
+      const sums = new Map<string, { text: string; count: number; nonworking: boolean }>();
+      for (const f of result.sweep.findings) {
+        const move = t(f.move.kind !== "lateral" ? "waxup.move.protrusion" : f.move.toward > 0 ? "waxup.move.left" : "waxup.move.right");
+        const text = t("waxup.sweepFinding", { move, lower: f.lower, upper: f.upper, wax: t(f.wax ? "waxup.findingWax" : "waxup.findingTooth"), kind: f.kind === "nonworking" ? t("waxup.findingNonworking") : "" });
+        const entry = sums.get(text) ?? { text, count: 0, nonworking: f.kind === "nonworking" };
+        entry.count += 1;
+        sums.set(text, entry);
+      }
+      setWaxup((latest) => ({ ...latest, occlusion: { ...latest.occlusion, busy: false, result: { rest: result.rest.map((r) => ({ fdi: r.fdi, gap: r.gap })), openings: result.openings, findings: [...sums.values()], carved: result.carved, missing: result.sweep.guidanceMissing.length } } }));
+    } catch (error) {
+      setWaxup((latest) => ({ ...latest, occlusion: { ...latest.occlusion, busy: false }, error: error instanceof Error ? localizedError(error.message) : String(error) }));
+    }
+  }, [commitShapes, dentalInput, waxFound]); // eslint-disable-line react-hooks/exhaustive-deps
   // Build 94: the ghost view - the wax teeth see-through while Wax-up Studio is open.
   const waxGhostIds = dentalStudio?.waxStudio ? shapes.filter((shape) => shape.dental === "wax" && !shape.hidden).map((shape) => shape.id).join(",") : "";
   useEffect(() => {
@@ -11075,6 +11123,7 @@ export function LayerlingEditor({
     selected: selectedIds.length === 1 ? selectedIds[0] : null,
     mirror: waxMirror,
     found: waxFoundHere ? waxFoundHere.teeth.map((tooth) => ({ fdi: tooth.fdi, agreed: tooth.agreed })) : null,
+    occlusion: { ...waxup.occlusion, ready: Boolean(dentalStudio?.slots.upper && dentalStudio?.slots.lower && shapes.some((shape) => shape.dental === "wax" && !shape.hidden)) },
     chosen: waxFoundHere?.chosen ?? [],
   };
   useEffect(() => {
@@ -17365,6 +17414,8 @@ export function LayerlingEditor({
               onGhost: (ghost) => setWaxup((current) => ({ ...current, ghost })),
               onIdeal: (ideal) => setWaxup((current) => ({ ...current, ideal })),
               onRed: (red) => setWaxup((current) => ({ ...current, red })),
+              onOcclusion: (patch) => setWaxup((current) => ({ ...current, occlusion: { ...current.occlusion, ...patch } })),
+              onWorkOcclusion: () => void workOcclusion(),
             },
           } : undefined}
           onCancel={() => {
