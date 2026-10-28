@@ -4,6 +4,12 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 93,
+    items: [
+      "Scans are easy to see on the light background again: the workplane look and the plain white look now take most of their light from just above and to the left of your eye, as the dark look does, so the teeth shade properly instead of washing out to white. Coloured parts and shadows look much as before.",
+    ],
+  },
+  {
     build: 92,
     items: [
       "Soft transform in Sculpt (Meshmixer's Transform with a soft edge): select a cusp, an edge or a tooth and move, turn or resize it with sliders, live, the surface round it following smoothly.",
