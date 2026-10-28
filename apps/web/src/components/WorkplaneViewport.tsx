@@ -11615,23 +11615,27 @@ function applyViewLook(state: ThreeState | null) {
   // Build 88: Meshmixer's lighting in the dark look - nearly all of it from the camera, so faces turned
   // to you are bright and hollows and creases fall dark, with only a little soft grey all round (the
   // light blue ground light of the workplane look made scans dull and flat).
-  state.lights.ambient.intensity = dark ? 0.35 : base.ambient;
+  // Build 93: the light looks too take most of their light from just above and left of the eye - with the
+  // even light of earlier builds a near-white scan washed out against the white workplane (only its
+  // outline showed). Less even light, the sun and fill turned down (the shadow and a coloured part's look
+  // kept), so a scan's faces turned away and its creases shade as they do in the dark look.
+  state.lights.ambient.intensity = dark ? 0.35 : base.ambient * 0.33;
   state.lights.ambient.groundColor.set(dark ? "#505050" : "#d6edf5");
-  state.lights.key.intensity = dark ? 0 : base.key;
-  state.lights.fill.intensity = dark ? 0 : base.fill;
+  state.lights.key.intensity = dark ? 0 : base.key * 0.39;
+  state.lights.fill.intensity = dark ? 0 : base.fill * 0.25;
   let head = state.scene.getObjectByName("ViewHeadlight") as THREE.DirectionalLight | undefined;
-  if (!head && dark) {
+  if (!head) {
     head = new THREE.DirectionalLight("#ffffff", 3.0);
     head.name = "ViewHeadlight";
     state.scene.add(head, head.target);
   }
-  if (head) head.visible = dark;
+  head.intensity = dark ? 3.0 : 2.4;
+  head.visible = true;
   state.needsRender = true;
 }
 /** Before each frame: the headlight where the camera is, aimed where it looks. */
 const headOffset = new THREE.Vector3();
 function placeHeadlight(state: ThreeState) {
-  if (viewLook !== "dark") return;
   const head = state.scene.getObjectByName("ViewHeadlight") as THREE.DirectionalLight | undefined;
   if (!head) return;
   // Build 88: a little above and to the left of the eye, as Meshmixer lights - faces square to the view
