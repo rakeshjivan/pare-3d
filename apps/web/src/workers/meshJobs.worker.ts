@@ -76,6 +76,11 @@ scope.onmessage = async (event: MessageEvent<MeshJobRequest | { archPartFor: num
       const area = autoDentalArea(job.positions, crowns);
       const reply: MeshJobResponse = { id: job.id, ok: true, kind: "dentalArea", area, crowns };
       scope.postMessage(reply, [area.buffer, crowns.buffer]);
+    } else if (job.kind === "biteContacts") {
+      const { biteContactMap } = await import("@/lib/biteContacts");
+      const map = biteContactMap(job.upper, job.lower);
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "biteContacts", map };
+      scope.postMessage(reply, [map.upper.buffer as ArrayBuffer, map.lower.buffer as ArrayBuffer]);
     } else if (job.kind === "remesh") {
       const { remeshPositions } = await import("@/lib/meshRemesh");
       const result = await remeshPositions(job.positions, job.options);

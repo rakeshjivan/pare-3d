@@ -683,6 +683,8 @@ declare global {
     layerlingSculptPreview?: (shapeId: string, triangles: Float32Array | null, color?: string) => void;
     /** Build 73: live Sculpt - the engine's own geometry drawn in the part's place (it updates the buffers itself); null puts the part back. */
     layerlingSculptLive?: (shapeId: string, geometry: THREE.BufferGeometry | null, color?: string) => void;
+    /** Build 84: parts drawn with per-corner colours in place of their own (the bite contacts map); null clears. */
+    layerlingColorOverlay?: (items: Array<{ shapeId: string; positions: Float32Array; colors: Float32Array }> | null) => void;
     /** Build 73: draw the next frame (after the live Sculpt geometry changed). */
     layerlingRedraw?: () => void;
     /** Build 85: the view's look - the workplane, no workplane, or Meshmixer's dark background. */
@@ -9361,6 +9363,37 @@ export function WorkplaneViewport({
       });
       state.needsRender = true;
     };
+    // Build 84: colour maps drawn over parts (the bite contacts map): each part's own objects are hidden
+    // while its coloured copy shows; null puts them back.
+    let overlays: THREE.Mesh[] = [];
+    const overlayHidden: THREE.Object3D[] = [];
+    const clearOverlay = () => {
+      const state = threeRef.current;
+      for (const m of overlays) { m.removeFromParent(); m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
+      overlays = [];
+      for (const object of overlayHidden) object.visible = true;
+      overlayHidden.length = 0;
+      if (state) state.needsRender = true;
+    };
+    window.layerlingColorOverlay = (items) => {
+      const state = threeRef.current;
+      clearOverlay();
+      if (!state || !items) return;
+      for (const item of items) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.BufferAttribute(item.positions, 3));
+        geometry.setAttribute("color", new THREE.BufferAttribute(item.colors, 3));
+        geometry.computeVertexNormals();
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.65, metalness: 0.02, side: THREE.DoubleSide }));
+        mesh.userData.colorOverlayOf = item.shapeId;
+        state.scene.add(mesh);
+        overlays.push(mesh);
+        state.scene.traverse((object) => {
+          if (object !== mesh && object.visible && object.userData.shapeId === item.shapeId && (object as THREE.Mesh).isMesh) { object.visible = false; overlayHidden.push(object); }
+        });
+      }
+      state.needsRender = true;
+    };
     window.layerlingRedraw = () => { const state = threeRef.current; if (state) state.needsRender = true; };
     viewLook = readViewLook();
     applyViewLook(threeRef.current);
@@ -9395,7 +9428,7 @@ export function WorkplaneViewport({
       if (state && id) state.scene.traverse((object) => { if (object !== mesh && object.userData.shapeId === id && object.visible) showing += 1; });
       return { drawn: Boolean(mesh), inScene: Boolean(mesh?.parent), hidden: hidden.length, showing, triangles: mesh ? (mesh.geometry.getAttribute("position") as THREE.BufferAttribute).count / 3 : 0 };
     };
-    return () => { clear(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingRedraw; delete window.layerlingViewLook; delete window.layerlingStrokeMotion; delete window.layerlingOnFrame; beforeFrame = null; delete window.layerlingScreenRay; };
+    return () => { clear(); clearOverlay(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingColorOverlay; delete window.layerlingRedraw; delete window.layerlingViewLook; delete window.layerlingStrokeMotion; delete window.layerlingOnFrame; beforeFrame = null; delete window.layerlingScreenRay; };
   }, []);
   // Fork (build 53): Dental Studio's tooth area, tinted over the scan while it is being designated.
   useEffect(() => {

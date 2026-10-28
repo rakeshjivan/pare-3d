@@ -62,9 +62,10 @@ import { faceComponents } from "@/lib/meshComponents";
 import { movedPointIds, solveSketchConstraints } from "@/lib/sketchConstraints";
 import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
-import { analyseDentalInBackground, stopMeshJobs, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground, waxupInBackground } from "@/lib/meshJobs";
+import { analyseDentalInBackground, biteContactsInBackground, stopMeshJobs, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground, waxupInBackground } from "@/lib/meshJobs";
 import { BUILT_IN_LIBRARIES, loadToothLibrary, loadToothSet, type ToothLibraryManifest } from "@/lib/toothLibrary";
 import { WAXUP_ENABLED } from "@/lib/pareFeatures";
+import { contactColors, type BiteContactStats } from "@/lib/biteContacts";
 import { alignToPlate, bridgeChoice, expandConnected, extrudeChoice, invertConnected, optimizeBoundary, shrinkChoice, smoothChoice } from "@/lib/meshEditTools";
 import { CENTRAL_RATIO, contralateral, imtFirstInjection, moveFrame, nudgeMatrix, rigidMoveBetween, type ToothNudge, fdiNumber, parseObj, splitShells, librarySet, type WaxLandmarks } from "@/lib/dentalWaxup";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
@@ -9712,6 +9713,9 @@ export function LayerlingEditor({
     biteMode?: "auto" | "fit";
   };
   const [dentalStudio, setDentalStudio] = useState<DentalStudioState | null>(null);
+  // Build 84: the bite contacts & clearance map - on, being worked out, its summary.
+  const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string } | null>(null);
+  const biteMapRun = useRef(0);
   const dentalStudioRef = useRef(dentalStudio);
   dentalStudioRef.current = dentalStudio;
   const dentalRun = useRef(0);
@@ -10213,6 +10217,39 @@ export function LayerlingEditor({
   useEffect(() => {
     if (dentalAreaManual && dentalStudio?.analysis) void ensureDentalAreas();
   }, [dentalAreaManual, dentalStudio?.analysis, dentalStudio?.slots.upper, dentalStudio?.slots.lower, ensureDentalAreas]);
+  // Build 84: the bite contacts map, worked out in the background whenever the arches move in the bite,
+  // and drawn over the two scans while it is on (in occlusion only).
+  useEffect(() => {
+    const upperId = dentalStudio?.slots.upper, lowerId = dentalStudio?.slots.lower;
+    const upper = upperId ? shapes.find((shape) => shape.id === upperId) : undefined;
+    const lower = lowerId ? shapes.find((shape) => shape.id === lowerId) : undefined;
+    if (!biteMap?.on || !dentalStudio || dentalStudio.layout !== "occlusion" || !upper || !lower) {
+      window.layerlingColorOverlay?.(null);
+      return;
+    }
+    const key = projectShapesFingerprint([upper, lower]);
+    // Worked out already for these positions (or being worked out now).
+    if (biteMap.key === key) return;
+    const run = ++biteMapRun.current;
+    setBiteMap((current) => current ? { ...current, busy: true, key, error: undefined } : current);
+    window.setTimeout(async () => {
+      try {
+        const up = Float32Array.from(worldTriangles(upper)), low = Float32Array.from(worldTriangles(lower));
+        const map = await biteContactsInBackground(up, low);
+        if (run !== biteMapRun.current) return;
+        window.layerlingColorOverlay?.([
+          { shapeId: upper.id, positions: up, colors: contactColors(map.upper, upper.color || "#919191") },
+          { shapeId: lower.id, positions: low, colors: contactColors(map.lower, lower.color || "#919191") },
+        ]);
+        setBiteMap((current) => current?.on ? { ...current, busy: false, key, upper: map.upperStats, lower: map.lowerStats } : current);
+      } catch (error) {
+        if (run !== biteMapRun.current) return;
+        setBiteMap((current) => current ? { ...current, busy: false, key, error: error instanceof Error ? error.message : String(error) } : current);
+      }
+    }, 30);
+  }, [biteMap?.on, biteMap?.key, dentalStudio?.layout, dentalStudio?.slots.upper, dentalStudio?.slots.lower, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The map goes when Dental Studio closes.
+  useEffect(() => { if (!dentalStudio) { setBiteMap(null); window.layerlingColorOverlay?.(null); } }, [dentalStudio]);
   // The area tinted over the scans while it can be edited.
   useEffect(() => {
     const state = dentalStudioRef.current;
@@ -16891,6 +16928,8 @@ export function LayerlingEditor({
           onView={showDentalView}
           layout={dentalStudio.layout}
           onLayout={layOutDentalScans}
+          biteMap={biteMap}
+          onBiteMap={(on) => setBiteMap(on ? { on: true, busy: true, key: "" } : null)}
           onFitBite={() => { if (dentalStudio) analyseDentalStudio({ ...dentalStudio, biteMode: "fit" }); }}
           biteLocked={Boolean(dentalStudio.analysis?.pair?.bite?.locked)}
           onRestore={(slot) => void restoreDentalScan(slot)}
