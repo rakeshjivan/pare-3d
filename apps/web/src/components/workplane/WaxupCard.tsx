@@ -67,7 +67,7 @@ export type WaxupView = {
   occlusion: {
     ready: boolean; busy: boolean;
     raise: number; scheme: "canine" | "group"; guidance: number; bennett: number;
-    result: { rest: Array<{ fdi: number; gap: number }>; openings: Array<{ fdi: number; mm: number }>; findings: Array<{ text: string; count: number; nonworking: boolean }>; carved: Array<{ fdi: number; mm: number }>; missing: number } | null;
+    result: { rest: Array<{ fdi: number; gap: number }>; openings: Array<{ fdi: number; mm: number }>; findings: Array<{ text: string; count: number; nonworking: boolean }>; carved: Array<{ fdi: number; mm: number }>; missing: number; lowerPose?: number[]; raise: number } | null;
   };
 };
 
@@ -382,6 +382,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
                 </ul>
               ) : <p className="dental-status" role="status"><Check size={15} /> {t("waxup.sweepClear")}</p>}
               {view.occlusion.result.missing ? <p className="dental-status warn" role="status">{t("waxup.guidanceMissing", { count: view.occlusion.result.missing })}</p> : null}
+              {view.occlusion.result.raise > 0 ? <p className="dental-status" role="note">{t("waxup.fixedBite", { mm: view.occlusion.result.raise })}</p> : null}
               {view.occlusion.result.carved.length ? <p className="blend-hint">{t("waxup.carved", { list: view.occlusion.result.carved.map((c) => `${c.fdi} ${c.mm.toFixed(2)}`).join(", ") })}</p> : null}
             </div>
           ) : null}

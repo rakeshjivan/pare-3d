@@ -217,6 +217,8 @@ export type OcclusionResult = {
   sweep: SweepReport;
   /** Wax carved away, mm at most, per tooth. */
   carved: Array<{ fdi: number; mm: number }>;
+  /** Build 95: the lower's move to the opened bite (the designed vertical dimension), in the input's frame, column-major. */
+  lowerPose?: number[];
 };
 
 /** The lower's incisal point: its frontmost tooth point near the midline at the occlusal plane. */
@@ -406,5 +408,9 @@ export function occlusionInScanFrame(input: OcclusionInput): OcclusionResult {
   const back = frame.clone().invert();
   const move = (list: WaxTooth[], m: THREE.Matrix4) => list.map((t) => ({ fdi: t.fdi, positions: transformSoup(t.positions, m) }));
   const result = occlusionWork({ ...input, upperScan: transformSoup(input.upperScan, frame), lowerScan: transformSoup(input.lowerScan, frame), upperWax: move(input.upperWax, frame), lowerWax: move(input.lowerWax, frame) });
-  return { ...result, upperWax: move(result.upperWax, back), lowerWax: move(result.lowerWax, back) };
+  const incisal = incisalPoint(transformSoup(input.lowerScan, frame));
+  const a = input.articulator ?? AVERAGE_ARTICULATOR;
+  const pose = mandiblePose({ kind: "rest" }, openingFor(Math.max(0, Math.min(OVD_MAX * 2, input.raise)), incisal, a), incisal, a);
+  const lowerPose = back.clone().multiply(pose).multiply(frame).toArray();
+  return { ...result, upperWax: move(result.upperWax, back), lowerWax: move(result.lowerWax, back), lowerPose };
 }

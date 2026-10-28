@@ -4504,6 +4504,7 @@ export const MESSAGES_EN = {
   "sculpt.selectionKeys": "Delete or Backspace deletes the selection (never the part), Esc clears it, Ctrl+A selects everything, > and < grow and shrink it, I inverts. Double-click selects a face group (Shift adds, Ctrl takes away).",
   "sculpt.deleteNothing": "Nothing selected to delete - select part of the surface first (Delete never removes the whole part while Sculpt is open).",
   "waxup.findStep": "Teeth",
+  "waxup.fixedBite": "Make builds the models at this opened bite ({mm} mm at the incisors): the articulator closes to the new vertical dimension, so the index is made in the designed position.",
   "waxup.chairside": "Chairside checks with the mock-up",
   "waxup.chairside.display": "Incisal display at rest: about 3.4 mm in women and 1.9 mm in men when young, falling towards 0 by 60 (Vig & Brundo 1978) - set the central's edge from it first.",
   "waxup.chairside.fv": "F and V sounds: the upper incisal edges touch the wet-dry line of the lower lip.",

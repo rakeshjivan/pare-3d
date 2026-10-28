@@ -10692,8 +10692,18 @@ export function LayerlingEditor({
   const applyDentalStudio = useCallback(() => {
     const state = dentalStudioRef.current;
     if (!state || !state.analysis) return;
-    const input = dentalInput(state);
+    let input = dentalInput(state);
     if (!input) return;
+    // Build 95: Wax-up Studio with the bite opened: the models are made at the designed vertical
+    // dimension - the lower moved to the opened bite - so the articulator closes to it (a fixed pair
+    // at the new bite, the pin at rest); the occlusion was worked out there.
+    const opened = state.waxStudio ? waxupRef.current.occlusion.result : null;
+    const openedPose = opened?.lowerPose && opened.raise > 0 && state.slots.lower ? new THREE.Matrix4().fromArray(opened.lowerPose) : null;
+    if (openedPose) {
+      const lowerId = state.slots.lower!;
+      input = { ...input, arches: input.arches.map((arch) => (arch.id === lowerId ? { ...arch, positions: transformSoup(Float32Array.from(arch.positions), openedPose), ...(arch.wax ? { wax: transformSoup(Float32Array.from(arch.wax), openedPose) } : {}) } : arch)) };
+    }
+    const fixedInput = input;
     const involved = [state.slots.upper, state.slots.lower, state.slots.bite, state.slots.bite2].filter((id): id is string => Boolean(id));
     const before = shapesRef.current.filter((shape) => involved.includes(shape.id));
     const fingerprint = projectShapesFingerprint(before);
@@ -10715,8 +10725,8 @@ export function LayerlingEditor({
         const anonymous = state.patientDetails === "remove";
         // Build 79: with a wax-up the pin stands either side, unless chosen otherwise, so the front teeth are clear.
         const pinPlace = state.options.pinPlace ?? (input.arches.some((arch) => arch.wax?.length) ? "sides" : "midline");
-        const makeOptions = { ...state.options, pinPlace, ...(anonymous ? { label: "" } : {}) };
-        const result = await makeDentalStudioInBackground(input, makeOptions);
+        const makeOptions = { ...state.options, pinPlace, ...(anonymous ? { label: "" } : {}), ...(openedPose ? { pinRaise: 0 } : {}) };
+        const result = await makeDentalStudioInBackground(fixedInput, makeOptions);
         // Build 79: stopped with Cancel while it was making - nothing is changed.
         if (run !== dentalMakeRun.current) return;
         const current = shapesRef.current.filter((shape) => involved.includes(shape.id));
@@ -11192,7 +11202,7 @@ export function LayerlingEditor({
         entry.count += 1;
         sums.set(text, entry);
       }
-      setWaxup((latest) => ({ ...latest, occlusion: { ...latest.occlusion, busy: false, result: { rest: result.rest.map((r) => ({ fdi: r.fdi, gap: r.gap })), openings: result.openings, findings: [...sums.values()], carved: result.carved, missing: result.sweep.guidanceMissing.length } } }));
+      setWaxup((latest) => ({ ...latest, occlusion: { ...latest.occlusion, busy: false, result: { rest: result.rest.map((r) => ({ fdi: r.fdi, gap: r.gap })), openings: result.openings, findings: [...sums.values()], carved: result.carved, missing: result.sweep.guidanceMissing.length, lowerPose: result.lowerPose, raise: current.raise } } }));
     } catch (error) {
       setWaxup((latest) => ({ ...latest, occlusion: { ...latest.occlusion, busy: false }, error: error instanceof Error ? localizedError(error.message) : String(error) }));
     }
