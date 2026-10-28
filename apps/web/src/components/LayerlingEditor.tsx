@@ -15825,6 +15825,8 @@ export function LayerlingEditor({
     if (selectedShapes.length >= 2 && !selectionLocked) items.push({ key: "group", label: t("contextMenu.group"), shortcut: "Ctrl+G", onSelect: () => void groupSelected() });
     if (single && (single.groupedShapes?.length || wasGroupBeforeEdgeTreatments(single)) && !selectionLocked) items.push({ key: "ungroup", label: t("contextMenu.ungroup"), shortcut: "Ctrl+Shift+G", onSelect: ungroupSelected });
     if (canSeparateSelectedParts && !selectionLocked) items.push({ key: "separateParts", label: t("inspector.separateParts"), onSelect: separateSelectedParts });
+    // Build 90: Sculpt straight from the menu for a scan or other mesh (it is under Surface › too).
+    if (single && single.importedMesh && !single.groupedShapes?.length && !single.hole && !selectionLocked && !isNonSolidShapeKind(single.kind)) items.push({ key: "sculptTop", label: t("sculpt.menu"), separated: true, onSelect: toggleSculpt });
     // Build 71: the tools in four sub-menus, so the menu is about half as long (31 items before).
     const edges: ShapeContextMenuItem[] = [];
     const surface: ShapeContextMenuItem[] = [];

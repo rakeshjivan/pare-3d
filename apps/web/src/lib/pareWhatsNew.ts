@@ -9,6 +9,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Freeze in Sculpt (Meshmixer's mask): paint over what the brushes must leave alone and it turns blue - no brush moves it and refining leaves its triangles be. Ctrl frees it again; Freeze selection, Invert freeze and Clear freeze in the panel.",
       "Pinch matched to Meshmixer: it draws a ridge in gently and keeps its height (it took away half a ridge's width at 50 before).",
       "The resize and turn handles, sizes and their lines are put away while Sculpt is open, so a scan cannot be resized by accident, and come back when it closes. Right-click → Hide handles and sizes does the same for the mesh tools (until Pare 3D is opened again).",
+      "Right-click a scan or other mesh → Sculpt… opens Sculpt with its brushes straight away (it was under Surface ›).",
     ],
   },
   {
