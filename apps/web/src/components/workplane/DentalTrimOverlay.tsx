@@ -212,7 +212,19 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live
 }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
   const [points, setPoints] = useState<TrimPoint[]>([]);
-  const [cursor, setCursor] = useState<TrimPoint | null>(null);
+  // Build 87: the brush ring moves by itself (no React render per mouse move), placed against the view's
+  // box measured once per stroke rather than at every move.
+  const ring = useRef<SVGCircleElement | null>(null);
+  const hostBox = useRef<DOMRect | null>(null);
+  const placeRing = (x: number, y: number) => {
+    const circle = ring.current;
+    if (!circle) return;
+    const box = hostBox.current ?? (hostBox.current = host?.getBoundingClientRect() ?? null);
+    if (!box) return;
+    circle.setAttribute("cx", String(x - box.left));
+    circle.setAttribute("cy", String(y - box.top));
+    circle.style.visibility = "visible";
+  };
   const drawing = useRef(false);
   const line = useRef<TrimPoint[]>([]);
   const overlay = useRef<HTMLDivElement | null>(null);
@@ -236,7 +248,9 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onCancel(); }
     };
     window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    const forget = () => { hostBox.current = null; };
+    window.addEventListener("resize", forget);
+    return () => { window.removeEventListener("keydown", onKey, true); window.removeEventListener("resize", forget); };
   }, [onCancel]);
   if (!host) return null;
   const rect = host.getBoundingClientRect();
@@ -252,6 +266,7 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
         drawing.current = true;
+        hostBox.current = null;
         if (live) { live.start(event.clientX, event.clientY, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey }); return; }
         line.current = [[event.clientX, event.clientY]];
         setPoints(line.current);
@@ -260,7 +275,7 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live
       onWheel={(event) => { if (!(onStrengthWheel && (event.ctrlKey || event.metaKey))) passToView.wheel(event); }}
       onContextMenu={(event) => event.preventDefault()}
       onPointerMove={(event) => {
-        setCursor([event.clientX, event.clientY]);
+        placeRing(event.clientX, event.clientY);
         if (!drawing.current) return;
         if (live) {
           // Every coalesced point, so a quick stroke keeps its shape.
@@ -274,7 +289,7 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live
         line.current = [...line.current, [event.clientX, event.clientY]];
         setPoints(line.current);
       }}
-      onPointerLeave={() => setCursor(null)}
+      onPointerLeave={() => { if (ring.current) ring.current.style.visibility = "hidden"; hostBox.current = null; }}
       onPointerUp={(event) => {
         if (!drawing.current) return;
         drawing.current = false;
@@ -289,7 +304,7 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live
       <p className="dental-trim-hint">{hint}</p>
       <svg aria-hidden="true">
         {points.length ? <polyline points={points.map(local).join(" ")} style={{ strokeWidth: radius * 2 }} /> : null}
-        {cursor ? <circle cx={cursor[0] - rect.left} cy={cursor[1] - rect.top} r={radius} /> : null}
+        <circle ref={ring} r={radius} style={{ visibility: "hidden" }} />
       </svg>
     </div>,
     host,

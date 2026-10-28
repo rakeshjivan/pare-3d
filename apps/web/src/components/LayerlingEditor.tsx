@@ -9162,6 +9162,7 @@ export function LayerlingEditor({
     list.push([kind, Math.round(work * 10) / 10, Math.round(gpu * 10) / 10, kind === "frame" ? -1 : sculptState.current?.live.triangleCount() ?? 0]);
     if (list.length > 400) list.splice(0, list.length - 400);
   };
+  const sculptFrameRef = useRef<(drain?: boolean) => void>(() => {});
   const sculptFrame = (drain = false) => {
     const stroke = sculptStroke.current;
     const state = sculptState.current;
@@ -9214,13 +9215,25 @@ export function LayerlingEditor({
       }
       if (outOfTime) {
         stroke.pending = pending.slice(i - 1).concat(stroke.pending);
-        if (!stroke.frame) stroke.frame = requestAnimationFrame(() => sculptFrame());
+        scheduleSculptFrame(stroke);
       }
       sculptRefineBalls(stroke, Math.max(2, 14 - (performance.now() - started)));
     }
     const worked = performance.now();
     if (state.live.flushGpu()) { if (window.layerlingStrokeMotion) window.layerlingStrokeMotion(); else window.layerlingRedraw?.(); }
     sculptStat("frame", worked - started, performance.now() - worked);
+  };
+  sculptFrameRef.current = sculptFrame;
+  /**
+   * Build 87: the stroke's next piece of work, run at the start of the render loop's next frame (so it is
+   * drawn in that frame); a plain animation frame where the view has no such hook.
+   */
+  const scheduleSculptFrame = (stroke: SculptStroke) => {
+    if (stroke.frame) return;
+    if (window.layerlingOnFrame) {
+      stroke.frame = -1;
+      window.layerlingOnFrame(() => { const current = sculptStroke.current; if (current && current.frame === -1) sculptFrameRef.current(); });
+    } else stroke.frame = requestAnimationFrame(() => sculptFrameRef.current());
   };
   const startSculptStroke = useCallback((x: number, y: number, keys?: { ctrl: boolean; shift: boolean }) => {
     const opened = performance.now();
@@ -9272,14 +9285,15 @@ export function LayerlingEditor({
     const stroke = sculptStroke.current;
     if (!stroke) return;
     stroke.pending.push([x, y]);
-    if (!stroke.frame) stroke.frame = requestAnimationFrame(() => sculptFrame());
+    scheduleSculptFrame(stroke);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const endSculptStroke = useCallback(() => {
     const stroke = sculptStroke.current;
     const state = sculptState.current;
     sculptStroke.current = null;
     if (!stroke || !state) return;
-    if (stroke.frame) cancelAnimationFrame(stroke.frame);
+    if (stroke.frame > 0) cancelAnimationFrame(stroke.frame);
+    window.layerlingOnFrame?.(null);
     sculptStroke.current = stroke;
     sculptFrame(true);
     sculptStroke.current = null;

@@ -688,6 +688,8 @@ declare global {
     /** Build 85: the view's look - the workplane, no workplane, or Meshmixer's dark background. */
     layerlingViewLook?: (look: ViewLook) => void;
     layerlingStrokeMotion?: () => void;
+    /** Build 87: work to run at the start of each drawn frame (Sculpt's stroke), or null. */
+    layerlingOnFrame?: (run: (() => void) | null) => void;
     /** Build 73: the camera's ray through a page point (client pixels), in the world. */
     layerlingScreenRay?: (x: number, y: number) => { origin: [number, number, number]; direction: [number, number, number] } | null;
     /** Fork (build 53): where the camera is, in the world. */
@@ -4900,6 +4902,12 @@ export function WorkplaneViewport({
 
     const animate = () => {
       state.animationId = window.requestAnimationFrame(animate);
+      // Build 87: a Sculpt stroke's work for this frame runs first, so what it changed is drawn in this
+      // same frame - before, the stroke's own frame callback ran after this one and its change showed a
+      // frame late (about 17 ms behind the hand).
+      if (beforeFrame) beforeFrame();
+      const strokeOnly = sculptFrameOnly;
+      sculptFrameOnly = false;
       const now = performance.now();
       const turning = stepCameraTurn(state, now);
       const controlsChanged = state.controls.update();
@@ -4926,7 +4934,10 @@ export function WorkplaneViewport({
         syncViewCube(state, viewCubeRef.current);
         state.lastViewCubeSync = now;
       }
-      if (controlsChanged || cameraSettled || state.needsRender || now - state.lastOverlaySync > 96) {
+      // Build 87: a frame where only the sculpted surface changed leaves the overlays (handles, measures,
+      // notes) as they were - the camera has not moved, and recomputing a dozen of them every stroke frame
+      // cost time and garbage for nothing.
+      if (!(strokeOnly && !controlsChanged && !turning && !cameraSettled) && (controlsChanged || cameraSettled || state.needsRender || now - state.lastOverlaySync > 96)) {
         const previewShapes = previewShapesForDrag(shapesRef.current, dragRef.current);
         syncTransformOverlay(
           state,
@@ -9352,9 +9363,12 @@ export function WorkplaneViewport({
     window.layerlingStrokeMotion = () => {
       const state = threeRef.current;
       if (!state) return;
-      adaptiveResolution(state, state.renderer.domElement).lastMotion = performance.now();
+      // Build 87: drawn at full sharpness throughout - switching the resolution for a stroke resized the
+      // canvas (its buffers made again) at the start of every stroke and 180 ms after it.
+      sculptFrameOnly = true;
       state.needsRender = true;
     };
+    window.layerlingOnFrame = (run) => { beforeFrame = run; };
     window.layerlingScreenRay = (x, y) => {
       const state = threeRef.current;
       if (!state) return null;
@@ -9373,7 +9387,7 @@ export function WorkplaneViewport({
       if (state && id) state.scene.traverse((object) => { if (object !== mesh && object.userData.shapeId === id && object.visible) showing += 1; });
       return { drawn: Boolean(mesh), inScene: Boolean(mesh?.parent), hidden: hidden.length, showing, triangles: mesh ? (mesh.geometry.getAttribute("position") as THREE.BufferAttribute).count / 3 : 0 };
     };
-    return () => { clear(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingRedraw; delete window.layerlingViewLook; delete window.layerlingStrokeMotion; delete window.layerlingScreenRay; };
+    return () => { clear(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingRedraw; delete window.layerlingViewLook; delete window.layerlingStrokeMotion; delete window.layerlingOnFrame; beforeFrame = null; delete window.layerlingScreenRay; };
   }, []);
   // Fork (build 53): Dental Studio's tooth area, tinted over the scan while it is being designated.
   useEffect(() => {
@@ -11535,6 +11549,10 @@ function refreshFrozenObjectMatrix(object: THREE.Object3D) {
  * surface reads as it does in Meshmixer whichever way it is turned.
  */
 let viewLook: ViewLook = "plate";
+/** Build 87: Sculpt's per-frame stroke work, run at the start of the render loop's frame. */
+let beforeFrame: (() => void) | null = null;
+/** Build 87: set when only the sculpted surface changed this frame. */
+let sculptFrameOnly = false;
 const MESHMIXER_BACKGROUND = "#3e3d3b";
 const baseLight = new WeakMap<object, { ambient: number; key: number; fill: number; background: string }>();
 function applyViewLook(state: ThreeState | null) {
