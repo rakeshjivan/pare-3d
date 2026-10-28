@@ -956,7 +956,9 @@ export class LiveMesh {
     for (let q = 0; q < queue.length && work > 0; q += 1) {
       if ((q & 31) === 0 && late()) break;
       const [a, b] = queue[q];
-      if (!this.vAlive[a] || !this.vAlive[b] || this.dist(a, b) <= hi) continue;
+      if (!this.vAlive[a] || !this.vAlive[b]) continue;
+      const parent = this.dist(a, b);
+      if (parent <= hi) continue;
       // A split moves neither end: only an edge between two held corners stays whole.
       if (options.fixed && options.fixed(a) && options.fixed(b)) continue;
       const m = this.splitEdge(a, b);
@@ -964,7 +966,10 @@ export class LiveMesh {
       if (m === null) continue;
       region.add(m);
       if (options.project) { const q = new THREE.Vector3(this.pos[m * 3], this.pos[m * 3 + 1], this.pos[m * 3 + 2]); options.project(q); this.pos[m * 3] = q.x; this.pos[m * 3 + 1] = q.y; this.pos[m * 3 + 2] = q.z; this.moved(m); }
-      for (const w of this.neighbours(m)) if (this.dist(m, w) > hi && inside(m, w)) queue.push([Math.min(m, w), Math.max(m, w)]);
+      // Build 82: only an edge that came out shorter than the one split goes back in the queue. Pulled back
+      // onto a rough surface (a ridge finer than the triangles), a new corner can land where its edges are
+      // as long as before, and splitting on would never end (a full-arch Remesh ran for minutes).
+      for (const w of this.neighbours(m)) { const d = this.dist(m, w); if (d > hi && d < parent * 0.95 && inside(m, w)) queue.push([Math.min(m, w), Math.max(m, w)]); }
     }
     // Collapse the short ones.
     const short = late() ? [] : edgesOf((a, b) => this.dist(a, b) < lo && inside(a, b));

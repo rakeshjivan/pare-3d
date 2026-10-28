@@ -1,0 +1,77 @@
+{
+  "kind": "pare-flows",
+  "build": 82,
+  "date": "2026-10-28T04:58:38.661Z",
+  "machine": {
+    "cpus": 2,
+    "model": "Intel(R) Xeon(R) Processor @ 2.80GHz"
+  },
+  "runs": 1,
+  "scans": true,
+  "results": {
+    "open": {
+      "duration": 2730,
+      "frameGap": 1317,
+      "lag": 1633,
+      "fps": 20,
+      "p95Frame": 1317,
+      "scriptMb": 8
+    },
+    "importScan": {
+      "duration": 4011,
+      "frameGap": 1533,
+      "lag": 1040,
+      "fps": 60,
+      "p95Frame": 233
+    },
+    "orbit": {
+      "duration": 73639,
+      "frameGap": 1767,
+      "lag": 104,
+      "fps": 1,
+      "p95Frame": 1617
+    },
+    "sculptOpen": {
+      "duration": 3144,
+      "frameGap": 867,
+      "lag": 826,
+      "fps": 1,
+      "p95Frame": 867
+    },
+    "sculptStroke": {
+      "duration": 24087,
+      "frameGap": 1600,
+      "lag": 157,
+      "fps": 30,
+      "p95Frame": 933
+    },
+    "sculptDone": {
+      "duration": 2115,
+      "frameGap": 950,
+      "lag": 1,
+      "fps": 1,
+      "p95Frame": 950
+    },
+    "undo": {
+      "duration": 2997,
+      "frameGap": 2667,
+      "lag": 2775,
+      "fps": 10,
+      "p95Frame": 2667
+    },
+    "studioImport": {
+      "duration": 16315,
+      "frameGap": 6200,
+      "lag": 3300,
+      "fps": 60,
+      "p95Frame": 67
+    },
+    "studioMake": {
+      "duration": 54424,
+      "frameGap": 4416,
+      "lag": 1752,
+      "fps": 7,
+      "p95Frame": 233
+    }
+  }
+}

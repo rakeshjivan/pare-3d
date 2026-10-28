@@ -1,0 +1,26 @@
+{
+  "kind": "engine",
+  "build": 82,
+  "date": "2026-10-28T04:52:21.539Z",
+  "machine": {
+    "cpus": 2,
+    "model": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "node": "v22.22.0"
+  },
+  "triangles": 301088,
+  "results": {
+    "Import a 300k-triangle STL": 440,
+    "Save the design (JSON)": 960,
+    "Weld the triangles": 92,
+    "Open Sculpt (live copy)": 423,
+    "Sculpt stroke (60 dabs)": 178,
+    "Pick the surface (1,000 rays)": 1110,
+    "Sculpt selection copy": 198,
+    "Grow the selection": 2,
+    "Extrude a selection": 900,
+    "Remesh (live, 2 passes)": 10451,
+    "Cap holes (Make solid prep)": 3026,
+    "Thicken 1 mm (voxel)": 5015,
+    "Make solid (0.3 mm)": 8528
+  }
+}

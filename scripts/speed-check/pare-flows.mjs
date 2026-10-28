@@ -92,6 +92,11 @@ async function dropFiles(page, files) {
 }
 
 const quiet = (page, ms = 1500) => page.waitForTimeout(ms);
+/** The card offering a higher triangle limit for a big scan: accepted, as a person would. */
+async function acceptLargeMesh(page) {
+  const card = page.locator(".large-mesh-notice button.primary");
+  if (await card.count()) await card.first().click().catch(() => {});
+}
 
 async function oneRun(browser, stl) {
   const out = {};
@@ -112,6 +117,7 @@ async function oneRun(browser, stl) {
   });
   await page.locator(".mesh-check-card button", { hasText: "Leave it" }).click({ timeout: 3000 }).catch(() => {});
   await quiet(page);
+  await acceptLargeMesh(page);
   // Turning the view with the scan in it: a right-button drag for about three seconds.
   out.orbit = await measure(page, async () => {
     await page.mouse.move(600, 450); await page.mouse.down({ button: "right" });
@@ -153,8 +159,10 @@ async function oneRun(browser, stl) {
       await dropFiles(studio, names.map((n) => [`${n}.stl`, readFileSync(join(SCANS, `${n}.stl`))]));
       await studio.waitForFunction(() => (document.querySelector(".dental-studio-panel")?.innerText.match(/Holes filled/g) ?? []).length >= 2, null, { timeout: 600000 });
     });
-    await studio.locator(".large-mesh-notice button.primary").click({ timeout: 5000 }).catch(() => {});
+    await studio.waitForSelector(".large-mesh-notice", { timeout: 15000 }).catch(() => {});
+    await acceptLargeMesh(studio);
     await quiet(studio, 3000);
+    await acceptLargeMesh(studio);
     out.studioMake = await measure(studio, async () => {
       await studio.locator(".dental-studio-panel .edge-modifier-footer button.primary").last().click({ timeout: 600000 });
       await studio.waitForSelector(".dental-made", { timeout: 1800000 });
