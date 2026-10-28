@@ -15921,6 +15921,7 @@ export function LayerlingEditor({
     <div className={`layerling-editor ${historyViewState ? "history-view-active" : ""}`}>
       <SecondaryToolbar
         toolbarMode={toolbarMode}
+        projectId={projectId ?? null}
         projectName={projectName}
         onProjectNameChange={onProjectNameChange}
         onToolbarModeChange={(mode) => {

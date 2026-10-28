@@ -233,6 +233,7 @@ const FOLD_ORDER = ["arrange", "mesh", "combine", "clipboard", "history"] as con
 
 export function SecondaryToolbar({
   toolbarMode,
+  projectId = null,
   projectName,
   onProjectNameChange,
   onToolbarModeChange,
@@ -373,6 +374,8 @@ export function SecondaryToolbar({
   onSelectObject,
 }: {
   toolbarMode: ToolbarMode;
+  /** Build 90: the design open - a different one puts the Shapes panel as its pin says. */
+  projectId?: string | null;
   projectName: string;
   onProjectNameChange?: (name: string) => void;
   onToolbarModeChange: (mode: ToolbarMode) => void;
@@ -534,12 +537,21 @@ export function SecondaryToolbar({
       setGeometryShapesPinned(pinned);
       setSketchShapesPinned(window.localStorage.getItem("layerling.sketch.shapeMenuPinned") === "true");
       // A pinned panel is there again at the next start, not only its pin (forum, prmod3d).
-      // Fork (build 22): like Tinkercad, the Shapes panel is open whenever a design opens, pinned or not.
-      setShapesOpen(true);
+      // Build 90: open when a design opens only while it is pinned - unpinned, it waits for the Shapes button
+      // (build 22 opened it every time, pinned or not).
+      setShapesOpen(pinned);
     } catch {
       // Blocked storage: the panel closes after each shape, as it always did.
     }
   }, []);
+  // Build 90: another design opened in the same visit - the Shapes panel open only if it is pinned.
+  const shownForProject = useRef(projectId);
+  useEffect(() => {
+    if (shownForProject.current === projectId) return;
+    shownForProject.current = projectId;
+    setShapesTab("shapes");
+    setShapesOpen(shapesPinnedRef.current);
+  }, [projectId]);
   const toggleShapesPinned = () => {
     const next = !shapesPinnedRef.current;
     const sketch = toolbarMode === "sketch";
