@@ -12,6 +12,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Face groups: the surface split into patches at its creases, shown in colour; Select > Group picks a whole patch with one click.",
       "Deviation from the original: the part coloured by what was added (warm) and taken away (cool) since Sculpt opened, updated after every stroke.",
       "Remesh selection and Reduce selection make only the selected triangles again, the rest of the part untouched.",
+      "Every Sculpt tool, button and setting is explained when the pointer rests on it, and the list button at the top of the panel shows what each one does.",
+      "Exporting Dental Studio models reminds you to print them at a 25-50 micron layer height: coarser layers leave lines on the tooth surfaces that a silicone index copies into IMT composite.",
       "Faster sculpting: Smooth about a third faster, fewer pauses on refining strokes, and the panel no longer copies the whole mesh at every slider step while something is selected.",
     ],
   },

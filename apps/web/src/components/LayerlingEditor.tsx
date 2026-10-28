@@ -16773,6 +16773,7 @@ export function LayerlingEditor({
           projectName={historyViewName}
           shapeCount={exportableShapeCount}
           selectionLeavesOut={exportSelectionScoped && exportSelectedVisibleCount < exportVisibleCount ? { selected: selectedShapes.length, total: exportVisibleCount } : null}
+          dentalModels={(exportSelectionScoped ? selectedShapes : shapes.filter((shape) => !shape.hidden)).some((shape) => shape.dental === "model" || shape.dental === "wax")}
           onSelectAll={selectAllVisible}
           onClose={() => setExportWindowOpen(false)}
           onMoreFormats={() => {

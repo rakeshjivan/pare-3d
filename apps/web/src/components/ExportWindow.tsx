@@ -25,8 +25,10 @@ function readParts(): ExportParts {
  * Build 71: the blue Export button's window - where the file opens (a slicer, or nowhere), its
  * type, its name and folder, then Export. Prefilled from the defaults, so it is two clicks.
  */
-export function ExportWindow({ projectName, shapeCount, selectionLeavesOut, onSelectAll, onExport, onMoreFormats, onClose }: {
+export function ExportWindow({ projectName, shapeCount, selectionLeavesOut, dentalModels = false, onSelectAll, onExport, onMoreFormats, onClose }: {
   projectName: string;
+  /** Build 92: Dental Studio models are among what is exported - a note on the resin printer's layer height. */
+  dentalModels?: boolean;
   shapeCount: number;
   /** Something is selected and visible parts are left out: only the selection is exported. */
   selectionLeavesOut: { selected: number; total: number } | null;
@@ -139,6 +141,12 @@ export function ExportWindow({ projectName, shapeCount, selectionLeavesOut, onSe
           </button>
         </header>
 
+        {dentalModels ? (
+          <div className="export-holes-only-warning export-selection-note export-dental-layers" role="note">
+            <Info size={16} aria-hidden="true" />
+            <span>{t("export.dentalLayers")}</span>
+          </div>
+        ) : null}
         {selectionLeavesOut ? (
           <div className="export-holes-only-warning export-selection-note export-window-scope" role="status">
             <Info size={16} aria-hidden="true" />

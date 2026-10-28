@@ -4352,6 +4352,7 @@ export const MESSAGES_EN = {
   "dental.reliefOn": "Retromolar and tuberosity tissue that would hold the models open is trimmed. The teeth, and gum that teeth meet, are never touched.",
   "dental.reliefOff": "The scans are kept exactly as captured, as orthodontic records require. Soft tissue that meets the other model may hold the models open.",
   "dental.pinSet": "Incisal pins",
+  "export.dentalLayers": "Print dental models at a 25-50 micron (0.025-0.05 mm) layer height on the resin printer. Coarser layers leave layer lines across the tooth surfaces; a silicone index copies them, and composite injected for IMT then needs a lot of smoothing by hand.",
   "dental.madeHere": "Models made.",
   "dental.bite2": "Second bite scan",
   "dental.biteMap": "Bite contacts & clearance",

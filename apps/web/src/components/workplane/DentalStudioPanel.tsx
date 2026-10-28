@@ -315,6 +315,7 @@ export function DentalStudioPanel({
         <div className="dental-made">
           <p className="dental-status" role="status"><Check size={15} /> {t("dental.madeHere")}</p>
           <p className="blend-hint">{t("dental.madeHint")}</p>
+          <p className="dental-status warn" role="note">{t("export.dentalLayers")}</p>
           <div className="edge-modifier-footer">
             <button type="button" className="secondary" onClick={onEditDesign}>{t("dental.editDesign")}</button>
             <button type="button" className="primary" onClick={onDone}><Check size={17} /> {t("dental.doneButton")}</button>
