@@ -1984,3 +1984,11 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .dental-bite-legend { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 12px; }
 .dental-bite-legend li { display: flex; align-items: center; gap: 6px; }
 .dental-bite-legend .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+
+/* Build 92: Sculpt's list of what each tool does. */
+.sculpt-help-list { display: grid; gap: 10px; max-height: 340px; overflow-y: auto; padding: 8px 10px; margin: 4px 0 8px; border: 1px solid var(--border, #d4dae3); border-radius: 8px; background: var(--panel-subtle, rgba(127, 127, 127, 0.06)); font-size: 12px; }
+.sculpt-help-list h5 { margin: 0 0 4px; font-size: 12px; font-weight: 600; }
+.sculpt-help-list dl { display: grid; gap: 4px; margin: 0; }
+.sculpt-help-list dl > div { display: grid; grid-template-columns: 96px 1fr; gap: 8px; }
+.sculpt-help-list dt { font-weight: 600; }
+.sculpt-help-list dd { margin: 0; color: var(--muted, #5b6573); }

@@ -146,6 +146,7 @@ export function EdgeModifierSlider({
   autoFocus = false,
   onEnter,
   onChange,
+  title,
 }: {
   label: string;
   value: number;
@@ -166,6 +167,8 @@ export function EdgeModifierSlider({
   /** Enter takes the typed value and then calls this with it, for a window that applies on Enter (#760). */
   onEnter?: (value: number) => void;
   onChange: (value: number) => void;
+  /** Build 92: what the slider does, shown when the pointer rests on it. */
+  title?: string;
 }) {
   const safeMin = Number.isFinite(min) ? min : 0;
   const safeMax = Math.max(safeMin, Number.isFinite(max) ? max : safeMin);
@@ -235,7 +238,7 @@ export function EdgeModifierSlider({
 
   // Fork (build 32): the compact row of the properties panel - the value box rides on the slider as its handle.
   return (
-    <label className={`edge-modifier-field edge-modifier-slider range-property compact${editing ? " editing" : ""}`} style={{ "--slider-pos": `${position}%`, "--slider-frac": String(position / 100) } as CSSProperties}>
+    <label title={title} className={`edge-modifier-field edge-modifier-slider range-property compact${editing ? " editing" : ""}`} style={{ "--slider-pos": `${position}%`, "--slider-frac": String(position / 100) } as CSSProperties}>
       <span className="range-property-header">
         <span className="range-property-name">{label}</span>
       </span>

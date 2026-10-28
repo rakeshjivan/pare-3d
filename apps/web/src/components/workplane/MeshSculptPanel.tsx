@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, LoaderCircle, Redo2, Undo2, X, Gauge } from "lucide-react";
+import { Check, LoaderCircle, Redo2, Undo2, X, Gauge, ListChecks } from "lucide-react";
+import { useState } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
@@ -43,7 +44,6 @@ const TRIM_ACTIONS = ["delete", "fill", "grow", "connected", "invert", "clear"] 
 const SCULPT_ACTIONS = ["fill", "delete", "smooth", "flatten", "grow", "shrink", "smoothEdge", "tidy", "connected", "invert", "clear"] as const;
 /** Build 81: Meshmixer's Edit tools on the selection. */
 const EDIT_ACTIONS = ["extrude", "offset", "bridge", "align", "remeshPart", "reducePart"] as const;
-const HINTED: ReadonlyArray<SculptSelectionAction> = ["fill", "shrink", "smoothEdge", "tidy", "connected", "grow", "invert", "extrude", "offset", "bridge", "align"];
 
 /** Build 69: Sculpt - brushes that shape a mesh, a brush that selects a patch of it, and the whole part rebuilt. */
 export function MeshSculptPanel({
@@ -173,6 +173,8 @@ export function MeshSculptPanel({
   onSoftEnd?: (keep: boolean) => void;
 }) {
   useLanguage();
+  // Build 92: a list of every tool and button with a line on what it does, opened from the header.
+  const [helpOpen, setHelpOpen] = useState(false);
   const title = t(trim ? "sculpt.trimTitle" : "sculpt.title");
   return (
     <MovableToolPanel className={`edge-modifier-panel mesh-sculpt-panel${besideDental ? " beside-dental" : ""}`} ariaLabel={title}>
@@ -184,10 +186,31 @@ export function MeshSculptPanel({
         </div>
         <div className="panel-header-actions">
           <GuideHelpLink section="meshSculpt" />
+          <button type="button" className={helpOpen ? "active" : undefined} aria-pressed={helpOpen} aria-label={t("sculpt.help.toggle")} title={t("sculpt.help.toggle")} onClick={() => setHelpOpen((open) => !open)}><ListChecks size={18} /></button>
           {onSpeed ? <button type="button" className={speedShown ? "active" : undefined} aria-pressed={speedShown} aria-label={t("sculpt.speed.toggle")} title={t("sculpt.speed.toggle")} onClick={onSpeed}><Gauge size={18} /></button> : null}
           <button type="button" aria-label={t("sculpt.done")} onClick={onClose}><X size={20} /></button>
         </div>
       </div>
+      {helpOpen ? (
+        <div className="sculpt-help-list" role="region" aria-label={t("sculpt.help.toggle")}>
+          {([
+            ["sculpt.help.brushes", (trim ? [] : SCULPT_TOOLS.filter((v) => v !== "select" && v !== "unselect")).map((v) => [t(`sculpt.tool.${v}`), t(`sculpt.tip.${v}` as "sculpt.tip.draw")])],
+            ["sculpt.help.select", [(["select", "unselect"] as const).map((v) => [t(`sculpt.tool.${v}`), t(`sculpt.tip.${v}` as "sculpt.tip.draw")]), (["brush", "lasso", "group"] as const).map((v) => [t(`sculpt.selectShape.${v}`), t(`sculpt.tip.selectShape.${v}`)]), (["front", "back", "through"] as const).map((v) => [t(`sculpt.reach.${v}`), t(`sculpt.reach.${v}Hint`)])].flat()],
+            ["sculpt.help.selection", (trim ? TRIM_ACTIONS : SCULPT_ACTIONS).map((a) => [t(`sculpt.selection.${a}`), t(`sculpt.selection.${a}Hint` as "sculpt.selection.fillHint")])],
+            ...(trim ? [] : [
+              ["sculpt.help.edit", [[t("sculpt.soft.start"), t("sculpt.soft.startHint")], ...EDIT_ACTIONS.map((a) => [t(`sculpt.selection.${a}`), t(`sculpt.selection.${a}Hint`)])]],
+              ["sculpt.help.freeze", FREEZE_ACTIONS.map((a) => [t(`sculpt.freeze.${a}`), t(`sculpt.freeze.${a}Hint`)])],
+              ["sculpt.help.whole", (["remesh", "offset", "thicken", "solid"] as const).map((m) => [t(`sculpt.mode.${m}`), t(`sculpt.mode.${m}Hint`)])],
+              ["sculpt.help.settings", [[t("sculpt.size"), t("sculpt.tip.size")], [t("sculpt.strength"), t("sculpt.tip.strength")], [t("sculpt.refine"), t("sculpt.tip.refine")], [t("sculpt.symmetry"), t("sculpt.tip.symmetry")], [t("sculpt.options.falloff"), t("sculpt.options.falloff.smoothHint") + " " + t("sculpt.options.falloff.sharpHint") + " " + t("sculpt.options.falloff.flatHint")], [t("sculpt.options.lazy"), t("sculpt.tip.lazy")], [t("sculpt.options.hold"), t("sculpt.options.holdHint")], [t("sculpt.groups.show"), t("sculpt.groups.hint")], [t("sculpt.deviation.show"), t("sculpt.deviation.hint")], [t("sculpt.undo"), t("sculpt.tip.undo")], [t("sculpt.done"), t("sculpt.tip.done")]]],
+            ]),
+          ] as Array<[string, string[][]]>).map(([heading, rows]) => rows.length ? (
+            <section key={heading}>
+              <h5>{t(heading as "sculpt.help.brushes")}</h5>
+              <dl>{rows.map(([name, text]) => (<div key={name}><dt>{name}</dt><dd>{text}</dd></div>))}</dl>
+            </section>
+          ) : null)}
+        </div>
+      ) : null}
       {preparing ? (
         <p className="edge-modifier-selection-help sculpt-preparing" role="status"><LoaderCircle className="edge-modifier-spinner" size={16} aria-hidden="true" /> {t("sculpt.preparing")}</p>
       ) : (
@@ -195,7 +218,7 @@ export function MeshSculptPanel({
       )}
       <div className="dental-trim-mode dental-area-tools sculpt-tools" role="radiogroup" aria-label={t("sculpt.brushes")}>
         {(trim ? TRIM_TOOLS : SCULPT_TOOLS).map((value) => (
-          <button key={value} type="button" role="radio" aria-checked={tool === value} className={tool === value ? "active" : ""} disabled={busy} onClick={() => onTool(tool === value ? null : value)}>
+          <button key={value} type="button" role="radio" aria-checked={tool === value} className={tool === value ? "active" : ""} disabled={busy} title={t(`sculpt.tip.${value}` as "sculpt.tip.draw")} onClick={() => onTool(tool === value ? null : value)}>
             {t(`sculpt.tool.${value}`)}
           </button>
         ))}
@@ -204,7 +227,7 @@ export function MeshSculptPanel({
         <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.selectShape")}>
           <div className="shell-opening-options">
             {(["brush", "lasso", "group"] as const).map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={selectShape === value} className={selectShape === value ? "active" : ""} disabled={busy} onClick={() => onSelectShape?.(value)}>
+              <button key={value} type="button" role="radio" aria-checked={selectShape === value} className={selectShape === value ? "active" : ""} disabled={busy} title={t(`sculpt.tip.selectShape.${value}` as "sculpt.tip.selectShape.brush")} onClick={() => onSelectShape?.(value)}>
                 {t(`sculpt.selectShape.${value}`)}
               </button>
             ))}
@@ -213,9 +236,9 @@ export function MeshSculptPanel({
           {selectShape === "group" ? <p className="blend-hint">{t("sculpt.groupHelp")}</p> : null}
         </div>
       ) : null}
-      {(tool === "select" || tool === "unselect") && selectShape === "lasso" ? null : <EdgeModifierSlider label={t("sculpt.size")} value={size} min={4} max={150} step={1} workspace={workspace} disabled={busy} onChange={onSize} />}
+      {(tool === "select" || tool === "unselect") && selectShape === "lasso" ? null : <EdgeModifierSlider label={t("sculpt.size")} title={t("sculpt.tip.size")} value={size} min={4} max={150} step={1} workspace={workspace} disabled={busy} onChange={onSize} />}
       {tool !== "select" && tool !== "unselect" ? (
-        <EdgeModifierSlider label={t("sculpt.strength")} value={Math.round(strength * 100)} min={1} max={100} step={1} workspace={workspace} disabled={busy} onChange={(value) => onStrength(value / 100)} />
+        <EdgeModifierSlider label={t("sculpt.strength")} title={t("sculpt.tip.strength")} value={Math.round(strength * 100)} min={1} max={100} step={1} workspace={workspace} disabled={busy} onChange={(value) => onStrength(value / 100)} />
       ) : null}
       {tool && tool !== "select" && tool !== "unselect" ? <p className="blend-hint sculpt-keys">{t(tool === "mask" ? "sculpt.freeze.keys" : "sculpt.keysHint")}</p> : null}
       {tool && tool !== "select" && tool !== "unselect" && brushOptions && onBrushOptions ? (
@@ -232,7 +255,7 @@ export function MeshSculptPanel({
               ))}
             </div>
           </div>
-          <EdgeModifierSlider label={t("sculpt.options.lazy")} value={brushOptions.lazy} min={0} max={60} step={1} unit="px" workspace={workspace} disabled={busy} onChange={(value) => onBrushOptions({ ...brushOptions, lazy: value })} />
+          <EdgeModifierSlider label={t("sculpt.options.lazy")} title={t("sculpt.tip.lazy")} value={brushOptions.lazy} min={0} max={60} step={1} unit="px" workspace={workspace} disabled={busy} onChange={(value) => onBrushOptions({ ...brushOptions, lazy: value })} />
           {tool === "flatten" ? <EdgeModifierSlider label={t("sculpt.options.depth")} value={brushOptions.depth} min={-2} max={2} step={0.05} workspace={workspace} length disabled={busy} onChange={(value) => onBrushOptions({ ...brushOptions, depth: value })} /> : null}
           <label className="edge-modifier-check" title={t("sculpt.options.holdHint")}>
             <input type="checkbox" checked={brushOptions.hold} disabled={busy} onChange={(event) => onBrushOptions({ ...brushOptions, hold: event.currentTarget.checked })} />
@@ -252,10 +275,10 @@ export function MeshSculptPanel({
       </>) : null}
       {tool !== "select" && tool !== "unselect" && tool !== "mask" ? (<>
         <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.refine")}>
-          <span className="sculpt-reach-label">{t("sculpt.refine")}</span>
+          <span className="sculpt-reach-label" title={t("sculpt.tip.refine")}>{t("sculpt.refine")}</span>
           <div className="shell-opening-options four">
             {(["off", "coarse", "medium", "fine"] as const).map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={refine === value} className={refine === value ? "active" : ""} disabled={busy} onClick={() => onRefine(value)}>
+              <button key={value} type="button" role="radio" aria-checked={refine === value} className={refine === value ? "active" : ""} disabled={busy} title={t("sculpt.tip.refine")} onClick={() => onRefine(value)}>
                 {t(`sculpt.refine.${value}`)}
               </button>
             ))}
@@ -263,10 +286,10 @@ export function MeshSculptPanel({
           <p className="blend-hint">{t(refine === "off" ? "sculpt.refine.offHint" : "sculpt.refine.onHint")}</p>
         </div>
         <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.symmetry")}>
-          <span className="sculpt-reach-label">{t("sculpt.symmetry")}</span>
+          <span className="sculpt-reach-label" title={t("sculpt.tip.symmetry")}>{t("sculpt.symmetry")}</span>
           <div className="shell-opening-options">
             {(["off", "x", "z"] as const).map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={symmetry === value} className={symmetry === value ? "active" : ""} disabled={busy} onClick={() => onSymmetry(value)}>
+              <button key={value} type="button" role="radio" aria-checked={symmetry === value} className={symmetry === value ? "active" : ""} disabled={busy} title={t("sculpt.tip.symmetry")} onClick={() => onSymmetry(value)}>
                 {t(`sculpt.symmetry.${value}`)}
               </button>
             ))}
@@ -311,14 +334,14 @@ export function MeshSculptPanel({
       {teethWarning > 0 ? <p className="dental-status warn sculpt-teeth-warning" role="status" aria-live="assertive">{t("sculpt.trimTeeth", { count: teethWarning.toLocaleString() })}</p> : null}
       <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.selection")}>
         {(trim ? TRIM_ACTIONS : SCULPT_ACTIONS).map((action) => (
-          <button key={action} type="button" className={trim && (action === "delete" || action === "fill") ? "danger" : undefined} title={HINTED.includes(action) ? t(`sculpt.selection.${action}Hint` as "sculpt.selection.fillHint") : undefined} disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
+          <button key={action} type="button" className={trim && (action === "delete" || action === "fill") ? "danger" : undefined} title={t(`sculpt.selection.${action}Hint` as "sculpt.selection.fillHint")} disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
             {teethWarning > 0 && action === warnedAction ? t(action === "fill" ? "sculpt.fillAnyway" : "sculpt.deleteAnyway") : t(`sculpt.selection.${action}`)}
           </button>
         ))}
       </div>
       {!trim ? (<>
         <strong className="sculpt-subtitle">{t("sculpt.edit")}</strong>
-        <EdgeModifierSlider label={t("sculpt.editDistance")} value={editAmount} min={-10} max={10} step={0.1} workspace={workspace} length disabled={busy} onChange={(value) => onEditAmount?.(value)} />
+        <EdgeModifierSlider label={t("sculpt.editDistance")} title={t("sculpt.tip.distance")} value={editAmount} min={-10} max={10} step={0.1} workspace={workspace} length disabled={busy} onChange={(value) => onEditAmount?.(value)} />
         {soft && onSoft ? (
           // Build 92: Soft Transform - the selection moved, turned and scaled, the surface round it following.
           <div className="sculpt-soft" role="group" aria-label={t("sculpt.soft.title")}>
@@ -362,14 +385,14 @@ export function MeshSculptPanel({
       <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.wholePart")}>
         <div className="shell-opening-options">
           {(["remesh", "offset", "thicken", "solid"] as const).map((value) => (
-            <button key={value} type="button" role="radio" aria-checked={remeshMode === value} className={remeshMode === value ? "active" : ""} disabled={busy} onClick={() => onRemeshMode(value)}>
+            <button key={value} type="button" role="radio" aria-checked={remeshMode === value} className={remeshMode === value ? "active" : ""} disabled={busy} title={t(`sculpt.mode.${value}Hint`)} onClick={() => onRemeshMode(value)}>
               {t(`sculpt.mode.${value}`)}
             </button>
           ))}
         </div>
       </div>
       <p className="blend-hint">{t(`sculpt.mode.${remeshMode}Hint`)}</p>
-      <EdgeModifierSlider label={t("sculpt.detail")} value={detail} min={0.05} max={5} step={0.05} workspace={workspace} length disabled={busy} onChange={onDetail} />
+      <EdgeModifierSlider label={t("sculpt.detail")} title={t("sculpt.tip.detail")} value={detail} min={0.05} max={5} step={0.05} workspace={workspace} length disabled={busy} onChange={onDetail} />
       {remeshMode === "offset" || remeshMode === "thicken" ? (
         <EdgeModifierSlider
           label={t(remeshMode === "offset" ? "sculpt.distance" : "sculpt.thickness")}
@@ -388,8 +411,8 @@ export function MeshSculptPanel({
       {error ? <p className="blend-hint" role="status">{t("sculpt.errorHelp")}</p> : null}
       <div className="edge-modifier-footer">
         {WHOLE_PART_TOOLS && !trim ? (<>
-        <button type="button" className="secondary" disabled={busy} onClick={onClose}>{t("sculpt.done")}</button>
-        <button type="button" className="primary" disabled={busy} onClick={onRemesh}>
+        <button type="button" className="secondary" disabled={busy} title={t("sculpt.tip.done")} onClick={onClose}>{t("sculpt.done")}</button>
+        <button type="button" className="primary" disabled={busy} title={t(`sculpt.mode.${remeshMode}Hint`)} onClick={onRemesh}>
           {busy ? <LoaderCircle className="edge-modifier-spinner" size={17} /> : <Check size={17} />}
           {busy ? t("sculpt.working") : t(`sculpt.apply.${remeshMode}`)}
         </button>
