@@ -13,6 +13,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Smile design: a slider takes the front teeth from the patient's own to a designed smile - level edges, an upright midline, a symmetric arch, natural width steps or the RED proportion, the smile arc - with smile checks (Kokich's symmetry thresholds, width/length, axial inclinations).",
       "Occlusion: with both arches waxed, the bite opened on an average articulator, the back teeth brought into even contact, then protrusion and both lateral excursions checked (canine guidance or group function), interferences on the wax carved back and the rest reported.",
       "Ghost view: the wax drawn see-through, to see the scan beneath. Upper tooth sets now always stand the right way up.",
+      "Sculpt made easier: tabs for Brushes, Select and Whole part, a selection's actions right under the select tools and in a small bar beside the selection in the view; Delete deletes just the selection (never the part), Esc clears it, Ctrl+A selects all, double-click selects a face group; hold Space for a ring of brushes; dental presets (smooth margin, remove bubble, add contact, flatten occlusal, ease undercut, fissure).",
       "The Sculpt brush ring has a dot at its centre: exactly where the brush works.",
     ],
   },
