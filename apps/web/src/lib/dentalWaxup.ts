@@ -912,6 +912,8 @@ export type WaxupPlan = {
   arcDepth: number;
   centralWidth: number;
   teeth: Array<{ kind: ToothKind; side: -1 | 1; positions: Float32Array; clearance: number | null; width: number; length: number; lengthening: number; extension: number; frame: ToothFrame }>;
+  /** Build 94: the smile checked (when the arch is known). */
+  checks?: SmileCheck[];
 };
 
 /** A scan in its arch frame (teeth up, front at -y), with outward vertex normals and the move into it. */
@@ -1380,7 +1382,8 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
   // Neighbours meet at their contacts (the wax closes the gaps the patient's own teeth may have:
   // each tooth widened, not moved, so it stays over its own), and the cervical part blends.
   if (options.blend !== false) {
-    widenToContacts(placed);
+    // Smile-designed teeth have their widths by design: only gaps are closed, overlaps left (they are contacts).
+    widenToContacts(placed, ideal >= 0.5);
     for (const entry of placed) drapeCervical(entry, scan, normals);
   }
   return placed;
@@ -1402,7 +1405,9 @@ export function planWaxupOnTeeth(scan: ArrayLike<number>, shells: Float32Array[]
   }
   const all: PatientCrown[] = [...byFdi].map(([n, list]) => ({ fdi: n, points: Float32Array.from(list) }));
   const placed = placeOnTeeth(set, mesh, normals, all.filter((c) => chosen.includes(c.fdi)), all, arch, options);
+  const checks = smileChecks(placed.map((p) => ({ fdi: fdiNumber(p.tooth.kind, p.tooth.side, arch), positions: p.positions })), arch);
   return {
+    checks,
     landmarks: null,
     scale: 1,
     arcDepth: 0,
@@ -1419,7 +1424,7 @@ export function planWaxupOnTeeth(scan: ArrayLike<number>, shells: Float32Array[]
  */
 /** The most a fitted tooth is widened at each end to meet its neighbour, mm. */
 export const WIDEN_MAX = 0.75;
-function widenToContacts(placed: PlacedTooth[]) {
+function widenToContacts(placed: PlacedTooth[], widenOnly = false) {
   // Arch order: each side out from the midline, the two sides joined at it.
   const rank = (p: PlacedTooth) => KINDS.indexOf(p.tooth.kind) + 1;
   const left = placed.filter((p) => p.tooth.side < 0).sort((a, b) => rank(b) - rank(a));
@@ -1437,7 +1442,7 @@ function widenToContacts(placed: PlacedTooth[]) {
       if (!(a.tooth.side === b.tooth.side ? Math.abs(ra - rb) === 1 : ra === 1 && rb === 1)) continue;
       const gap = contactGap(a.positions, b.positions);
       if (gap === null) continue;
-      const need = gap > CONTACT_GAP ? gap : gap < -CONTACT_OVERLAP ? (gap + CONTACT_OVERLAP) / 2 : 0;
+      const need = gap > CONTACT_GAP ? gap : gap < -CONTACT_OVERLAP && !widenOnly ? (gap + CONTACT_OVERLAP) / 2 : 0;
       if (!need) continue;
       any = true;
       // Which end of each faces the other: the left side's mesial end faces right along the order.
@@ -1655,8 +1660,23 @@ export function smileTargets(crowns: PatientCrown[], arch: "upper" | "lower", op
     const unit = X / (ratios[0] + ratios[1] + ratios[2]);
     bounds = [0, unit, unit * (1 + ratios[1]), X];
   } else {
-    const S = arcTo(X), wc = (S + 3) / 3;
-    bounds = [0, uAt(wc), uAt(wc + wc - 2), X];
+    // The space: the patient's own front teeth's widths along the curve, each side, averaged (so
+    // the design is symmetric) - measured tooth by tooth, as the curve's flat front can understate
+    // how far back the canines' contacts lie.
+    const widthOf = (c: PatientCrown) => {
+      let cx = 0; const n = c.points.length / 3;
+      for (let i = 0; i < c.points.length; i += 3) cx += c.points[i];
+      const u = Math.abs(cx / n - mid), sign = cx / n > mid ? 1 : -1;
+      const dir = new THREE.Vector2(sign, slope(u)).normalize();
+      const t = top(c), along: number[] = [];
+      for (let i = 0; i < c.points.length; i += 3) if (c.points[i + 2] > t - 6) along.push(c.points[i] * dir.x + c.points[i + 1] * dir.y);
+      along.sort((a, b) => a - b);
+      return along.length ? along[Math.floor(along.length * 0.98)] - along[Math.floor(along.length * 0.02)] : 0;
+    };
+    const side = (qi: number) => [1, 2, 3].reduce((sum, n) => { const c = get(qi * 10 + n); return sum + (c ? widthOf(c) : 0); }, 0);
+    const S = (side(q[0]) + side(q[1])) / 2;
+    const wc = (S + 3) / 3;
+    bounds = [0, uAt(wc), uAt(wc + wc - 2), uAt(S)];
   }
   const edgeC = (top(c1) + top(c2)) / 2 + minWax + (options.lengthen ?? 0);
   const centralWidth = arcTo(bounds[1]);
@@ -1688,4 +1708,69 @@ function solve3(A: number[][], B: number[]): number[] | null {
   const d = det(A);
   if (Math.abs(d) < 1e-12) return null;
   return [0, 1, 2].map((c) => det(A.map((row, r) => row.map((v, k) => (k === c ? B[r] : v)))) / d);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Build 94: the smile checked (Kokich 1999/2006, Magne 2003, Ward 2007, Chu 2009, Andrews 1972)
+
+export type SmileCheck = { key: string; level: "ok" | "warn"; values: Record<string, string> };
+/** Left-right differences warned at, mm (stricter than lay detection: the viewer is a dentist). */
+export const SYMMETRY_WARN = 0.5;
+/** Left-right axial inclination difference warned at, degrees. */
+export const TILT_WARN = 2;
+
+/**
+ * The anterior wax-up teeth checked (arch frame, teeth up, front -y): central W/L, apparent width
+ * ratios, left-right symmetry of lengths, widths and zeniths, the incisal plane between the
+ * centrals, and axial inclinations rising from central to canine (incisal edges towards the midline).
+ */
+export function smileChecks(teeth: Array<{ fdi: number; positions: Float32Array }>, arch: "upper" | "lower"): SmileCheck[] {
+  const q = arch === "upper" ? [1, 2] : [4, 3];
+  const measure = (p: Float32Array) => {
+    let x0 = Infinity, x1 = -Infinity, top = -Infinity, bottom = Infinity, cx = 0;
+    for (let i = 0; i < p.length; i += 3) { x0 = Math.min(x0, p[i]); x1 = Math.max(x1, p[i]); top = Math.max(top, p[i + 2]); bottom = Math.min(bottom, p[i + 2]); cx += p[i]; }
+    cx /= p.length / 3;
+    // Frontal long axis: the middle x of the incisal fifth against the cervical fifth.
+    const h = top - bottom;
+    let ia = 0, ib = 0, ca = 0, cb = 0;
+    for (let i = 0; i < p.length; i += 3) {
+      if (p[i + 2] > top - 0.2 * h) { ia += p[i]; ib += 1; }
+      else if (p[i + 2] < bottom + 0.2 * h) { ca += p[i]; cb += 1; }
+    }
+    const tilt = ib && cb ? Math.atan2(ia / ib - ca / cb, 0.6 * h) * 180 / Math.PI : 0;
+    return { apparent: x1 - x0, length: h, top, zenith: bottom, cx, tilt };
+  };
+  const m = new Map(teeth.map((t) => [t.fdi, measure(t.positions)]));
+  const out: SmileCheck[] = [];
+  const f = (v: number, d = 1) => v.toFixed(d);
+  const c1 = m.get(q[0] * 10 + 1), c2 = m.get(q[1] * 10 + 1);
+  const midX = c1 && c2 ? (c1.cx + c2.cx) / 2 : 0;
+  // Central W/L.
+  for (const fdi of [q[0] * 10 + 1, q[1] * 10 + 1]) {
+    const t = m.get(fdi);
+    if (!t) continue;
+    const ratio = t.apparent / t.length;
+    out.push({ key: "waxup.check.ratio", level: ratio < 0.7 || ratio > 0.85 ? "warn" : "ok", values: { fdi: String(fdi), ratio: String(Math.round(ratio * 100)) } });
+  }
+  // Apparent width ratios (RED), each side.
+  for (const qi of q) {
+    const a = m.get(qi * 10 + 1), b = m.get(qi * 10 + 2), c = m.get(qi * 10 + 3);
+    if (a && b) out.push({ key: "waxup.check.red", level: b.apparent / a.apparent < 0.6 || b.apparent / a.apparent > 0.8 ? "warn" : "ok", values: { a: String(qi * 10 + 2), b: String(qi * 10 + 1), ratio: String(Math.round((b.apparent / a.apparent) * 100)) } });
+    if (b && c) out.push({ key: "waxup.check.red", level: c.apparent / b.apparent < 0.6 || c.apparent / b.apparent > 0.95 ? "warn" : "ok", values: { a: String(qi * 10 + 3), b: String(qi * 10 + 2), ratio: String(Math.round((c.apparent / b.apparent) * 100)) } });
+  }
+  // Symmetry, pair by pair.
+  for (let n = 1; n <= 3; n += 1) {
+    const a = m.get(q[0] * 10 + n), b = m.get(q[1] * 10 + n);
+    if (!a || !b) continue;
+    const pair = { a: String(q[0] * 10 + n), b: String(q[1] * 10 + n) };
+    const len = Math.abs(a.length - b.length), wid = Math.abs(a.apparent - b.apparent), zen = Math.abs(a.zenith - b.zenith), edge = Math.abs(a.top - b.top);
+    out.push({ key: "waxup.check.length", level: len >= SYMMETRY_WARN ? "warn" : "ok", values: { ...pair, mm: f(len) } });
+    out.push({ key: "waxup.check.width", level: wid >= SYMMETRY_WARN ? "warn" : "ok", values: { ...pair, mm: f(wid) } });
+    out.push({ key: "waxup.check.zenith", level: zen >= SYMMETRY_WARN ? "warn" : "ok", values: { ...pair, mm: f(zen) } });
+    if (n === 1) out.push({ key: "waxup.check.cant", level: edge >= 1 ? "warn" : "ok", values: { ...pair, mm: f(edge) } });
+    // Axial inclinations: incisal part towards the midline is positive.
+    const tiltA = (a.cx > midX ? -1 : 1) * a.tilt, tiltB = (b.cx > midX ? -1 : 1) * b.tilt;
+    out.push({ key: "waxup.check.tilt", level: Math.abs(tiltA - tiltB) > TILT_WARN || tiltA < -1 || tiltB < -1 ? "warn" : "ok", values: { ...pair, a1: f(tiltA, 0), b1: f(tiltB, 0) } });
+  }
+  return out;
 }

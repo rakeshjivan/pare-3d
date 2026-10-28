@@ -1958,6 +1958,11 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .waxup-found .waxup-tooth.unsure { border-style: dashed; color: #8a6d3b; }
 .waxup-groups { flex-wrap: wrap; }
 .waxup-groups button { flex: 1 1 auto; font-size: 12px; padding: 4px 6px; }
+.waxup-checks { margin: 6px 0; font-size: 12px; }
+.waxup-checks summary { cursor: pointer; font-weight: 600; }
+.waxup-checks ul { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 2px; }
+.waxup-checks li.warn { color: #a35b00; }
+.waxup-checks li.ok { color: var(--muted, #5b6573); }
 .waxup-point-overlay { cursor: crosshair; }
 .waxup-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
 .waxup-table th, .waxup-table td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--border, #d4dae3); }

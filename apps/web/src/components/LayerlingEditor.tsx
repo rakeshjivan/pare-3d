@@ -10769,7 +10769,7 @@ export function LayerlingEditor({
   // Build 79: the digital wax-up - a tooth set over an arch's anterior teeth, from three landmarks.
   const WAX_COLOR = "#f1e7d0";
   type WaxupState = Omit<WaxupView, "marked" | "selected" | "mirror" | "found" | "chosen"> & { landmarks: WaxLandmarks | null; guessed: boolean; marks: Array<[number, number, number]> };
-  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: null, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 0, red: null });
+  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: null, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 0, red: null, checks: null });
   // Build 94: the teeth found on each scan (by its part id): each scan triangle's FDI (as the studio
   // reads the scan), the teeth, the landmarks from them, and the teeth chosen for the wax-up.
   type FoundTeeth = { key: string; input: Float32Array; fdi: Uint8Array; teeth: ScanTeeth["teeth"]; landmarks: WaxLandmarks | null; chosen: number[] };
@@ -10917,6 +10917,7 @@ export function LayerlingEditor({
         teethShown: false,
         placed: teeth.map((tooth) => ({ id: tooth.shape.id, fdi: tooth.fdi, clearance: tooth.clearance, width: tooth.width, length: tooth.length, lengthening: tooth.lengthening, extension: tooth.extension })),
         arcUsed: plan.arcDepth,
+        checks: plan.checks ?? null,
         // Guessed landmarks are kept, so placing again (a new length, say) puts the teeth where they were.
         ...(current.landmarks ? {} : { landmarks: plan.landmarks, guessed: Boolean(plan.landmarks) }),
       }));

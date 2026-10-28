@@ -9,7 +9,8 @@ import { AlertTriangle, Check, LoaderCircle, Upload } from "lucide-react";
 import { useRef } from "react";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { t } from "@/lib/i18n";
-import { IMT_REDUCE, IMT_UNSUPPORTED, imtFirstInjection, type ToothNudge } from "@/lib/dentalWaxup";
+import type { MessageKey } from "@/lib/messages.en";
+import { IMT_REDUCE, IMT_UNSUPPORTED, imtFirstInjection, type SmileCheck, type ToothNudge } from "@/lib/dentalWaxup";
 import type { WorkplaneWorkspaceSettings } from "@/types/layerling";
 
 /** How long the wax can make the teeth, mm (negative shortens). */
@@ -60,6 +61,8 @@ export type WaxupView = {
   ideal: number;
   /** Widths in the smile design: natural steps (null), or the RED proportion. */
   red: number | null;
+  /** Build 94: the smile checked after placing (fitted on the teeth found). */
+  checks: SmileCheck[] | null;
 };
 
 export type WaxupActions = {
@@ -286,6 +289,16 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
             </div>
             <EdgeModifierSlider label={t("waxup.ghost")} value={Math.round(view.ghost * 100)} min={10} max={100} step={5} unit="%" workspace={workspace} onChange={(value) => actions.onGhost(Math.max(0.1, Math.min(1, Math.round(value) / 100)))} />
             <p className="blend-hint">{t("waxup.ghostHint")}</p>
+            {view.checks?.length ? (
+              <details className="waxup-checks" open={view.checks.some((c) => c.level === "warn")}>
+                <summary>{t("waxup.checks", { warn: view.checks.filter((c) => c.level === "warn").length, all: view.checks.length })}</summary>
+                <ul>
+                  {view.checks.map((check, i) => (
+                    <li key={i} className={check.level}>{check.level === "warn" ? <AlertTriangle size={12} aria-hidden="true" /> : <Check size={12} aria-hidden="true" />} {t(check.key as MessageKey, check.values)}</li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
             <table className="waxup-table">
               <thead><tr><th>{t("waxup.colTooth")}</th><th>{t("waxup.colWidth")}</th><th>{t("waxup.colLength")}</th><th>{t("waxup.colRatio")}</th><th>{t("waxup.colEdge")}</th><th>{t("waxup.colLengthening")}</th></tr></thead>
               <tbody>
