@@ -4,6 +4,18 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 92,
+    items: [
+      "Soft transform in Sculpt (Meshmixer's Transform with a soft edge): select a cusp, an edge or a tooth and move, turn or resize it with sliders, live, the surface round it following smoothly.",
+      "The Attract brush pulls the surface onto another part - the opposing arch, a tooth beside it - and stops on it, never through it.",
+      "Brush options: falloff (smooth, sharp, flat), lazy mouse for steady lines, hold boundary for a scan's open edge, and Flatten's depth.",
+      "Face groups: the surface split into patches at its creases, shown in colour; Select > Group picks a whole patch with one click.",
+      "Deviation from the original: the part coloured by what was added (warm) and taken away (cool) since Sculpt opened, updated after every stroke.",
+      "Remesh selection and Reduce selection make only the selected triangles again, the rest of the part untouched.",
+      "Faster sculpting: Smooth about a third faster, fewer pauses on refining strokes, and the panel no longer copies the whole mesh at every slider step while something is selected.",
+    ],
+  },
+  {
     build: 91,
     items: [
       "Sculpt makes far less garbage for the browser to clear up: a brush gathers the surface under it into the same arrays every time instead of new ones for every dab, and the editor is no longer drawn again after every stroke - the pause when you let go is gone.",
