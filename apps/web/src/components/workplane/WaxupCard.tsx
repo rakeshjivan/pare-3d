@@ -23,7 +23,7 @@ export type WaxupView = {
   /** The tooth set loaded, and how many teeth it has. */
   setName: string | null;
   /** Build 79: the sets that ship with Pare 3D, and the one chosen (null = none, or one loaded from a file). */
-  builtIn: Array<{ id: string; name: string; library?: string; credit?: string; preview?: string | null }>;
+  builtIn: Array<{ id: string; name: string; library?: string; credit?: string; preview?: string | null; arch?: "upper" | "lower" }>;
   builtInCredit: string | null;
   setId: string | null;
   teeth: number;
@@ -119,6 +119,8 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
   const file = useRef<HTMLInputElement>(null);
   const finderFile = useRef<HTMLInputElement>(null);
   const working = busy || view.busy;
+  // Build 94: the sets for the arch being waxed (and any whose arch is not known).
+  const sets = view.builtIn.filter((set) => !set.arch || set.arch === view.slot);
   // Build 94: fitted to the teeth found needs teeth chosen; set out by smile design, the three landmarks.
   const fitTeeth = view.fit === "teeth" && Boolean(view.found?.length);
   const placeable = Boolean(view.setName) && (fitTeeth ? view.chosen.length > 0 : view.marked === 3);
@@ -202,11 +204,11 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
         {view.builtIn.length ? (
           // Build 91: the sets as pictures, by library (Teethy, Dr Adam Nulty's).
           <div className="waxup-sets" role="radiogroup" aria-label={t("waxup.builtIn")}>
-            {[...new Set(view.builtIn.map((set) => set.library ?? ""))].map((library) => (
+            {[...new Set(sets.map((set) => set.library ?? ""))].map((library) => (
               <div key={library} className="waxup-set-library">
                 {library ? <span className="waxup-set-library-name">{library}</span> : null}
                 <div className="waxup-set-grid">
-                  {view.builtIn.filter((set) => (set.library ?? "") === library).map((set) => (
+                  {sets.filter((set) => (set.library ?? "") === library).map((set) => (
                     <button key={set.id} type="button" role="radio" aria-checked={view.setId === set.id} className={`waxup-set${view.setId === set.id ? " active" : ""}`} disabled={working} title={set.name} onClick={() => actions.onBuiltIn(set.id)}>
                       {set.preview ? <img src={set.preview} alt="" loading="lazy" /> : <span className="waxup-set-blank" aria-hidden="true" />}
                       <span>{set.name}</span>
@@ -383,6 +385,15 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
             </div>
           ) : null}
         </div>
+      ) : null}
+      {view.placed.length ? (
+        // Build 94: what only the patient can tell - checked chairside with the mock-up (Spear, Vig & Brundo, Abduo).
+        <details className="waxup-checks">
+          <summary>{t("waxup.chairside")}</summary>
+          <ul>
+            {(["display", "fv", "s", "ovd", "photo"] as const).map((key) => <li key={key} className="ok">{t(`waxup.chairside.${key}`)}</li>)}
+          </ul>
+        </details>
       ) : null}
       {view.error ? <div className="edge-modifier-error" role="alert">{view.error}</div> : null}
     </div>

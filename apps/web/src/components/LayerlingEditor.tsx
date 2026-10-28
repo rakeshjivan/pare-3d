@@ -10784,9 +10784,11 @@ export function LayerlingEditor({
     void Promise.all(BUILT_IN_LIBRARIES.map((id) => loadToothLibrary(id).catch(() => null))).then((found) => {
       const libraries = found.filter((library): library is ToothLibraryManifest => Boolean(library));
       waxLibraries.current = libraries;
-      const builtIn = libraries.flatMap((library) => library.sets.filter((set) => set.kind !== "arch").map((set) => ({
+      const builtIn = libraries.flatMap((library) => library.sets.map((set) => ({
         id: set.id, name: set.name, library: library.name, credit: library.credit,
         preview: set.preview ? `libraries/${library.id}/${set.preview}` : null,
+        // Build 94: which arch the set is for (from its teeth's numbers), so the picker shows the arch being waxed.
+        ...(set.fdi?.length ? { arch: set.fdi.every((n) => n >= 31) ? "lower" as const : set.fdi.every((n) => n < 30) ? "upper" as const : undefined } : {}),
       })));
       setWaxup((current) => ({ ...current, builtIn, builtInCredit: null }));
     });
