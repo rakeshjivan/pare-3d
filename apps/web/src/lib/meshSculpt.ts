@@ -199,6 +199,83 @@ export function brushChoice(mesh: SculptMesh, projected: ArrayLike<number>, eye:
   return changed;
 }
 
+/**
+ * Build 82: whether points fall inside a closed screen loop (page pixels), the loop filled once into a
+ * one-pixel mask by scanlines (even-odd), so each point is a lookup - quick for a 300,000-triangle scan.
+ */
+export function loopMask(loop: ScreenPoint[]) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of loop) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  const x0 = Math.floor(minX), y0 = Math.floor(minY);
+  const width = Math.max(1, Math.ceil(maxX) - x0 + 1), height = Math.max(1, Math.ceil(maxY) - y0 + 1);
+  const mask = new Uint8Array(width * height);
+  const n = loop.length;
+  if (n >= 3) {
+    const crossings: number[] = [];
+    for (let row = 0; row < height; row += 1) {
+      const y = y0 + row + 0.5;
+      crossings.length = 0;
+      for (let k = 0; k < n; k += 1) {
+        const [ax, ay] = loop[k], [bx, by] = loop[(k + 1) % n];
+        if ((ay <= y) !== (by <= y)) crossings.push(ax + ((y - ay) / (by - ay)) * (bx - ax));
+      }
+      crossings.sort((a, b) => a - b);
+      for (let k = 0; k + 1 < crossings.length; k += 2) {
+        const from = Math.max(0, Math.ceil(crossings[k] - x0 - 0.5)), to = Math.min(width - 1, Math.floor(crossings[k + 1] - x0 - 0.5));
+        for (let col = from; col <= to; col += 1) mask[row * width + col] = 1;
+      }
+    }
+  }
+  return {
+    box: { minX, minY, maxX, maxY },
+    inside: (x: number, y: number) => {
+      const col = Math.floor(x) - x0, row = Math.floor(y) - y0;
+      return col >= 0 && row >= 0 && col < width && row < height && mask[row * width + col] === 1;
+    },
+  };
+}
+
+/** Build 82: what a lasso does to the selection - Meshmixer's: a new lasso replaces it, Shift adds, Ctrl takes away. */
+export type LassoMode = "replace" | "add" | "remove";
+
+/**
+ * Build 82: Meshmixer's screen-space lasso. The triangles whose three corners all fall inside the
+ * closed `loop` (page pixels; `projected` is x/y per corner) are chosen or let go, as `mode` says;
+ * `reach` decides which surface counts, as for the Select brush. Returns how many changed.
+ */
+export function lassoChoice(mesh: SculptMesh, projected: ArrayLike<number>, eye: [number, number, number], loop: ScreenPoint[], chosen: Uint8Array, mode: LassoMode, reach: SelectReach = "front"): number {
+  const { triangles, points } = mesh;
+  let changed = 0;
+  if (mode === "replace") for (let t = 0; t < chosen.length; t += 1) if (chosen[t]) { chosen[t] = 0; changed += 1; }
+  if (loop.length < 3) return changed;
+  const lasso = loopMask(loop);
+  const n = points.length / 3;
+  const inside = new Uint8Array(n);
+  for (let i = 0; i < n; i += 1) if (lasso.inside(projected[i * 2], projected[i * 2 + 1])) inside[i] = 1;
+  const view = reach === "front" ? viewDepth(mesh, projected, eye, lasso.box) : null;
+  const add = mode !== "remove";
+  for (let t = 0; t < chosen.length; t += 1) {
+    if (Boolean(chosen[t]) === add) continue;
+    const a = triangles[t * 3], b = triangles[t * 3 + 1], c = triangles[t * 3 + 2];
+    if (!inside[a] || !inside[b] || !inside[c]) continue;
+    if (view) {
+      const x = (projected[a * 2] + projected[b * 2] + projected[c * 2]) / 3;
+      const y = (projected[a * 2 + 1] + projected[b * 2 + 1] + projected[c * 2 + 1]) / 3;
+      if (!view.seen(x, y, (view.distance(a) + view.distance(b) + view.distance(c)) / 3)) continue;
+    }
+    if (reach === "back") {
+      const ax = points[a * 3], ay = points[a * 3 + 1], az = points[a * 3 + 2];
+      const ux = points[b * 3] - ax, uy = points[b * 3 + 1] - ay, uz = points[b * 3 + 2] - az;
+      const vx = points[c * 3] - ax, vy = points[c * 3 + 1] - ay, vz = points[c * 3 + 2] - az;
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      if (nx * (eye[0] - ax) + ny * (eye[1] - ay) + nz * (eye[2] - az) >= 0) continue;
+    }
+    chosen[t] = add ? 1 : 0;
+    changed += 1;
+  }
+  return changed;
+}
+
 /** Area-weighted normal at every corner, of unit length. */
 export function cornerNormals(mesh: SculptMesh): Float64Array {
   const { points, triangles } = mesh;

@@ -1674,6 +1674,13 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 .dental-next { margin: 8px 0 0; padding: 6px 8px; border-left: 3px solid var(--primary, #1662b3); font-size: 12px; color: var(--foreground, #1d2430); }
 /* Fork (build 53): Dental Studio's tooth-area brush. */
 .dental-brush-overlay { cursor: none; }
+/* Build 82: the Select tool's lasso. */
+.sculpt-lasso-overlay polygon { fill: rgba(242, 163, 58, 0.14); stroke: #f2a33a; stroke-dasharray: 6 4; }
+.sculpt-lasso-overlay polyline { fill: none; stroke: #f2a33a; stroke-width: 2; stroke-dasharray: 6 4; }
+.sculpt-lasso-overlay circle { fill: #fff; stroke: #f2a33a; stroke-width: 2; }
+.sculpt-lasso-overlay circle.closing { fill: #f2a33a; }
+.sculpt-lasso-overlay.erase polygon { fill: rgba(31, 111, 235, 0.12); stroke: #1f6feb; }
+.sculpt-lasso-overlay.erase polyline, .sculpt-lasso-overlay.erase circle { stroke: #1f6feb; }
 .dental-brush-overlay polyline { fill: none; stroke: rgba(242, 163, 58, 0.45); stroke-linecap: round; stroke-linejoin: round; }
 .dental-brush-overlay circle { fill: none; stroke: #f2a33a; stroke-width: 1.5; }
 .dental-brush-overlay.erase polyline { stroke: rgba(31, 111, 235, 0.35); }

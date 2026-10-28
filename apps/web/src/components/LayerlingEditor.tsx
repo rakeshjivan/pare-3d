@@ -71,11 +71,11 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { WaxupPointOverlay, markerTriangles, rayHit } from "./workplane/WaxupPointOverlay";
 import { WAXUP_LANDMARKS, type WaxupView } from "./workplane/WaxupCard";
 import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
-import { applyToSelection, brushChoice, cornerPositions, growChoice, soupFloat32, invertChoice, sculptMeshOf, soupOf, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
+import { applyToSelection, brushChoice, lassoChoice, type LassoMode, cornerPositions, growChoice, soupFloat32, invertChoice, sculptMeshOf, soupOf, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
 import { LiveMesh, averageEdgeOf, type LiveBrush, type LivePatch } from "@/lib/liveSculpt";
 import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
 import { MeshSculptPanel, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
-import { DentalBrushOverlay, DentalTrimOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
+import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
 import { looksLikeDentalScan, type DentalAnalysis, type DentalRole, type DentalStudioInput, type DentalStudioOptions } from "@/lib/dentalModel";
@@ -8962,7 +8962,7 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso"; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
   /** Build 76: bumped when a stroke is added or stepped back, so Undo and Redo show what they can do. */
   const [, setSculptSteps] = useState(0);
   const sculptToolRef = useRef(sculptTool);
@@ -9001,7 +9001,7 @@ export function LayerlingEditor({
       sculptHidOthers.current = true;
       setDentalHidden(Object.values(studio.slots).filter((id): id is string => Boolean(id) && id !== shape.id));
     }
-    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: 0.5, reach: trim ? readTrimReach() : readSculptReach(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, panelSteps: 0, panelRedo: 0 };
+    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: 0.5, reach: trim ? readTrimReach() : readSculptReach(), selectShape: readSelectShape(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, panelSteps: 0, panelRedo: 0 };
     const known = sculptState.current;
     const ready = (state: SculptSession) => Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100);
     if (known && known.shapeId === shape.id && known.key === projectShapesFingerprint([shape])) {
@@ -9074,6 +9074,16 @@ export function LayerlingEditor({
     brushChoice(selection.mesh, window.layerlingProjectPoints(cornerPositions(selection.mesh)), window.layerlingCameraPosition(), points, tool.size, selection.chosen, tool.tool === "select", tool.reach);
     setSculptTool((current) => current ? { ...current, chosen: selection.chosen.reduce((a, b) => a + b, 0) } : current);
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Build 82: the Select tool's lasso - the triangles inside the loop, as Meshmixer's screen-space lasso. */
+  const applySculptLasso = useCallback((loop: TrimPoint[], mode: LassoMode) => {
+    const target = sculptTarget();
+    if (!target || !window.layerlingProjectPoints || !window.layerlingCameraPosition) return;
+    const { tool, state } = target;
+    if (tool.tool !== "select" && tool.tool !== "unselect") return;
+    const selection = sculptSelectionOf(state);
+    lassoChoice(selection.mesh, window.layerlingProjectPoints(cornerPositions(selection.mesh)), window.layerlingCameraPosition(), loop, selection.chosen, tool.tool === "unselect" ? "remove" : mode, tool.reach);
+    setSculptTool((current) => current ? { ...current, chosen: selection.chosen.reduce((a, b) => a + b, 0) } : current);
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build 73: live brushes. A stroke is a stream of dabs along the pointer's path, applied as it moves,
   // a frame at a time; the GPU buffers get only what changed. Refine keeps the triangles under the
@@ -9115,7 +9125,7 @@ export function LayerlingEditor({
     stroke.touched = true;
     const radius = brushRadiusAt(x, y, stroke.sizePx, hit.point);
     const normal = state.live.vertexNormal(state.live.tri[hit.triangle * 3]);
-    const step = radius * 0.06;
+    const step = radius * 0.06 * (stroke.dig ? -1 : 1);
     state.live.dab(stroke.brush, hit.point, [normal.x, normal.y, normal.z], radius, state.live.region(hit.point, radius, hit.triangle), stroke.strength, step);
     stroke.balls.push({ centre: hit.point, radius });
     const twin = mirroredHit(state, stroke.symmetry, ray);
@@ -9197,7 +9207,7 @@ export function LayerlingEditor({
     if (state.live.flushGpu()) window.layerlingRedraw?.();
     sculptStat("frame", worked - started, performance.now() - worked);
   };
-  const startSculptStroke = useCallback((x: number, y: number) => {
+  const startSculptStroke = useCallback((x: number, y: number, keys?: { ctrl: boolean; shift: boolean }) => {
     const opened = performance.now();
     const target = sculptTarget();
     if (!target || !target.tool.tool || target.tool.tool === "select" || target.tool.tool === "unselect") return;
@@ -9206,8 +9216,11 @@ export function LayerlingEditor({
     const hit = ray ? state.live.pick(ray.origin, ray.direction) : null;
     if (!ray || !hit) { setNotice(t("sculpt.nothing")); return; }
     window.layerlingSculptLive?.(shape.id, state.live.geometry, shape.color);
-    const brush = tool.tool as LiveBrush;
+    // Build 82: Meshmixer's keys while stroking - Shift smooths, Ctrl does the opposite.
+    const chosenBrush = tool.tool as LiveBrush;
+    const brush: LiveBrush = keys?.shift && chosenBrush !== "move" ? "smooth" : keys?.ctrl ? (chosenBrush === "inflate" ? "deflate" : chosenBrush === "deflate" ? "inflate" : chosenBrush) : chosenBrush;
     const stroke: SculptStroke = {
+      dig: Boolean(keys?.ctrl && !keys.shift && (brush === "draw" || brush === "crease")),
       brush, sizePx: tool.size, strength: tool.strength, refine: brush === "move" ? "off" : tool.refine, symmetry: tool.symmetry,
       pending: [], last: null, frame: 0, balls: [], touched: false,
       edits: state.live.topologyEdits,
@@ -9495,6 +9508,13 @@ export function LayerlingEditor({
   useEffect(() => {
     if (!sculptOpen) return;
     const onKey = (event: KeyboardEvent) => {
+      // Build 82: [ and ] make the brush smaller and larger, as in Meshmixer.
+      if ((event.key === "[" || event.key === "]") && !event.ctrlKey && !event.metaKey && !(event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable=true]")) {
+        event.preventDefault();
+        const grow = event.key === "]";
+        setSculptTool((current) => current ? { ...current, size: Math.max(4, Math.min(150, Math.round(grow ? Math.max(current.size + 1, current.size * 1.15) : Math.min(current.size - 1, current.size / 1.15)))) } : current);
+        return;
+      }
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
       // Ctrl (or Cmd) on its own comes first, before the letter: nothing to do yet.
@@ -16888,6 +16908,8 @@ export function LayerlingEditor({
           workspace={workspaceSettings}
           onTool={(tool) => setSculptTool((current) => current ? { ...current, tool } : current)}
           onSize={(size) => setSculptTool((current) => current ? { ...current, size: Math.max(4, Math.min(150, size)) } : current)}
+          selectShape={sculptTool.selectShape ?? "brush"}
+          onSelectShape={(selectShape) => { storeSelectShape(selectShape); setSculptTool((current) => current ? { ...current, selectShape } : current); }}
           reach={sculptTool.reach}
           onReach={(reach) => { if (sculptTool.trim) storeTrimReach(reach); else storeSculptReach(reach); setSculptTool((current) => current ? { ...current, reach } : current); }}
           refine={sculptTool.refine}
@@ -16906,11 +16928,19 @@ export function LayerlingEditor({
           besideDental={Boolean(dentalStudio)}
         />
       ) : null}
-      {sculptTool?.tool && !sculptTool.busy ? (
+      {sculptTool?.tool && !sculptTool.busy && sculptTool.selectShape === "lasso" && (sculptTool.tool === "select" || sculptTool.tool === "unselect") ? (
+        <SculptLassoOverlay
+          hint={t("sculpt.lassoHint")}
+          erase={sculptTool.tool === "unselect"}
+          onDone={applySculptLasso}
+          onCancel={() => setSculptTool((current) => current ? { ...current, tool: null } : current)}
+        />
+      ) : sculptTool?.tool && !sculptTool.busy ? (
         <DentalBrushOverlay
           hint={t("sculpt.hint", { brush: t(`sculpt.tool.${sculptTool.tool}`) })}
           radius={sculptTool.size}
           erase={sculptTool.tool === "unselect"}
+          onStrengthWheel={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : (up) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.05, Math.min(1, Math.round((current.strength + (up ? 0.05 : -0.05)) * 20) / 20)) } : current)}
           onDone={applySculptStroke}
           onCancel={() => { endSculptStroke(); setSculptTool((current) => current ? { ...current, tool: null } : current); }}
           live={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : { start: startSculptStroke, move: moveSculptStroke, end: endSculptStroke }}
@@ -17234,6 +17264,8 @@ type SculptStroke = {
   balls: Array<{ centre: Vec3; radius: number }>;
   touched: boolean;
   edits: number;
+  /** Build 82: Ctrl held at the start - Draw and Crease dig in instead (Meshmixer's opposite). */
+  dig?: boolean;
   grab?: { plane: { point: Vec3; normal: Vec3 }; corners: Array<[number, number, number, number, number]>; mirrored: Array<[number, number, number, number, number]> | null; radius: number; centre: Vec3 };
 };
 function undoBytes(entry: SculptUndo) {
@@ -17272,6 +17304,21 @@ function readTrimReach(): SelectReach {
 function storeTrimReach(reach: SelectReach) {
   try {
     window.localStorage.setItem("pare3d.trimReach", reach);
+  } catch {
+    // Holds for this visit.
+  }
+}
+/** Build 82: the Select tool paints with the brush or draws a lasso - remembered, as Meshmixer does. */
+function readSelectShape(): "brush" | "lasso" {
+  try {
+    return window.localStorage.getItem("pare3d.selectShape") === "lasso" ? "lasso" : "brush";
+  } catch {
+    return "brush";
+  }
+}
+function storeSelectShape(shape: "brush" | "lasso") {
+  try {
+    window.localStorage.setItem("pare3d.selectShape", shape);
   } catch {
     // Holds for this visit.
   }

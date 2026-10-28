@@ -70,6 +70,8 @@ export function MeshSculptPanel({
   besideDental = false,
   editAmount = 1,
   onEditAmount,
+  selectShape = "brush",
+  onSelectShape,
 }: {
   targetName: string;
   tool: SculptTool | null;
@@ -112,6 +114,9 @@ export function MeshSculptPanel({
   onClose: () => void;
   /** Build 71: opened from Dental Studio - stands beside its panel instead of over it. */
   besideDental?: boolean;
+  /** Build 82: the Select tool paints (brush) or draws a loop (lasso). */
+  selectShape?: "brush" | "lasso";
+  onSelectShape?: (shape: "brush" | "lasso") => void;
   /** Build 81: Extrude and Offset's distance, mm. */
   editAmount?: number;
   onEditAmount?: (value: number) => void;
@@ -143,10 +148,23 @@ export function MeshSculptPanel({
           </button>
         ))}
       </div>
-      <EdgeModifierSlider label={t("sculpt.size")} value={size} min={4} max={150} step={1} workspace={workspace} disabled={busy} onChange={onSize} />
+      {tool === "select" || tool === "unselect" ? (
+        <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.selectShape")}>
+          <div className="shell-opening-options">
+            {(["brush", "lasso"] as const).map((value) => (
+              <button key={value} type="button" role="radio" aria-checked={selectShape === value} className={selectShape === value ? "active" : ""} disabled={busy} onClick={() => onSelectShape?.(value)}>
+                {t(`sculpt.selectShape.${value}`)}
+              </button>
+            ))}
+          </div>
+          {selectShape === "lasso" ? <p className="blend-hint">{t("sculpt.lassoHelp")}</p> : null}
+        </div>
+      ) : null}
+      {(tool === "select" || tool === "unselect") && selectShape === "lasso" ? null : <EdgeModifierSlider label={t("sculpt.size")} value={size} min={4} max={150} step={1} workspace={workspace} disabled={busy} onChange={onSize} />}
       {tool !== "select" && tool !== "unselect" ? (
         <EdgeModifierSlider label={t("sculpt.strength")} value={Math.round(strength * 100)} min={5} max={100} step={5} unit="%" workspace={workspace} disabled={busy} onChange={(value) => onStrength(value / 100)} />
       ) : null}
+      {tool && tool !== "select" && tool !== "unselect" ? <p className="blend-hint sculpt-keys">{t("sculpt.keysHint")}</p> : null}
       {tool !== "select" && tool !== "unselect" ? (<>
         <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.refine")}>
           <span className="sculpt-reach-label">{t("sculpt.refine")}</span>

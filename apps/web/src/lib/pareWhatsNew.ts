@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 82,
+    items: [
+      "Select in Sculpt (and Trim in Dental Studio) has a Lasso, as in Meshmixer: drag a loop freehand, or click its corners and click the first to close it. A new loop replaces the selection, Shift adds, Ctrl takes away; Surface I see, Back side and Through apply as for the brush.",
+      "Meshmixer's brush keys: [ and ] for the brush size, Ctrl + wheel for the strength, Ctrl while stroking for the opposite effect, Shift to smooth.",
+    ],
+  },
+  {
     build: 81,
     items: [
       "Sculpt has Meshmixer's edit tools for a selection: Extrude and Offset (a patch moved out or in, joined back by a wall), Bridge (two holes joined into a tube, or two open edges bridged) and Face down on the plate (the part turned so the selected surface sits on the plate).",
