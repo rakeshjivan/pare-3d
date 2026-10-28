@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 84,
+    items: [
+      "Dental Studio's articulator is back to drop-in cups: each ball condyle slips into a cup a tenth of a millimetre bigger than it, with nothing to snap or force (made for resin, where the snap-in seat could crack), and the upper rests on the balls at the scanned bite with no play to speak of.",
+      "The incisal pin is slim again - a 5 mm column on a 5 mm arm - and the cups' blocks are smaller, so the models print quicker and the pin stays clear of the front teeth.",
+    ],
+  },
+  {
     build: 83,
     items: [
       "Remesh no longer runs away on a rough surface: a full-arch scan with detail finer than its triangles could grow to over a million triangles and take minutes; it now takes seconds.",

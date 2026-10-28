@@ -1,7 +1,7 @@
 import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
 import { beforeAll, describe, expect, it } from "vitest";
 import { analyseDental, makeDentalStudio, pinchedEdges, type DentalStudioOptions } from "@/lib/dentalModel";
-import { articulatorParts, articulatorPinPatch, CONDYLE_RADIUS, incisalPins, PIN, PIN_BAND, PIN_CLEAR, PIN_SET, pinTipAt } from "@/lib/dentalArticulator";
+import { articulatorParts, articulatorPinPatch, CONDYLE_RADIUS, CUP_HALF_X, DROP_IN_CHANNEL, incisalPins, PIN, PIN_BAND, PIN_CLEAR, PIN_HALF, PIN_SET, pinTipAt } from "@/lib/dentalArticulator";
 import type { ArticulatorSides } from "@/lib/dentalArticulator";
 import { hingeOpening } from "@/lib/dentalBase";
 import { weld, toManifold } from "@/lib/dentalMesh";
@@ -61,18 +61,18 @@ const base: DentalStudioOptions = { keep: null, base: 4, baseStyle: "clean", ins
 const heels = [{ x: -22, y: 20 }, { x: 22, y: 20 }];
 const front = { x: 0, upperY: -30, lowerY: -28 };
 
-describe("Build 78: the kinematic articulator", () => {
-  it("seats the upper on exactly six points (build 79, Kelvin's layout): the pin in its cup, a ball in a groove aimed at it, a ball on a flat", () => {
+describe("The printed articulator (build 78; build 84 drop-in cups and slim pin)", () => {
+  it("rests the upper on the top of each ball and the pin's tip in its cup (build 84: drop-in cups)", () => {
     const a = articulatorParts(runtime as never, 20, -25, 25, 18, -18, front, 0, { upper: heels, lower: heels });
     expect(runtime.Manifold.intersection(a.upper, a.lower).volume()).toBe(0);
-    // Grown by 10 microns, each ball meets its seat: two points in the groove, one on the flat.
-    const contactsOf = (c: number) => runtime.Manifold.intersection(a.upper, runtime.Manifold.sphere(CONDYLE_RADIUS + 0.01, 96).translate([c, a.axleY, 0])).decompose().length;
-    expect(contactsOf(a.centres[0])).toBe(2);
-    expect(contactsOf(a.centres[1])).toBe(1);
+    // Grown by 20 microns, each ball meets its cup at the top only - the bite is exactly as scanned.
+    for (const c of a.centres) {
+      const hit = runtime.Manifold.intersection(a.upper, runtime.Manifold.sphere(CONDYLE_RADIUS + 0.02, 96).translate([c, a.axleY, 0]));
+      expect(hit.decompose().length).toBe(1);
+      expect(hit.boundingBox().min[2]).toBeGreaterThan(CONDYLE_RADIUS - 1.5);
+    }
     // The pin's tip, grown the same, meets the cup all round (one ring) and nothing else.
     const [tipY, tipZ] = pinTipAt(0, a.axleY, a.pinY);
-    expect(tipY).toBeCloseTo(a.pinY, 6);
-    expect(tipZ).toBeCloseTo(0, 6);
     const tip = runtime.Manifold.intersection(a.upper, runtime.Manifold.sphere(PIN.tip + 0.01, 64).translate([front.x, tipY, tipZ]));
     expect(tip.decompose().length).toBe(1);
     expect(tip.boundingBox().min[2]).toBeGreaterThan(0.5);
@@ -80,15 +80,37 @@ describe("Build 78: the kinematic articulator", () => {
     expect(a.centres[1] - a.centres[0]).toBeGreaterThan(25);
   });
 
-  it("keeps the upper on: lifted, it meets the keepers; closed, they never touch (build 78)", () => {
+  it("drops each ball in without forcing it, with no more than a tenth of a millimetre of play (build 84)", () => {
     const a = articulatorParts(runtime as never, 20, -25, 25, 18, -18, front, 0, { upper: heels, lower: heels });
-    // Closed, a ball grown by a quarter of a millimetre still touches only the seat faces above it.
-    const balls = (grow: number) => runtime.Manifold.union(a.centres.map((c) => runtime.Manifold.sphere(CONDYLE_RADIUS + grow, 96).translate([c, a.axleY, 0])));
-    const hit = runtime.Manifold.intersection(a.upper, balls(0.25));
-    expect(hit.boundingBox().min[2]).toBeGreaterThan(0);
-    // Lifted straight up by 0.6 mm, the keepers catch the balls.
+    const tilt = (DROP_IN_CHANNEL * Math.PI) / 180;
+    for (const c of a.centres) {
+      // The ball (a hair under size, for the facets) slides in along the channel, from outside the block to the seat, touching nothing.
+      for (let t = 16; t >= 0; t -= 0.5) {
+        const ball = runtime.Manifold.sphere(CONDYLE_RADIUS - 0.01, 96).translate([c, a.axleY + Math.sin(tilt) * t, -Math.cos(tilt) * t]);
+        expect(runtime.Manifold.intersection(a.upper, ball).volume()).toBeLessThan(1e-6);
+      }
+      // Seated, it has play only up to the fit: 0.05 mm sideways is free, 0.15 mm meets the cup.
+      const at = (dx: number, dy: number, dz: number) => runtime.Manifold.intersection(a.upper, runtime.Manifold.sphere(CONDYLE_RADIUS, 96).translate([c + dx, a.axleY + dy, dz])).volume();
+      expect(at(0.05, 0, -0.06)).toBeLessThan(1e-6);
+      expect(at(0.18, 0, -0.1)).toBeGreaterThan(0);
+      expect(at(-0.18, 0, -0.1)).toBeGreaterThan(0);
+      expect(at(0, -0.18, -0.1)).toBeGreaterThan(0);
+    }
+    // Lifted straight up, the cups' lips under the balls hold it on.
     expect(runtime.Manifold.intersection(a.upper.translate([0, 0, 0.6]), a.lower).volume()).toBeGreaterThan(0);
-    expect(runtime.Manifold.intersection(a.upper.translate([0, 0, 0.2]), a.lower).volume()).toBeLessThan(1e-9);
+    expect(runtime.Manifold.intersection(a.upper.translate([0, 0, 0.1]), a.lower).volume()).toBeLessThan(1e-6);
+  });
+
+  it("is slim: small cup blocks and a pin no thicker than 6 mm (build 84)", () => {
+    const a = articulatorParts(runtime as never, 20, -25, 25, 18, -18, front, 0, { upper: heels, lower: heels });
+    // The cup blocks: about 15 x 16 mm (build 82's seats were 19 to 25 mm wide with keepers).
+    expect(2 * CUP_HALF_X).toBeLessThan(16);
+    // Through the pin at half its height: the lower's column 5 mm across, the upper's 6 mm.
+    const slab = (z: number) => runtime.Manifold.cube([30, 14, 0.2]).translate([front.x - 15, a.pinY - 7, z]);
+    const lowerCut = runtime.Manifold.intersection(a.lower, slab(-4)).boundingBox();
+    expect(lowerCut.max[0] - lowerCut.min[0]).toBeLessThan(5.2);
+    const upperCut = runtime.Manifold.intersection(a.upper, slab(4)).boundingBox();
+    expect(upperCut.max[0] - upperCut.min[0]).toBeLessThan(6.2);
   });
 
   it("opens 90 degrees about the condyles", () => {
@@ -100,11 +122,17 @@ describe("Build 78: the kinematic articulator", () => {
     // Teeth 5 mm in front of the bases across the pin's band.
     const flared = { ...front, teethY: front.upperY - 5 };
     const a = articulatorParts(runtime as never, 20, -25, 25, 18, -18, flared, 0, { upper: heels, lower: heels });
-    // The cup's block (5 mm each side of the pin) and the boss behind the pin stand PIN_CLEAR in front of the teeth.
-    expect(PIN_BAND).toBeGreaterThan(5);
-    expect(a.pinY + PIN.foot + 1).toBeLessThanOrEqual(flared.teethY - PIN_CLEAR + 1e-9);
-    const cupBack = a.pinY + 5;
-    expect(cupBack).toBeLessThanOrEqual(flared.teethY - PIN_CLEAR + 1e-9);
+    // The pin's columns (no more than PIN_HALF either side of its line) stand PIN_CLEAR in front of the teeth.
+    expect(PIN_BAND).toBeGreaterThan(PIN_HALF);
+    expect(a.pinY + PIN_HALF).toBeLessThanOrEqual(flared.teethY - PIN_CLEAR + 1e-9);
+    const behind = runtime.Manifold.cube([30, 20, 80]).translate([-15, flared.teethY - PIN_CLEAR, -40]);
+    const near = runtime.Manifold.cube([2 * PIN_BAND, 30, 80]).translate([-PIN_BAND, flared.teethY - PIN_CLEAR - 30, -40]);
+    // Nothing of the pin or its arms reaches into the 2 mm before the teeth (the arms run below and above the bases).
+    for (const part of [a.upper, a.lower]) {
+      const piece = runtime.Manifold.intersection(runtime.Manifold.intersection(part, near), runtime.Manifold.cube([30, 30, 2 * 10]).translate([-15, flared.teethY - 30, -10]));
+      if (!piece.isEmpty()) expect(piece.boundingBox().max[1]).toBeLessThanOrEqual(flared.teethY - PIN_CLEAR + 1e-6);
+    }
+    behind.delete();
   });
 
   it("with posts either side (build 79): a hinge on the condyles, and each post's tip on its pad at every opening", () => {
@@ -112,9 +140,9 @@ describe("Build 78: the kinematic articulator", () => {
     for (const raise of [0, 3, 6]) {
       const a = articulatorParts(runtime as never, 20, -25, 25, 18, -18, { ...front, sides }, raise, { upper: heels, lower: heels });
       if (raise === 0) {
-        // Closed: the condyles hold it as a hinge - three points on one ball, two on the other.
-        const contactsOf = (c: number) => runtime.Manifold.intersection(a.upper, runtime.Manifold.sphere(CONDYLE_RADIUS + 0.01, 96).translate([c, a.axleY, 0])).decompose().length;
-        expect([contactsOf(a.centres[0]), contactsOf(a.centres[1])]).toEqual([3, 2]);
+        // Closed: the drop-in cups rest on the tops of the balls (build 84), a hinge about their axis.
+        const contactsOf = (c: number) => runtime.Manifold.intersection(a.upper, runtime.Manifold.sphere(CONDYLE_RADIUS + 0.02, 96).translate([c, a.axleY, 0])).decompose().length;
+        expect([contactsOf(a.centres[0]), contactsOf(a.centres[1])]).toEqual([1, 1]);
         // Nothing in front of the incisors.
         expect(runtime.Manifold.intersection(a.upper, runtime.Manifold.cube([30, 20, 60]).translate([-15, front.upperY - 20, -30])).isEmpty()).toBe(true);
         expect(runtime.Manifold.intersection(a.lower, runtime.Manifold.cube([30, 20, 60]).translate([-15, front.lowerY - 20, -30])).isEmpty()).toBe(true);
@@ -196,9 +224,9 @@ describe("Build 78: the kinematic articulator", () => {
     const a = articulatorParts(runtime as never, 20, -25, 25, 18, -18, null, 0, { upper: heels, lower: heels });
     expect(a.rest).toBe(0);
     expect(runtime.Manifold.intersection(a.upper, a.lower).volume()).toBe(0);
-    // Three points on one ball, two on the other: it turns about the axis and cannot slide or rock.
-    const contactsOf = (c: number) => runtime.Manifold.intersection(a.upper, runtime.Manifold.sphere(CONDYLE_RADIUS + 0.01, 96).translate([c, a.axleY, 0])).decompose().length;
-    expect([contactsOf(a.centres[0]), contactsOf(a.centres[1])]).toEqual([3, 2]);
+    // The cups rest on the balls' tops and hold them within the fit: it turns about the axis (build 84).
+    const contactsOf = (c: number) => runtime.Manifold.intersection(a.upper, runtime.Manifold.sphere(CONDYLE_RADIUS + 0.02, 96).translate([c, a.axleY, 0])).decompose().length;
+    expect([contactsOf(a.centres[0]), contactsOf(a.centres[1])]).toEqual([1, 1]);
     // Nothing of either part forward of the heels' bars (no pin, cup or arms).
     const ahead = runtime.Manifold.cube([200, 40, 200]).translate([-100, -60, -100]);
     expect(runtime.Manifold.intersection(a.upper, ahead).isEmpty()).toBe(true);

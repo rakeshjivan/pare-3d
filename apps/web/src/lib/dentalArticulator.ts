@@ -1,34 +1,22 @@
 /**
- * Build 78 (build 79: Kelvin's layout): the one printed articulator, made so it cannot change the
- * scanned bite.
+ * The printed articulator, made so it keeps the scanned bite (build 78; build 84: drop-in cups and a
+ * slim pin, after Rakesh's prints of builds 77 and 82).
  *
- * A kinematic coupling - Kelvin's clamp, as in precision instruments: the upper is located by
- * exactly six contacts and nothing else.
- * - At the front, the incisal pin's rounded tip in a cone-shaped cup under the upper (three
- *   constraints): it centres itself as the models close, like the pin and cup of a lab articulator.
- * - Behind, two ball condyles on the lower, set as wide apart as the models allow. Over the first a
- *   V-groove in the upper, aimed at the cup (two constraints): the ball can slide along it, so the
- *   distance from condyle to pin never has to match exactly, whatever the printer shrinks.
- * - Over the second, a flat (one constraint): it stops the upper rolling, and lets that ball sit
- *   wherever the print puts it.
- * Nothing else touches: no snap, clip or axle fit to fight the seats, so the models close to the
- * same place every time. The upper's own weight seats it (the groove faces and the cup slope at 45
- * degrees, so the ball and tip slide home whatever the friction of the resin, short of a coefficient
- * of 1), and a keeper - a lip round each ball below its equator, 0.3 mm clear of it - stops it lifting
- * off when the models are picked up or turned over. The keeper never touches while the models are
- * closed. The ball goes in by a channel running straight back: the models are parted by sliding the
- * upper forward off the balls, never pulled.
- *
- * Opening: the two balls lie on one line, so the upper turns about it like a hinge, up to 90 degrees;
- * every part of the seats stands clear of the balls' necks as it turns.
- *
- * The incisal pin (build 79) is either fused to the lower at the opening chosen (0 = the scanned
- * bite), or a set of removable pins, each engraved with how far it raises the bite at the pin. A
- * removable pin sits on its boss by Maxwell's three-groove seat: three domes on the boss, three
- * V-grooves under the pin's disc - located in all six directions with no clearance anywhere, so every
- * pin of the set stands exactly where the fused pin would. A rim round the disc, clear of it, only
- * keeps a pin from being knocked off. A raised pin turns the upper open about the condyles' axis, as
- * on an articulator: the front teeth part by less than the pin, the back teeth by less again.
+ * - Two ball condyles on the lower, as wide apart as the models allow, each dropping into a small cup
+ *   under the upper by a channel slanting down and back (build 77's joint). The cup is the ball's
+ *   shape a tenth of a millimetre bigger, set so the upper rests on the top of each ball exactly at
+ *   the scanned bite: a passive slip fit for resin - nothing snaps, flexes or is forced - with no more
+ *   play than that tenth. Build 78-83's trihedral seat, groove and snap keeper were stiff to assemble
+ *   (resin would crack), bulky to print, and the groove side felt loose.
+ * - In front, the slim incisal pin (build 61-77's profile): a 5 mm column on a 5 mm arm under the lower,
+ *   its rounded tip in a small 45-degree cup in the end of a 6 mm column on an arm over the upper - it
+ *   centres the front as the models close. Or a slim post each side in the premolar region (build 79),
+ *   or no pin at all (build 82): then the cups alone make the hinge and the teeth stop it.
+ * - The pin is fused to the lower at the opening chosen (0 = the scanned bite); a raised pin turns the
+ *   upper open about the condyles' axis, as on an articulator, the front teeth parting by less than the
+ *   pin and the back teeth by less again. Every part of it stands at least PIN_CLEAR in front of the teeth.
+ * - Opening: the upper turns about the balls' axis up to 90 degrees, the necks swinging back through
+ *   room left in the cups' blocks.
  */
 import type { ManifoldRuntime, ManifoldSolid } from "@/lib/dentalMesh";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
@@ -37,31 +25,35 @@ const deg = Math.PI / 180;
 
 /** The ball condyles' radius, mm (10 mm across). */
 export const CONDYLE_RADIUS = 5;
-/** Where each seat face touches its ball: this many degrees above the ball's equator. */
-export const SEAT_LATITUDE = 45;
-/** The seat blocks' undersides stand this far above the balls' centres, mm - clear of the necks as it opens. */
-export const SEAT_FLOOR = 3;
-/** Half the size of a seat block, mm. */
-export const SEAT_HALF = 9.5;
-/** The flat's block is this much longer each way along the axis, mm: the room the second ball may stand in. */
-export const GROOVE_SLIDE = 3;
-/** The room the balls may stand in the other ways (along the groove; front to back on the flat), mm. */
-const GROOVE_PLAY = 1;
-/** Half the size of the cup's block, mm. */
-const CUP_HALF = 5;
-const NECK = 2.5;
-/** The pedestal's top stands this far below the balls' centres, mm - clear of the keepers as it opens. */
-const PEDESTAL = SEAT_HALF + 1.5;
 /**
- * Build 78: the keeper - a lip round the ball below its equator, reaching KEEPER_LOW below its
- * centre, KEEPER_FIT clear of it all round, so it never touches while the models are closed and only
- * stops the upper lifting off. The ball goes in (and comes out) by a channel running straight back
- * (KEEPER_CHANNEL degrees from straight down) - the same channel the neck swings into as the models
- * open, so the keeper never meets it.
+ * Build 84: the drop-in cup (build 77's joint, which held best in the hand). The seat is the ball's
+ * own shape, CUP_FIT larger all round and set CUP_FIT lower, so with the upper resting on its own
+ * weight each ball touches the top of its cup exactly at the scanned bite, and the only play is
+ * CUP_FIT to the sides and twice it below - a passive slip fit for resin: nothing snaps or is forced.
  */
-export const KEEPER_LOW = 4;
-export const KEEPER_FIT = 0.3;
-export const KEEPER_CHANNEL = 90;
+export const CUP_FIT = 0.1;
+/** 10 microns over the top of each ball, so the facets of a cup and a ball never cross as the upper turns: far below any scan's or print's accuracy. */
+const FACET_ALLOWANCE = 0.01;
+/** The cup's block: its wall beside the ball, how far it reaches in front of and behind the ball's centre, and below its equator, mm. */
+export const CUP_WALL = 2.2;
+export const CUP_HALF_Y = CONDYLE_RADIUS + 3;
+export const CUP_UNDER = 3;
+/** Half the block's width across the axis, mm. */
+export const CUP_HALF_X = CONDYLE_RADIUS + CUP_FIT + CUP_WALL;
+/** The channel the ball drops in by: degrees back from straight down (build 63's). */
+export const DROP_IN_CHANNEL = 35;
+const NECK = 2.5;
+/** The pedestal's top stands this far below the balls' centres, mm - clear of the cup's block as it swings down past it when the models open. */
+const PEDESTAL = Math.hypot(CUP_HALF_Y, CUP_UNDER) + 1;
+/**
+ * Build 84: the slim incisal pin (build 61-77's profile, which Rakesh preferred): a 5 mm column from
+ * a 5 mm arm under the lower, ending in the rounded tip, into a small 45-degree cup in the end of a
+ * 6 mm column on a 5 mm arm over the upper - the two columns meeting about the occlusal plane.
+ */
+export const PIN_COLUMN = 2.5;
+export const CUP_COLUMN = 3;
+/** The pin and its cup are no wider than this either side of the pin's line, mm (for the teeth's clearance). */
+export const PIN_HALF = CUP_COLUMN;
 
 /**
  * Build 79: the incisal pin - its rounded tip (radius), the cup it sits in (a 45-degree cone), the
@@ -111,53 +103,7 @@ const box = (runtime: ManifoldRuntime, x0: number, x1: number, y0: number, y1: n
 
 /** Where the condyles' axis runs (y; z = 0, the occlusal plane), for models whose backs reach `back`. */
 export function condyleAxisY(back: number) {
-  return back + SEAT_HALF + 0.5;
-}
-
-/** The seat faces' outward directions from a ball's centre, at SEAT_LATITUDE. */
-function seatDirections(azimuths: number[]) {
-  const c = Math.cos(SEAT_LATITUDE * deg), s = Math.sin(SEAT_LATITUDE * deg);
-  return azimuths.map((a) => [c * Math.cos(a * deg), c * Math.sin(a * deg), s] as [number, number, number]);
-}
-
-/** Solves the 3 x 3 system rows . p = rhs. */
-function solve3(rows: number[][], rhs: number[]): [number, number, number] {
-  const [a, b, c] = rows;
-  const det = (m: number[][]) => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
-  const d = det([a, b, c]);
-  const col = (k: number) => [a, b, c].map((row, i) => row.map((v, j) => (j === k ? rhs[i] : v)));
-  return [det(col(0)) / d, det(col(1)) / d, det(col(2)) / d];
-}
-
-/**
- * The cavity a seat is cut by: everything on the ball's side of each face (face d . (p - centre) = R),
- * from below the block up to where the faces meet. Built as the hull of its corners. Three faces: a
- * trihedral seat; two: a V-groove running along `axis` (horizontal, unit), `reach` each way.
- */
-function seatCavity(runtime: ManifoldRuntime, centre: [number, number, number], faces: Array<[number, number, number]>, low: number, groove?: { axis: [number, number]; reach: number }) {
-  const R = CONDYLE_RADIUS;
-  const offset = (d: [number, number, number]) => R + d[0] * centre[0] + d[1] * centre[1] + d[2] * centre[2];
-  const points: Array<[number, number, number]> = [];
-  if (!groove) {
-    points.push(solve3(faces, faces.map(offset)));
-    for (let i = 0; i < 3; i += 1) {
-      const a = faces[i], b = faces[(i + 1) % 3];
-      points.push(solve3([a, b, [0, 0, 1]], [offset(a), offset(b), low]));
-    }
-  } else {
-    // The ridge where the two faces meet and their feet at z = low, at both ends.
-    const plane: [number, number, number] = [groove.axis[0], groove.axis[1], 0];
-    const along = plane[0] * centre[0] + plane[1] * centre[1];
-    for (const at of [along - groove.reach, along + groove.reach]) {
-      points.push(solve3([faces[0], faces[1], plane], [offset(faces[0]), offset(faces[1]), at]));
-      points.push(solve3([faces[0], [0, 0, 1], plane], [offset(faces[0]), low, at]));
-      points.push(solve3([faces[1], [0, 0, 1], plane], [offset(faces[1]), low, at]));
-    }
-  }
-  const corners = points.map((p) => runtime.Manifold.cube([0.001, 0.001, 0.001], true).translate(p));
-  const hull = runtime.Manifold.hull(corners);
-  corners.forEach((corner) => corner.delete());
-  return hull;
+  return back + CUP_HALF_Y + 0.5;
 }
 
 /** The pin raise's rest: how far the upper turns open about the axis, radians, for a raise at the pin. */
@@ -181,6 +127,19 @@ function pinStem(runtime: ManifoldRuntime, x: number, y: number, z0: number, tip
   return [
     keep(runtime.Manifold.cylinder(rise, foot, PIN.tip, 48).translate([x, y, z0])),
     keep(runtime.Manifold.cylinder(Math.max(0.01, tip - z0), PIN.tip, PIN.tip, 48).translate([x, y, z0])),
+    keep(runtime.Manifold.sphere(PIN.tip, 48).translate([x, y, tip])),
+  ];
+}
+
+/**
+ * Build 84: the slim fused pin - a PIN_COLUMN column from `z0` up, tapering over its last millimetre
+ * to the rounded tip (radius PIN.tip) whose centre is at `tip`.
+ */
+function slimPin(runtime: ManifoldRuntime, x: number, y: number, z0: number, tip: number, keep: (solid: ManifoldSolid) => ManifoldSolid) {
+  const taper = Math.max(z0 + 0.01, tip - 1);
+  return [
+    keep(runtime.Manifold.cylinder(Math.max(0.01, taper - z0), PIN_COLUMN, PIN_COLUMN, 48).translate([x, y, z0])),
+    keep(runtime.Manifold.cylinder(Math.max(0.01, tip - taper), PIN_COLUMN, PIN.tip, 48).translate([x, y, taper])),
     keep(runtime.Manifold.sphere(PIN.tip, 48).translate([x, y, tip])),
   ];
 }
@@ -262,21 +221,21 @@ export function articulatorParts(
   const ay = condyleAxisY(back);
   const known = Number.isFinite(xMin) && Number.isFinite(xMax);
   const cx = known ? (xMin + xMax) / 2 : 0;
-  const half = Math.max(SEAT_HALF + GROOVE_SLIDE, known ? (xMax - xMin) / 2 : 14);
-  // As wide as the models allow: the seats' outer edges at the heels' outer edges.
-  const centres = half >= 2 * (SEAT_HALF + GROOVE_SLIDE) + 2
-    ? [cx - half + SEAT_HALF, cx + half - SEAT_HALF - GROOVE_SLIDE]
-    : [cx - SEAT_HALF - GROOVE_SLIDE - 1, cx + SEAT_HALF + GROOVE_SLIDE + 1];
+  const half = Math.max(CUP_HALF_X, known ? (xMax - xMin) / 2 : 14);
+  // As wide as the models allow: the cups' outer edges at the heels' outer edges.
+  const centres = half >= 2 * CUP_HALF_X + 2
+    ? [cx - half + CUP_HALF_X, cx + half - CUP_HALF_X]
+    : [cx - CUP_HALF_X - 1, cx + CUP_HALF_X + 1];
   const made: ManifoldSolid[] = [];
   const keep = <T extends ManifoldSolid>(solid: T) => { made.push(solid); return solid; };
-  const yBack = ay + SEAT_HALF;
+  const yBack = ay + CUP_HALF_Y;
   const lowerParts: ManifoldSolid[] = [];
   const upperParts: ManifoldSolid[] = [];
   const cuts: ManifoldSolid[] = [];
   const lowerCuts: ManifoldSolid[] = [];
   // A bar along the back of each base, reaching across every heel, with a strut to each heel.
   const span = (heels: ArticulatorHeel[] | undefined): [number, number] => {
-    const xs = [centres[0] - SEAT_HALF, centres[1] + SEAT_HALF + GROOVE_SLIDE, ...(heels ?? []).flatMap((heel) => [heel.x - 4, heel.x + 4])];
+    const xs = [centres[0] - CUP_HALF_X, centres[1] + CUP_HALF_X, ...(heels ?? []).flatMap((heel) => [heel.x - 4, heel.x + 4])];
     return [Math.min(...xs), Math.max(...xs)];
   };
   const backOf = (heels: ArticulatorHeel[] | undefined) => (heels?.length ? Math.max(...heels.map((heel) => heel.y)) : back);
@@ -288,59 +247,29 @@ export function articulatorParts(
   // The cup's place: in front of the further-forward model, on the midline of the models.
   const pinX = front ? front.x : cx;
   // Build 79: never on the teeth - clear of the furthest-forward tooth across the pin's band, as well as the bases.
-  const pinY = front ? Math.min(Math.min(front.upperY, front.lowerY) - PIN_AHEAD, (front.teethY ?? Infinity) - Math.max(CUP_HALF, PIN.foot + 1) - PIN_CLEAR) : NaN;
-  centres.forEach((c, index) => {
+  const pinY = front ? Math.min(Math.min(front.upperY, front.lowerY) - PIN_AHEAD, (front.teethY ?? Infinity) - PIN_HALF - PIN_CLEAR) : NaN;
+  centres.forEach((c) => {
     // The lower: a pedestal from its bar, a neck and the ball, centred on the axis (y = ay, z = 0).
-    // The pedestal stops at the neck behind, where the seat block swings down past it at 90 degrees.
+    // The pedestal stops below where the cup's block swings down past it as the models open.
     lowerParts.push(
       keep(box(runtime, c - 4, c + 4, ay - 4, ay + NECK, floorLower, Math.max(floorLower + 1, -PEDESTAL))),
       keep(runtime.Manifold.cylinder(PEDESTAL + 0.5, NECK, NECK, 32).translate([c, ay, -PEDESTAL - 0.25])),
       keep(runtime.Manifold.sphere(R, 96).translate([c, ay, 0])),
     );
-    // The upper: the seat block, from SEAT_FLOOR above the ball's centre up into the upper's bar.
-    // With the pin in the middle (Kelvin): the first ball in a V-groove aimed at the cup, the second on
-    // a flat. With posts either side (build 79): a hinge - the first ball in a three-face seat, the
-    // second in a groove along the axis; the posts only stop it closing, so nothing is held twice.
-    // Build 82: with no pin at all, the hinge too - the condyles alone make a true hinge axis and the
-    // teeth stop it closing (a Kelvin groove and flat would leave the upper free to slide without the cup).
-    const sideMode = Boolean(front?.sides) || !front;
-    const flat = !sideMode && index === 1;
-    const along = sideMode && index === 1;
-    const x0 = c - SEAT_HALF - (flat || along ? GROOVE_SLIDE : 0), x1 = c + SEAT_HALF + (flat || along ? GROOVE_SLIDE : 0);
-    upperParts.push(keep(box(runtime, x0, x1, ay - SEAT_HALF, ay + SEAT_HALF, -KEEPER_LOW, floorUpper)));
-    const centre: [number, number, number] = [c, ay, 0];
-    // Where the ball may stand: along the groove, or anywhere about the flat.
-    let room: Array<[number, number]>;
-    if (sideMode && !along) {
-      cuts.push(keep(seatCavity(runtime, centre, seatDirections([90, 210, 330]), SEAT_FLOOR - 0.5)));
-      room = [[0, 0]];
-    } else if (along) {
-      cuts.push(keep(seatCavity(runtime, centre, seatDirections([90, 270]), SEAT_FLOOR - 0.5, { axis: [1, 0], reach: SEAT_HALF + GROOVE_SLIDE + 1 })));
-      room = [[-GROOVE_SLIDE, 0], [GROOVE_SLIDE, 0]];
-    } else if (!flat) {
-      const toward = front ? [pinX - c, pinY - ay] : [0, -1];
-      const n = Math.hypot(toward[0], toward[1]);
-      const axis: [number, number] = [toward[0] / n, toward[1] / n];
-      const azimuth = Math.atan2(axis[1], axis[0]) / deg;
-      cuts.push(keep(seatCavity(runtime, centre, seatDirections([azimuth + 90, azimuth + 270]), SEAT_FLOOR - 0.5, { axis, reach: SEAT_HALF * 2 })));
-      room = [[-axis[0] * GROOVE_PLAY, -axis[1] * GROOVE_PLAY], [axis[0] * GROOVE_PLAY, axis[1] * GROOVE_PLAY]];
-    } else {
-      // The flat: the ball's room, up to its top (z = R), clear all round of where it may stand.
-      const spots: ManifoldSolid[] = [];
-      for (const dx of [-GROOVE_SLIDE, GROOVE_SLIDE]) for (const dy of [-GROOVE_PLAY, GROOVE_PLAY]) spots.push(keep(runtime.Manifold.cylinder(R - SEAT_FLOOR + 1, R + 0.5, R + 0.5, 64).translate([c + dx, ay + dy, SEAT_FLOOR - 1])));
-      cuts.push(keep(runtime.Manifold.hull(spots)));
-      room = [[-GROOVE_SLIDE, -GROOVE_PLAY], [GROOVE_SLIDE, -GROOVE_PLAY], [-GROOVE_SLIDE, GROOVE_PLAY], [GROOVE_SLIDE, GROOVE_PLAY]];
-    }
-    // The keeper: the ball's room below the seats (KEEPER_FIT clear of it wherever it may stand) and
-    // the channel it comes in by - only below SEAT_FLOOR, so the seat faces stay whole.
-    const tilt = KEEPER_CHANNEL * deg, run = R + KEEPER_LOW + 6;
-    const balls: ManifoldSolid[] = [];
-    for (const [dx, dy] of room) {
-      balls.push(keep(runtime.Manifold.sphere(R + KEEPER_FIT, 64).translate([c + dx, ay + dy, 0])));
-      balls.push(keep(runtime.Manifold.sphere(R + KEEPER_FIT, 64).translate([c + dx, ay + dy + Math.sin(tilt) * run, -Math.cos(tilt) * run])));
-    }
-    const keeperRoom = keep(runtime.Manifold.hull(balls));
-    cuts.push(keep(runtime.Manifold.intersection(keeperRoom, keep(box(runtime, x0 - 1, x1 + 1, ay - SEAT_HALF - 1, ay + SEAT_HALF + 1, -R - KEEPER_LOW - 10, SEAT_FLOOR)))));
+    // Build 84: the drop-in cup (as build 77's, which held best in the hand). A small block round the
+    // ball, reaching CUP_UNDER under its equator at the front and sides; the seat, the ball's own shape
+    // CUP_FIT larger and set CUP_FIT lower, so the upper rests on the top of each ball exactly at the
+    // scanned bite with the play all to the sides and below; and the channel the ball drops in by, as
+    // wide as the seat, slanting down and back out of the block - nothing snaps, flexes or slides.
+    // A polygon's flats lie inside the true sphere: the seat is grown by their depth, so its facets never cut the ball's.
+    const top = (R + CUP_FIT) / Math.cos(Math.PI / 96);
+    upperParts.push(keep(box(runtime, c - CUP_HALF_X, c + CUP_HALF_X, ay - CUP_HALF_Y, ay + CUP_HALF_Y, -CUP_UNDER, floorUpper)));
+    const seat = keep(runtime.Manifold.sphere(top, 96).translate([c, ay, R + FACET_ALLOWANCE - top]));
+    const tilt = DROP_IN_CHANNEL * deg, run = R + CUP_UNDER + 8;
+    const out = keep(runtime.Manifold.sphere(top, 96).translate([c, ay + Math.sin(tilt) * run, R + FACET_ALLOWANCE - top - Math.cos(tilt) * run]));
+    cuts.push(keep(runtime.Manifold.hull([seat, out])));
+    // Room behind the ball for the neck as the models open (in the upper's frame it swings back).
+    cuts.push(keep(box(runtime, c - NECK - 0.6, c + NECK + 0.6, ay, ay + CUP_HALF_Y + 1, -CUP_UNDER - 1, NECK + 1)));
   });
   let rest = 0;
   let bossTop = NaN;
@@ -358,13 +287,13 @@ export function articulatorParts(
       const inward = (to: number) => [Math.min(x, to), Math.max(x, to)] as const;
       const [lx0, lx1] = inward(bases.lower[side] + (side === 0 ? 3 : -3));
       const [ux0, ux1] = inward(bases.upper[side] + (side === 0 ? 3 : -3));
+      // Build 84: slim - a 5 mm post from a 5 mm arm, its tip under a 6 mm column whose flat end is the pad.
       lowerParts.push(
-        keep(runtime.Manifold.cylinder(bossTop - floorLower, PIN.foot + 1, PIN.foot + 1, 48).translate([x, tipY, floorLower])),
         keep(box(runtime, lx0, lx1, tipY - 2.5, tipY + 2.5, floorLower, floorLower + 3)),
-        ...pinStem(runtime, x, tipY, bossTop - 0.01, tipZ, keep),
+        ...slimPin(runtime, x, tipY, floorLower, tipZ, keep),
       );
       upperParts.push(
-        keep(box(runtime, x - POST_HALF, x + POST_HALF, y - POST_HALF, y + POST_HALF, 0, floorUpper)),
+        keep(runtime.Manifold.cylinder(floorUpper, CUP_COLUMN, CUP_COLUMN, 48).translate([x, y, 0])),
         keep(box(runtime, ux0, ux1, y - 2.5, y + 2.5, floorUpper - 3, floorUpper)),
       );
     });
@@ -374,13 +303,11 @@ export function articulatorParts(
     // The boss's top: BOSS_TOP below the occlusal plane, or less on a shallow base.
     bossTop = Math.max(-BOSS_TOP, floorLower + 3);
     const column = (radius: number, z0: number, z1: number, sides = 48) => runtime.Manifold.cylinder(z1 - z0, radius, radius, sides).translate([x, pinY, z0]);
-    const bossRadius = pinStyle === "set" ? PIN.disc + PIN.rimClear + PIN.rimWall : PIN.foot + 1;
-    // The lower: the boss, on an arm along the bottom of its base.
-    lowerParts.push(
-      keep(column(bossRadius, floorLower, bossTop)),
-      keep(box(runtime, x - 2.5, x + 2.5, pinY - 4.5, front.lowerY + 3, floorLower, floorLower + 3)),
-    );
+    const bossRadius = PIN.disc + PIN.rimClear + PIN.rimWall;
+    // The lower: an arm along the bottom of its base (and for the removable set, the boss).
+    lowerParts.push(keep(box(runtime, x - 2.5, x + 2.5, pinY - 4.5, front.lowerY + 3, floorLower, floorLower + 3)));
     if (pinStyle === "set") {
+      lowerParts.push(keep(column(bossRadius, floorLower, bossTop)));
       // Maxwell's seat: three domes on the boss, under the three grooves of each pin's disc; and a rim
       // round the disc, clear of it, so a pin cannot be knocked off.
       for (const azimuth of [90, 210, 330]) {
@@ -389,16 +316,18 @@ export function articulatorParts(
       }
       lowerParts.push(keep(runtime.Manifold.difference(column(bossRadius, bossTop - 0.01, bossTop + PIN.rimHigh), keep(column(PIN.disc + PIN.rimClear, bossTop, bossTop + PIN.rimHigh + 1)))));
     } else {
-      // The pin itself, fused to the boss, its tip where the cup stands at this opening.
+      // Build 84: the slim pin, from the arm up, its tip where the cup stands at this opening.
       const [tipY, tipZ] = pinTipAt(raise, ay, pinY);
-      lowerParts.push(...pinStem(runtime, x, tipY, bossTop - 0.01, tipZ, keep));
+      lowerParts.push(keep(box(runtime, x - 2.5, x + 2.5, Math.min(tipY, pinY) - 2.5, pinY, floorLower, floorLower + 3)));
+      lowerParts.push(...slimPin(runtime, x, tipY, floorLower, tipZ, keep));
     }
-    // The upper: the cup's block, on an arm along the top of its base, with the cup - a 45-degree cone
-    // whose faces touch the tip's sphere when its centre is at the occlusal plane - opening downwards.
+    // The upper: a slim column on an arm along the top of its base (build 84; it was a 10 mm block),
+    // with the cup in its end - a 45-degree cone whose faces touch the tip's sphere when its centre is
+    // at the occlusal plane - opening downwards. The column stops half a millimetre above the plane.
     const apex = PIN.tip * Math.SQRT2;
     upperParts.push(
-      keep(box(runtime, x - CUP_HALF, x + CUP_HALF, pinY - CUP_HALF, pinY + CUP_HALF, 0, floorUpper)),
-      keep(box(runtime, x - 2.5, x + 2.5, pinY - 4, front.upperY + 3, floorUpper - 3, floorUpper)),
+      keep(runtime.Manifold.cylinder(floorUpper - 0.5, CUP_COLUMN, CUP_COLUMN, 48).translate([x, pinY, 0.5])),
+      keep(box(runtime, x - 2.5, x + 2.5, pinY - 2.5, front.upperY + 3, floorUpper - 3, floorUpper)),
     );
     const mouth = apex + 1;
     // Its faces outside the true cone (a polygon's flats circumscribe it), so the tip's facets never cross them.

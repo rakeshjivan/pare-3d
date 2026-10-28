@@ -19,7 +19,7 @@ import { alignToBite, archFrame, biteResidual, contacts, vertexNormals, canineWi
 import { blockOutline, cleanOutline, closeToFloor, distanceFrom, distanceFromEdge, honeycombIn, HONEYCOMB_BASE_HEIGHT, prismOf, articulatorOutline, articulatorPockets, locatorNotches, tieBar, EDGE_FRINGE, bevelCutter, hingeOpening, withoutDebris, hollowCavity, orthoOutline, outlineSide, prism, smoothEdge, CROWN_REACH, TOOTH_CROWN, TOOTH_REACH, TIP_CEILING, TIP_FLOOR, TIP_LONELY, toothZone } from "@/lib/dentalBase";
 import { labelSection, labelText, labelWidth } from "@/lib/dentalLabel";
 import { insideOf, splitShells } from "@/lib/dentalWaxup";
-import { articulatorParts, incisalPins, PIN, PIN_BAND, PIN_CLEAR, PIN_MAX, PIN_SET, POST_BACK, POST_HALF, restAngle, type ArticulatorSides, type PinStyle } from "@/lib/dentalArticulator";
+import { articulatorParts, incisalPins, PIN, PIN_BAND, PIN_CLEAR, PIN_HALF, PIN_MAX, PIN_SET, POST_BACK, restAngle, type ArticulatorSides, type PinStyle } from "@/lib/dentalArticulator";
 import {
   applyMatrix, boundaryLoops, cloneMesh, transformSoup, convexHull, cutAlongField, cutBelow, dropFragments, smoothField, faceArea, loopLength, surfaceKept, pinchedEdges, PointGrid, solidPositions, toManifold, upwardness, weld,
   type ManifoldRuntime, type ManifoldSolid, type Mesh, type Ring,
@@ -1058,7 +1058,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     let sides: ArticulatorSides | undefined;
     if (options.pinPlace === "sides" && Number.isFinite(teethY)) {
       const y = teethY + POST_BACK;
-      const reach = Math.max(POST_HALF, PIN.foot + 1) + PIN_CLEAR;
+      const reach = PIN_HALF + PIN_CLEAR;
       let left = Infinity, right = -Infinity;
       everything.forEach((p) => {
         for (let i = 0; i < p.length; i += 3) if (Math.abs(p[i + 1] - y) <= reach + 2) { left = Math.min(left, p[i]); right = Math.max(right, p[i]); }
