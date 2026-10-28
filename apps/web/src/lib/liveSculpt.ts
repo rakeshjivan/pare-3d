@@ -27,13 +27,19 @@ export type LiveBrush = "draw" | "draw2" | "drag" | "inflate" | "deflate" | "smo
 type DabBrush = Exclude<LiveBrush, "move" | "mask">;
 export type Vec3 = [number, number, number];
 
-const K = 131072, OFF = 65536;
+/**
+ * Build 91: a cell's key wraps every 1024 cells on each axis, so it is always a small integer - the
+ * keys of build 73 (up to 2^51) were stored as boxed numbers, and keeping triangles in their cells was
+ * the largest single cost of a refining stroke. Cells far apart can share a key; everything read from
+ * the grid is checked against the real positions, so that only adds a candidate now and then.
+ */
+const K = 1024, WRAP = 1023;
 
 /** A uniform grid of items by cell (cell size `h`). */
 class Grid {
   cells = new Map<number, number[]>();
   constructor(public h: number) {}
-  key(ix: number, iy: number, iz: number) { return ((ix + OFF) * K + (iy + OFF)) * K + (iz + OFF); }
+  key(ix: number, iy: number, iz: number) { return ((ix & WRAP) * K + (iy & WRAP)) * K + (iz & WRAP); }
   cellOf(x: number, y: number, z: number) { return this.key(Math.floor(x / this.h), Math.floor(y / this.h), Math.floor(z / this.h)); }
   add(key: number, item: number) { const list = this.cells.get(key); if (list) list.push(item); else this.cells.set(key, [item]); }
   remove(key: number, item: number) {
@@ -115,7 +121,7 @@ export class LiveMesh {
     for (let v = 0; v < n; v += 1) this.vTris.push([]);
     for (let t = 0; t < m; t += 1) for (let k = 0; k < 3; k += 1) this.vTris[this.tri[t * 3 + k]].push(t);
     for (let v = 0; v < n; v += 1) { this.vCell[v] = this.cellOfVertex(v); this.vGrid.add(this.vCell[v], v); }
-    for (let t = 0; t < m; t += 1) { this.tCells.push([]); this.binTriangle(t); }
+    for (let t = 0; t < m; t += 1) { this.tCells.push([]); this.placeTriangle(t); }
     this.geometry = new THREE.BufferGeometry();
     this.allocateGpu();
     this.refreshAllNormals();
@@ -168,7 +174,32 @@ export class LiveMesh {
     return Math.sqrt(x * x + y * y + z * z);
   }
   private cellOfVertex(v: number) { return this.vGrid.cellOf(this.pos[v * 3], this.pos[v * 3 + 1], this.pos[v * 3 + 2]); }
+  /**
+   * Build 91: a triangle that moved or changed is put back in its grid cells once, when the grid is next
+   * read (pick, or the end of the frame) - a refining stroke touched each triangle many times over in a
+   * frame (seven million times in a test stroke) and binned it again every time.
+   */
   private binTriangle(t: number) {
+    if (this.bulk) return;
+    if (this.binDirtyMark.length < this.tri.length / 3) { const next = new Int32Array(this.tri.length / 3); next.set(this.binDirtyMark); this.binDirtyMark = next; }
+    if (this.binDirtyMark[t] === this.binGeneration) return;
+    this.binDirtyMark[t] = this.binGeneration;
+    if (this.binDirtyCount === this.binDirty.length) { const next = new Int32Array(this.binDirty.length * 2); next.set(this.binDirty); this.binDirty = next; }
+    this.binDirty[this.binDirtyCount++] = t;
+  }
+  private binDirty = new Int32Array(4096);
+  private binDirtyCount = 0;
+  private binDirtyMark = new Int32Array(0);
+  private binGeneration = 1;
+  /** The triangles waiting to go back in their cells, put there now. */
+  settleBins() {
+    const count = this.binDirtyCount;
+    if (!count) return;
+    this.binDirtyCount = 0;
+    this.binGeneration += 1;
+    for (let i = 0; i < count; i += 1) this.placeTriangle(this.binDirty[i]);
+  }
+  private placeTriangle(t: number) {
     if (this.bulk) return;
     const cells = this.tCells[t];
     const box = this.tBox, o = t * 6;
@@ -179,9 +210,18 @@ export class LiveMesh {
       return;
     }
     const h = this.tGrid.h, p = this.pos, a = this.tri[t * 3] * 3, b = this.tri[t * 3 + 1] * 3, c = this.tri[t * 3 + 2] * 3;
-    const x0 = Math.floor(Math.min(p[a], p[b], p[c]) / h), x1 = Math.floor(Math.max(p[a], p[b], p[c]) / h);
-    const y0 = Math.floor(Math.min(p[a + 1], p[b + 1], p[c + 1]) / h), y1 = Math.floor(Math.max(p[a + 1], p[b + 1], p[c + 1]) / h);
-    const z0 = Math.floor(Math.min(p[a + 2], p[b + 2], p[c + 2]) / h), z1 = Math.floor(Math.max(p[a + 2], p[b + 2], p[c + 2]) / h);
+    const lx = Math.min(p[a], p[b], p[c]), hx = Math.max(p[a], p[b], p[c]);
+    const ly = Math.min(p[a + 1], p[b + 1], p[c + 1]), hy = Math.max(p[a + 1], p[b + 1], p[c + 1]);
+    const lz = Math.min(p[a + 2], p[b + 2], p[c + 2]), hz = Math.max(p[a + 2], p[b + 2], p[c + 2]);
+    let x0: number, x1: number, y0: number, y1: number, z0: number, z1: number;
+    if (hx - lx < h * 0.5 && hy - ly < h * 0.5 && hz - lz < h * 0.5) {
+      // Build 91: a small triangle (under half a cell each way, as nearly all are) in the one cell of its
+      // middle - pick() looks a cell round every point of the ray, which still finds it. One cell instead
+      // of up to eight, and it changes cell far less often as a brush moves it.
+      x0 = x1 = Math.floor((lx + hx) / 2 / h); y0 = y1 = Math.floor((ly + hy) / 2 / h); z0 = z1 = Math.floor((lz + hz) / 2 / h);
+    } else {
+      x0 = Math.floor(lx / h); x1 = Math.floor(hx / h); y0 = Math.floor(ly / h); y1 = Math.floor(hy / h); z0 = Math.floor(lz / h); z1 = Math.floor(hz / h);
+    }
     if (box[o] === x0 && box[o + 1] === y0 && box[o + 2] === z0 && box[o + 3] === x1 && box[o + 4] === y1 && box[o + 5] === z1 && cells.length) return;
     box[o] = x0; box[o + 1] = y0; box[o + 2] = z0; box[o + 3] = x1; box[o + 4] = y1; box[o + 5] = z1;
     for (const key of cells) this.tGrid.remove(key, t);
@@ -216,6 +256,8 @@ export class LiveMesh {
   private dabCen = new THREE.Vector3();
   private dabMoves = new Float64Array(4096);
   private dabCorners = new Int32Array(1024);
+  private dabCornerW = new Float64Array(1024);
+  private dabW = new Float64Array(4096);
   /** After a corner moved: its grid cell, and the cells of its triangles. */
   private moved(v: number) {
     if (this.bulk) { this.dirtyV.add(v); return; }
@@ -495,7 +537,7 @@ export class LiveMesh {
     this.tGrid = new Grid(h);
     for (let v = 0; v < this.vCount; v += 1) if (this.vAlive[v]) { this.vCell[v] = this.cellOfVertex(v); this.vGrid.add(this.vCell[v], v); this.dirtyV.add(v); }
     this.tBox.fill(2147483647);
-    for (let t = 0; t < this.tCount; t += 1) { this.tCells[t] = []; if (this.tAlive[t]) this.binTriangle(t); }
+    for (let t = 0; t < this.tCount; t += 1) { this.tCells[t] = []; if (this.tAlive[t]) this.placeTriangle(t); }
   }
 
   /** The corners joined to v by an edge. */
@@ -621,6 +663,7 @@ export class LiveMesh {
   }
   /** Copies what changed since the last call into the GPU buffers (as runs of indices). */
   flushGpu() {
+    this.settleBins();
     if (!this.dirtyV.size && !this.dirtyT.size && !this.dirtyC.size) return false;
     // Normals of the changed corners and of their neighbours (their fans changed).
     // Build 85: each corner once, by a stamp per corner, into a list kept between frames.
@@ -681,6 +724,7 @@ export class LiveMesh {
 
   /** Where the ray first meets the surface: point, triangle and distance along the ray, or null. */
   pick(origin: Vec3, direction: Vec3): { point: Vec3; triangle: number; t: number } | null {
+    this.settleBins();
     const h = this.tGrid.h;
     const d = new THREE.Vector3(...direction).normalize();
     // Start where the ray enters the mesh's box.
@@ -766,6 +810,57 @@ export class LiveMesh {
    * The corners within `radius` of `centre` joined to `seed` (a triangle) over the surface without
    * leaving the ball, with their distance from the centre. A thin wall's other side is not joined.
    */
+  /**
+   * Build 91: the corners under a brush, gathered into arrays kept from dab to dab - `brushList` (the
+   * corners) and `brushDist` (each one's distance from the centre), `brushCount` long. A Map made for
+   * every dab (and every pass of a smooth) was most of the garbage a stroke left for the browser.
+   */
+  brushList = new Int32Array(4096);
+  brushDist = new Float64Array(4096);
+  brushCount = 0;
+  private brushMark = new Int32Array(0);
+  private brushStamp = 0;
+  private brushSeeds = [0, 0, 0];
+  gather(centre: Vec3, radius: number, seed: number | null): number {
+    if (this.brushMark.length < this.pos.length / 3) this.brushMark = new Int32Array(this.pos.length / 3);
+    const mark = this.brushMark, stamp = ++this.brushStamp, p = this.pos, tri = this.tri;
+    const cx = centre[0], cy = centre[1], cz = centre[2], r2 = radius * radius;
+    let list = this.brushList, dist = this.brushDist, count = 0;
+    const push = (v: number, dd: number) => {
+      if (count === list.length) {
+        const nl = new Int32Array(list.length * 2); nl.set(list); list = this.brushList = nl;
+        const nd = new Float64Array(dist.length * 2); nd.set(dist); dist = this.brushDist = nd;
+      }
+      mark[v] = stamp; list[count] = v; dist[count] = Math.sqrt(dd); count += 1;
+    };
+    const seeds = this.brushSeeds;
+    let seedCount = 0;
+    if (seed !== null && this.tAlive[seed]) { seeds[0] = tri[seed * 3]; seeds[1] = tri[seed * 3 + 1]; seeds[2] = tri[seed * 3 + 2]; seedCount = 3; }
+    else {
+      let best = -1, bd = Infinity;
+      const near = (radius + 2 * this.vGrid.h) ** 2;
+      this.forCornersNear(centre, radius, (v) => { const dd = (p[v * 3] - cx) ** 2 + (p[v * 3 + 1] - cy) ** 2 + (p[v * 3 + 2] - cz) ** 2; if (dd < bd && dd <= near) { bd = dd; best = v; } });
+      if (best >= 0) { seeds[0] = best; seedCount = 1; }
+    }
+    for (let k = 0; k < seedCount; k += 1) { const v = seeds[k]; if (mark[v] !== stamp) push(v, (p[v * 3] - cx) ** 2 + (p[v * 3 + 1] - cy) ** 2 + (p[v * 3 + 2] - cz) ** 2); }
+    // Out across the surface from the seeds (the list is its own queue).
+    for (let q = 0; q < count; q += 1) {
+      const fan = this.vTris[list[q]];
+      for (let f = 0; f < fan.length; f += 1) {
+        const t = fan[f] * 3;
+        for (let k = 0; k < 3; k += 1) {
+          const w = tri[t + k];
+          if (mark[w] === stamp) continue;
+          const dd = (p[w * 3] - cx) ** 2 + (p[w * 3 + 1] - cy) ** 2 + (p[w * 3 + 2] - cz) ** 2;
+          if (dd > r2) { mark[w] = stamp; continue; }
+          push(w, dd);
+        }
+      }
+    }
+    this.brushCount = count;
+    return count;
+  }
+  /** The corners under a brush, as a Map of distances (for callers outside the stroke's hot path). */
   region(centre: Vec3, radius: number, seed: number | null): Map<number, number> {
     const out = new Map<number, number>();
     const r2 = radius * radius;
@@ -775,7 +870,8 @@ export class LiveMesh {
     else {
       // No triangle given: the nearest corner.
       let best = -1, bd = Infinity;
-      this.forCornersNear(centre, radius, (v) => { const dd = d2(v); if (dd < bd) { bd = dd; best = v; } });
+      const near = (radius + 2 * this.vGrid.h) ** 2;
+      this.forCornersNear(centre, radius, (v) => { const dd = d2(v); if (dd < bd && dd <= near) { bd = dd; best = v; } });
       if (best >= 0) seeds = [best];
     }
     const queue: number[] = [];
@@ -817,34 +913,52 @@ export class LiveMesh {
    * One dab: the corners in `region` (distance from the centre) moved by `brush`. `normal` is the
    * surface's facing at the centre, `step` the most a corner moves (mm), `strength` 0..1.
    */
-  dab(brush: DabBrush, centre: Vec3, normal: Vec3, radius: number, region: Map<number, number>, strength: number, step: number) {
-    if (!region.size) return;
-    const weight = (d: number) => { const x = 1 - (d / radius) ** 2; return x > 0 ? x * x * strength : 0; };
+  /** Loads a Map of corners and distances (as region() gives) as the brush's corners. */
+  private useRegion(region: Map<number, number>) {
+    if (this.brushList.length < region.size) { this.brushList = new Int32Array(region.size * 2); this.brushDist = new Float64Array(region.size * 2); }
+    let i = 0;
+    region.forEach((d, v) => { this.brushList[i] = v; this.brushDist[i] = d; i += 1; });
+    this.brushCount = i;
+  }
+  /**
+   * One dab of a brush over the corners `region` lists - or, with null, those the last gather() found
+   * (build 91: the stroke's way, no Map made).
+   */
+  dab(brush: DabBrush, centre: Vec3, normal: Vec3, radius: number, region: Map<number, number> | null, strength: number, step: number) {
+    if (region) this.useRegion(region);
+    const size = this.brushCount, list = this.brushList, dist = this.brushDist;
+    if (!size) return;
+    const inv = 1 / (radius * radius);
     const p = this.pos;
     const n = this.dabN;
     // The brush's own facing: the weighted normal of what it covers.
     const area = this.dabArea.set(0, 0, 0);
     const cen = this.dabCen.set(0, 0, 0);
     let total = 0;
-    region.forEach((d, v) => {
-      const w = weight(d);
+    if (this.dabW.length < size) this.dabW = new Float64Array(size * 2);
+    const weights = this.dabW;
+    for (let i = 0; i < size; i += 1) {
+      const v = list[i], x = 1 - dist[i] * dist[i] * inv;
+      const w = x > 0 ? x * x * strength : 0;
+      weights[i] = w;
       this.vertexNormal(v, n);
       area.addScaledVector(n, w);
       cen.x += p[v * 3] * w; cen.y += p[v * 3 + 1] * w; cen.z += p[v * 3 + 2] * w;
       total += w;
-    });
+    }
     if (!total) return;
     cen.divideScalar(total);
     if (area.lengthSq() < 1e-12) area.set(...normal);
     area.normalize();
     // Moves are worked out from the positions before the dab, then applied together.
-    if (this.dabMoves.length < region.size * 3) this.dabMoves = new Float64Array(region.size * 6);
-    if (this.dabCorners.length < region.size) this.dabCorners = new Int32Array(region.size * 2);
-    const moves = this.dabMoves, corners = this.dabCorners;
+    if (this.dabMoves.length < size * 3) this.dabMoves = new Float64Array(size * 6);
+    if (this.dabCorners.length < size) { this.dabCorners = new Int32Array(size * 2); this.dabCornerW = new Float64Array(size * 2); }
+    const moves = this.dabMoves, corners = this.dabCorners, cornerW = this.dabCornerW;
     let count = 0;
     const mask = this.mask;
-    for (const v of region.keys()) {
-      const w = weight(region.get(v)!) * (1 - mask[v]);
+    for (let r = 0; r < size; r += 1) {
+      const v = list[r];
+      const w = weights[r] * (1 - mask[v]);
       if (!(w > 0)) continue;
       const x = p[v * 3], y = p[v * 3 + 1], z = p[v * 3 + 2];
       let dx = 0, dy = 0, dz = 0;
@@ -858,10 +972,8 @@ export class LiveMesh {
             if (!this.cotanMiddle(v, this.dabMid)) continue;
             ax = this.dabMid.x; ay = this.dabMid.y; az = this.dabMid.z;
           } else {
-            const around = this.neighbours(v);
-            if (!around.length) continue;
-            for (const u of around) { ax += p[u * 3]; ay += p[u * 3 + 1]; az += p[u * 3 + 2]; }
-            ax /= around.length; ay /= around.length; az /= around.length;
+            if (!this.uniformMiddle(v, this.dabMid)) continue;
+            ax = this.dabMid.x; ay = this.dabMid.y; az = this.dabMid.z;
           }
           const k = Math.min(1, w * 1.5);
           dx = (ax - x) * k; dy = (ay - y) * k; dz = (az - z) * k;
@@ -906,7 +1018,7 @@ export class LiveMesh {
         const s = brush === "inflate" ? step : -step;
         dx = n.x * s * w; dy = n.y * s * w; dz = n.z * s * w;
       }
-      corners[count] = v; moves[count * 3] = dx; moves[count * 3 + 1] = dy; moves[count * 3 + 2] = dz;
+      corners[count] = v; cornerW[count] = w; moves[count * 3] = dx; moves[count * 3 + 1] = dy; moves[count * 3 + 2] = dz;
       count += 1;
     }
     if (brush === "bubbleSmooth" && count) {
@@ -914,14 +1026,14 @@ export class LiveMesh {
       // patch keeps its volume - a bump rounds off instead of sinking.
       let sunk = 0, spread = 0;
       for (let i = 0; i < count; i += 1) {
-        const v = corners[i], w = weight(region.get(v)!) * (1 - mask[v]);
+        const w = cornerW[i];
         sunk += moves[i * 3] * area.x + moves[i * 3 + 1] * area.y + moves[i * 3 + 2] * area.z;
         spread += w;
       }
       if (spread > 0) {
         const back = -sunk / spread;
         for (let i = 0; i < count; i += 1) {
-          const w = weight(region.get(corners[i])!) * (1 - mask[corners[i]]);
+          const w = cornerW[i];
           moves[i * 3] += area.x * back * w; moves[i * 3 + 1] += area.y * back * w; moves[i * 3 + 2] += area.z * back * w;
         }
       }
@@ -937,24 +1049,45 @@ export class LiveMesh {
    * angles facing the edge to it (negative weights, from obtuse triangles, taken as none). False when v
    * has no usable neighbours.
    */
+  /** The cotangent of the angle at o in the triangle o, a, b. */
+  private cot(o: number, a: number, b: number) {
+    const p = this.pos;
+    const ux = p[a * 3] - p[o * 3], uy = p[a * 3 + 1] - p[o * 3 + 1], uz = p[a * 3 + 2] - p[o * 3 + 2];
+    const vx = p[b * 3] - p[o * 3], vy = p[b * 3 + 1] - p[o * 3 + 1], vz = p[b * 3 + 2] - p[o * 3 + 2];
+    const dot = ux * vx + uy * vy + uz * vz;
+    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+    const cross = Math.sqrt(cx * cx + cy * cy + cz * cz);
+    return cross > 1e-12 ? dot / cross : 0;
+  }
+  /** Build 91: the plain middle of v's neighbours (each once), without making a list of them. */
+  private uniformMiddle(v: number, out: THREE.Vector3) {
+    const p = this.pos, tri = this.tri, fan = this.vTris[v];
+    if (this.normalMark.length < this.pos.length / 3) this.normalMark = new Int32Array(this.pos.length / 3);
+    const mark = this.normalMark, stamp = ++this.normalStamp;
+    mark[v] = stamp;
+    let sx = 0, sy = 0, sz = 0, count = 0;
+    for (let f = 0; f < fan.length; f += 1) {
+      const t = fan[f] * 3;
+      for (let k = 0; k < 3; k += 1) {
+        const w = tri[t + k];
+        if (mark[w] === stamp) continue;
+        mark[w] = stamp;
+        sx += p[w * 3]; sy += p[w * 3 + 1]; sz += p[w * 3 + 2]; count += 1;
+      }
+    }
+    if (!count) return false;
+    out.set(sx / count, sy / count, sz / count);
+    return true;
+  }
   private cotanMiddle(v: number, out: THREE.Vector3) {
     const p = this.pos, tri = this.tri;
     let sx = 0, sy = 0, sz = 0, sw = 0;
-    const cot = (o: number, a: number, b: number) => {
-      // The cotangent of the angle at o in the triangle o, a, b.
-      const ux = p[a * 3] - p[o * 3], uy = p[a * 3 + 1] - p[o * 3 + 1], uz = p[a * 3 + 2] - p[o * 3 + 2];
-      const vx = p[b * 3] - p[o * 3], vy = p[b * 3 + 1] - p[o * 3 + 1], vz = p[b * 3 + 2] - p[o * 3 + 2];
-      const dot = ux * vx + uy * vy + uz * vz;
-      const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
-      const cross = Math.sqrt(cx * cx + cy * cy + cz * cz);
-      return cross > 1e-12 ? dot / cross : 0;
-    };
     for (const t of this.vTris[v]) {
       const i = t * 3;
       // The triangle's other two corners, a and b: the angle at b faces edge v-a, the angle at a faces v-b.
       let a = tri[i], b = tri[i + 1];
       if (a === v) { a = tri[i + 1]; b = tri[i + 2]; } else if (b === v) { b = tri[i + 2]; }
-      const wa = Math.max(0, cot(b, v, a)) / 2, wb = Math.max(0, cot(a, v, b)) / 2;
+      const wa = Math.max(0, this.cot(b, v, a)) / 2, wb = Math.max(0, this.cot(a, v, b)) / 2;
       sx += p[a * 3] * wa + p[b * 3] * wb; sy += p[a * 3 + 1] * wa + p[b * 3 + 1] * wb; sz += p[a * 3 + 2] * wa + p[b * 3 + 2] * wb;
       sw += wa + wb;
     }
@@ -974,14 +1107,16 @@ export class LiveMesh {
   freeOf(v: number) { return 1 - this.mask[v]; }
   private maskChanged(v: number) { this.dirtyC.add(v); this.maskShown = true; }
   /** Paints frozen (or, `thaw`, free) under a brush: the same fall-off as the brushes. */
-  paintMask(region: Map<number, number>, radius: number, strength: number, thaw = false) {
-    region.forEach((d, v) => {
+  paintMask(region: Map<number, number> | null, radius: number, strength: number, thaw = false) {
+    if (region) this.useRegion(region);
+    for (let i = 0; i < this.brushCount; i += 1) {
+      const v = this.brushList[i], d = this.brushDist[i];
       const x = 1 - (d / radius) ** 2;
-      if (!(x > 0)) return;
+      if (!(x > 0)) continue;
       const add = Math.min(1, x * 2) * strength * 1.5;
       const next = Math.max(0, Math.min(1, this.mask[v] + (thaw ? -add : add)));
       if (next !== this.mask[v]) { this.mask[v] = next; this.maskChanged(v); }
-    });
+    }
   }
   /** Frees every corner. */
   clearMask() { for (let v = 0; v < this.vCount; v += 1) if (this.mask[v] !== 0) { this.mask[v] = 0; this.maskChanged(v); } }
@@ -1202,7 +1337,14 @@ export class LiveMesh {
       for (const v of region) {
         if (!this.vAlive[v]) continue;
         // Each edge once: from its smaller corner, or from the corner in the region when only one is.
-        for (const w of this.neighbours(v)) {
+        // Build 91: round v's fan with a stamp per neighbour, no list of them made for every corner.
+        if (this.stamp.length < this.vCount) { const next = new Int32Array(this.pos.length / 3); next.set(this.stamp); this.stamp = next; }
+        const seen = this.stamp, here = ++this.stampNow, fan = this.vTris[v], tri = this.tri;
+        seen[v] = here;
+        for (let f = 0; f < fan.length; f += 1) for (let k = 0; k < 3; k += 1) {
+          const w = tri[fan[f] * 3 + k];
+          if (seen[w] === here) continue;
+          seen[w] = here;
           if (mark[w] === now && w < v) continue;
           const a = v < w ? v : w, b = v < w ? w : v;
           if (!keep || keep(a, b)) out.push(a, b);
@@ -1366,7 +1508,7 @@ export function surfaceProjector(source: LiveMesh) {
   // and a neighbouring cell is only looked in when it could hold something nearer.
   const h = Math.max(0.05, source.averageEdge(sampleCorners(source, 2000)) * 2);
   const grid = new Map<number, number[]>();
-  const key = (ix: number, iy: number, iz: number) => ((ix + OFF) * K + (iy + OFF)) * K + (iz + OFF);
+  const key = (ix: number, iy: number, iz: number) => ((ix & WRAP) * K + (iy & WRAP)) * K + (iz & WRAP);
   const P = snapshot.points, T = snapshot.triangles;
   for (let t = 0; t < T.length / 3; t += 1) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
@@ -1494,10 +1636,12 @@ export function brushResponse(brush: LiveBrush, strength: number): { strength: n
 /** Build 82: one dab of a brush at a point, as brushResponse sets it (Ctrl: Draw and Crease dig in). */
 export function stampBrush(mesh: LiveMesh, brush: Exclude<LiveBrush, "move">, centre: Vec3, normal: Vec3, radius: number, triangle: number, strength: number, dig = false) {
   const response = brushResponse(brush, strength);
-  if (brush === "mask") { mesh.paintMask(mesh.region(centre, radius, triangle), radius, response.strength, dig); return; }
+  // Build 91: the corners gathered into the mesh's own arrays, no Map per dab.
+  if (brush === "mask") { mesh.gather(centre, radius, triangle); mesh.paintMask(null, radius, response.strength, dig); return; }
   const step = radius * response.step * (dig ? -1 : 1);
   for (let k = 0; k < response.passes; k += 1) {
-    mesh.dab(brush, centre, normal, radius, mesh.region(centre, radius, triangle), response.strength, step);
+    mesh.gather(centre, radius, triangle);
+    mesh.dab(brush, centre, normal, radius, null, response.strength, step);
   }
 }
 

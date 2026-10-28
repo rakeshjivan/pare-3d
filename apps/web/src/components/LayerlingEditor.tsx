@@ -9161,7 +9161,9 @@ export function LayerlingEditor({
       const { centre, radius } = balls[k];
       const reach = radius * 1.15;
       // Adds triangles where the brush needs them; the part's own finer triangles stay (only the brush's slivers go).
-      state.live.refine(state.live.region(centre, reach, null).keys(), Math.max(0.03, radius * factor), { within: { centre, radius: reach }, budget: 600, milliseconds: per, collapseBelow: state.baseEdge * 0.5 });
+      // Build 91: the corners gathered into the engine's own arrays (no Map), copied once for refine.
+      const count = state.live.gather(centre, reach, null);
+      state.live.refine(state.live.brushList.slice(0, count), Math.max(0.03, radius * factor), { within: { centre, radius: reach }, budget: 600, milliseconds: per, collapseBelow: state.baseEdge * 0.5 });
     }
   };
   /** Timings of the last strokes, for the speed checks (window.layerlingSculptStats). */
@@ -9332,6 +9334,9 @@ export function LayerlingEditor({
     // One step of undo for the stroke: what it changed, as a patch back and a patch forward.
     const entry = state.live.endPatch();
     if (!stroke.touched || !entry) return;
+    // Build 91: the editor is drawn again only when the panel's Undo or Redo changes (the first step, or
+    // Redo emptied) - drawing the whole editor again after every stroke was most of the pause there.
+    const panelChanges = state.undo.length === 0 || state.redo.length > 0;
     state.undo.push(entry);
     // At most about 300 MB of steps back.
     let bytes = state.undo.reduce((sum, e) => sum + undoBytes(e), 0);
@@ -9339,7 +9344,7 @@ export function LayerlingEditor({
     state.redo = [];
     state.strokes += 1;
     state.lastBrush = stroke.brush;
-    setSculptSteps((n) => n + 1);
+    if (panelChanges) setSculptSteps((n) => n + 1);
     sculptStat("end", performance.now() - ending, 0);
     if (speedTrack.current) {
       const track = speedTrack.current;
