@@ -1158,3 +1158,231 @@ function drapeCervical(tooth: PlacedTooth, scan: Mesh, normals: ArrayLike<number
     p[i] -= out.x * back; p[i + 1] -= out.y * back; p[i + 2] -= out.z * back;
   }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Build 94: each library tooth fitted to the patient's own tooth
+
+/** A patient's tooth found on the scan (lib/toothSegment): its number and its crown's corners, arch frame. */
+export type PatientCrown = { fdi: number; points: Float32Array };
+
+/** FDI number to kind and side in the arch frame (the inverse of fdiNumber). */
+export function fdiKind(fdi: number, arch: "upper" | "lower"): { kind: ToothKind; side: -1 | 1 } {
+  const q = Math.floor(fdi / 10), n = fdi % 10;
+  const right = q === 1 || q === 4;
+  const side = (arch === "upper" ? right : !right) ? 1 : -1;
+  return { kind: KINDS[Math.max(0, Math.min(7, n - 1))], side };
+}
+
+/** Within each side, teeth in order out from the midline; the tangent at a tooth from its neighbours, pointing mesially. */
+function mesialDirections(items: Array<{ key: number; side: -1 | 1; rank: number; c: [number, number] }>) {
+  const out = new Map<number, THREE.Vector3>();
+  for (const item of items) {
+    const sameSide = items.filter((o) => o.side === item.side).sort((a, b) => a.rank - b.rank);
+    const k = sameSide.indexOf(item);
+    // Mesial neighbour: the next tooth in towards the midline, or across it for the first.
+    const mesial = k > 0 ? sameSide[k - 1] : items.filter((o) => o.side !== item.side).sort((a, b) => a.rank - b.rank)[0];
+    const distal = sameSide[k + 1];
+    const d = new THREE.Vector3();
+    if (mesial) d.add(new THREE.Vector3(mesial.c[0] - item.c[0], mesial.c[1] - item.c[1], 0));
+    if (distal) d.add(new THREE.Vector3(item.c[0] - distal.c[0], item.c[1] - distal.c[1], 0));
+    if (d.lengthSq() < 1e-9) d.set(-item.side, 0, 0);
+    out.set(item.key, d.normalize());
+  }
+  return out;
+}
+
+/**
+ * Places library teeth over the patient's own teeth, one by one (`crowns`: the teeth to wax up, as
+ * found): each library tooth of the same kind and side is turned to the patient's tooth (its line
+ * along the arch and outward), scaled to its width along the arch, its edge at the patient's edge
+ * plus `minWax` and `lengthen` and its cervical end at the patient's margin, then moved straight out until its
+ * facial (and, on posterior teeth, occlusal) surface stands `minWax` proud of the patient's tooth.
+ * The patient's arch form, widths and positions are kept - the wax restores shape and contour, as a
+ * wax-up for worn or broken teeth (and IMT) wants. `all` gives the neighbours for the arch's line.
+ */
+export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<number>, crowns: PatientCrown[], all: PatientCrown[], arch: "upper" | "lower", options: { minWax?: number; lengthen?: number; blend?: boolean } = {}): PlacedTooth[] {
+  const minWax = options.minWax ?? MIN_WAX;
+  const grid = new PointGrid(scan.v, PLACE_REACH);
+  // The patient's teeth: centre, top, measures.
+  const info = all.map((crown) => {
+    const { kind, side } = fdiKind(crown.fdi, arch);
+    const p = crown.points;
+    let x = 0, y = 0, top = -Infinity;
+    for (let i = 0; i < p.length; i += 3) { x += p[i]; y += p[i + 1]; top = Math.max(top, p[i + 2]); }
+    const n = Math.max(1, p.length / 3);
+    return { crown, kind, side, rank: crown.fdi % 10, c: [x / n, y / n] as [number, number], top };
+  });
+  const patientMesial = mesialDirections(info.map((t) => ({ key: t.crown.fdi, side: t.side, rank: t.rank, c: t.c })));
+  // The library's teeth, the same way.
+  const lib = set.teeth.map((tooth, i) => {
+    let top = -Infinity, bottom = Infinity;
+    for (let k = 2; k < tooth.positions.length; k += 3) { top = Math.max(top, tooth.positions[k]); bottom = Math.min(bottom, tooth.positions[k]); }
+    return { tooth, i, rank: KINDS.indexOf(tooth.kind) + 1, c: [tooth.centroid[0], tooth.centroid[1]] as [number, number], top, bottom };
+  });
+  const libMesial = mesialDirections(lib.map((t) => ({ key: t.i, side: t.tooth.side, rank: t.rank, c: t.c })));
+  const placed: PlacedTooth[] = [];
+  for (const crown of crowns) {
+    const me = info.find((t) => t.crown.fdi === crown.fdi);
+    if (!me) continue;
+    // The same kind on the same side; else the other side's, mirrored.
+    let match = lib.find((t) => t.tooth.kind === me.kind && t.tooth.side === me.side);
+    const mirrored = !match;
+    if (!match) match = lib.find((t) => t.tooth.kind === me.kind);
+    if (!match) continue;
+    const mMes = libMesial.get(match.i)!.clone();
+    if (mirrored) mMes.x = -mMes.x;
+    const pMes = patientMesial.get(crown.fdi)!;
+    // Outward: the mesial direction turned a quarter in the plane - towards the front for a central
+    // on the +x side (mesial -x), so the other way round on the -x side.
+    const outOf = (mes: THREE.Vector3, side: number) => new THREE.Vector3(-mes.y, mes.x, 0).multiplyScalar(side > 0 ? 1 : -1);
+    const pOut = outOf(pMes, me.side), mOut = outOf(mMes, mirrored ? -match.tooth.side : match.tooth.side);
+    // Measures along the arch and outward: the patient's crown, the library tooth.
+    // Robustly: the 2nd to 98th percentile, so a little gum the finder took with the crown does not widen it.
+    const extent = (p: ArrayLike<number>, c: [number, number], dir: THREE.Vector3, robust: boolean) => {
+      const along: number[] = [];
+      for (let i = 0; i < p.length; i += 3) along.push((p[i] - c[0]) * dir.x + (p[i + 1] - c[1]) * dir.y);
+      along.sort((a, b) => a - b);
+      const at = (q: number) => along[Math.max(0, Math.min(along.length - 1, Math.round(q * (along.length - 1))))];
+      const lo = robust ? at(0.02) : along[0], hi = robust ? at(0.98) : along[along.length - 1];
+      return { lo, hi, size: hi - lo };
+    };
+    const lp = mirrored ? (() => { const q = Float32Array.from(match.tooth.positions); for (let i = 0; i < q.length; i += 3) q[i] = -q[i]; return q; })() : match.tooth.positions;
+    const lc: [number, number] = mirrored ? [-match.c[0], match.c[1]] : match.c;
+    const pw = extent(crown.points, me.c, pMes, true), lw = extent(lp, lc, mMes, false);
+    // The patient's margin: low on the facial side of the crown (the crown's edge, where the gum begins).
+    const facialZ: number[] = [];
+    for (let i = 0; i < crown.points.length; i += 3) if ((crown.points[i] - me.c[0]) * pOut.x + (crown.points[i + 1] - me.c[1]) * pOut.y > 0) facialZ.push(crown.points[i + 2]);
+    facialZ.sort((a, b) => a - b);
+    const margin = facialZ.length ? facialZ[Math.floor(facialZ.length * 0.05)] : me.top - 8;
+    // The edge covered by the wax too (minWax over the patient's), plus any lengthening.
+    const edge = me.top + minWax + (options.lengthen ?? 0);
+    const k = Math.max(0.3, (edge - margin) / Math.max(1, match.top - match.bottom));
+    const s = lw.size > 0 ? pw.size / lw.size : 1;
+    // Library frame: middle of its width on its line, top at z = 0, axes mesial/out/up -> patient's.
+    const lMid = [lc[0] + mMes.x * (lw.lo + lw.hi) / 2, lc[1] + mMes.y * (lw.lo + lw.hi) / 2];
+    const pMid = [me.c[0] + pMes.x * (pw.lo + pw.hi) / 2, me.c[1] + pMes.y * (pw.lo + pw.hi) / 2];
+    const fromLib = new THREE.Matrix4().makeBasis(mMes, mOut, new THREE.Vector3(0, 0, 1)).invert().multiply(new THREE.Matrix4().makeTranslation(-lMid[0], -lMid[1], -match.top));
+    const toPatient = new THREE.Matrix4().makeTranslation(pMid[0], pMid[1], edge).multiply(new THREE.Matrix4().makeBasis(pMes, pOut, new THREE.Vector3(0, 0, 1)));
+    const base = toPatient.clone().multiply(new THREE.Matrix4().makeScale(s, s, k)).multiply(fromLib);
+    let positions = transformSoup(lp, base);
+    if (mirrored) for (let i = 0; i < positions.length; i += 9) for (let c = 0; c < 3; c += 1) { const t = positions[i + 3 + c]; positions[i + 3 + c] = positions[i + 6 + c]; positions[i + 6 + c] = t; }
+    // Out until the wax is minWax proud: the facial surface, and on posterior teeth the occlusal too.
+    const posterior = KINDS.indexOf(me.kind) >= 3;
+    const dir = posterior ? pOut.clone().multiplyScalar(0.5).add(new THREE.Vector3(0, 0, 1)).normalize() : pOut.clone();
+    const samples: number[] = [];
+    for (let t = 0; t < positions.length; t += 9) {
+      const a = new THREE.Vector3().fromArray(positions, t), b = new THREE.Vector3().fromArray(positions, t + 3), c = new THREE.Vector3().fromArray(positions, t + 6);
+      const nrm = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+      const z = (a.z + b.z + c.z) / 3;
+      if (z < edge - FACIAL_SHARE * (edge - margin)) continue;
+      if (nrm.dot(pOut) > 0.5 || (posterior && nrm.z > 0.7)) samples.push((a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3, z);
+    }
+    let shift = 0, clearance: number | null = null;
+    for (let round = 0; round < 8; round += 1) {
+      const least = leastClearance(samples, dir.clone().multiplyScalar(shift), scan, normals, grid);
+      clearance = least;
+      if (least === null) break;
+      const move = minWax - least;
+      if (Math.abs(move) < 0.01) break;
+      shift = Math.max(-PLACE_REACH, Math.min(PLACE_REACH, shift + move));
+    }
+    const moveOut = new THREE.Matrix4().makeTranslation(dir.x * shift, dir.y * shift, dir.z * shift);
+    positions = transformSoup(positions, moveOut);
+    const matrix = moveOut.clone().multiply(base);
+    placed.push({
+      tooth: { ...match.tooth, side: me.side },
+      matrix,
+      positions,
+      clearance,
+      width: pw.size,
+      length: edge - margin,
+      lengthening: 0,
+      extension: edge - me.top,
+      frame: { origin: [pMid[0] + dir.x * shift, pMid[1] + dir.y * shift, edge + dir.z * shift], out: pOut.toArray() as Vec3, mesial: pMes.toArray() as Vec3, up: [0, 0, 1] },
+    });
+  }
+  // Neighbours meet at their contacts (the wax closes the gaps the patient's own teeth may have:
+  // each tooth widened, not moved, so it stays over its own), and the cervical part blends.
+  if (options.blend !== false) {
+    widenToContacts(placed);
+    for (const entry of placed) drapeCervical(entry, scan, normals);
+  }
+  return placed;
+}
+
+/** Build 94: the wax-up fitted tooth by tooth (scan in its own coordinates; `fdi` per scan triangle, as found). */
+export function planWaxupOnTeeth(scan: ArrayLike<number>, shells: Float32Array[], fdi: Uint8Array, chosen: number[], arch: "upper" | "lower", options: { minWax?: number; lengthen?: number } = {}): WaxupPlan {
+  const set = librarySet("set", shells);
+  const { mesh, normals, frame } = scanInArchFrame(scan);
+  const back = frame.clone().invert();
+  // The crowns, in the arch frame: the scan's own triangles by their number.
+  const local = transformSoup(scan, frame);
+  const byFdi = new Map<number, number[]>();
+  for (let t = 0; t < fdi.length; t += 1) {
+    if (!fdi[t]) continue;
+    let list = byFdi.get(fdi[t]);
+    if (!list) byFdi.set(fdi[t], (list = []));
+    for (let k = 0; k < 9; k += 1) list.push(local[t * 9 + k]);
+  }
+  const all: PatientCrown[] = [...byFdi].map(([n, list]) => ({ fdi: n, points: Float32Array.from(list) }));
+  const placed = placeOnTeeth(set, mesh, normals, all.filter((c) => chosen.includes(c.fdi)), all, arch, options);
+  return {
+    landmarks: null,
+    scale: 1,
+    arcDepth: 0,
+    centralWidth: placed.find((p) => p.tooth.kind === "central")?.width ?? 0,
+    teeth: placed.map(({ tooth, positions, clearance, width, length, lengthening, extension, frame: f }) => ({ kind: tooth.kind, side: tooth.side, positions: transformSoup(positions, back), clearance, width, length, lengthening, extension, frame: moveFrame(f, back) })),
+  };
+}
+
+/**
+ * Build 94: closes the gaps between neighbouring fitted teeth by widening each along the arch - half
+ * of each gap from each side - so every tooth stays over the patient's own (moving them, as
+ * closeContacts does for a set laid out from the midline, would slide them off their teeth). Overlaps
+ * deeper than CONTACT_OVERLAP narrow them the same way. A few passes, as gaps are measured in 3D.
+ */
+/** The most a fitted tooth is widened at each end to meet its neighbour, mm. */
+export const WIDEN_MAX = 0.75;
+function widenToContacts(placed: PlacedTooth[]) {
+  // Arch order: each side out from the midline, the two sides joined at it.
+  const rank = (p: PlacedTooth) => KINDS.indexOf(p.tooth.kind) + 1;
+  const left = placed.filter((p) => p.tooth.side < 0).sort((a, b) => rank(b) - rank(a));
+  const right = placed.filter((p) => p.tooth.side > 0).sort((a, b) => rank(a) - rank(b));
+  const order = [...left, ...right];
+  // A gap wider than this at an end is the patient's (a diastema, a tooth missing): left for the dentist to close by hand.
+  const grown = order.map(() => ({ mesial: 0, distal: 0 }));
+  for (let pass = 0; pass < CONTACT_PASSES; pass += 1) {
+    const change = order.map(() => ({ mesial: 0, distal: 0 }));
+    let any = false;
+    for (let i = 0; i + 1 < order.length; i += 1) {
+      const a = order[i], b = order[i + 1];
+      // Neighbours only (not across a tooth left out).
+      const ra = rank(a), rb = rank(b);
+      if (!(a.tooth.side === b.tooth.side ? Math.abs(ra - rb) === 1 : ra === 1 && rb === 1)) continue;
+      const gap = contactGap(a.positions, b.positions);
+      if (gap === null) continue;
+      const need = gap > CONTACT_GAP ? gap : gap < -CONTACT_OVERLAP ? (gap + CONTACT_OVERLAP) / 2 : 0;
+      if (!need) continue;
+      any = true;
+      // Which end of each faces the other: the left side's mesial end faces right along the order.
+      const aEnd = a.tooth.side < 0 ? "mesial" : "distal", bEnd = b.tooth.side < 0 ? "distal" : "mesial";
+      change[i][aEnd] += need / 2;
+      change[i + 1][bEnd] += need / 2;
+    }
+    if (!any) break;
+    order.forEach((tooth, i) => {
+      const gm = Math.max(-WIDEN_MAX, Math.min(WIDEN_MAX - grown[i].mesial, change[i].mesial)), gd = Math.max(-WIDEN_MAX, Math.min(WIDEN_MAX - grown[i].distal, change[i].distal));
+      if (Math.abs(gm) < 1e-3 && Math.abs(gd) < 1e-3) return;
+      grown[i].mesial += gm; grown[i].distal += gd;
+      const o = new THREE.Vector3(...tooth.frame.origin), mes = new THREE.Vector3(...tooth.frame.mesial).normalize(), out = new THREE.Vector3(...tooth.frame.out).normalize(), up = new THREE.Vector3(...tooth.frame.up).normalize();
+      const k = Math.max(0.5, (tooth.width + gm + gd) / Math.max(0.5, tooth.width));
+      // Grown by gm towards mesial and gd distally: scaled about the point that keeps both.
+      const basis = new THREE.Matrix4().makeBasis(mes, out, up).setPosition(o);
+      const m = basis.clone().multiply(new THREE.Matrix4().makeTranslation((gm - gd) / 2, 0, 0)).multiply(new THREE.Matrix4().makeScale(k, 1, 1)).multiply(basis.clone().invert());
+      tooth.positions = transformSoup(tooth.positions, m);
+      tooth.matrix = m.clone().multiply(tooth.matrix);
+      tooth.width += gm + gd;
+      tooth.frame = { ...tooth.frame, origin: o.clone().addScaledVector(mes, (gm - gd) / 2).toArray() as Vec3 };
+    });
+  }
+}

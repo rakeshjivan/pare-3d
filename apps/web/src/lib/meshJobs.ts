@@ -9,6 +9,8 @@ import type { DentalAnalysis, DentalArchPart, DentalStudioInput, DentalStudioOpt
 import type { DentalTrimMode, DentalTrimResult } from "@/lib/dentalTrim";
 import type { WaxLandmarks, WaxupOptions, WaxupPlan } from "@/lib/dentalWaxup";
 import type { ScanTeeth } from "@/lib/toothSegment";
+/** Build 94: fit the set tooth by tooth to the teeth found: each scan triangle's FDI, the teeth chosen. */
+export type WaxTeethFit = { fdi: Uint8Array; chosen: number[]; arch: "upper" | "lower" };
 import type { WorkplaneShape } from "@/types/layerling";
 import type { SurfaceTextureOptions, SurfaceTextureResult } from "@/lib/surfaceTexture";
 import type { RemeshOptions, RemeshResult } from "@/lib/meshRemesh";
@@ -21,7 +23,7 @@ export type MeshJobRequest =
   | { id: number; base: string; kind: "dentalArch"; input: DentalStudioInput; options: DentalStudioOptions; index: number }
   | { id: number; base: string; kind: "dentalTrim"; positions: Float32Array; side: Float32Array; mode: DentalTrimMode; local: Float32Array }
   | { id: number; base: string; kind: "dentalArea"; positions: Float32Array }
-  | { id: number; base: string; kind: "waxup"; scan: Float32Array; shells: Float32Array[] | null; landmarks: WaxLandmarks | null; options: Omit<WaxupOptions, "landmarks"> }
+  | { id: number; base: string; kind: "waxup"; scan: Float32Array; shells: Float32Array[] | null; landmarks: WaxLandmarks | null; options: Omit<WaxupOptions, "landmarks">; teeth?: WaxTeethFit }
   | { id: number; base: string; kind: "texture"; positions: Float32Array; options: SurfaceTextureOptions }
   | { id: number; base: string; kind: "remesh"; positions: Float32Array; options: RemeshOptions }
   | { id: number; base: string; kind: "biteContacts"; upper: Float32Array; lower: Float32Array }
@@ -384,11 +386,12 @@ export async function dentalAreaInBackground(positions: Float32Array): Promise<{
  * Build 79: the wax-up of a tooth set on a scan (Z-up soup, the studio's input coordinates), from the
  * landmarks in those coordinates; without `shells`, only the first guess at the landmarks.
  */
-export function waxupInBackground(scan: Float32Array, shells: Float32Array[], landmarks: WaxLandmarks | null, options?: Omit<WaxupOptions, "landmarks">): Promise<WaxupPlan>;
+export function waxupInBackground(scan: Float32Array, shells: Float32Array[], landmarks: WaxLandmarks | null, options?: Omit<WaxupOptions, "landmarks">, teeth?: WaxTeethFit): Promise<WaxupPlan>;
 export function waxupInBackground(scan: Float32Array, shells: null): Promise<WaxLandmarks | null>;
-export async function waxupInBackground(scan: Float32Array, shells: Float32Array[] | null, landmarks: WaxLandmarks | null = null, options: Omit<WaxupOptions, "landmarks"> = {}): Promise<WaxupPlan | WaxLandmarks | null> {
+export async function waxupInBackground(scan: Float32Array, shells: Float32Array[] | null, landmarks: WaxLandmarks | null = null, options: Omit<WaxupOptions, "landmarks"> = {}, teeth?: WaxTeethFit): Promise<WaxupPlan | WaxLandmarks | null> {
   const here = async () => {
-    const { guessLandmarks, planWaxup } = await import("@/lib/dentalWaxup");
+    const { guessLandmarks, planWaxup, planWaxupOnTeeth } = await import("@/lib/dentalWaxup");
+    if (shells && teeth) return planWaxupOnTeeth(scan, shells, teeth.fdi, teeth.chosen, teeth.arch, { lengthen: options.lengthen });
     return shells ? planWaxup(scan, shells, landmarks, options) : guessLandmarks(scan);
   };
   const target = meshWorker();
@@ -398,7 +401,7 @@ export async function waxupInBackground(scan: Float32Array, shells: Float32Array
   try {
     return await new Promise<WaxupPlan | WaxLandmarks | null>((resolve, reject) => {
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
-      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "waxup", scan, shells, landmarks, options } satisfies MeshJobRequest);
+      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "waxup", scan, shells, landmarks, options, ...(teeth ? { teeth } : {}) } satisfies MeshJobRequest);
     });
   } catch (error) {
     if (error instanceof Error && error.message === "worker-unavailable") return here();

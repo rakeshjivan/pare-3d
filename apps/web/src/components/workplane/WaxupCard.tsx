@@ -52,6 +52,8 @@ export type WaxupView = {
   chosen: number[];
   /** The teeth shown in colour over the scan. */
   teethShown: boolean;
+  /** Build 94: each library tooth fitted to the patient's own (teeth found), or the set laid out by smile design from the landmarks. */
+  fit: "teeth" | "smile";
 };
 
 export type WaxupActions = {
@@ -74,6 +76,7 @@ export type WaxupActions = {
   onChoose: (fdi: number) => void;
   onChooseGroup: (group: "front" | "front-premolars" | "all" | "none") => void;
   onTeethShown: (shown: boolean) => void;
+  onFit: (fit: "teeth" | "smile") => void;
 };
 
 /** One click of an adjusting button: mm, or degrees for a turn. */
@@ -96,6 +99,9 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
   const file = useRef<HTMLInputElement>(null);
   const finderFile = useRef<HTMLInputElement>(null);
   const working = busy || view.busy;
+  // Build 94: fitted to the teeth found needs teeth chosen; set out by smile design, the three landmarks.
+  const fitTeeth = view.fit === "teeth" && Boolean(view.found?.length);
+  const placeable = Boolean(view.setName) && (fitTeeth ? view.chosen.length > 0 : view.marked === 3);
   const thin = view.placed.filter((tooth) => tooth.clearance !== null && tooth.clearance < WAX_THIN);
   const selectedTooth = view.placed.find((tooth) => tooth.id === view.selected) ?? null;
   const lengthening = [...view.placed].filter((tooth) => tooth.lengthening > 0).sort((a, b) => a.fdi - b.fdi);
@@ -206,7 +212,15 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
 
       <div className="dental-substep">
         <h4 className="dental-substep-title">{t("waxup.placeStep")}</h4>
-        <p className="blend-hint">{t("waxup.designHint")}</p>
+        {view.found?.length ? (
+          <div className="dental-trim-mode" role="radiogroup" aria-label={t("waxup.fit")}>
+            {(["teeth", "smile"] as const).map((value) => (
+              <button key={value} type="button" role="radio" aria-checked={view.fit === value} className={view.fit === value ? "active" : ""} disabled={working} onClick={() => actions.onFit(value)}>{t(value === "teeth" ? "waxup.fitTeeth" : "waxup.fitSmile")}</button>
+            ))}
+          </div>
+        ) : null}
+        <p className="blend-hint">{t(fitTeeth ? "waxup.fitTeethHint" : "waxup.designHint")}</p>
+        {fitTeeth ? null : (<>
         <EdgeModifierSlider label={t("waxup.centralRatio")} value={Math.round(view.centralRatio * 100)} min={70} max={90} step={1} unit="%" workspace={workspace} disabled={working} onChange={(value) => actions.onCentralRatio(Math.max(0.7, Math.min(0.9, Math.round(value) / 100)))} />
         <EdgeModifierSlider label={t("waxup.arcDepth")} value={view.arcDepth ?? view.arcUsed ?? 1} min={0} max={3} step={0.25} workspace={workspace} length disabled={working} onChange={(value) => actions.onArcDepth(Math.max(0, Math.min(3, Math.round(value / 0.25) * 0.25)))} />
         <p className="blend-hint">{view.arcDepth === null ? t("waxup.arcAuto") : <>{t("waxup.arcSet")}{" "}<button type="button" className="link-button" disabled={working} onClick={() => actions.onArcDepth(null)}>{t("waxup.arcBack")}</button></>}</p>
@@ -217,9 +231,10 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
             </button>
           ))}
         </div>
+        </>)}
         <EdgeModifierSlider label={t("waxup.lengthen")} value={view.lengthen} min={WAX_LENGTHEN.min} max={WAX_LENGTHEN.max} step={WAX_LENGTHEN.step} workspace={workspace} length disabled={working} onChange={(value) => actions.onLengthen(Math.max(WAX_LENGTHEN.min, Math.min(WAX_LENGTHEN.max, Math.round(value / WAX_LENGTHEN.step) * WAX_LENGTHEN.step)))} />
         <div className="dental-trim-buttons">
-          <button type="button" className={view.setName && view.marked === 3 ? "active" : ""} disabled={working || !view.setName || view.marked < 3 || view.picking !== null} onClick={actions.onPlace}>
+          <button type="button" className={placeable ? "active" : ""} disabled={working || !placeable || view.picking !== null} onClick={actions.onPlace}>
             {view.busy ? <LoaderCircle className="edge-modifier-spinner" size={15} /> : <Check size={15} />} {t(view.placed.length ? "waxup.placeAgain" : "waxup.place")}
           </button>
           {view.placed.length ? <button type="button" className="secondary" disabled={working} onClick={actions.onRemove}>{t("waxup.remove")}</button> : null}
