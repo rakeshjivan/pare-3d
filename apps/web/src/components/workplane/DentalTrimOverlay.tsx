@@ -199,7 +199,7 @@ export const passToView = {
   },
 };
 
-export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live, onStrengthWheel }: {
+export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live, onStrengthWheel, onDouble }: {
   hint: string;
   radius: number;
   erase: boolean;
@@ -209,6 +209,8 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live
   onCancel: () => void;
   /** Build 73: a live brush - each pointer move is handed over as it happens, and no path is drawn. */
   live?: { start: (x: number, y: number, keys?: { ctrl: boolean; shift: boolean }) => void; move: (x: number, y: number) => void; end: () => void };
+  /** Build 94: a double-click (Sculpt: the face group under it). */
+  onDouble?: (x: number, y: number, keys: { ctrl: boolean; shift: boolean }) => void;
 }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
   const [points, setPoints] = useState<TrimPoint[]>([]);
@@ -274,6 +276,7 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live
       ref={overlay}
       onWheel={(event) => { if (!(onStrengthWheel && (event.ctrlKey || event.metaKey))) passToView.wheel(event); }}
       onContextMenu={(event) => event.preventDefault()}
+      onDoubleClick={(event) => { if (onDouble) { event.preventDefault(); onDouble(event.clientX, event.clientY, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey }); } }}
       onPointerMove={(event) => {
         placeRing(event.clientX, event.clientY);
         if (!drawing.current) return;

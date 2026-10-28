@@ -2007,3 +2007,20 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .sculpt-help-list dl > div { display: grid; grid-template-columns: 96px 1fr; gap: 8px; }
 .sculpt-help-list dt { font-weight: 600; }
 .sculpt-help-list dd { margin: 0; color: var(--muted, #5b6573); }
+
+/* Build 94: Sculpt in tabs, and the bar of the selection's actions beside it in the view. */
+.sculpt-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 4px 0 8px; padding: 3px; border-radius: 9px; background: var(--surface-2, #eef1f5); }
+.sculpt-tabs button { border: 0; background: transparent; padding: 7px 4px; border-radius: 7px; font-weight: 600; color: var(--muted, #5b6573); cursor: pointer; }
+.sculpt-tabs button.active { background: var(--surface, #fff); color: var(--accent, #1f5fbf); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.sculpt-tools.two { grid-template-columns: repeat(2, 1fr); }
+.sculpt-view-aids { display: grid; gap: 4px; margin-top: 6px; }
+.sculpt-selection button.danger { color: #b42318; border-color: #e4a29b; }
+.sculpt-selection-bar { position: fixed; z-index: 60; display: flex; flex-wrap: wrap; gap: 4px; max-width: 360px; padding: 5px; border-radius: 10px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22); pointer-events: auto; }
+.sculpt-selection-bar button { border: 1px solid var(--border, #d4dae3); background: #fff; border-radius: 7px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+.sculpt-selection-bar button.danger { color: #b42318; border-color: #e4a29b; }
+.sculpt-selection-bar button:hover { background: #f1f5fb; }
+.sculpt-radial { position: fixed; z-index: 70; width: 0; height: 0; pointer-events: none; }
+.sculpt-radial button { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; min-width: 74px; padding: 6px 9px; border-radius: 999px; border: 1px solid var(--border, #d4dae3); background: rgba(255, 255, 255, 0.97); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2); font-size: 12px; font-weight: 600; cursor: pointer; }
+.sculpt-radial button.active { color: var(--accent, #1f5fbf); border-color: var(--accent, #1f5fbf); }
+.sculpt-radial button.hover { background: var(--accent, #1f5fbf); color: #fff; }
+.sculpt-radial-hint { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; font-size: 11px; color: #fff; background: rgba(0, 0, 0, 0.55); padding: 2px 7px; border-radius: 6px; }

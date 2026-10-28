@@ -80,6 +80,8 @@ import { remeshRegion, LiveMesh, averageEdgeOf, stampBrush, type LiveBrush, type
 import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
 import { MeshSculptPanel, type SculptBrushOptions, type SoftTransform, type SculptFreezeAction, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
+import { SculptSelectionBar } from "./workplane/SculptSelectionBar";
+import { RADIAL_TOOLS, SculptRadialMenu, radialIndex } from "./workplane/SculptRadialMenu";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
 import { looksLikeDentalScan, type DentalAnalysis, type DentalRole, type DentalStudioInput, type DentalStudioOptions } from "@/lib/dentalModel";
@@ -9109,6 +9111,41 @@ export function LayerlingEditor({
     brushChoice(selection.mesh, window.layerlingProjectPoints(cornerPositions(selection.mesh)), window.layerlingCameraPosition(), points, tool.size, selection.chosen, tool.tool === "select", tool.reach);
     setSculptTool((current) => current ? { ...current, chosen: selection.chosen.reduce((a, b) => a + b, 0) } : current);
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Build 94: the selection's middle (in the scene), for the bar of actions beside it.
+  const sculptSelectionAnchor = useMemo<[number, number, number] | null>(() => {
+    const open = sculptTool;
+    const state = sculptState.current;
+    if (!open?.chosen || !state || state.shapeId !== open.shapeId || !state.selection) return null;
+    const { mesh, chosen } = state.selection;
+    let x = 0, y = 0, z = 0, n = 0;
+    for (let t = 0; t < chosen.length; t += 1) {
+      if (!chosen[t]) continue;
+      for (let k = 0; k < 3; k += 1) { const c = mesh.triangles[t * 3 + k] * 3; x += mesh.points[c]; y += mesh.points[c + 1]; z += mesh.points[c + 2]; n += 1; }
+    }
+    return n ? [x / n, y / n, z / n] : null;
+  }, [sculptTool?.chosen, sculptTool?.shapeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  /**
+   * Build 94: a double-click selects the whole face group under it (Meshmixer): on its own it takes
+   * the place of the selection, with Shift it is added, with Ctrl taken away. Groups are made first if
+   * they were not shown.
+   */
+  const selectGroupAt = useCallback((x: number, y: number, keys: { ctrl: boolean; shift: boolean }) => {
+    const target = sculptTarget();
+    if (!target) return;
+    const { tool, state } = target;
+    const ray = window.layerlingScreenRay?.(x, y);
+    const hit = ray ? state.live.pick(ray.origin, ray.direction) : null;
+    if (!hit) return;
+    if (!state.live.groups) state.live.generateGroups(tool.groupAngle ?? 30);
+    const g = state.live.groupOf(hit.triangle);
+    if (g < 0) return;
+    const selection = sculptSelectionOf(state);
+    const map = liveToSelection(state);
+    const groups = state.live.groups!;
+    if (!keys.shift && !keys.ctrl) selection.chosen.fill(0);
+    for (let t = 0; t < map.length; t += 1) if (map[t] >= 0 && groups[t] === g) selection.chosen[map[t]] = keys.ctrl ? 0 : 1;
+    setSculptTool((current) => current ? { ...current, chosen: selection.chosen.reduce((a, b) => a + b, 0) } : current);
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
   /**
    * Build 92: each live triangle's number in the selection's copy (made from the live triangles in their
    * order, less any whose corners weld into one), or -1.
@@ -9770,6 +9807,11 @@ export function LayerlingEditor({
     setSculptTool((current) => current ? { ...current, chosen: 0, teethHit: 0, teethWarned: undefined, teethAction: undefined, panelSteps: Math.max(0, (current.panelSteps ?? 0) + (back ? -1 : 1)), panelRedo: Math.max(0, (current.panelRedo ?? 0) + (back ? 1 : -1)) } : current);
     if (sculptTool?.trim) window.setTimeout(() => void ensureDentalAreasRef.current(), 0);
   };
+  // Build 94: the ring of brushes (Space), where the pointer is, and how a brush is picked from it.
+  const [sculptRadial, setSculptRadial] = useState<{ x: number; y: number; hover: number } | null>(null);
+  const sculptPointer = useRef<[number, number]>([0, 0]);
+  const pickSculptToolRef = useRef<(tool: SculptTool) => void>(() => {});
+  pickSculptToolRef.current = (tool: SculptTool) => setSculptTool((current) => current ? { ...current, tool } : current);
   const stepSculptPanelRef = useRef(stepSculptPanel);
   stepSculptPanelRef.current = stepSculptPanel;
   // While Sculpt is open: Ctrl+Z steps through its strokes; any other shortcut, or a click outside the
@@ -9777,6 +9819,32 @@ export function LayerlingEditor({
   useEffect(() => {
     if (!sculptOpen) return;
     const onKey = (event: KeyboardEvent) => {
+      const inField = Boolean((event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable=true]"));
+      // Build 94: Delete (or Backspace) deletes the selected triangles only - never the part; with
+      // nothing selected it does nothing. Ctrl+A selects all of the part; Esc with a selection clears it.
+      // Build 94: Space held - the ring of brushes at the pointer.
+      if (!inField && event.key === " " && !event.repeat && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault(); event.stopPropagation();
+        setSculptRadial({ x: sculptPointer.current[0], y: sculptPointer.current[1], hover: -1 });
+        return;
+      }
+      if (!inField && (event.key === "Delete" || event.key === "Backspace")) {
+        event.preventDefault(); event.stopPropagation();
+        if (sculptToolRef.current?.chosen) applySculptSelectionRef.current("delete");
+        else setNotice(t("sculpt.deleteNothing"));
+        return;
+      }
+      if (!inField && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+        event.preventDefault(); event.stopPropagation();
+        if (sculptToolRef.current?.chosen) applySculptSelectionRef.current("clear");
+        applySculptSelectionRef.current("invert");
+        return;
+      }
+      if (!inField && event.key === "Escape" && sculptToolRef.current?.chosen && (sculptToolRef.current.tool === "select" || sculptToolRef.current.tool === "unselect" || !sculptToolRef.current.tool)) {
+        event.preventDefault(); event.stopPropagation();
+        applySculptSelectionRef.current("clear");
+        return;
+      }
       // Build 83: Meshmixer's Select keys - > and < grow and shrink, E connected, I invert, Shift+I
       // invert connected, O tidy edge.
       const selectKey = !event.ctrlKey && !event.metaKey && !event.altKey && !(event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable=true]")
@@ -9814,9 +9882,27 @@ export function LayerlingEditor({
       if (target?.closest?.(".mesh-sculpt-panel, .dental-brush-overlay, .workplane-plane")) return;
       flushSculptRef.current();
     };
+    // Build 94: where the pointer is (for the ring), and the ring's choice when Space is let go.
+    const onMove = (event: PointerEvent) => {
+      sculptPointer.current = [event.clientX, event.clientY];
+      setSculptRadial((ring) => {
+        if (!ring) return ring;
+        const hover = radialIndex(event.clientX - ring.x, event.clientY - ring.y);
+        return hover === ring.hover ? ring : { ...ring, hover };
+      });
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== " ") return;
+      setSculptRadial((ring) => {
+        if (ring && ring.hover >= 0) pickSculptToolRef.current(RADIAL_TOOLS[ring.hover]);
+        return null;
+      });
+    };
     window.addEventListener("keydown", onKey, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("pointermove", onMove, true);
     window.addEventListener("pointerdown", onPointer, true);
-    return () => { window.removeEventListener("keydown", onKey, true); window.removeEventListener("pointerdown", onPointer, true); };
+    return () => { window.removeEventListener("keydown", onKey, true); window.removeEventListener("keyup", onKeyUp, true); window.removeEventListener("pointermove", onMove, true); window.removeEventListener("pointerdown", onPointer, true); setSculptRadial(null); };
   }, [sculptOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fork (build 55): Texture - a pattern pressed into or raised out of one part's surface.
@@ -17510,6 +17596,7 @@ export function LayerlingEditor({
           onGroups={sculptGroups}
           brushOptions={sculptTool.brushOptions ?? BRUSH_OPTIONS_DEFAULT}
           onBrushOptions={(brushOptions) => { storeBrushOptions(brushOptions); setSculptTool((current) => current ? { ...current, brushOptions } : current); }}
+          onPreset={(preset) => setSculptTool((current) => current ? { ...current, tool: preset.tool, size: preset.size, strength: preset.strength, brushOptions: { ...(current.brushOptions ?? { falloff: "smooth", lazy: 0, hold: false, depth: 0 }), falloff: preset.falloff } } : current)}
           onSoftStart={softStart}
           onSoft={softChange}
           onSoftEnd={softEnd}
@@ -17538,10 +17625,15 @@ export function LayerlingEditor({
           erase={sculptTool.tool === "unselect"}
           onStrengthWheel={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : (up) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.01, Math.min(1, Math.round((current.strength + (up ? 0.05 : -0.05)) * 100) / 100)) } : current)}
           onDone={applySculptStroke}
+          onDouble={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? selectGroupAt : undefined}
           onCancel={() => { endSculptStroke(); setSculptTool((current) => current ? { ...current, tool: null } : current); }}
           live={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : { start: startSculptStroke, move: moveSculptStroke, end: endSculptStroke }}
         />
       ) : null}
+      {sculptTool && !sculptTool.trim && sculptTool.chosen > 0 && !sculptTool.soft && sculptSelectionAnchor ? (
+        <SculptSelectionBar anchor={sculptSelectionAnchor} busy={sculptTool.busy} onAction={(action) => applySculptSelectionRef.current(action)} onSoft={softStart} />
+      ) : null}
+      {sculptTool && sculptRadial ? <SculptRadialMenu x={sculptRadial.x} y={sculptRadial.y} hover={sculptRadial.hover} current={sculptTool.tool} onPick={(tool) => { pickSculptToolRef.current(tool); setSculptRadial(null); }} /> : null}
       {sculptTool && sculptSpeedShown ? (
         <div className="sculpt-speed" role="status" aria-live="polite">
           <strong>{t("sculpt.speed.title")}</strong>
