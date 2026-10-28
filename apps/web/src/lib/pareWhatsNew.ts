@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 89,
+    items: [
+      "More of Meshmixer's sculpt brushes: Draw 2 (an even layer, however often you go over it), Drag (pulls the surface along the stroke), Shrink smooth and Bubble smooth (keeps the volume, so rounded shapes stay rounded).",
+      "Smooth now works as Meshmixer's RobustSmooth: it evens the surface without shrinking it, so a cusp or a ridge keeps its size.",
+      "Flatten grows with the strength as Meshmixer's does - gentle at low settings, nearly flat in one stroke at 100 (it flattened almost everything even at 25 before).",
+    ],
+  },
+  {
     build: 88,
     items: [
       "Scans look as they do in Meshmixer: a near-white grey with a soft sheen, lit from just above and to the left of your eye, so faces turned to you are bright and creases and hollows fall dark (in the dark look, which Model Builder opens in).",

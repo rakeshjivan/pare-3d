@@ -21,7 +21,8 @@ export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "
 /** Remesh, Offset and Thicken in the panel: on again in build 73 (they keep the part's surface now). */
 export const WHOLE_PART_TOOLS = true;
 
-export const SCULPT_TOOLS: SculptTool[] = ["draw", "inflate", "deflate", "smooth", "flatten", "pinch", "crease", "move", "select", "unselect"];
+// Build 89: Meshmixer's brushes, in its order where it has them.
+export const SCULPT_TOOLS: SculptTool[] = ["drag", "draw", "draw2", "flatten", "inflate", "deflate", "pinch", "move", "crease", "smooth", "shrinkSmooth", "bubbleSmooth", "select", "unselect"];
 /** Build 75: Trim (Dental Studio's step 2a) - only selecting and deleting. */
 export const TRIM_TOOLS: SculptTool[] = ["select", "unselect"];
 /** Build 76: Erase & Fill (fill) sits beside Delete in Trim and Sculpt. */

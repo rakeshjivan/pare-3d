@@ -81,21 +81,22 @@ describe("brush strength like Meshmixer's (build 82; build 85 at a person's pace
       return 1 - (hi - lo) / 2 / 0.3;
     });
     // Meshmixer: 19%, 50%, 86% (one pass); build 85 at an unhurried pace, a little more.
-    expect(removed[0]).toBeGreaterThan(0.35);
-    expect(removed[0]).toBeLessThan(0.6);
-    expect(removed[1]).toBeGreaterThan(0.75);
-    expect(removed[1]).toBeLessThan(0.95);
-    expect(removed[2]).toBeGreaterThan(0.82);
-    expect(removed[2]).toBeLessThan(0.98);
+    // Build 89: RobustSmooth (cotangent weights) - a little gentler than the plain smooth on this even grid.
+    expect(removed[0]).toBeGreaterThan(0.25);
+    expect(removed[0]).toBeLessThan(0.55);
+    expect(removed[1]).toBeGreaterThan(0.65);
+    expect(removed[1]).toBeLessThan(0.9);
+    expect(removed[2]).toBeGreaterThan(0.75);
+    expect(removed[2]).toBeLessThan(0.95);
   });
 
   it("the response is defined at every strength and Smooth never moves a corner past its neighbours' average", () => {
-    for (const brush of ["draw", "inflate", "deflate", "smooth", "flatten", "pinch", "crease"] as const) {
+    for (const brush of ["draw", "draw2", "drag", "inflate", "deflate", "smooth", "shrinkSmooth", "bubbleSmooth", "flatten", "pinch", "crease"] as const) {
       for (const s of [0, 0.05, 0.5, 1]) {
         const r = brushResponse(brush, s);
         expect(Number.isFinite(r.step) && Number.isFinite(r.strength)).toBe(true);
         expect(r.passes).toBeGreaterThanOrEqual(1);
-        if (brush === "smooth") expect(r.strength * 1.5).toBeLessThanOrEqual(1.2);
+        if (brush === "smooth" || brush === "shrinkSmooth" || brush === "bubbleSmooth") expect(r.strength * 1.5).toBeLessThanOrEqual(1.2);
       }
     }
   });

@@ -16,7 +16,15 @@
  */
 import * as THREE from "three";
 
-export type LiveBrush = "draw" | "inflate" | "deflate" | "smooth" | "flatten" | "pinch" | "crease" | "move";
+/**
+ * Build 89: Meshmixer's brushes. "smooth" is RobustSmooth (weighted by the triangles' shape, so uneven
+ * triangles do not throw it off); "shrinkSmooth" the plain smooth of builds 73-88 (each corner to its
+ * neighbours' plain average, which pulls the surface in), "bubbleSmooth" smooths
+ * and keeps the volume (bumps round off rather than sink); "drag" pulls the surface along the stroke;
+ * "draw2" raises the surface to a set height above where it was when the stroke began, and no further.
+ */
+export type LiveBrush = "draw" | "draw2" | "drag" | "inflate" | "deflate" | "smooth" | "shrinkSmooth" | "bubbleSmooth" | "flatten" | "pinch" | "crease" | "move";
+type DabBrush = Exclude<LiveBrush, "move">;
 export type Vec3 = [number, number, number];
 
 const K = 131072, OFF = 65536;
@@ -283,6 +291,7 @@ export class LiveMesh {
   }
   /** Starts recording changes (call before a stroke). */
   beginPatch() {
+    this.beginStroke();
     this.journal = new Map();
     this.journalT = this.tCount;
     this.journalV = this.vCount;
@@ -779,7 +788,7 @@ export class LiveMesh {
    * One dab: the corners in `region` (distance from the centre) moved by `brush`. `normal` is the
    * surface's facing at the centre, `step` the most a corner moves (mm), `strength` 0..1.
    */
-  dab(brush: Exclude<LiveBrush, "move">, centre: Vec3, normal: Vec3, radius: number, region: Map<number, number>, strength: number, step: number) {
+  dab(brush: DabBrush, centre: Vec3, normal: Vec3, radius: number, region: Map<number, number>, strength: number, step: number) {
     if (!region.size) return;
     const weight = (d: number) => { const x = 1 - (d / radius) ** 2; return x > 0 ? x * x * strength : 0; };
     const p = this.pos;
@@ -809,13 +818,30 @@ export class LiveMesh {
       if (!w) continue;
       const x = p[v * 3], y = p[v * 3 + 1], z = p[v * 3 + 2];
       let dx = 0, dy = 0, dz = 0;
-      if (brush === "smooth" || brush === "pinch" || brush === "crease") {
-        if (brush === "smooth") {
-          const around = this.neighbours(v);
-          if (!around.length) continue;
+      if (brush === "smooth" || brush === "shrinkSmooth" || brush === "bubbleSmooth" || brush === "pinch" || brush === "crease") {
+        if (brush !== "pinch" && brush !== "crease") {
           let ax = 0, ay = 0, az = 0;
-          for (const u of around) { ax += p[u * 3]; ay += p[u * 3 + 1]; az += p[u * 3 + 2]; }
-          dx = (ax / around.length - x) * Math.min(1, w * 1.5); dy = (ay / around.length - y) * Math.min(1, w * 1.5); dz = (az / around.length - z) * Math.min(1, w * 1.5);
+          if (brush === "smooth") {
+            // RobustSmooth: the neighbours weighted by the shape of the triangles between them (the
+            // cotangent weights of mean-curvature flow, Desbrun et al. 1999), so long thin triangles and
+            // uneven spacing - a scan's, or a refined patch's - do not drag the corner sideways.
+            if (!this.cotanMiddle(v, this.dabMid)) continue;
+            ax = this.dabMid.x; ay = this.dabMid.y; az = this.dabMid.z;
+          } else {
+            const around = this.neighbours(v);
+            if (!around.length) continue;
+            for (const u of around) { ax += p[u * 3]; ay += p[u * 3 + 1]; az += p[u * 3 + 2]; }
+            ax /= around.length; ay /= around.length; az /= around.length;
+          }
+          const k = Math.min(1, w * 1.5);
+          dx = (ax - x) * k; dy = (ay - y) * k; dz = (az - z) * k;
+          if (brush === "smooth") {
+            // ...and only across the surface's facing: bumps and dents go, but nothing slides along the
+            // surface, so the triangles stay where they are and a flat or gently curved patch stays put.
+            this.vertexNormal(v, n);
+            const along = dx * n.x + dy * n.y + dz * n.z;
+            dx = n.x * along; dy = n.y * along; dz = n.z * along;
+          }
         } else {
           // Pinch: towards the brush's middle, across the surface (not along its facing).
           let tx = centre[0] - x, ty = centre[1] - y, tz = centre[2] - z;
@@ -830,6 +856,21 @@ export class LiveMesh {
         dx = -area.x * off * k; dy = -area.y * off * k; dz = -area.z * off * k;
       } else if (brush === "draw") {
         dx = area.x * step * w; dy = area.y * step * w; dz = area.z * step * w;
+      } else if (brush === "draw2") {
+        // Up to `step` x 6 above where the corner was when the stroke began, along the facing it had then.
+        let base = this.layerBase.get(v);
+        if (!base) { this.vertexNormal(v, n); base = [x, y, z, n.x, n.y, n.z]; this.layerBase.set(v, base); }
+        const desired = step * 6 * (w / Math.max(1e-6, strength));
+        const gap = desired - ((x - base[0]) * base[3] + (y - base[1]) * base[4] + (z - base[2]) * base[5]);
+        if (step >= 0 ? gap <= 0 : gap >= 0) continue;
+        const rise = gap * 0.35;
+        dx = base[3] * rise; dy = base[4] * rise; dz = base[5] * rise;
+      } else if (brush === "drag") {
+        // Along the stroke: the corners under the brush follow the brush's move since the last dab.
+        const prev = this.dragPrev;
+        if (!prev) continue;
+        const k = Math.min(1, w * 1.4);
+        dx = (centre[0] - prev[0]) * k; dy = (centre[1] - prev[1]) * k; dz = (centre[2] - prev[2]) * k;
       } else {
         this.vertexNormal(v, n);
         const s = brush === "inflate" ? step : -step;
@@ -838,9 +879,63 @@ export class LiveMesh {
       corners[count] = v; moves[count * 3] = dx; moves[count * 3 + 1] = dy; moves[count * 3 + 2] = dz;
       count += 1;
     }
+    if (brush === "bubbleSmooth" && count) {
+      // BubbleSmooth: whatever the smoothing took in along the brush's facing is given back evenly, so the
+      // patch keeps its volume - a bump rounds off instead of sinking.
+      let sunk = 0, spread = 0;
+      for (let i = 0; i < count; i += 1) {
+        const v = corners[i], w = weight(region.get(v)!);
+        sunk += moves[i * 3] * area.x + moves[i * 3 + 1] * area.y + moves[i * 3 + 2] * area.z;
+        spread += w;
+      }
+      if (spread > 0) {
+        const back = -sunk / spread;
+        for (let i = 0; i < count; i += 1) {
+          const w = weight(region.get(corners[i])!);
+          moves[i * 3] += area.x * back * w; moves[i * 3 + 1] += area.y * back * w; moves[i * 3 + 2] += area.z * back * w;
+        }
+      }
+    }
     for (let i = 0; i < count; i += 1) { const v = corners[i]; p[v * 3] += moves[i * 3]; p[v * 3 + 1] += moves[i * 3 + 1]; p[v * 3 + 2] += moves[i * 3 + 2]; this.moved(v); }
     this.rebin(corners, count);
+    if (brush === "drag") this.dragPrev = [centre[0], centre[1], centre[2]];
   }
+  /** Build 89: Draw2's starting surface and Drag's last brush centre, for the stroke under way. */
+  private dabMid = new THREE.Vector3();
+  /**
+   * The cotangent-weighted middle of v's neighbours: each neighbour weighted by the cotangents of the two
+   * angles facing the edge to it (negative weights, from obtuse triangles, taken as none). False when v
+   * has no usable neighbours.
+   */
+  private cotanMiddle(v: number, out: THREE.Vector3) {
+    const p = this.pos, tri = this.tri;
+    let sx = 0, sy = 0, sz = 0, sw = 0;
+    const cot = (o: number, a: number, b: number) => {
+      // The cotangent of the angle at o in the triangle o, a, b.
+      const ux = p[a * 3] - p[o * 3], uy = p[a * 3 + 1] - p[o * 3 + 1], uz = p[a * 3 + 2] - p[o * 3 + 2];
+      const vx = p[b * 3] - p[o * 3], vy = p[b * 3 + 1] - p[o * 3 + 1], vz = p[b * 3 + 2] - p[o * 3 + 2];
+      const dot = ux * vx + uy * vy + uz * vz;
+      const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+      const cross = Math.sqrt(cx * cx + cy * cy + cz * cz);
+      return cross > 1e-12 ? dot / cross : 0;
+    };
+    for (const t of this.vTris[v]) {
+      const i = t * 3;
+      // The triangle's other two corners, a and b: the angle at b faces edge v-a, the angle at a faces v-b.
+      let a = tri[i], b = tri[i + 1];
+      if (a === v) { a = tri[i + 1]; b = tri[i + 2]; } else if (b === v) { b = tri[i + 2]; }
+      const wa = Math.max(0, cot(b, v, a)) / 2, wb = Math.max(0, cot(a, v, b)) / 2;
+      sx += p[a * 3] * wa + p[b * 3] * wb; sy += p[a * 3 + 1] * wa + p[b * 3 + 1] * wb; sz += p[a * 3 + 2] * wa + p[b * 3 + 2] * wb;
+      sw += wa + wb;
+    }
+    if (!(sw > 1e-12)) return false;
+    out.set(sx / sw, sy / sw, sz / sw);
+    return true;
+  }
+  private layerBase = new Map<number, [number, number, number, number, number, number]>();
+  private dragPrev: Vec3 | null = null;
+  /** Starts a stroke for the brushes that remember it (Draw2, Drag). beginPatch does this too. */
+  beginStroke() { this.layerBase.clear(); this.dragPrev = null; }
 
   /** Puts corners back where they were (undo of a stroke that only moved corners). */
   setPositions(corners: ArrayLike<number>, values: ArrayLike<number>) {
@@ -1293,9 +1388,14 @@ export function brushResponse(brush: LiveBrush, strength: number): { strength: n
   // about 80 pointer events over 16 mm) rather than between its quick and slow ones - 1.67 times the
   // build 82 figures. Build 86: twice that again (3.34 times) - a hand stroke on a trackpad or a fast
   // mouse sends Meshmixer far more events than the test did, and side by side Pare 3D still felt weak.
-  if (brush === "draw" || brush === "crease") return { strength: s, step: BRUSH_PACE * 0.031 * s, passes: 1 };
+  if (brush === "draw" || brush === "crease" || brush === "draw2") return { strength: s, step: BRUSH_PACE * 0.031 * s, passes: 1 };
+  if (brush === "drag") return { strength: s, step: 0, passes: 1 };
+  // Build 89: Flatten as Meshmixer's - one stroke over 0.3 mm ridges took away 16 / 44 / 84% at Strength
+  // 25 / 51 / 100 there (a quick stroke); here about 25 / 60 / 88%, at a person's pace (it took away
+  // 84% even at 25 before, far too strong at low settings).
+  if (brush === "flatten") return { strength: 0.29 * Math.pow(s, 1.43), step: 0.06, passes: 1 };
   if (brush === "inflate" || brush === "deflate") return { strength: s, step: BRUSH_PACE * 0.021 * Math.pow(s, 0.3), passes: 1 };
-  if (brush === "smooth") {
+  if (brush === "smooth" || brush === "shrinkSmooth" || brush === "bubbleSmooth") {
     // One pass at weight u takes away about 1 - exp(-0.87 u^0.73) of fine ridges; Meshmixer's
     // 19 / 50 / 86% at 25 / 53 / 100 is work W = 2.26 s^1.6 in those units, spread over passes
     // (build 85: times the same pace, capped so a full-strength stroke cannot wipe out a cusp in one go).
@@ -1311,7 +1411,9 @@ export function brushResponse(brush: LiveBrush, strength: number): { strength: n
 export function stampBrush(mesh: LiveMesh, brush: Exclude<LiveBrush, "move">, centre: Vec3, normal: Vec3, radius: number, triangle: number, strength: number, dig = false) {
   const response = brushResponse(brush, strength);
   const step = radius * response.step * (dig ? -1 : 1);
-  for (let k = 0; k < response.passes; k += 1) mesh.dab(brush, centre, normal, radius, mesh.region(centre, radius, triangle), response.strength, step);
+  for (let k = 0; k < response.passes; k += 1) {
+    mesh.dab(brush, centre, normal, radius, mesh.region(centre, radius, triangle), response.strength, step);
+  }
 }
 
 export function averageEdgeOf(mesh: LiveMesh) { return mesh.averageEdge(sampleCorners(mesh, 5000)); }
