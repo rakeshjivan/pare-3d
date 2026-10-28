@@ -883,6 +883,16 @@ export function effectiveViewSettings<T extends Pick<WorkplaneWorkspaceSettings,
 }
 
 /** How many pixels the view draws per screen pixel: fast mode draws no more than the screen has. */
-export function viewPixelRatio(workspace: Pick<WorkplaneWorkspaceSettings, "fastMode">, devicePixelRatio: number) {
-  return workspace.fastMode ? 1 : Math.min(Math.max(1, devicePixelRatio || 1), 2);
+/**
+ * Build 88: the most pixels the 3D view draws, whatever the screen. On a Mac set to "More Space" the
+ * system draws at a larger size and shrinks the picture to fit, so the view was filling 40% more pixels
+ * every frame for no gain a person can see - and a full-arch scan drawn that big made Sculpt lag. About
+ * a 14-inch MacBook Pro's view at its default setting.
+ */
+export const VIEW_PIXEL_BUDGET = 4_200_000;
+export function viewPixelRatio(workspace: Pick<WorkplaneWorkspaceSettings, "fastMode">, devicePixelRatio: number, cssWidth = 0, cssHeight = 0) {
+  const ratio = workspace.fastMode ? 1 : Math.min(Math.max(1, devicePixelRatio || 1), 2);
+  const area = cssWidth * cssHeight;
+  if (!(area > 0) || ratio <= 1) return ratio;
+  return Math.max(1, Math.min(ratio, Math.round(Math.sqrt(VIEW_PIXEL_BUDGET / area) * 100) / 100));
 }

@@ -6,7 +6,7 @@ import { zUpToLayerling } from "@/lib/meshCoordinates";
 import type { WorkplaneShape } from "@/types/layerling";
 
 /** Build 85: the colour an imported STL takes - Meshmixer's light grey (it was the import blue). */
-export const SCAN_GREY = "#bcbcbc";
+export const SCAN_GREY = "#cccaca";
 
 const stlLoader = new STLLoader();
 const SUPPORTED_IMPORT_EXTENSIONS = new Set(["stl", "svg"]);

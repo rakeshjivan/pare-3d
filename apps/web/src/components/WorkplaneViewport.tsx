@@ -11041,6 +11041,11 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
   const resize = () => {
     const width = Math.max(1, host.clientWidth);
     const height = Math.max(1, host.clientHeight);
+    // Build 88: the view's resolution kept within its pixel budget as the window changes size.
+    const adapt = adaptiveResolution(state, renderer.domElement);
+    const budgeted = viewPixelRatio({ fastMode: viewFastMode }, window.devicePixelRatio, width, height);
+    adapt.base = budgeted;
+    if (!adapt.low && renderer.getPixelRatio() !== budgeted) renderer.setPixelRatio(budgeted);
     renderer.setSize(width, height);
     updateCameraViewport(state.camera, width, height);
     [state.transformGuideLayer, state.moveDimensionLayer, state.originDimensionLayer, state.cornerRulerLayer, state.modifierLayer].forEach((layer) => {
@@ -11549,6 +11554,8 @@ function refreshFrozenObjectMatrix(object: THREE.Object3D) {
  * surface reads as it does in Meshmixer whichever way it is turned.
  */
 let viewLook: ViewLook = "plate";
+/** Build 88: fast mode as last set, for the pixel budget when the window changes size. */
+let viewFastMode = false;
 /** Build 87: Sculpt's per-frame stroke work, run at the start of the render loop's frame. */
 let beforeFrame: (() => void) | null = null;
 /** Build 87: set when only the sculpted surface changed this frame. */
@@ -11562,12 +11569,16 @@ function applyViewLook(state: ThreeState | null) {
   state.workplaneLayer.visible = viewLook === "plate";
   const dark = viewLook === "dark";
   state.scene.background = new THREE.Color(dark ? MESHMIXER_BACKGROUND : base.background);
-  state.lights.ambient.intensity = base.ambient * (dark ? 0.4 : 1);
-  state.lights.key.intensity = base.key * (dark ? 0.25 : 1);
-  state.lights.fill.intensity = base.fill * (dark ? 0.2 : 1);
+  // Build 88: Meshmixer's lighting in the dark look - nearly all of it from the camera, so faces turned
+  // to you are bright and hollows and creases fall dark, with only a little soft grey all round (the
+  // light blue ground light of the workplane look made scans dull and flat).
+  state.lights.ambient.intensity = dark ? 0.23 : base.ambient;
+  state.lights.ambient.groundColor.set(dark ? "#484848" : "#d6edf5");
+  state.lights.key.intensity = dark ? 0 : base.key;
+  state.lights.fill.intensity = dark ? 0 : base.fill;
   let head = state.scene.getObjectByName("ViewHeadlight") as THREE.DirectionalLight | undefined;
   if (!head && dark) {
-    head = new THREE.DirectionalLight("#ffffff", 2.2);
+    head = new THREE.DirectionalLight("#ffffff", 4.1);
     head.name = "ViewHeadlight";
     state.scene.add(head, head.target);
   }
@@ -11602,7 +11613,8 @@ function rebuildWorkplane(
   const view = effectiveViewSettings(workspace);
   state.renderer.shadowMap.enabled = view.showShadows;
   state.controls.enableDamping = view.cameraInertia;
-  const pixelRatio = viewPixelRatio(workspace, window.devicePixelRatio);
+  viewFastMode = Boolean(workspace.fastMode);
+  const pixelRatio = viewPixelRatio(workspace, window.devicePixelRatio, state.renderer.domElement.clientWidth, state.renderer.domElement.clientHeight);
   const adapt = adaptiveResolution(state, state.renderer.domElement);
   adapt.base = pixelRatio;
   if (!adapt.low && state.renderer.getPixelRatio() !== pixelRatio) state.renderer.setPixelRatio(pixelRatio);
@@ -14402,7 +14414,7 @@ function holeOpacity(shape: WorkplaneShape) {
 
 /** Build 85: an imported mesh (a scan) a little glossy, as Meshmixer draws one, so its surface reads. */
 function shapeRoughness(shape: WorkplaneShape) {
-  return shape.hole ? 0.88 : shape.importedMesh ? 0.45 : 0.57;
+  return shape.hole ? 0.88 : shape.importedMesh ? 0.35 : 0.57;
 }
 
 function sharedShapeMaterial(shape: WorkplaneShape, vertexColors = false) {

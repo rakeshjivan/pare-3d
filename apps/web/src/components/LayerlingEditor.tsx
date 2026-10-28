@@ -9847,7 +9847,8 @@ export function LayerlingEditor({
     placed.forEach(({ arch, shape, place }, i) => {
       const fields = placementFor(shape, new THREE.Matrix4().makeTranslation(shift(boxes[i], arch.role)).multiply(place));
       // Build 79: the arch scans turn model grey (unless given a colour of their own); the bite scan keeps the import blue.
-      const color = !shape.color || shape.color.toLowerCase() === IMPORT_BLUE || shape.color.toLowerCase() === "#919191" ? DENTAL_SCAN_GREY : shape.color;
+      // Build 88: the import colours of builds 79-87 too, so scans brought in then take the new grey.
+      const color = !shape.color || [IMPORT_BLUE, "#919191", "#bcbcbc", "#d2d2d2"].includes(shape.color.toLowerCase()) ? DENTAL_SCAN_GREY : shape.color;
       if (fields) out.set(shape.id, canonicalizeShape({ ...shape, ...fields, color }));
     });
     for (const slot of ["bite", "bite2"] as const) {
