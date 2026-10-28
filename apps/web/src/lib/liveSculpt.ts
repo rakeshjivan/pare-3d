@@ -23,8 +23,8 @@ import * as THREE from "three";
  * and keeps the volume (bumps round off rather than sink); "drag" pulls the surface along the stroke;
  * "draw2" raises the surface to a set height above where it was when the stroke began, and no further.
  */
-export type LiveBrush = "draw" | "draw2" | "drag" | "inflate" | "deflate" | "smooth" | "shrinkSmooth" | "bubbleSmooth" | "flatten" | "pinch" | "crease" | "move";
-type DabBrush = Exclude<LiveBrush, "move">;
+export type LiveBrush = "draw" | "draw2" | "drag" | "inflate" | "deflate" | "smooth" | "shrinkSmooth" | "bubbleSmooth" | "flatten" | "pinch" | "crease" | "move" | "mask";
+type DabBrush = Exclude<LiveBrush, "move" | "mask">;
 export type Vec3 = [number, number, number];
 
 const K = 131072, OFF = 65536;
@@ -72,6 +72,16 @@ export class LiveMesh {
   private gPos!: THREE.BufferAttribute;
   private gNrm!: THREE.BufferAttribute;
   private gIdx!: THREE.BufferAttribute;
+  /** Build 90: a colour per corner - white, or tinted where the corner is frozen. */
+  private gCol!: THREE.BufferAttribute;
+  /**
+   * Build 90: how frozen each corner is (Meshmixer's Freeze), 0 free to 1 frozen: brushes move a corner
+   * only by its free part, and refining leaves the triangles of frozen corners as they are.
+   */
+  mask: Float32Array;
+  /** Set once anything was frozen: from then on the colours go to the graphics card with the positions. */
+  private maskShown = false;
+  private dirtyC = new Set<number>();
   private dirtyV = new Set<number>();
   private dirtyT = new Set<number>();
   /** Set when triangles were added or removed (the index buffer and draw range change). */
@@ -90,6 +100,7 @@ export class LiveMesh {
     this.tCount = m;
     this.tAlive = new Uint8Array(this.tri.length / 3).fill(1, 0, m);
     this.vCell = new Float64Array(this.pos.length / 3);
+    this.mask = new Float32Array(this.pos.length / 3);
     this.tBox = new Int32Array(this.tri.length * 2).fill(2147483647);
     // The grid cell: about three edges, at least 0.5 mm.
     let edge = 0;
@@ -218,6 +229,7 @@ export class LiveMesh {
     const pos = new Float64Array(cap * 3); pos.set(this.pos); this.pos = pos;
     const alive = new Uint8Array(cap); alive.set(this.vAlive); this.vAlive = alive;
     const cell = new Float64Array(cap); cell.set(this.vCell); this.vCell = cell;
+    const mask = new Float32Array(cap); mask.set(this.mask); this.mask = mask;
     this.allocateGpu();
   }
   private growTriangles(extra: number) {
@@ -233,6 +245,7 @@ export class LiveMesh {
     const v = this.vCount++;
     this.pos[v * 3] = x; this.pos[v * 3 + 1] = y; this.pos[v * 3 + 2] = z;
     this.vAlive[v] = 1;
+    this.mask[v] = 0;
     this.vTris[v] = [];
     if (v < this.rim.length) this.rim[v] = -1;
     if (!this.bulk) { this.vCell[v] = this.cellOfVertex(v); this.vGrid.add(this.vCell[v], v); }
@@ -584,12 +597,21 @@ export class LiveMesh {
     this.gPos = new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage);
     this.gNrm = new THREE.BufferAttribute(normals, 3).setUsage(THREE.DynamicDrawUsage);
     this.gIdx = new THREE.BufferAttribute(index, 1).setUsage(THREE.DynamicDrawUsage);
+    const colors = new Float32Array(vCap * 3).fill(1);
+    this.gCol = new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage);
+    for (let v = 0; v < this.vCount; v += 1) if (this.mask[v] > 0) this.tint(v, colors);
+    this.geometry.setAttribute("color", this.gCol);
     this.geometry.setAttribute("position", this.gPos);
     this.geometry.setAttribute("normal", this.gNrm);
     this.geometry.setIndex(this.gIdx);
     this.geometry.setDrawRange(0, this.tCount * 3);
     this.growBox(this.dirtyV);
     this.dirtyV.clear(); this.dirtyT.clear();
+  }
+  /** Build 90: a frozen corner's colour - towards a soft blue as it is frozen (the material's colour times this). */
+  private tint(v: number, colors: Float32Array) {
+    const m = Math.max(0, Math.min(1, this.mask[v]));
+    colors[v * 3] = 1 - 0.55 * m; colors[v * 3 + 1] = 1 - 0.4 * m; colors[v * 3 + 2] = 1 - 0.05 * m;
   }
   private refreshAllNormals() {
     const n = new THREE.Vector3(), arr = this.gNrm.array as Float32Array;
@@ -599,7 +621,7 @@ export class LiveMesh {
   }
   /** Copies what changed since the last call into the GPU buffers (as runs of indices). */
   flushGpu() {
-    if (!this.dirtyV.size && !this.dirtyT.size) return false;
+    if (!this.dirtyV.size && !this.dirtyT.size && !this.dirtyC.size) return false;
     // Normals of the changed corners and of their neighbours (their fans changed).
     // Build 85: each corner once, by a stamp per corner, into a list kept between frames.
     if (this.normalMark.length < this.pos.length / 3) this.normalMark = new Int32Array(this.pos.length / 3);
@@ -639,6 +661,13 @@ export class LiveMesh {
       attribute.needsUpdate = true;
     };
     ranges(this.dirtyV, this.gPos, 3);
+    if (this.maskShown) {
+      const changed = this.dirtyC, colors = this.gCol.array as Float32Array;
+      for (const v of this.dirtyV) changed.add(v);
+      for (const v of changed) this.tint(v, colors);
+      ranges(changed, this.gCol, 3);
+    }
+    this.dirtyC.clear();
     ranges(normalSet, this.gNrm, 3);
     if (this.dirtyT.size) ranges(this.dirtyT, this.gIdx, 3);
     this.geometry.setDrawRange(0, this.tCount * 3);
@@ -813,9 +842,10 @@ export class LiveMesh {
     if (this.dabCorners.length < region.size) this.dabCorners = new Int32Array(region.size * 2);
     const moves = this.dabMoves, corners = this.dabCorners;
     let count = 0;
+    const mask = this.mask;
     for (const v of region.keys()) {
-      const w = weight(region.get(v)!);
-      if (!w) continue;
+      const w = weight(region.get(v)!) * (1 - mask[v]);
+      if (!(w > 0)) continue;
       const x = p[v * 3], y = p[v * 3 + 1], z = p[v * 3 + 2];
       let dx = 0, dy = 0, dz = 0;
       if (brush === "smooth" || brush === "shrinkSmooth" || brush === "bubbleSmooth" || brush === "pinch" || brush === "crease") {
@@ -884,14 +914,14 @@ export class LiveMesh {
       // patch keeps its volume - a bump rounds off instead of sinking.
       let sunk = 0, spread = 0;
       for (let i = 0; i < count; i += 1) {
-        const v = corners[i], w = weight(region.get(v)!);
+        const v = corners[i], w = weight(region.get(v)!) * (1 - mask[v]);
         sunk += moves[i * 3] * area.x + moves[i * 3 + 1] * area.y + moves[i * 3 + 2] * area.z;
         spread += w;
       }
       if (spread > 0) {
         const back = -sunk / spread;
         for (let i = 0; i < count; i += 1) {
-          const w = weight(region.get(corners[i])!);
+          const w = weight(region.get(corners[i])!) * (1 - mask[corners[i]]);
           moves[i * 3] += area.x * back * w; moves[i * 3 + 1] += area.y * back * w; moves[i * 3 + 2] += area.z * back * w;
         }
       }
@@ -937,6 +967,48 @@ export class LiveMesh {
   /** Starts a stroke for the brushes that remember it (Draw2, Drag). beginPatch does this too. */
   beginStroke() { this.layerBase.clear(); this.dragPrev = null; }
 
+  // ---------------------------------------------------------------------------------------------
+  // Build 90: Freeze (Meshmixer's mask)
+
+  /** How much of a corner a brush may move: 1 free, 0 frozen. */
+  freeOf(v: number) { return 1 - this.mask[v]; }
+  private maskChanged(v: number) { this.dirtyC.add(v); this.maskShown = true; }
+  /** Paints frozen (or, `thaw`, free) under a brush: the same fall-off as the brushes. */
+  paintMask(region: Map<number, number>, radius: number, strength: number, thaw = false) {
+    region.forEach((d, v) => {
+      const x = 1 - (d / radius) ** 2;
+      if (!(x > 0)) return;
+      const add = Math.min(1, x * 2) * strength * 1.5;
+      const next = Math.max(0, Math.min(1, this.mask[v] + (thaw ? -add : add)));
+      if (next !== this.mask[v]) { this.mask[v] = next; this.maskChanged(v); }
+    });
+  }
+  /** Frees every corner. */
+  clearMask() { for (let v = 0; v < this.vCount; v += 1) if (this.mask[v] !== 0) { this.mask[v] = 0; this.maskChanged(v); } }
+  /** Frozen becomes free and free frozen. */
+  invertMask() { for (let v = 0; v < this.vCount; v += 1) if (this.vAlive[v]) { this.mask[v] = 1 - this.mask[v]; this.maskChanged(v); } }
+  /** Freezes the corners at these points (x y z each; within 1e-4 mm), e.g. a selection's triangles. */
+  freezePoints(points: ArrayLike<number>) {
+    const key = (x: number, y: number, z: number) => `${Math.round(x * 1e4)},${Math.round(y * 1e4)},${Math.round(z * 1e4)}`;
+    const wanted = new Set<string>();
+    for (let k = 0; k + 2 < points.length; k += 3) wanted.add(key(points[k], points[k + 1], points[k + 2]));
+    let count = 0;
+    for (let v = 0; v < this.vCount; v += 1) {
+      if (!this.vAlive[v] || this.mask[v] === 1) continue;
+      // Compared at single precision, as the part's triangles are kept.
+      if (wanted.has(key(Math.fround(this.pos[v * 3]), Math.fround(this.pos[v * 3 + 1]), Math.fround(this.pos[v * 3 + 2])))) { this.mask[v] = 1; this.maskChanged(v); count += 1; }
+    }
+    return count;
+  }
+  /** Where the frozen corners (half or more) are, x y z each - to freeze them again on a new copy of the part. */
+  frozenPoints(): Float32Array {
+    const out: number[] = [];
+    for (let v = 0; v < this.vCount; v += 1) if (this.vAlive[v] && this.mask[v] >= 0.5) out.push(this.pos[v * 3], this.pos[v * 3 + 1], this.pos[v * 3 + 2]);
+    return Float32Array.from(out);
+  }
+  /** Corners frozen half or more. */
+  frozenCount() { let n = 0; for (let v = 0; v < this.vCount; v += 1) if (this.vAlive[v] && this.mask[v] >= 0.5) n += 1; return n; }
+
   /** Puts corners back where they were (undo of a stroke that only moved corners). */
   setPositions(corners: ArrayLike<number>, values: ArrayLike<number>) {
     this.box = null;
@@ -971,6 +1043,7 @@ export class LiveMesh {
     if (!tris.length || tris.length > 2) return null;
     const p = this.pos;
     const m = this.addVertex((p[a * 3] + p[b * 3]) / 2, (p[a * 3 + 1] + p[b * 3 + 1]) / 2, (p[a * 3 + 2] + p[b * 3 + 2]) / 2);
+    this.mask[m] = (this.mask[a] + this.mask[b]) / 2;
     for (const t of tris) {
       const i = t * 3;
       const corners = [this.tri[i], this.tri[i + 1], this.tri[i + 2]];
@@ -1110,6 +1183,11 @@ export class LiveMesh {
     // `collapseBelow` keeps detail finer than the target that was there before (a scan's own triangles):
     // only edges shorter than it are collapsed.
     const hi = target * (4 / 3), lo = Math.min(target * (4 / 5), options.collapseBelow ?? Infinity);
+    // Build 90: frozen corners (half or more) are held as `fixed` ones are; flips keep off their triangles too.
+    // (this.mask read afresh each time: splitting can outgrow it, and it is then made anew.)
+    const given = options.fixed;
+    const held = (v: number) => this.mask[v] >= 0.5 || (given ? given(v) : false);
+    options = { ...options, fixed: held };
     let work = options.budget ?? 20000;
     const until = options.milliseconds ? performance.now() + options.milliseconds : Infinity;
     const late = () => performance.now() > until;
@@ -1194,6 +1272,7 @@ export class LiveMesh {
       if (work <= 0 || ((e & 63) === 0 && late())) break;
       if (!this.vAlive[a] || !this.vAlive[b]) continue;
       if (creaseCos !== null && isCrease(a, b)) continue;
+      if (this.mask[a] >= 0.5 || this.mask[b] >= 0.5) continue;
       if (options.fixed && options.fixed(a) && options.fixed(b)) continue;
       if (this.flipEdge(a, b)) work -= 1;
     }
@@ -1221,7 +1300,8 @@ export class LiveMesh {
         let dx = ax - this.pos[v * 3], dy = ay - this.pos[v * 3 + 1], dz = az - this.pos[v * 3 + 2];
         const along = dx * n.x + dy * n.y + dz * n.z;
         dx -= n.x * along; dy -= n.y * along; dz -= n.z * along;
-        moves.push([v, this.pos[v * 3] + dx * 0.5, this.pos[v * 3 + 1] + dy * 0.5, this.pos[v * 3 + 2] + dz * 0.5]);
+        const k = 0.5 * (1 - this.mask[v]);
+        moves.push([v, this.pos[v * 3] + dx * k, this.pos[v * 3 + 1] + dy * k, this.pos[v * 3 + 2] + dz * k]);
       }
       for (const [v, x, y, z] of moves) {
         q.set(x, y, z);
@@ -1389,11 +1469,15 @@ export function brushResponse(brush: LiveBrush, strength: number): { strength: n
   // build 82 figures. Build 86: twice that again (3.34 times) - a hand stroke on a trackpad or a fast
   // mouse sends Meshmixer far more events than the test did, and side by side Pare 3D still felt weak.
   if (brush === "draw" || brush === "crease" || brush === "draw2") return { strength: s, step: BRUSH_PACE * 0.031 * s, passes: 1 };
-  if (brush === "drag") return { strength: s, step: 0, passes: 1 };
+  if (brush === "drag" || brush === "mask") return { strength: s, step: 0, passes: 1 };
   // Build 89: Flatten as Meshmixer's - one stroke over 0.3 mm ridges took away 16 / 44 / 84% at Strength
   // 25 / 51 / 100 there (a quick stroke); here about 25 / 60 / 88%, at a person's pace (it took away
   // 84% even at 25 before, far too strong at low settings).
   if (brush === "flatten") return { strength: 0.29 * Math.pow(s, 1.43), step: 0.06, passes: 1 };
+  // Build 90: Pinch as Meshmixer's - a stroke along a soft ridge (0.8 mm high) drew it about a quarter to
+  // a third narrower there, keeping its height; Pare 3D's took away half of its width at 50 and three
+  // quarters at 100. Now about 15 / 25 / 35% at 25 / 50 / 100.
+  if (brush === "pinch") return { strength: 0.32 * Math.pow(s, 0.65), step: 0.06, passes: 1 };
   if (brush === "inflate" || brush === "deflate") return { strength: s, step: BRUSH_PACE * 0.021 * Math.pow(s, 0.3), passes: 1 };
   if (brush === "smooth" || brush === "shrinkSmooth" || brush === "bubbleSmooth") {
     // One pass at weight u takes away about 1 - exp(-0.87 u^0.73) of fine ridges; Meshmixer's
@@ -1410,6 +1494,7 @@ export function brushResponse(brush: LiveBrush, strength: number): { strength: n
 /** Build 82: one dab of a brush at a point, as brushResponse sets it (Ctrl: Draw and Crease dig in). */
 export function stampBrush(mesh: LiveMesh, brush: Exclude<LiveBrush, "move">, centre: Vec3, normal: Vec3, radius: number, triangle: number, strength: number, dig = false) {
   const response = brushResponse(brush, strength);
+  if (brush === "mask") { mesh.paintMask(mesh.region(centre, radius, triangle), radius, response.strength, dig); return; }
   const step = radius * response.step * (dig ? -1 : 1);
   for (let k = 0; k < response.passes; k += 1) {
     mesh.dab(brush, centre, normal, radius, mesh.region(centre, radius, triangle), response.strength, step);

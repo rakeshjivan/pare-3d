@@ -193,6 +193,8 @@ With several parts selected, a {{ui:selectionSize.title}} card shows how wide, d
 
 With several parts selected, the properties panel on the right shows how many there are and offers what applies to all of them together: {{ui:inspector.solid}} or {{ui:inspector.hole}}, one colour for all (a click on {{ui:inspector.solid}} opens the colours) and the lock. With a mixed selection, one click makes them all solids or all holes. If any of the parts is locked, only the lock can be used. Sizes are changed with the handles, with {{ui:scalePercent.title}} or by typing a number into a size label. With several parts the number is the size of the whole selection: every part grows with it, the spaces between them too, as when you drag a handle. Solid and hole also work with a right-click or the [[S]] and [[H]] keys.
 
+To work on a scan or another mesh without resizing it by accident, right-click and choose {{ui:contextMenu.hideHandles}}: the resize and turn handles, the sizes and their lines are put away, and the part can still be selected, moved and worked on with the mesh tools. {{ui:contextMenu.showHandles}} in the same menu brings them back, and they are back anyway the next time Pare 3D opens. While {{ui:sculpt.title}} is open they are put away by themselves and come back when it closes.
+
 ## Scaling by percent
 
 To make one or several parts larger or smaller by the same share, say all the parts of a print file by 20 %, use {{ui:scalePercent.title}}. Select the parts, right-click them and choose {{ui:scalePercent.title}}, or search for it with [[Ctrl]]+[[K]].

@@ -74,7 +74,7 @@ import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
 import { applyToSelection, brushChoice, lassoChoice, type LassoMode, cornerPositions, growChoice, soupFloat32, invertChoice, sculptMeshOf, soupOf, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
 import { LiveMesh, averageEdgeOf, stampBrush, type LiveBrush, type LivePatch } from "@/lib/liveSculpt";
 import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
-import { MeshSculptPanel, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
+import { MeshSculptPanel, type SculptFreezeAction, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
@@ -8961,7 +8961,7 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso"; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso"; frozen?: number; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
   /** Build 76: bumped when a stroke is added or stepped back, so Undo and Redo show what they can do. */
   const [, setSculptSteps] = useState(0);
   // Build 85: the speed readout (the ` key in Sculpt): the last stroke's frames, timed.
@@ -8975,13 +8975,18 @@ export function LayerlingEditor({
   const flushSculptRef = useRef<() => void>(() => {});
   const sculptPreviewDone = useRef<string | null>(null);
   /** The live copy of the part being sculpted - made again when the part changed some other way (undo, a move). */
+  const sculptFrozenKept = useRef<{ shapeId: string; points: Float32Array } | null>(null);
   const sculptMeshFor = (shape: WorkplaneShape) => {
     const key = projectShapesFingerprint([shape]);
     const known = sculptState.current;
     if (known && known.shapeId === shape.id && known.key === key) return known;
     if (known && known.shapeId === shape.id) window.layerlingSculptLive?.(shape.id, null);
+    // Build 90: what was frozen stays frozen on the new copy (where those corners still are).
+    const frozen = known && known.shapeId === shape.id ? known.live.frozenPoints() : sculptFrozenKept.current?.shapeId === shape.id ? sculptFrozenKept.current.points : null;
+    sculptFrozenKept.current = null;
     known?.live.dispose();
     const live = LiveMesh.fromSoup(worldTriangles(shape));
+    if (frozen?.length) live.freezePoints(frozen);
     const box = live.bounds();
     sculptState.current = { shapeId: shape.id, key, live, baseEdge: averageEdgeOf(live), centre: [(box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2], selection: null, strokes: 0, lastBrush: null, undo: [], redo: [] };
     return sculptState.current;
@@ -9042,7 +9047,11 @@ export function LayerlingEditor({
     // Build 76: one more step the panel's Undo can take back; a new step ends what Redo could do again.
     setSculptTool((current) => current ? { ...current, panelSteps: (current.panelSteps ?? 0) + 1, panelRedo: 0 } : current);
     if (keepCopy && sculptState.current) sculptState.current.key = projectShapesFingerprint([next]);
-    else { sculptState.current?.live.dispose(); sculptState.current = null; }
+    else {
+      const known = sculptState.current;
+      if (known) sculptFrozenKept.current = { shapeId: known.shapeId, points: known.live.frozenPoints() };
+      known?.live.dispose(); sculptState.current = null;
+    }
     return next;
   };
   /** Strokes not yet in the part go in now, as one step of undo. */
@@ -9251,10 +9260,11 @@ export function LayerlingEditor({
     window.layerlingSculptLive?.(shape.id, state.live.geometry, shape.color);
     // Build 82: Meshmixer's keys while stroking - Shift smooths, Ctrl does the opposite.
     const chosenBrush = tool.tool as LiveBrush;
-    const brush: LiveBrush = keys?.shift && chosenBrush !== "move" ? "smooth" : keys?.ctrl ? (chosenBrush === "inflate" ? "deflate" : chosenBrush === "deflate" ? "inflate" : chosenBrush) : chosenBrush;
+    const brush: LiveBrush = keys?.shift && chosenBrush !== "move" && chosenBrush !== "mask" ? "smooth" : keys?.ctrl ? (chosenBrush === "inflate" ? "deflate" : chosenBrush === "deflate" ? "inflate" : chosenBrush) : chosenBrush;
     const stroke: SculptStroke = {
-      dig: Boolean(keys?.ctrl && !keys.shift && (brush === "draw" || brush === "crease")),
-      brush, sizePx: tool.size, strength: tool.strength, refine: brush === "move" ? "off" : tool.refine, symmetry: tool.symmetry,
+      // Build 90: Ctrl with Freeze frees what it paints.
+      dig: Boolean(keys?.ctrl && !keys.shift && (brush === "draw" || brush === "crease" || brush === "mask")),
+      brush, sizePx: tool.size, strength: tool.strength, refine: brush === "move" || brush === "mask" ? "off" : tool.refine, symmetry: tool.symmetry,
       pending: [], last: null, frame: 0, balls: [], touched: false,
       edits: state.live.topologyEdits,
     };
@@ -9264,7 +9274,7 @@ export function LayerlingEditor({
       const grabOf = (centre: Vec3, seed: number) => {
         const out: Array<[number, number, number, number, number]> = [];
         for (const [v, d] of state.live.region(centre, radius, seed)) {
-          const f = 1 - (d / radius) ** 2;
+          const f = (1 - (d / radius) ** 2) * Math.sqrt(state.live.freeOf(v));
           if (f > 0) out.push([v, f * f * tool.strength * 2, state.live.pos[v * 3], state.live.pos[v * 3 + 1], state.live.pos[v * 3 + 2]]);
         }
         return out;
@@ -9317,6 +9327,8 @@ export function LayerlingEditor({
       }
       if (state.live.flushGpu()) window.layerlingRedraw?.();
     }
+    // Build 90: Freeze strokes change no shape (no step of undo) - the panel's count follows them.
+    if (stroke.brush === "mask") { const frozen = state.live.frozenCount(); setSculptTool((current) => current ? { ...current, frozen } : current); }
     // One step of undo for the stroke: what it changed, as a patch back and a patch forward.
     const entry = state.live.endPatch();
     if (!stroke.touched || !entry) return;
@@ -9431,11 +9443,34 @@ export function LayerlingEditor({
     commitSculpt(shape, positions, t("sculpt.selectionDone", { action: t(`sculpt.selection.${action}`) }), true);
     // The live copy follows (same triangles, same order), and the selection stays.
     const kept = selection.chosen;
+    const frozen = state.live.frozenPoints();
     state.live.dispose();
     state.live = LiveMesh.fromSoup(positions);
+    if (frozen.length) state.live.freezePoints(frozen);
     state.selection = { mesh: selection.mesh, chosen: kept, stale: false };
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
   applySculptSelectionRef.current = applySculptSelection;
+  /** Build 90: Freeze from the selection, Invert and Clear (Meshmixer's mask). */
+  const applySculptFreeze = useCallback((action: SculptFreezeAction) => {
+    const target = sculptTarget();
+    if (!target) return;
+    const { shape, state } = target;
+    if (action === "selection") {
+      const selection = sculptSelectionOf(state);
+      const { points, triangles } = selection.mesh;
+      const at: number[] = [];
+      selection.chosen.forEach((chosen, t) => {
+        if (!chosen) return;
+        for (let k = 0; k < 3; k += 1) { const v = triangles[t * 3 + k]; at.push(points[v * 3], points[v * 3 + 1], points[v * 3 + 2]); }
+      });
+      state.live.freezePoints(at);
+    } else if (action === "invert") state.live.invertMask();
+    else state.live.clearMask();
+    window.layerlingSculptLive?.(shape.id, state.live.geometry, shape.color);
+    if (state.live.flushGpu()) window.layerlingRedraw?.();
+    const frozen = state.live.frozenCount();
+    setSculptTool((current) => current ? { ...current, frozen } : current);
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Make solid on a coarse mesh: the triangles' size is too coarse a grid - about 160 voxels on the longest side instead. */
   const solidDetailFor = () => {
     const target = sculptTarget();
@@ -9472,7 +9507,7 @@ export function LayerlingEditor({
   useEffect(() => {
     if (sculptTool && !sculptTool.busy && !(selectedIds.length === 1 && selectedIds[0] === sculptTool.shapeId)) { flushSculptRef.current(); setSculptTool(null); }
   }, [sculptTool, selectedIds]);
-  useEffect(() => { if (!sculptTool) { sculptState.current?.live.dispose(); sculptState.current = null; } }, [sculptTool]);
+  useEffect(() => { if (!sculptTool) { sculptState.current?.live.dispose(); sculptState.current = null; sculptFrozenKept.current = null; } }, [sculptTool]);
   const sculptOpen = Boolean(sculptTool);
   useEffect(() => {
     const id = sculptPreviewDone.current;
@@ -15732,6 +15767,14 @@ export function LayerlingEditor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [multiSelect, endMultiSelect]);
 
+  // Build 90: the resize handles, sizes and their lines put away from the right-click menu.
+  // Put away automatically while Sculpt (or Trim) is open, back when it closes; the menu's choice is for
+  // this visit only, so a new design never opens without its handles.
+  const [handlesHidden, setHandlesHidden] = useState(false);
+  const sculptOpen = Boolean(sculptTool);
+  useEffect(() => { window.layerlingTransformHandles?.(handlesHidden || sculptOpen); }, [handlesHidden, sculptOpen]);
+  const toggleHandlesHidden = () => setHandlesHidden((hidden) => !hidden);
+  const handlesItem = (separated: boolean): ShapeContextMenuItem => ({ key: "handles", label: t(handlesHidden ? "contextMenu.showHandles" : "contextMenu.hideHandles"), separated, onSelect: toggleHandlesHidden });
   const shapeContextMenuItems = (): ShapeContextMenuItem[] => {
     if (!shapeContextMenu) return [];
     // The bodies under the pointer, front to back: a row marks its body through what stands in front, a click selects it,
@@ -15762,6 +15805,7 @@ export function LayerlingEditor({
       if (shapes.some((shape) => !shape.hole && !shape.hidden && !shape.locked && !isNonSolidShapeKind(shape.kind))) items.push({ key: "cutBelow", label: t("contextMenu.cutBelow"), separated: true, onSelect: () => void cutPartsBelowBed([]) });
       if (shapes.some((shape) => shape.hidden)) items.push({ key: "showHidden", label: t("contextMenu.showHidden"), shortcut: "Ctrl+Shift+H", onSelect: showHidden });
       if (referencePoints(notes).length > 0) items.push({ key: "removePoints", label: t("contextMenu.removeAllPoints", { count: referencePoints(notes).length }), danger: true, separated: true, onSelect: removeAllReferencePoints });
+      items.push(handlesItem(true));
       return items;
     }
     const allHoles = selectedShapes.every((shape) => shape.hole);
@@ -15861,6 +15905,7 @@ export function LayerlingEditor({
     if (!selectionLocked) {
       items.push({ key: "scalePercent", label: t("scalePercent.title"), separated: true, onSelect: toggleScalePercentTool });
     }
+    items.push(handlesItem(selectionLocked));
     items.push(
       { key: "hide", label: t("contextMenu.hide"), shortcut: "Ctrl+H", separated: true, onSelect: toggleHidden },
       { key: "lock", label: t(allLocked ? "contextMenu.unlock" : "contextMenu.lock"), shortcut: "Ctrl+L", onSelect: toggleLocked },
@@ -16972,6 +17017,8 @@ export function LayerlingEditor({
           onSymmetry={(symmetry) => setSculptTool((current) => current ? { ...current, symmetry } : current)}
           onStrength={(strength) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.01, Math.min(1, Math.round(strength * 100) / 100)) } : current)}
           onSelection={applySculptSelection}
+          frozen={sculptTool.frozen ?? 0}
+          onFreeze={applySculptFreeze}
           editAmount={sculptTool.editAmount ?? 1}
           onEditAmount={(editAmount) => setSculptTool((current) => current ? { ...current, editAmount } : current)}
           onRemeshMode={(remeshMode) => { const solidDetail = remeshMode === "solid" ? solidDetailFor() : Infinity; setSculptTool((current) => current && !current.busy ? { ...current, remeshMode, detail: Math.min(current.detail, solidDetail), amount: remeshMode === "thicken" ? Math.max(0.2, Math.abs(current.amount)) : current.amount, error: null } : current); }}

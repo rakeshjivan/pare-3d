@@ -687,6 +687,8 @@ declare global {
     layerlingRedraw?: () => void;
     /** Build 85: the view's look - the workplane, no workplane, or Meshmixer's dark background. */
     layerlingViewLook?: (look: ViewLook) => void;
+    /** Build 90: hides (or shows again) the selection's resize handles, sizes and guide lines. */
+    layerlingTransformHandles?: (hidden: boolean) => void;
     layerlingStrokeMotion?: () => void;
     /** Build 87: work to run at the start of each drawn frame (Sculpt's stroke), or null. */
     layerlingOnFrame?: (run: (() => void) | null) => void;
@@ -9342,6 +9344,11 @@ export function WorkplaneViewport({
       if (!(mesh && mesh.geometry === geometry)) {
         clear();
         mesh = new THREE.Mesh(geometry, lookOf(state, shapeId, color));
+        // Build 90: the live copy's colour per corner (white, blue where frozen) tints the part's colour.
+        if (geometry.getAttribute("color")) {
+          const look = mesh.material as THREE.MeshStandardMaterial;
+          if (look.isMaterial && !look.vertexColors) { look.vertexColors = true; look.needsUpdate = true; }
+        }
         mesh.userData.sculptOf = shapeId;
         // The engine grows the buffers in place: the drawn box is the part's, padded, not recomputed each stroke.
         mesh.frustumCulled = false;
@@ -9358,6 +9365,7 @@ export function WorkplaneViewport({
     viewLook = readViewLook();
     applyViewLook(threeRef.current);
     window.layerlingViewLook = (look) => { viewLook = look; applyViewLook(threeRef.current); };
+    window.layerlingTransformHandles = (hidden) => { transformHandlesHidden = hidden; const state = threeRef.current; if (state) state.needsRender = true; };
     // Build 85: a Sculpt stroke draws at standard resolution while it goes on, as turning the view does,
     // and at full sharpness again as soon as it stops - a quarter of the pixels on a Retina screen.
     window.layerlingStrokeMotion = () => {
@@ -11556,6 +11564,8 @@ function refreshFrozenObjectMatrix(object: THREE.Object3D) {
 let viewLook: ViewLook = "plate";
 /** Build 88: fast mode as last set, for the pixel budget when the window changes size. */
 let viewFastMode = false;
+/** Build 90: the selection's handles, sizes and lines put away (right-click menu), so a mesh is not resized by accident. */
+let transformHandlesHidden = false;
 /** Build 87: Sculpt's per-frame stroke work, run at the start of the render loop's frame. */
 let beforeFrame: (() => void) | null = null;
 /** Build 87: set when only the sculpted surface changed this frame. */
@@ -13124,7 +13134,7 @@ function syncTransformOverlay(
   theme: ResolvedAppTheme = "light",
   dimensionsAlwaysVisible = true,
 ) {
-  if (selectedIds.length < 1) {
+  if (selectedIds.length < 1 || transformHandlesHidden) {
     syncTransformGuideWorldLines(state, null, theme);
     if (overlayRef.current) {
       overlayRef.current = null;

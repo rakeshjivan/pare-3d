@@ -18,11 +18,15 @@ export type SculptRefine = "off" | "coarse" | "medium" | "fine";
 export type SculptSymmetry = "off" | "x" | "z";
 export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "grow" | "shrink" | "smoothEdge" | "connected" | "invertConnected" | "tidy" | "invert" | "clear" | "extrude" | "offset" | "bridge" | "align";
 
+/** Build 90: Freeze (Meshmixer's mask) - from the selection, turned the other way round, or cleared. */
+export type SculptFreezeAction = "selection" | "invert" | "clear";
+const FREEZE_ACTIONS: SculptFreezeAction[] = ["selection", "invert", "clear"];
+
 /** Remesh, Offset and Thicken in the panel: on again in build 73 (they keep the part's surface now). */
 export const WHOLE_PART_TOOLS = true;
 
 // Build 89: Meshmixer's brushes, in its order where it has them.
-export const SCULPT_TOOLS: SculptTool[] = ["drag", "draw", "draw2", "flatten", "inflate", "deflate", "pinch", "move", "crease", "smooth", "shrinkSmooth", "bubbleSmooth", "select", "unselect"];
+export const SCULPT_TOOLS: SculptTool[] = ["drag", "draw", "draw2", "flatten", "inflate", "deflate", "pinch", "move", "crease", "smooth", "shrinkSmooth", "bubbleSmooth", "mask", "select", "unselect"];
 /** Build 75: Trim (Dental Studio's step 2a) - only selecting and deleting. */
 export const TRIM_TOOLS: SculptTool[] = ["select", "unselect"];
 /** Build 76: Erase & Fill (fill) sits beside Delete in Trim and Sculpt. */
@@ -76,6 +80,8 @@ export function MeshSculptPanel({
   onEditAmount,
   selectShape = "brush",
   onSelectShape,
+  frozen = 0,
+  onFreeze,
 }: {
   targetName: string;
   tool: SculptTool | null;
@@ -127,6 +133,9 @@ export function MeshSculptPanel({
   /** Build 81: Extrude and Offset's distance, mm. */
   editAmount?: number;
   onEditAmount?: (value: number) => void;
+  /** Build 90: corners frozen, and Freeze from selection / Invert / Clear. */
+  frozen?: number;
+  onFreeze?: (action: SculptFreezeAction) => void;
 }) {
   useLanguage();
   const title = t(trim ? "sculpt.trimTitle" : "sculpt.title");
@@ -172,8 +181,18 @@ export function MeshSculptPanel({
       {tool !== "select" && tool !== "unselect" ? (
         <EdgeModifierSlider label={t("sculpt.strength")} value={Math.round(strength * 100)} min={1} max={100} step={1} workspace={workspace} disabled={busy} onChange={(value) => onStrength(value / 100)} />
       ) : null}
-      {tool && tool !== "select" && tool !== "unselect" ? <p className="blend-hint sculpt-keys">{t("sculpt.keysHint")}</p> : null}
-      {tool !== "select" && tool !== "unselect" ? (<>
+      {tool && tool !== "select" && tool !== "unselect" ? <p className="blend-hint sculpt-keys">{t(tool === "mask" ? "sculpt.freeze.keys" : "sculpt.keysHint")}</p> : null}
+      {!trim && onFreeze ? (<>
+        <p className="blend-hint" role="status">{frozen ? t("sculpt.freeze.count", { count: frozen.toLocaleString() }) : t("sculpt.freeze.none")}</p>
+        <div className="dental-trim-buttons sculpt-selection sculpt-freeze" role="group" aria-label={t("sculpt.freeze.title")}>
+          {FREEZE_ACTIONS.map((action) => (
+            <button key={action} type="button" title={t(`sculpt.freeze.${action}Hint`)} disabled={busy || (action === "selection" ? !chosen : action === "clear" ? !frozen : false)} onClick={() => onFreeze(action)}>
+              {t(`sculpt.freeze.${action}`)}
+            </button>
+          ))}
+        </div>
+      </>) : null}
+      {tool !== "select" && tool !== "unselect" && tool !== "mask" ? (<>
         <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.refine")}>
           <span className="sculpt-reach-label">{t("sculpt.refine")}</span>
           <div className="shell-opening-options four">
