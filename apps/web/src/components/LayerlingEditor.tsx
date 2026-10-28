@@ -10769,7 +10769,7 @@ export function LayerlingEditor({
   // Build 79: the digital wax-up - a tooth set over an arch's anterior teeth, from three landmarks.
   const WAX_COLOR = "#f1e7d0";
   type WaxupState = Omit<WaxupView, "marked" | "selected" | "mirror" | "found" | "chosen"> & { landmarks: WaxLandmarks | null; guessed: boolean; marks: Array<[number, number, number]> };
-  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: null, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1 });
+  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: null, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 0, red: null });
   // Build 94: the teeth found on each scan (by its part id): each scan triangle's FDI (as the studio
   // reads the scan), the teeth, the landmarks from them, and the teeth chosen for the wax-up.
   type FoundTeeth = { key: string; input: Float32Array; fdi: Uint8Array; teeth: ScanTeeth["teeth"]; landmarks: WaxLandmarks | null; chosen: number[] };
@@ -10885,7 +10885,7 @@ export function LayerlingEditor({
     const shells = waxShells.current;
     const found = arch ? waxFound[arch.shape.id] : undefined;
     // Build 94: on the patient's teeth when they were found (the scan as it was then), else from the landmarks.
-    const onTeeth = current.fit === "teeth" && found && found.chosen.length && arch && found.input.length === arch.scan.length ? { fdi: found.fdi, chosen: found.chosen, arch: arch.slot } : undefined;
+    const onTeeth = current.fit === "teeth" && found && found.chosen.length && arch && found.input.length === arch.scan.length ? { fdi: found.fdi, chosen: found.chosen, arch: arch.slot, ideal: current.ideal, ...(current.red !== null ? { red: current.red } : {}), centralRatio: current.centralRatio, ...(current.arcDepth !== null ? { arcDepth: current.arcDepth } : {}) } : undefined;
     if (!arch || !shells || (!onTeeth && !current.landmarks)) return;
     setWaxup({ ...current, busy: true, error: null });
     try {
@@ -17362,6 +17362,8 @@ export function LayerlingEditor({
               onTeethShown: (teethShown) => setWaxup((current) => ({ ...current, teethShown })),
               onFit: (fit) => setWaxup((current) => ({ ...current, fit })),
               onGhost: (ghost) => setWaxup((current) => ({ ...current, ghost })),
+              onIdeal: (ideal) => setWaxup((current) => ({ ...current, ideal })),
+              onRed: (red) => setWaxup((current) => ({ ...current, red })),
             },
           } : undefined}
           onCancel={() => {

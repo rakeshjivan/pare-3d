@@ -10,7 +10,7 @@ import type { DentalTrimMode, DentalTrimResult } from "@/lib/dentalTrim";
 import type { WaxLandmarks, WaxupOptions, WaxupPlan } from "@/lib/dentalWaxup";
 import type { ScanTeeth } from "@/lib/toothSegment";
 /** Build 94: fit the set tooth by tooth to the teeth found: each scan triangle's FDI, the teeth chosen. */
-export type WaxTeethFit = { fdi: Uint8Array; chosen: number[]; arch: "upper" | "lower" };
+export type WaxTeethFit = { fdi: Uint8Array; chosen: number[]; arch: "upper" | "lower"; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number };
 import type { WorkplaneShape } from "@/types/layerling";
 import type { SurfaceTextureOptions, SurfaceTextureResult } from "@/lib/surfaceTexture";
 import type { RemeshOptions, RemeshResult } from "@/lib/meshRemesh";
@@ -391,7 +391,7 @@ export function waxupInBackground(scan: Float32Array, shells: null): Promise<Wax
 export async function waxupInBackground(scan: Float32Array, shells: Float32Array[] | null, landmarks: WaxLandmarks | null = null, options: Omit<WaxupOptions, "landmarks"> = {}, teeth?: WaxTeethFit): Promise<WaxupPlan | WaxLandmarks | null> {
   const here = async () => {
     const { guessLandmarks, planWaxup, planWaxupOnTeeth } = await import("@/lib/dentalWaxup");
-    if (shells && teeth) return planWaxupOnTeeth(scan, shells, teeth.fdi, teeth.chosen, teeth.arch, { lengthen: options.lengthen });
+    if (shells && teeth) return planWaxupOnTeeth(scan, shells, teeth.fdi, teeth.chosen, teeth.arch, { lengthen: options.lengthen, ideal: teeth.ideal, red: teeth.red, centralRatio: teeth.centralRatio, arcDepth: teeth.arcDepth });
     return shells ? planWaxup(scan, shells, landmarks, options) : guessLandmarks(scan);
   };
   const target = meshWorker();

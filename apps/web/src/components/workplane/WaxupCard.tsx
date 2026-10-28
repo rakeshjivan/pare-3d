@@ -56,6 +56,10 @@ export type WaxupView = {
   fit: "teeth" | "smile";
   /** Build 94: the ghost view - how solid the wax is drawn (1 solid; less shows the scan through it). */
   ghost: number;
+  /** Build 94: on the patient's teeth, how far towards the smile design (0 the patient's own, 1 the design). */
+  ideal: number;
+  /** Widths in the smile design: natural steps (null), or the RED proportion. */
+  red: number | null;
 };
 
 export type WaxupActions = {
@@ -80,6 +84,8 @@ export type WaxupActions = {
   onTeethShown: (shown: boolean) => void;
   onFit: (fit: "teeth" | "smile") => void;
   onGhost: (opacity: number) => void;
+  onIdeal: (share: number) => void;
+  onRed: (red: number | null) => void;
 };
 
 /** One click of an adjusting button: mm, or degrees for a turn. */
@@ -223,6 +229,24 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
           </div>
         ) : null}
         <p className="blend-hint">{t(fitTeeth ? "waxup.fitTeethHint" : "waxup.designHint")}</p>
+        {fitTeeth ? (
+          <>
+            <EdgeModifierSlider label={t("waxup.ideal")} value={Math.round(view.ideal * 100)} min={0} max={100} step={5} unit="%" workspace={workspace} disabled={working} onChange={(value) => actions.onIdeal(Math.max(0, Math.min(1, Math.round(value) / 100)))} />
+            <p className="blend-hint">{t("waxup.idealHint")}</p>
+            {view.ideal > 0 ? (
+              <>
+                <EdgeModifierSlider label={t("waxup.centralRatio")} value={Math.round(view.centralRatio * 100)} min={70} max={90} step={1} unit="%" workspace={workspace} disabled={working} onChange={(value) => actions.onCentralRatio(Math.max(0.7, Math.min(0.9, Math.round(value) / 100)))} />
+                <EdgeModifierSlider label={t("waxup.arcDepth")} value={view.arcDepth ?? 1} min={0} max={3} step={0.25} workspace={workspace} length disabled={working} onChange={(value) => actions.onArcDepth(Math.max(0, Math.min(3, Math.round(value / 0.25) * 0.25)))} />
+                <div className="dental-trim-mode" role="radiogroup" aria-label={t("waxup.proportions")}>
+                  <button type="button" role="radio" aria-checked={view.red === null} className={view.red === null ? "active" : ""} disabled={working} onClick={() => actions.onRed(null)}>{t("waxup.propSteps")}</button>
+                  <button type="button" role="radio" aria-checked={view.red !== null} className={view.red !== null ? "active" : ""} disabled={working} onClick={() => actions.onRed(0.7)}>{t("waxup.propRed")}</button>
+                </div>
+                {view.red !== null ? <EdgeModifierSlider label={t("waxup.red")} value={Math.round(view.red * 100)} min={62} max={80} step={1} unit="%" workspace={workspace} disabled={working} onChange={(value) => actions.onRed(Math.max(0.62, Math.min(0.8, Math.round(value) / 100)))} /> : null}
+                <p className="blend-hint">{t(view.red === null ? "waxup.propStepsHint" : "waxup.propRedHint")}</p>
+              </>
+            ) : null}
+          </>
+        ) : null}
         {fitTeeth ? null : (<>
         <EdgeModifierSlider label={t("waxup.centralRatio")} value={Math.round(view.centralRatio * 100)} min={70} max={90} step={1} unit="%" workspace={workspace} disabled={working} onChange={(value) => actions.onCentralRatio(Math.max(0.7, Math.min(0.9, Math.round(value) / 100)))} />
         <EdgeModifierSlider label={t("waxup.arcDepth")} value={view.arcDepth ?? view.arcUsed ?? 1} min={0} max={3} step={0.25} workspace={workspace} length disabled={working} onChange={(value) => actions.onArcDepth(Math.max(0, Math.min(3, Math.round(value / 0.25) * 0.25)))} />

@@ -167,3 +167,32 @@ describe("tooth sets the right way up", () => {
     }
   });
 });
+
+describe("smile design on the teeth found", () => {
+  it("sets out the front teeth symmetric, natural width steps, a level edge and the smile arc", async () => {
+    const { smileTargets } = await import("@/lib/dentalWaxup");
+    // Crowns as clouds round y = -25 + 0.04 x^2, a little asymmetric (the patient's), teeth up.
+    const crown = (fdi: number, x0: number, x1: number, top: number) => {
+      const pts: number[] = [];
+      for (let x = x0; x <= x1; x += 0.25) for (let z = top - 9; z <= top; z += 0.5) pts.push(x, -25 + 0.04 * x * x + (z > top - 4 ? 0 : 0.5), z);
+      return { fdi, points: Float32Array.from(pts) };
+    };
+    const crowns = [crown(11, 0.2, 8.6, 0.2), crown(12, 8.8, 15.2, -0.6), crown(13, 15.4, 22, -0.5), crown(21, -8.9, -0.2, 0), crown(22, -15.6, -9.1, -0.4), crown(23, -22.3, -15.8, -0.8)];
+    const t = smileTargets(crowns, "upper")!;
+    expect(t).not.toBeNull();
+    const w = (n: number) => t.get(n)!.width;
+    expect(w(11)).toBeCloseTo(w(21), 6);
+    expect(w(11) - w(12)).toBeCloseTo(2, 1);
+    expect(w(11) - w(13)).toBeCloseTo(1, 1);
+    expect(t.get(11)!.edge).toBeCloseTo(t.get(21)!.edge, 6);
+    expect(t.get(11)!.edge - t.get(12)!.edge).toBeCloseTo(1, 6);
+    // Symmetric about the midline (x of 11 and 21 mirrored about it).
+    const mid = (t.get(11)!.at[0] + t.get(21)!.at[0]) / 2;
+    expect(t.get(13)!.at[0] - mid).toBeCloseTo(mid - t.get(23)!.at[0], 6);
+    // In front of every crown point (the wax only adds).
+    for (const v of t.values()) expect(v.at[1]).toBeLessThan(-25 + 0.04 * v.at[0] * v.at[0]);
+    // RED: apparent widths in proportion.
+    const r = smileTargets(crowns, "upper", { red: 0.7 })!;
+    expect(r.get(12)!.apparent / r.get(11)!.apparent).toBeCloseTo(0.7, 6);
+  });
+});

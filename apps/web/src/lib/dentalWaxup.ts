@@ -1225,8 +1225,12 @@ function mesialDirections(items: Array<{ key: number; side: -1 | 1; rank: number
  * The patient's arch form, widths and positions are kept - the wax restores shape and contour, as a
  * wax-up for worn or broken teeth (and IMT) wants. `all` gives the neighbours for the arch's line.
  */
-export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<number>, crowns: PatientCrown[], all: PatientCrown[], arch: "upper" | "lower", options: { minWax?: number; lengthen?: number; blend?: boolean } = {}): PlacedTooth[] {
+export type FitOptions = { minWax?: number; lengthen?: number; blend?: boolean; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number };
+export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<number>, crowns: PatientCrown[], all: PatientCrown[], arch: "upper" | "lower", options: FitOptions = {}): PlacedTooth[] {
   const minWax = options.minWax ?? MIN_WAX;
+  // Build 94: the smile designed on the anterior teeth, and how far towards it the teeth go (0 = the patient's teeth, 1 = the design).
+  const ideal = Math.max(0, Math.min(1, options.ideal ?? 0));
+  const targets = ideal > 0 ? smileTargets(all, arch, { red: options.red, centralRatio: options.centralRatio, arcDepth: options.arcDepth, lengthen: options.lengthen, minWax }) : null;
   const grid = new PointGrid(scan.v, PLACE_REACH);
   // The patient's teeth: centre, top, measures.
   const info = all.map((crown) => {
@@ -1309,6 +1313,29 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
         positions = transformSoup(lp, base);
       }
     }
+    // Build 94: towards the smile design - the library tooth set at its target on the ideal arch
+    // (its own tip and torque kept), the two placements blended corner by corner.
+    const target = targets?.get(crown.fdi);
+    let widthNow = pw.size;
+    if (target) {
+      widthNow = pw.size * (1 - ideal) + target.width * ideal;
+      const tMes = new THREE.Vector3(target.mesial[0], target.mesial[1], 0).normalize(), tOut = new THREE.Vector3(target.out[0], target.out[1], 0).normalize();
+      const cervical = Math.min(target.cervical, margin);
+      const kz = Math.max(0.3, (target.edge - cervical) / Math.max(1, match.top - match.bottom));
+      const sw = lw.size > 0 ? target.width / lw.size : 1;
+      const toTarget = new THREE.Matrix4().makeTranslation(target.at[0], target.at[1], target.edge).multiply(new THREE.Matrix4().makeBasis(tMes, tOut, new THREE.Vector3(0, 0, 1)));
+      let idealBase = toTarget.multiply(new THREE.Matrix4().makeScale(sw, sw, kz)).multiply(fromLib);
+      let designed = transformSoup(lp, idealBase);
+      // Its facial surface on the curve: the frontmost point of its incisal half there.
+      let front = -Infinity;
+      for (let i = 0; i < designed.length; i += 3) if (designed[i + 2] > target.edge - 0.5 * (target.edge - cervical)) front = Math.max(front, (designed[i] - target.at[0]) * tOut.x + (designed[i + 1] - target.at[1]) * tOut.y);
+      if (Number.isFinite(front)) {
+        idealBase = new THREE.Matrix4().makeTranslation(-tOut.x * front, -tOut.y * front, 0).multiply(idealBase);
+        designed = transformSoup(lp, idealBase);
+      }
+      for (let i = 0; i < positions.length; i += 1) positions[i] = positions[i] * (1 - ideal) + designed[i] * ideal;
+      base = ideal >= 0.999 ? idealBase : base;
+    }
     if (mirrored) for (let i = 0; i < positions.length; i += 9) for (let c = 0; c < 3; c += 1) { const t = positions[i + 3 + c]; positions[i + 3 + c] = positions[i + 6 + c]; positions[i + 6 + c] = t; }
     // Out until the wax is minWax proud: the facial surface, and on posterior teeth the occlusal too.
     const posterior = KINDS.indexOf(me.kind) >= 3;
@@ -1338,7 +1365,7 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
       matrix,
       positions,
       clearance,
-      width: pw.size,
+      width: widthNow,
       length: edge - margin,
       lengthening: 0,
       extension: edge - me.top,
@@ -1360,7 +1387,7 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
 }
 
 /** Build 94: the wax-up fitted tooth by tooth (scan in its own coordinates; `fdi` per scan triangle, as found). */
-export function planWaxupOnTeeth(scan: ArrayLike<number>, shells: Float32Array[], fdi: Uint8Array, chosen: number[], arch: "upper" | "lower", options: { minWax?: number; lengthen?: number } = {}): WaxupPlan {
+export function planWaxupOnTeeth(scan: ArrayLike<number>, shells: Float32Array[], fdi: Uint8Array, chosen: number[], arch: "upper" | "lower", options: FitOptions = {}): WaxupPlan {
   const set = librarySet("set", shells);
   const { mesh, normals, frame } = scanInArchFrame(scan);
   const back = frame.clone().invert();
@@ -1527,4 +1554,138 @@ function largestEigenvector4(a: number[][]): number[] {
   let best = 0;
   for (let i = 1; i < 4; i += 1) if (m[i][i] > m[best][best]) best = i;
   return [v[0][best], v[1][best], v[2][best], v[3][best]];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Build 94: smile design on the teeth found
+
+/** The recurring esthetic dental (RED) proportion by default (Ward 2007): each tooth's apparent width the last's times this. */
+export const RED_DEFAULT = 0.7;
+export const RED_RANGE = [0.62, 0.8] as const;
+/** The lateral's edge short of the central's, mm (Kokich, Spear). */
+export const SMILE_LATERAL_STEP = 1;
+/** The lateral's zenith coronal to the central-canine line, mm (Chu 2009: 0.5-1). */
+export const SMILE_LATERAL_ZENITH = 0.75;
+
+/** Where smile design puts one anterior tooth: on the ideal arch, in the arch frame. */
+export type SmileTarget = {
+  fdi: number;
+  /** Middle of the tooth along the arch, on the facial curve (x, y), and the curve's directions there. */
+  at: [number, number];
+  mesial: [number, number];
+  out: [number, number];
+  /** True mesio-distal width (along the curve) and the apparent (frontal) width, mm. */
+  width: number;
+  apparent: number;
+  /** Incisal edge (or cusp tip) and the cervical end's target, z. */
+  edge: number;
+  cervical: number;
+};
+
+/**
+ * Build 94: the smile designed on a scan's anterior teeth (arch frame; `crowns` the teeth found), in
+ * the order DSD sets it out: the central's edge at the patient's (plus `lengthen`) on a level
+ * incisal plane; the midline at the centrals' contact, upright; the facial curve smooth and
+ * symmetric about it, just in front of every anterior tooth (so the wax only adds); the space from
+ * the midline to each canine's distal contact shared out by apparent widths in the RED proportion
+ * (`red`), the same both sides; each tooth's length from the central's width/length (`centralRatio`),
+ * the laterals' edges SMILE_LATERAL_STEP short and the canine tips `arcDepth` short (the smile arc);
+ * zeniths: canines level with the centrals, laterals SMILE_LATERAL_ZENITH coronal. Upper arch only
+ * (the lower anterior teeth are set by their own sizes, level). Null when the centrals or canines are missing.
+ */
+export function smileTargets(crowns: PatientCrown[], arch: "upper" | "lower", options: { /** Set: widths by the RED proportion; left out: natural steps. */ red?: number; centralRatio?: number; arcDepth?: number; lengthen?: number; minWax?: number } = {}): Map<number, SmileTarget> | null {
+  const q = arch === "upper" ? [1, 2] : [4, 3];
+  const get = (fdi: number) => crowns.find((c) => c.fdi === fdi);
+  const c1 = get(q[0] * 10 + 1), c2 = get(q[1] * 10 + 1), k1 = get(q[0] * 10 + 3), k2 = get(q[1] * 10 + 3);
+  if (!c1 || !c2 || !k1 || !k2) return null;
+  const top = (c: PatientCrown) => { let t = -Infinity; for (let i = 2; i < c.points.length; i += 3) t = Math.max(t, c.points[i]); return t; };
+  const centre = (c: PatientCrown) => { let x = 0, y = 0; const n = c.points.length / 3; for (let i = 0; i < c.points.length; i += 3) { x += c.points[i]; y += c.points[i + 1]; } return [x / n, y / n]; };
+  // Midline: between the centrals' nearest points near their edges.
+  const nearEdge = (c: PatientCrown, other: number[]) => {
+    const t = top(c); let best = [0, 0], d = Infinity;
+    for (let i = 0; i < c.points.length; i += 3) {
+      if (c.points[i + 2] < t - 2) continue;
+      const e = Math.hypot(c.points[i] - other[0], c.points[i + 1] - other[1]);
+      if (e < d) { d = e; best = [c.points[i], c.points[i + 1]]; }
+    }
+    return best;
+  };
+  const m1 = nearEdge(c1, centre(c2)), m2 = nearEdge(c2, centre(c1));
+  const mid = (m1[0] + m2[0]) / 2;
+  // The facial curve, symmetric about the midline: y = a + b u^2 + c u^4 (u = x - mid), fitted to the
+  // frontmost points of the anterior crowns' incisal halves, mirrored, then moved in front of them all.
+  const anterior = crowns.filter((c) => c.fdi % 10 <= 3 && Math.floor(c.fdi / 10) === q[0] || c.fdi % 10 <= 3 && Math.floor(c.fdi / 10) === q[1]);
+  const bins = new Map<number, number>();
+  for (const c of anterior) {
+    const t = top(c);
+    for (let i = 0; i < c.points.length; i += 3) {
+      if (c.points[i + 2] < t - 5) continue;
+      const u = Math.abs(c.points[i] - mid), k = Math.round(u * 2);
+      bins.set(k, Math.min(bins.get(k) ?? Infinity, c.points[i + 1]));
+    }
+  }
+  const pts = [...bins].map(([k, y]) => [k / 2, y]);
+  // Least squares for (a, b, c) on [1, u^2, u^4].
+  const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], B = [0, 0, 0];
+  for (const [u, y] of pts) { const f = [1, u * u, u ** 4]; for (let r = 0; r < 3; r += 1) { B[r] += f[r] * y; for (let s = 0; s < 3; s += 1) A[r][s] += f[r] * f[s]; } }
+  const coef = solve3(A, B) ?? [Math.min(...pts.map((p) => p[1])), 0.02, 0];
+  // A smile curve opens backwards: b, c not negative.
+  coef[1] = Math.max(0.005, coef[1]); coef[2] = Math.max(0, coef[2]);
+  const minWax = options.minWax ?? MIN_WAX;
+  let ahead = 0;
+  for (const [u, y] of pts) ahead = Math.max(ahead, coef[0] + coef[1] * u * u + coef[2] * u ** 4 - y);
+  coef[0] -= ahead + minWax;
+  const curveY = (u: number) => coef[0] + coef[1] * u * u + coef[2] * u ** 4;
+  const slope = (u: number) => 2 * coef[1] * u + 4 * coef[2] * u ** 3;
+  // Arc length along the curve from the midline.
+  const arcTo = (u: number) => { let s = 0; const n = 60; for (let i = 0; i < n; i += 1) { const a = (u * i) / n, b = (u * (i + 1)) / n; s += Math.hypot(b - a, curveY(b) - curveY(a)); } return s; };
+  // The canines' distal contacts, projected (apparent): the furthest the canine crowns reach from the midline near their contacts.
+  const distal = (c: PatientCrown) => { const t = top(c); let far = 0; for (let i = 0; i < c.points.length; i += 3) if (c.points[i + 2] > t - 4) far = Math.max(far, Math.abs(c.points[i] - mid)); return far; };
+  const X = (distal(k1) + distal(k2)) / 2;
+  // The boundaries between the teeth, as distances u from the midline (frontal). Two ways:
+  // - "natural" (default): true widths along the arch in natural steps - the lateral 2 mm and the
+  //   canine 1 mm narrower than the central (Chu 2007) - filling the space to the canines' distal contacts;
+  // - "red": apparent (frontal) widths in the RED proportion (Ward 2007) - a 2-D rule, true to a
+  //   frontal photograph; without one it can leave the canine small on a flat arch.
+  const uAt = (length: number) => { let lo = 0, hi = X * 2; for (let i = 0; i < 40; i += 1) { const m = (lo + hi) / 2; if (arcTo(m) < length) lo = m; else hi = m; } return (lo + hi) / 2; };
+  let bounds: number[];
+  if (options.red !== undefined || arch === "lower") {
+    const red = Math.max(RED_RANGE[0], Math.min(RED_RANGE[1], options.red ?? RED_DEFAULT));
+    const ratios = arch === "upper" ? [1, red, red * red] : [1, 1.08, 1.2];
+    const unit = X / (ratios[0] + ratios[1] + ratios[2]);
+    bounds = [0, unit, unit * (1 + ratios[1]), X];
+  } else {
+    const S = arcTo(X), wc = (S + 3) / 3;
+    bounds = [0, uAt(wc), uAt(wc + wc - 2), X];
+  }
+  const edgeC = (top(c1) + top(c2)) / 2 + minWax + (options.lengthen ?? 0);
+  const centralWidth = arcTo(bounds[1]);
+  const centralLength = centralWidth / (options.centralRatio ?? CENTRAL_RATIO);
+  const zenithC = edgeC - centralLength;
+  const arc = options.arcDepth ?? ARC_DEPTH_DEFAULT;
+  const out = new Map<number, SmileTarget>();
+  for (const [qi, sign] of [[q[0], arch === "upper" ? 1 : -1], [q[1], arch === "upper" ? -1 : 1]] as const) {
+    let u0 = 0;
+    for (let n = 1; n <= 3; n += 1) {
+      const u1 = bounds[n];
+      const um = (u0 + u1) / 2;
+      const x = mid + sign * um, y = curveY(um);
+      // Tangent towards the midline, and outward (the front is -y).
+      const t = new THREE.Vector3(-sign, -slope(um), 0).normalize();
+      const o = new THREE.Vector3(slope(um) * sign, -1, 0).normalize();
+      const edge = arch === "upper" ? edgeC - (n === 2 ? SMILE_LATERAL_STEP : n === 3 ? arc : 0) : edgeC;
+      const cervical = arch === "upper" ? zenithC + (n === 2 ? SMILE_LATERAL_ZENITH : 0) : edge - (arcTo(u1) - arcTo(u0)) / 0.62;
+      out.set(qi * 10 + n, { fdi: qi * 10 + n, at: [x, y], mesial: [t.x, t.y], out: [o.x, o.y], width: arcTo(u1) - arcTo(u0), apparent: u1 - u0, edge, cervical });
+      u0 = u1;
+    }
+  }
+  return out;
+}
+
+/** A 3x3 linear system (Cramer's rule); null when singular. */
+function solve3(A: number[][], B: number[]): number[] | null {
+  const det = (m: number[][]) => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  const d = det(A);
+  if (Math.abs(d) < 1e-12) return null;
+  return [0, 1, 2].map((c) => det(A.map((row, r) => row.map((v, k) => (k === c ? B[r] : v)))) / d);
 }
