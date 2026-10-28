@@ -6,8 +6,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
   {
     build: 84,
     items: [
-      "Dental Studio's articulator is back to drop-in cups: each ball condyle slips into a cup a tenth of a millimetre bigger than it, with nothing to snap or force (made for resin, where the snap-in seat could crack), and the upper rests on the balls at the scanned bite with no play to speak of.",
-      "The incisal pin is slim again - a 5 mm column on a 5 mm arm - and the cups' blocks are smaller, so the models print quicker and the pin stays clear of the front teeth.",
+      "Dental Studio's articulator is back to the drop-in ball and cup of builds 63-77, which printed easily, located well and had the least play: each ball slips into a cup a tenth of a millimetre bigger than it, with nothing to snap or force.",
+      "The pin is a split rod, as on a lab articulator: 5 mm halves on the upper and lower models, the upper half's rounded end resting in a shallow dish on the lower half. It is the same in front of the incisors and either side; to hold an opening, the upper half is longer.",
     ],
   },
   {

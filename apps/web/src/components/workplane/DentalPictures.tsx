@@ -151,7 +151,7 @@ export function ArticulatorPicture({ pinRaise, pin = true }: { pinRaise: number;
   const jx = JX, jy = JY, pinX = PIN_X;
   return (
     <svg className="dental-picture articulator" viewBox="0 -20 244 146" aria-hidden="true">
-      {/* Build 78: the lower model, its ball condyle and the incisal pin on its boss: these stay put. */}
+      {/* Build 78: the lower model, its ball condyle and its half of the pin: these stay put. */}
       <g className="lower-model">
         <path className="lower" d={`M42 ${PLANE + 26} H186 Q190 ${PLANE + 26} 190 ${PLANE + 30} V${PLANE + 48} H38 V${PLANE + 30} Q38 ${PLANE + 26} 42 ${PLANE + 26} Z`} />
         <path className="lower-gum" d={gumBand(LOWER_TEETH, false, PLANE + 28)} />
@@ -159,26 +159,25 @@ export function ArticulatorPicture({ pinRaise, pin = true }: { pinRaise: number;
         <path className="lower" d={`M188 ${PLANE + 34} H${jx + 9} V${PLANE + 48} H188 Z`} />
         <rect className="lower" x={jx - 2.6} y={jy} width="5.2" height={PLANE + 36 - jy} />
         <circle className="lower" cx={jx} cy={jy} r={6.2} />
-        {/* The pin's boss on an arm along the bottom of the lower base, and the pin on it. */}
+        {/* Build 84: the lower half of the split pin on an arm along the bottom of the lower base, a dish in its top. */}
         {pin ? (<>
           <rect className="lower" x={pinX - 8} y={PLANE + 45} width={42} height="3" />
-          <rect className="lower" x={pinX - 3} y={TABLE_TOP + 6} width="6" height={PLANE + 46 - TABLE_TOP - 6} />
-          <path className="upper pin" d={`M${pinX - 3} ${TABLE_TOP + 7} V${TABLE_TOP + 2 - gap} L${pinX - 1.6} ${TABLE_TOP - gap} H${pinX + 1.6} L${pinX + 3} ${TABLE_TOP + 2 - gap} V${TABLE_TOP + 7} Z`} />
+          <path className="lower" d={`M${pinX - 3} ${PLANE + 46} V${TABLE_TOP} H${pinX - 2} Q${pinX} ${TABLE_TOP + 1.4} ${pinX + 2} ${TABLE_TOP} H${pinX + 3} V${PLANE + 46} Z`} />
         </>) : null}
       </g>
-      {/* The upper model, turned about the condyles by the pin's raise: its cups rest on the balls, its cup on the pin. */}
+      {/* The upper model, turned about the condyles by the pin's raise: its cups round the balls, its half of the pin on the lower's. */}
       <g className="upper-model" transform={degrees ? `rotate(${f(degrees)} ${jx} ${jy})` : undefined}>
         <path className="upper" d={`M42 ${PLANE - 28} H190 Q194 ${PLANE - 28} 194 ${PLANE - 32} V${PLANE - 52} H38 V${PLANE - 32} Q38 ${PLANE - 28} 42 ${PLANE - 28} Z`} />
         <path className="upper-gum" d={gumBand(UPPER_TEETH, true, PLANE - 30)} />
         {UPPER_TEETH.map((tooth, i) => <path key={`u${i}`} className="tooth" d={toothPath(tooth, tipOf(tooth), true)} />)}
         <path className="upper" d={`M192 ${PLANE - 52} H${jx + 11} V${PLANE - 40} H192 Z`} />
-        {/* Build 84: the drop-in cup - the ball's shape a hair bigger, resting on its top, open behind by a
+        {/* Build 84: the drop-in cup (builds 63-77) - the ball's shape a hair bigger, open behind by a
             channel slanting down and back that the ball drops in by. */}
         <path className="upper" d={`M${jx - 10} ${PLANE - 42} H${jx + 10} V${jy + 3.1} L${jx + 5.25} ${jy - 3.67} A6.4 6.4 0 0 0 ${jx - 5.25} ${jy + 3.67} L${jx - 2.2} ${jy + 8} H${jx - 10} Z`} />
-        {/* Build 79: the cup the pin's tip centres itself in, a cone opening downwards. */}
+        {/* Build 84: the upper half of the split pin, longer by the opening, its rounded end in the dish. */}
         {pin ? (<>
           <rect className="upper" x={pinX - 8} y={PIN_TOP - 2} width={42} height="3" />
-          <path className="upper" d={`M${pinX - 3.8} ${PIN_TOP} H${pinX + 3.8} V${TABLE_TOP + 1.8} H${pinX + 3} L${pinX} ${TABLE_TOP - 1.4} L${pinX - 3} ${TABLE_TOP + 1.8} H${pinX - 3.8} Z`} />
+          <path className="upper" d={`M${pinX - 3} ${PIN_TOP} V${TABLE_TOP - 3 - gap} A3 3 0 0 0 ${pinX + 3} ${TABLE_TOP - 3 - gap} V${PIN_TOP} Z`} />
         </>) : null}
       </g>
       {raise > 0 ? (
