@@ -266,6 +266,11 @@ export class LiveMesh {
     if (cell !== this.vCell[v]) { this.vGrid.remove(this.vCell[v], v); this.vGrid.add(cell, v); this.vCell[v] = cell; }
     this.dirtyV.add(v);
   }
+  /**
+   * Build 92: room made before a refining stroke for the corners and triangles it may add, so the
+   * buffers are not made again (and sent to the graphics card whole) in the middle of it.
+   */
+  reserve(corners: number, triangles = corners * 2) { this.growVertices(corners); this.growTriangles(triangles); }
   private growVertices(extra: number) {
     if ((this.vCount + extra) * 3 <= this.pos.length) return;
     const cap = Math.ceil((this.vCount + extra) * 1.5);
@@ -955,6 +960,7 @@ export class LiveMesh {
     if (this.dabW.length < size) this.dabW = new Float64Array(size * 2);
     const weights = this.dabW;
     const falloff = this.falloff;
+    const sample = Math.max(1, Math.ceil(size / 1500));
     for (let i = 0; i < size; i += 1) {
       const v = list[i], x = 1 - dist[i] * dist[i] * inv;
       // Build 92: the brush's falloff (Meshmixer's brush shapes) - smooth (as before), sharp (a narrow
@@ -964,6 +970,9 @@ export class LiveMesh {
       else if (falloff === "flat") { const t = dist[i] / radius; f = t <= 0.6 ? 1 : t >= 1 ? 0 : (1 - (t - 0.6) / 0.4) ** 2 * (1 + 2 * ((t - 0.6) / 0.4)); }
       const w = f * strength;
       weights[i] = w;
+      // Build 92: the brush's facing and middle from at most about 1500 of its corners - on a finely
+      // refined patch a brush covers many thousands, and every one's normal was worked out for an average.
+      if (i % sample !== 0) continue;
       this.vertexNormal(v, n);
       area.addScaledVector(n, w);
       cen.x += p[v * 3] * w; cen.y += p[v * 3 + 1] * w; cen.z += p[v * 3 + 2] * w;
@@ -1132,6 +1141,7 @@ export class LiveMesh {
     out.set(sx / sw, sy / sw, sz / sw);
     return true;
   }
+  private projectScratch = new THREE.Vector3();
   /** Build 92: the brushes' options - falloff shape, a scan's open edge held, Flatten's plane offset (mm). */
   falloff: "smooth" | "sharp" | "flat" = "smooth";
   holdBoundary = false;
@@ -1624,13 +1634,15 @@ export class LiveMesh {
     const lengths = new Float64Array(order.length);
     for (let k = 0; k < order.length; k += 1) lengths[k] = this.dist(long[k * 2], long[k * 2 + 1]);
     order.sort((e, f) => lengths[f] - lengths[e]);
-    const queue: Array<[number, number]> = order.map((k) => [long[k * 2], long[k * 2 + 1]]);
+    // Build 92: the queue as pairs in one flat list, not an array per edge.
+    const queue: number[] = new Array(order.length * 2);
+    for (let k = 0; k < order.length; k += 1) { queue[k * 2] = long[order[k] * 2]; queue[k * 2 + 1] = long[order[k] * 2 + 1]; }
     // A guard against a run-away: never more splits in one call than eight per corner it started with.
     work = Math.min(work, Math.max(256, region.size * 8));
     const startWork = work;
-    for (let q = 0; q < queue.length && work > 0; q += 1) {
+    for (let q = 0; q * 2 < queue.length && work > 0; q += 1) {
       if ((q & 31) === 0 && late()) break;
-      const [a, b] = queue[q];
+      const a = queue[q * 2], b = queue[q * 2 + 1];
       if (!this.vAlive[a] || !this.vAlive[b]) continue;
       const parent = this.dist(a, b);
       if (parent <= hi) continue;
@@ -1640,11 +1652,11 @@ export class LiveMesh {
       work -= 1;
       if (m === null) continue;
       region.add(m);
-      if (options.project) { const q = new THREE.Vector3(this.pos[m * 3], this.pos[m * 3 + 1], this.pos[m * 3 + 2]); options.project(q); this.pos[m * 3] = q.x; this.pos[m * 3 + 1] = q.y; this.pos[m * 3 + 2] = q.z; this.moved(m); }
+      if (options.project) { const q = this.projectScratch.set(this.pos[m * 3], this.pos[m * 3 + 1], this.pos[m * 3 + 2]); options.project(q); this.pos[m * 3] = q.x; this.pos[m * 3 + 1] = q.y; this.pos[m * 3 + 2] = q.z; this.moved(m); }
       // Build 82: only an edge that came out shorter than the one split goes back in the queue. Pulled back
       // onto a rough surface (a ridge finer than the triangles), a new corner can land where its edges are
       // as long as before, and splitting on would never end (a full-arch Remesh ran for minutes).
-      for (const w of this.neighbours(m)) { const d = this.dist(m, w); if (d > hi && d < parent * 0.95 && inside(m, w)) queue.push([Math.min(m, w), Math.max(m, w)]); }
+      for (const w of this.neighbours(m)) { const d = this.dist(m, w); if (d > hi && d < parent * 0.95 && inside(m, w)) queue.push(Math.min(m, w), Math.max(m, w)); }
     }
     // Collapse the short ones.
     const short = late() ? [] : edgesOf((a, b) => this.dist(a, b) < lo && inside(a, b));
@@ -1906,7 +1918,9 @@ export function stampBrush(mesh: LiveMesh, brush: Exclude<LiveBrush, "move">, ce
   if (brush === "mask") { mesh.gather(centre, radius, triangle); mesh.paintMask(null, radius, response.strength, dig); return; }
   const step = radius * response.step * (dig ? -1 : 1);
   for (let k = 0; k < response.passes; k += 1) {
-    mesh.gather(centre, radius, triangle);
+    // Build 92: the corners under the brush gathered once for all of a dab's passes (a smooth makes up to
+    // five); between passes they move a fraction of their spacing, so the same ones are under it.
+    if (k === 0) mesh.gather(centre, radius, triangle);
     mesh.dab(brush, centre, normal, radius, null, response.strength, step);
   }
 }

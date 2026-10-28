@@ -9359,6 +9359,8 @@ export function LayerlingEditor({
     state.live.falloff = options.falloff;
     state.live.holdBoundary = options.hold;
     state.live.flattenDepth = options.depth;
+    // Build 92: room for what a refining stroke adds, made now rather than mid-stroke.
+    if (stroke.refine !== "off") state.live.reserve(stroke.refine === "fine" ? 120000 : 40000);
     // Build 92: Attract pulls towards the other parts on the plate (the opposing arch, a tooth beside it).
     state.live.attractTarget = brush === "attract" ? attractTargetFor(shape) : null;
     if (brush === "attract" && !state.live.attractTarget) { setNotice(t("sculpt.attractNothing")); return; }
