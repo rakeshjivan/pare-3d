@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 83,
+    items: [
+      "Remesh no longer runs away on a rough surface: a full-arch scan with detail finer than its triangles could grow to over a million triangles and take minutes; it now takes seconds.",
+      "Select in Sculpt has Meshmixer's extras: Connected (the whole of every piece the selection touches), Tidy edge (single triangles sticking out let go, notches filled), Invert connected, and the keys > < E I Shift+I O.",
+    ],
+  },
+  {
     build: 82,
     items: [
       "Select in Sculpt (and Trim in Dental Studio) has a Lasso, as in Meshmixer: drag a loop freehand, or click its corners and click the first to close it. A new loop replaces the selection, Shift adds, Ctrl takes away; Surface I see, Back side and Through apply as for the brush.",

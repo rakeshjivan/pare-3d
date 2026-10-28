@@ -252,3 +252,67 @@ export function alignToPlate(mesh: SculptMesh, chosen: Uint8Array): number[] | n
   for (let i = 1; i < soup.length; i += 3) soup[i] -= low;
   return soup;
 }
+
+/** Build 83: for each triangle, the (up to three) triangles sharing one of its edges; -1 where none. */
+export function edgeNeighbours(mesh: SculptMesh): Int32Array {
+  const tri = mesh.triangles;
+  const count = tri.length / 3;
+  const out = new Int32Array(count * 3).fill(-1);
+  const open = new Map<number, number>();
+  const key = (a: number, b: number) => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
+  for (let t = 0; t < count; t += 1) for (let k = 0; k < 3; k += 1) {
+    const e = key(tri[t * 3 + k], tri[t * 3 + ((k + 1) % 3)]);
+    const other = open.get(e);
+    if (other === undefined) { open.set(e, t * 3 + k); continue; }
+    out[t * 3 + k] = Math.floor(other / 3);
+    out[other] = t;
+    open.delete(e);
+  }
+  return out;
+}
+
+/** The triangles joined (edge to edge) to any of `seeds`, as one choice. */
+function connected(neighbours: Int32Array, seeds: Uint8Array): Uint8Array {
+  const out = new Uint8Array(seeds.length);
+  const stack: number[] = [];
+  for (let t = 0; t < seeds.length; t += 1) if (seeds[t]) { out[t] = 1; stack.push(t); }
+  while (stack.length) {
+    const t = stack.pop()!;
+    for (let k = 0; k < 3; k += 1) { const u = neighbours[t * 3 + k]; if (u >= 0 && !out[u]) { out[u] = 1; stack.push(u); } }
+  }
+  return out;
+}
+
+/** Build 83: Meshmixer's Expand to Connected (e) - the whole of every piece the choice touches. */
+export function expandConnected(mesh: SculptMesh, chosen: Uint8Array): Uint8Array {
+  return connected(edgeNeighbours(mesh), chosen);
+}
+
+/** Build 83: Meshmixer's Invert Connected (Shift+i) - inverted within the pieces the choice touches only. */
+export function invertConnected(mesh: SculptMesh, chosen: Uint8Array): Uint8Array {
+  const pieces = connected(edgeNeighbours(mesh), chosen);
+  return chosen.map((value, t) => (pieces[t] && !value ? 1 : 0));
+}
+
+/**
+ * Build 83: Meshmixer's Optimize Boundary (o) - the choice's edge tidied of ears and fins: a chosen
+ * triangle with at most one chosen neighbour (a fin sticking out) is let go, and a triangle not chosen
+ * with two or three chosen neighbours (a notch, an ear) is taken in, until nothing changes.
+ */
+export function optimizeBoundary(mesh: SculptMesh, chosen: Uint8Array): Uint8Array {
+  const neighbours = edgeNeighbours(mesh);
+  let out = chosen.slice();
+  for (let round = 0; round < 32; round += 1) {
+    let changed = 0;
+    const next = out.slice();
+    for (let t = 0; t < out.length; t += 1) {
+      let around = 0, sides = 0;
+      for (let k = 0; k < 3; k += 1) { const u = neighbours[t * 3 + k]; if (u < 0) continue; sides += 1; if (out[u]) around += 1; }
+      if (out[t] && sides >= 2 && around <= 1) { next[t] = 0; changed += 1; }
+      else if (!out[t] && around >= 2) { next[t] = 1; changed += 1; }
+    }
+    out = next;
+    if (!changed) break;
+  }
+  return out;
+}

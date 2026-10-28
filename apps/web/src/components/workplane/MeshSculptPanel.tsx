@@ -16,7 +16,7 @@ export type SculptTool = "select" | "unselect" | LiveBrush;
 export type SculptRefine = "off" | "coarse" | "medium" | "fine";
 /** Build 73: a brush also works mirrored across the part's middle, left-right (x) or front-back (z). */
 export type SculptSymmetry = "off" | "x" | "z";
-export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "grow" | "shrink" | "smoothEdge" | "invert" | "clear" | "extrude" | "offset" | "bridge" | "align";
+export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "grow" | "shrink" | "smoothEdge" | "connected" | "invertConnected" | "tidy" | "invert" | "clear" | "extrude" | "offset" | "bridge" | "align";
 
 /** Remesh, Offset and Thicken in the panel: on again in build 73 (they keep the part's surface now). */
 export const WHOLE_PART_TOOLS = true;
@@ -25,11 +25,12 @@ export const SCULPT_TOOLS: SculptTool[] = ["draw", "inflate", "deflate", "smooth
 /** Build 75: Trim (Dental Studio's step 2a) - only selecting and deleting. */
 export const TRIM_TOOLS: SculptTool[] = ["select", "unselect"];
 /** Build 76: Erase & Fill (fill) sits beside Delete in Trim and Sculpt. */
-const TRIM_ACTIONS = ["delete", "fill", "grow", "invert", "clear"] as const;
-const SCULPT_ACTIONS = ["fill", "delete", "smooth", "flatten", "grow", "shrink", "smoothEdge", "invert", "clear"] as const;
+const TRIM_ACTIONS = ["delete", "fill", "grow", "connected", "invert", "clear"] as const;
+/** Build 83: Connected and Tidy edge (Meshmixer's Expand to Connected and Optimize Boundary). */
+const SCULPT_ACTIONS = ["fill", "delete", "smooth", "flatten", "grow", "shrink", "smoothEdge", "tidy", "connected", "invert", "clear"] as const;
 /** Build 81: Meshmixer's Edit tools on the selection. */
 const EDIT_ACTIONS = ["extrude", "offset", "bridge", "align"] as const;
-const HINTED: ReadonlyArray<SculptSelectionAction> = ["fill", "shrink", "smoothEdge", "extrude", "offset", "bridge", "align"];
+const HINTED: ReadonlyArray<SculptSelectionAction> = ["fill", "shrink", "smoothEdge", "tidy", "connected", "grow", "invert", "extrude", "offset", "bridge", "align"];
 
 /** Build 69: Sculpt - brushes that shape a mesh, a brush that selects a patch of it, and the whole part rebuilt. */
 export function MeshSculptPanel({
@@ -199,6 +200,7 @@ export function MeshSculptPanel({
             ))}
           </div>
           <p className="blend-hint">{t(`sculpt.reach.${reach}Hint`)}</p>
+          <p className="blend-hint sculpt-keys">{t("sculpt.selectKeys")}</p>
         </div>
       ) : null}
       <p className="blend-hint" role="status">{chosen ? t("sculpt.chosen", { count: chosen.toLocaleString() }) : t("sculpt.noneChosen")}</p>

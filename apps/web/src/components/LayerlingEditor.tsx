@@ -65,7 +65,7 @@ import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
 import { analyseDentalInBackground, stopMeshJobs, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground, waxupInBackground } from "@/lib/meshJobs";
 import { BUILT_IN_LIBRARIES, loadToothLibrary, loadToothSet, type ToothLibraryManifest } from "@/lib/toothLibrary";
 import { WAXUP_ENABLED } from "@/lib/pareFeatures";
-import { alignToPlate, bridgeChoice, extrudeChoice, shrinkChoice, smoothChoice } from "@/lib/meshEditTools";
+import { alignToPlate, bridgeChoice, expandConnected, extrudeChoice, invertConnected, optimizeBoundary, shrinkChoice, smoothChoice } from "@/lib/meshEditTools";
 import { CENTRAL_RATIO, contralateral, imtFirstInjection, moveFrame, nudgeMatrix, rigidMoveBetween, type ToothNudge, fdiNumber, parseObj, splitShells, librarySet, type WaxLandmarks } from "@/lib/dentalWaxup";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { WaxupPointOverlay, markerTriangles, rayHit } from "./workplane/WaxupPointOverlay";
@@ -9321,6 +9321,7 @@ export function LayerlingEditor({
     }
     return hit >= TRIM_TEETH_NOISE ? hit : 0;
   };
+  const applySculptSelectionRef = useRef<(action: SculptSelectionAction) => void>(() => {});
   const applySculptSelection = useCallback((action: SculptSelectionAction) => {
     flushSculpt();
     const target = sculptTarget();
@@ -9328,8 +9329,10 @@ export function LayerlingEditor({
     const { shape, state } = target;
     const selection = sculptSelectionOf(state);
     const count = () => selection.chosen.reduce((a, b) => a + b, 0);
-    if (action === "clear" || action === "invert" || action === "grow" || action === "shrink" || action === "smoothEdge") {
-      selection.chosen = action === "clear" ? new Uint8Array(selection.chosen.length) : action === "invert" ? invertChoice(selection.chosen) : action === "grow" ? growChoice(selection.mesh, selection.chosen) : action === "shrink" ? shrinkChoice(selection.mesh, selection.chosen) : smoothChoice(selection.mesh, selection.chosen);
+    if (action === "clear" || action === "invert" || action === "grow" || action === "shrink" || action === "smoothEdge" || action === "connected" || action === "invertConnected" || action === "tidy") {
+      const { mesh, chosen } = selection;
+      selection.chosen = action === "clear" ? new Uint8Array(chosen.length) : action === "invert" ? invertChoice(chosen) : action === "grow" ? growChoice(mesh, chosen) : action === "shrink" ? shrinkChoice(mesh, chosen)
+        : action === "connected" ? expandConnected(mesh, chosen) : action === "invertConnected" ? invertConnected(mesh, chosen) : action === "tidy" ? optimizeBoundary(mesh, chosen) : smoothChoice(mesh, chosen);
       setSculptTool((current) => current ? { ...current, chosen: count() } : current);
       return;
     }
@@ -9407,6 +9410,7 @@ export function LayerlingEditor({
     state.live = LiveMesh.fromSoup(positions);
     state.selection = { mesh: selection.mesh, chosen: kept, stale: false };
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  applySculptSelectionRef.current = applySculptSelection;
   /** Make solid on a coarse mesh: the triangles' size is too coarse a grid - about 160 voxels on the longest side instead. */
   const solidDetailFor = () => {
     const target = sculptTarget();
@@ -9508,6 +9512,16 @@ export function LayerlingEditor({
   useEffect(() => {
     if (!sculptOpen) return;
     const onKey = (event: KeyboardEvent) => {
+      // Build 83: Meshmixer's Select keys - > and < grow and shrink, E connected, I invert, Shift+I
+      // invert connected, O tidy edge.
+      const selectKey = !event.ctrlKey && !event.metaKey && !event.altKey && !(event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable=true]")
+        ? ({ ">": "grow", "<": "shrink", e: "connected", E: "connected", i: "invert", I: "invertConnected", o: "tidy", O: "tidy" } as Record<string, SculptSelectionAction | undefined>)[event.key]
+        : undefined;
+      if (selectKey) {
+        event.preventDefault(); event.stopPropagation();
+        applySculptSelectionRef.current(selectKey);
+        return;
+      }
       // Build 82: [ and ] make the brush smaller and larger, as in Meshmixer.
       if ((event.key === "[" || event.key === "]") && !event.ctrlKey && !event.metaKey && !(event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable=true]")) {
         event.preventDefault();
