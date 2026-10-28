@@ -691,6 +691,8 @@ declare global {
     layerlingViewLook?: (look: ViewLook) => void;
     /** Build 90: hides (or shows again) the selection's resize handles, sizes and guide lines. */
     layerlingTransformHandles?: (hidden: boolean) => void;
+    /** Build 94: draws these parts see-through at `opacity` (1: as usual). */
+    layerlingGhost?: (ids: string[], opacity: number) => void;
     layerlingStrokeMotion?: () => void;
     /** Build 87: work to run at the start of each drawn frame (Sculpt's stroke), or null. */
     layerlingOnFrame?: (run: (() => void) | null) => void;
@@ -9399,6 +9401,8 @@ export function WorkplaneViewport({
     applyViewLook(threeRef.current);
     window.layerlingViewLook = (look) => { viewLook = look; applyViewLook(threeRef.current); };
     window.layerlingTransformHandles = (hidden) => { transformHandlesHidden = hidden; const state = threeRef.current; if (state) state.needsRender = true; };
+    // Build 94: the wax-up's ghost view.
+    window.layerlingGhost = (ids, opacity) => { ghost = { ids: new Set(ids), opacity }; const state = threeRef.current; if (state) state.needsRender = true; };
     // Build 85: a Sculpt stroke draws at standard resolution while it goes on, as turning the view does,
     // and at full sharpness again as soon as it stops - a quarter of the pixels on a Retina screen.
     window.layerlingStrokeMotion = () => {
@@ -11599,6 +11603,42 @@ let viewLook: ViewLook = "plate";
 let viewFastMode = false;
 /** Build 90: the selection's handles, sizes and lines put away (right-click menu), so a mesh is not resized by accident. */
 let transformHandlesHidden = false;
+/** Build 94: Wax-up Studio's ghost view - these parts (the wax teeth) drawn see-through at this opacity. */
+let ghost: { ids: Set<string>; opacity: number } = { ids: new Set(), opacity: 1 };
+let ghostShown = false;
+/** Each frame: the ghost parts get a see-through copy of their material (the original kept to put back). */
+function applyGhost(state: ThreeState) {
+  const active = ghost.opacity < 0.999 && ghost.ids.size > 0;
+  if (!active && !ghostShown) return;
+  state.scene.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const own = mesh.userData.ghostOriginal as THREE.Material | undefined;
+    const wanted = active && ghost.ids.has(mesh.userData.shapeId as string);
+    if (wanted) {
+      // A material replaced since (the part redrawn) is taken as the new original.
+      const current = mesh.material as THREE.Material;
+      if (!own || (current !== mesh.userData.ghostMaterial)) {
+        if (Array.isArray(mesh.material)) return;
+        mesh.userData.ghostOriginal = current;
+        const copy = current.clone();
+        mesh.userData.ghostMaterial = copy;
+        mesh.material = copy;
+      }
+      const m = mesh.userData.ghostMaterial as THREE.Material;
+      m.transparent = true;
+      m.opacity = ghost.opacity;
+      m.depthWrite = ghost.opacity > 0.9;
+      mesh.renderOrder = 2;
+    } else if (own) {
+      if (mesh.material === mesh.userData.ghostMaterial) mesh.material = own;
+      (mesh.userData.ghostMaterial as THREE.Material | undefined)?.dispose();
+      delete mesh.userData.ghostOriginal; delete mesh.userData.ghostMaterial;
+      mesh.renderOrder = 0;
+    }
+  });
+  ghostShown = active;
+}
 /** Build 87: Sculpt's per-frame stroke work, run at the start of the render loop's frame. */
 let beforeFrame: (() => void) | null = null;
 /** Build 87: set when only the sculpted surface changed this frame. */
@@ -12479,6 +12519,7 @@ function drawCutPreviews(state: ThreeState) {
 
 function renderFrame(state: ThreeState) {
   placeHeadlight(state);
+  applyGhost(state);
   state.renderer.render(state.scene, state.camera);
   drawCutPreviews(state);
 }

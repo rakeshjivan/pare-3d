@@ -4470,6 +4470,8 @@ export const MESSAGES_EN = {
   "waxup.stepStudio": "Wax-up",
   "waxup.stepStudioHint": "Find the teeth, choose those to wax up, place a tooth set and adjust it tooth by tooth.",
   "waxup.findStep": "Teeth",
+  "waxup.ghost": "Wax-up shown (ghost view)",
+  "waxup.ghostHint": "Lower it to see the scanned teeth through the wax: what is added, and where the patient's own tooth would show.",
   "waxup.fit": "How the set is placed",
   "waxup.fitTeeth": "On the patient's teeth",
   "waxup.fitSmile": "By smile design",

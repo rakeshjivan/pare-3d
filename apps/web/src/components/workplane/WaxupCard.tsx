@@ -54,6 +54,8 @@ export type WaxupView = {
   teethShown: boolean;
   /** Build 94: each library tooth fitted to the patient's own (teeth found), or the set laid out by smile design from the landmarks. */
   fit: "teeth" | "smile";
+  /** Build 94: the ghost view - how solid the wax is drawn (1 solid; less shows the scan through it). */
+  ghost: number;
 };
 
 export type WaxupActions = {
@@ -77,6 +79,7 @@ export type WaxupActions = {
   onChooseGroup: (group: "front" | "front-premolars" | "all" | "none") => void;
   onTeethShown: (shown: boolean) => void;
   onFit: (fit: "teeth" | "smile") => void;
+  onGhost: (opacity: number) => void;
 };
 
 /** One click of an adjusting button: mm, or degrees for a turn. */
@@ -257,6 +260,8 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
                 );
               })}
             </div>
+            <EdgeModifierSlider label={t("waxup.ghost")} value={Math.round(view.ghost * 100)} min={10} max={100} step={5} unit="%" workspace={workspace} onChange={(value) => actions.onGhost(Math.max(0.1, Math.min(1, Math.round(value) / 100)))} />
+            <p className="blend-hint">{t("waxup.ghostHint")}</p>
             <table className="waxup-table">
               <thead><tr><th>{t("waxup.colTooth")}</th><th>{t("waxup.colWidth")}</th><th>{t("waxup.colLength")}</th><th>{t("waxup.colRatio")}</th><th>{t("waxup.colEdge")}</th><th>{t("waxup.colLengthening")}</th></tr></thead>
               <tbody>

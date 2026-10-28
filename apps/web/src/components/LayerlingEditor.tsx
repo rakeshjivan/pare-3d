@@ -10769,7 +10769,7 @@ export function LayerlingEditor({
   // Build 79: the digital wax-up - a tooth set over an arch's anterior teeth, from three landmarks.
   const WAX_COLOR = "#f1e7d0";
   type WaxupState = Omit<WaxupView, "marked" | "selected" | "mirror" | "found" | "chosen"> & { landmarks: WaxLandmarks | null; guessed: boolean; marks: Array<[number, number, number]> };
-  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: null, busy: false, progress: null }, teethShown: true, fit: "teeth" });
+  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: null, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1 });
   // Build 94: the teeth found on each scan (by its part id): each scan triangle's FDI (as the studio
   // reads the scan), the teeth, the landmarks from them, and the teeth chosen for the wax-up.
   type FoundTeeth = { key: string; input: Float32Array; fdi: Uint8Array; teeth: ScanTeeth["teeth"]; landmarks: WaxLandmarks | null; chosen: number[] };
@@ -11060,6 +11060,11 @@ export function LayerlingEditor({
     toothOverlay.current = items.length ? items : null;
     if (!biteMap?.on) window.layerlingColorOverlay?.(toothOverlay.current);
   }, [dentalStudio?.waxStudio, dentalStudio?.slots.upper, dentalStudio?.slots.lower, waxFound, waxup.teethShown, shapes, dentalHidden, biteMap?.on]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Build 94: the ghost view - the wax teeth see-through while Wax-up Studio is open.
+  const waxGhostIds = dentalStudio?.waxStudio ? shapes.filter((shape) => shape.dental === "wax" && !shape.hidden).map((shape) => shape.id).join(",") : "";
+  useEffect(() => {
+    window.layerlingGhost?.(waxGhostIds ? waxGhostIds.split(",") : [], waxGhostIds ? waxup.ghost : 1);
+  }, [waxGhostIds, waxup.ghost]);
   // The teeth still there (one deleted or undone drops off the list).
   const waxPlacedNow = waxup.placed.filter((tooth) => shapes.some((shape) => shape.id === tooth.id && shape.dental === "wax" && !shape.hidden));
   const waxupView: WaxupView = {
@@ -17356,6 +17361,7 @@ export function LayerlingEditor({
               onChooseGroup: (group) => chooseWaxTeeth((_, teeth) => teeth.filter((fdi) => (group === "all" ? true : group === "none" ? false : fdi % 10 <= (group === "front" ? 3 : 5)))),
               onTeethShown: (teethShown) => setWaxup((current) => ({ ...current, teethShown })),
               onFit: (fit) => setWaxup((current) => ({ ...current, fit })),
+              onGhost: (ghost) => setWaxup((current) => ({ ...current, ghost })),
             },
           } : undefined}
           onCancel={() => {
