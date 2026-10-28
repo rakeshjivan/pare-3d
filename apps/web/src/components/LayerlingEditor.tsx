@@ -9157,7 +9157,8 @@ export function LayerlingEditor({
   /** Timings of the last strokes, for the speed checks (window.layerlingSculptStats). */
   const sculptStat = (kind: string, work: number, gpu: number) => {
     const list = ((window as unknown as { layerlingSculptStats?: Array<[string, number, number, number]> }).layerlingSculptStats ??= []);
-    list.push([kind, Math.round(work * 10) / 10, Math.round(gpu * 10) / 10, sculptState.current?.live.triangleCount() ?? 0]);
+    // Build 85: the triangles counted only at a stroke's start and end - counting walks the whole mesh, every frame it was 1 ms on a full-arch scan.
+    list.push([kind, Math.round(work * 10) / 10, Math.round(gpu * 10) / 10, kind === "frame" ? -1 : sculptState.current?.live.triangleCount() ?? 0]);
     if (list.length > 400) list.splice(0, list.length - 400);
   };
   const sculptFrame = (drain = false) => {
@@ -9217,7 +9218,7 @@ export function LayerlingEditor({
       sculptRefineBalls(stroke, Math.max(2, 14 - (performance.now() - started)));
     }
     const worked = performance.now();
-    if (state.live.flushGpu()) window.layerlingRedraw?.();
+    if (state.live.flushGpu()) { if (window.layerlingStrokeMotion) window.layerlingStrokeMotion(); else window.layerlingRedraw?.(); }
     sculptStat("frame", worked - started, performance.now() - worked);
   };
   const startSculptStroke = useCallback((x: number, y: number, keys?: { ctrl: boolean; shift: boolean }) => {

@@ -687,6 +687,7 @@ declare global {
     layerlingRedraw?: () => void;
     /** Build 85: the view's look - the workplane, no workplane, or Meshmixer's dark background. */
     layerlingViewLook?: (look: ViewLook) => void;
+    layerlingStrokeMotion?: () => void;
     /** Build 73: the camera's ray through a page point (client pixels), in the world. */
     layerlingScreenRay?: (x: number, y: number) => { origin: [number, number, number]; direction: [number, number, number] } | null;
     /** Fork (build 53): where the camera is, in the world. */
@@ -9346,6 +9347,14 @@ export function WorkplaneViewport({
     viewLook = readViewLook();
     applyViewLook(threeRef.current);
     window.layerlingViewLook = (look) => { viewLook = look; applyViewLook(threeRef.current); };
+    // Build 85: a Sculpt stroke draws at standard resolution while it goes on, as turning the view does,
+    // and at full sharpness again as soon as it stops - a quarter of the pixels on a Retina screen.
+    window.layerlingStrokeMotion = () => {
+      const state = threeRef.current;
+      if (!state) return;
+      adaptiveResolution(state, state.renderer.domElement).lastMotion = performance.now();
+      state.needsRender = true;
+    };
     window.layerlingScreenRay = (x, y) => {
       const state = threeRef.current;
       if (!state) return null;
@@ -9364,7 +9373,7 @@ export function WorkplaneViewport({
       if (state && id) state.scene.traverse((object) => { if (object !== mesh && object.userData.shapeId === id && object.visible) showing += 1; });
       return { drawn: Boolean(mesh), inScene: Boolean(mesh?.parent), hidden: hidden.length, showing, triangles: mesh ? (mesh.geometry.getAttribute("position") as THREE.BufferAttribute).count / 3 : 0 };
     };
-    return () => { clear(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingRedraw; delete window.layerlingViewLook; delete window.layerlingScreenRay; };
+    return () => { clear(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingRedraw; delete window.layerlingViewLook; delete window.layerlingStrokeMotion; delete window.layerlingScreenRay; };
   }, []);
   // Fork (build 53): Dental Studio's tooth area, tinted over the scan while it is being designated.
   useEffect(() => {

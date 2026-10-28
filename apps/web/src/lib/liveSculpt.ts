@@ -486,6 +486,27 @@ export class LiveMesh {
    * under split, collapse or flip (they keep rims as rims), so it is worked out once. */
   private rim = new Int8Array(0);
   /** The (one or two) triangles on edge a-b. */
+  /** Build 85: whether a and b share a triangle (an edge), without making a list. */
+  private hasEdge(a: number, b: number) {
+    const tri = this.tri;
+    for (const t of this.vTris[a]) { const i = t * 3; if (tri[i] === b || tri[i + 1] === b || tri[i + 2] === b) return true; }
+    return false;
+  }
+  /** Whether triangle t runs a then b. */
+  private runsAB(t: number, a: number, b: number) {
+    const tri = this.tri;
+    for (let k = 0; k < 3; k += 1) if (tri[t * 3 + k] === a) return tri[t * 3 + ((k + 1) % 3)] === b;
+    return false;
+  }
+  /** The corner of t that is neither a nor b. */
+  private oppositeOf(t: number, a: number, b: number) {
+    for (let k = 0; k < 3; k += 1) { const v = this.tri[t * 3 + k]; if (v !== a && v !== b) return v; }
+    return -1;
+  }
+  private flipN1 = new THREE.Vector3();
+  private flipN2 = new THREE.Vector3();
+  private flipM1 = new THREE.Vector3();
+  private flipM2 = new THREE.Vector3();
   edgeTriangles(a: number, b: number): number[] {
     const out: number[] = [];
     for (const t of this.vTris[a]) { const i = t * 3; if (this.tri[i] === b || this.tri[i + 1] === b || this.tri[i + 2] === b) out.push(t); }
@@ -590,7 +611,10 @@ export class LiveMesh {
       let start = -1, end = -1;
       for (const i of sorted) {
         if (start < 0) { start = i; end = i; continue; }
-        if (i - end <= 64) { end = i; continue; }
+        // Build 85: runs joined across gaps of up to 8192 entries, so a frame sends a few larger pieces
+        // instead of dozens of small ones - each piece is a separate call to the graphics card, and in
+        // the Mac app (WebKit) every call crosses to another process, which cost more than the bytes.
+        if (i - end <= 8192) { end = i; continue; }
         attribute.addUpdateRange(start * width, (end - start + 1) * width);
         start = i; end = i;
       }
@@ -622,6 +646,7 @@ export class LiveMesh {
     // Triangles already tried, by a stamp per triangle instead of a set made on every pick.
     if (this.pickMark.length < this.tri.length / 3) this.pickMark = new Int32Array(this.tri.length / 3);
     const mark = this.pickMark, stamp = ++this.pickStamp;
+    const dir: Vec3 = [d.x, d.y, d.z];
     let best: { point: Vec3; triangle: number; t: number } | null = null;
     const steps = Math.ceil((new THREE.Vector3(...box.max).sub(new THREE.Vector3(...box.min)).length() + 4 * h) / (h * 0.5)) + 4;
     const p = new THREE.Vector3();
@@ -631,10 +656,11 @@ export class LiveMesh {
       for (let ox = -1; ox <= 1; ox += 1) for (let oy = -1; oy <= 1; oy += 1) for (let oz = -1; oz <= 1; oz += 1) {
         const list = this.tGrid.cells.get(this.tGrid.key(cx + ox, cy + oy, cz + oz));
         if (!list) continue;
-        for (const t of list) {
+        for (let li = 0; li < list.length; li += 1) {
+          const t = list[li];
           if (mark[t] === stamp) continue;
           mark[t] = stamp;
-          const hit = this.rayTriangle(origin, [d.x, d.y, d.z], t);
+          const hit = this.rayTriangle(origin, dir, t);
           if (hit !== null && (!best || hit < best.t)) best = { t: hit, triangle: t, point: [origin[0] + d.x * hit, origin[1] + d.y * hit, origin[2] + d.z * hit] };
         }
       }
@@ -754,13 +780,13 @@ export class LiveMesh {
     const area = this.dabArea.set(0, 0, 0);
     const cen = this.dabCen.set(0, 0, 0);
     let total = 0;
-    for (const [v, d] of region) {
+    region.forEach((d, v) => {
       const w = weight(d);
       this.vertexNormal(v, n);
       area.addScaledVector(n, w);
       cen.x += p[v * 3] * w; cen.y += p[v * 3 + 1] * w; cen.z += p[v * 3 + 2] * w;
       total += w;
-    }
+    });
     if (!total) return;
     cen.divideScalar(total);
     if (area.lengthSq() < 1e-12) area.set(...normal);
@@ -770,8 +796,8 @@ export class LiveMesh {
     if (this.dabCorners.length < region.size) this.dabCorners = new Int32Array(region.size * 2);
     const moves = this.dabMoves, corners = this.dabCorners;
     let count = 0;
-    for (const [v, d] of region) {
-      const w = weight(d);
+    for (const v of region.keys()) {
+      const w = weight(region.get(v)!);
       if (!w) continue;
       const x = p[v * 3], y = p[v * 3 + 1], z = p[v * 3 + 2];
       let dx = 0, dy = 0, dz = 0;
@@ -901,18 +927,22 @@ export class LiveMesh {
 
   /** Flips edge a-b when that brings the four corners nearer six neighbours each. */
   flipEdge(a: number, b: number): boolean {
-    const tris = this.edgeTriangles(a, b);
-    if (tris.length !== 2) return false;
-    const opposite = (t: number) => { for (let k = 0; k < 3; k += 1) { const v = this.tri[t * 3 + k]; if (v !== a && v !== b) return v; } return -1; };
+    // Build 85: no arrays, closures or vectors made before the (usual) early refusals - a refining
+    // stroke tries hundreds of flips a frame, and their garbage was the biggest share of a stroke's.
+    const tri = this.tri;
+    let t1 = -1, t2 = -1, found = 0;
+    for (const t of this.vTris[a]) {
+      const i = t * 3;
+      if (tri[i] === b || tri[i + 1] === b || tri[i + 2] === b) { if (found === 0) t1 = t; else t2 = t; found += 1; }
+    }
+    if (found !== 2) return false;
     // t1 has a->b in order, t2 has b->a.
-    let [t1, t2] = tris;
-    const order = (t: number) => { for (let k = 0; k < 3; k += 1) if (this.tri[t * 3 + k] === a) return this.tri[t * 3 + ((k + 1) % 3)] === b; return false; };
-    if (!order(t1)) [t1, t2] = [t2, t1];
-    if (!order(t1) || order(t2)) return false;
-    const c = opposite(t1), d = opposite(t2);
+    if (!this.runsAB(t1, a, b)) { const swap = t1; t1 = t2; t2 = swap; }
+    if (!this.runsAB(t1, a, b) || this.runsAB(t2, a, b)) return false;
+    const c = this.oppositeOf(t1, a, b), d = this.oppositeOf(t2, a, b);
     if (c < 0 || d < 0 || c === d) return false;
-    if (this.edgeTriangles(c, d).length) return false;
-    const n1 = this.faceNormal(t1, new THREE.Vector3()), n2 = this.faceNormal(t2, new THREE.Vector3());
+    if (this.hasEdge(c, d)) return false;
+    const n1 = this.faceNormal(t1, this.flipN1), n2 = this.faceNormal(t2, this.flipN2);
     // A pair with a sliver: flipped when that makes the shared edge shorter (towards Delaunay), whatever the valences.
     const sliver = this.isSliver(t1, n1) || this.isSliver(t2, n2);
     const target = (v: number) => (this.onBoundary(v) ? 4 : 6);
@@ -925,12 +955,12 @@ export class LiveMesh {
     // The two new triangles must face the same way as the old pair (a sliver's own facing does not count).
     n1.normalize(); n2.normalize();
     const p = this.pos;
-    const normalOf = (x: number, y: number, z: number) => {
+    const normalOf = (x: number, y: number, z: number, out: THREE.Vector3) => {
       const ux = p[y * 3] - p[x * 3], uy = p[y * 3 + 1] - p[x * 3 + 1], uz = p[y * 3 + 2] - p[x * 3 + 2];
       const vx = p[z * 3] - p[x * 3], vy = p[z * 3 + 1] - p[x * 3 + 1], vz = p[z * 3 + 2] - p[x * 3 + 2];
-      return new THREE.Vector3(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+      return out.set(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
     };
-    const m1 = normalOf(c, a, d), m2 = normalOf(d, b, c);
+    const m1 = normalOf(c, a, d, this.flipM1), m2 = normalOf(d, b, c, this.flipM2);
     if (m1.lengthSq() < 1e-14 || m2.lengthSq() < 1e-14) return false;
     m1.normalize(); m2.normalize();
     if (sliver) { if (m1.dot(m2) < 0.5 || this.isSliverOf(c, a, d) || this.isSliverOf(d, b, c)) return false; }
