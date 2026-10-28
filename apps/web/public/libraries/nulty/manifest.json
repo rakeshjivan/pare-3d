@@ -1,0 +1,242 @@
+{
+  "id": "nulty",
+  "name": "Dr Adam Nulty",
+  "credit": "Tooth library by Dr Adam Nulty, used with his permission (CC BY-NC-ND 4.0).",
+  "url": "https://creativecommons.org/licenses/by-nc-nd/4.0/",
+  "sets": [
+    {
+      "id": "nulty-a01-upper-front",
+      "name": "Nulty A01 upper front",
+      "file": "a01-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "a01-upper-front.png"
+    },
+    {
+      "id": "nulty-a01-lower-front",
+      "name": "Nulty A01 lower front",
+      "file": "a01-lower-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        33,
+        32,
+        31,
+        41,
+        42,
+        43
+      ],
+      "preview": "a01-lower-front.png"
+    },
+    {
+      "id": "nulty-a01-upper-arch",
+      "name": "Nulty A01 upper arch",
+      "file": "a01-upper-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ]
+    },
+    {
+      "id": "nulty-a01-lower-arch",
+      "name": "Nulty A01 lower arch",
+      "file": "a01-lower-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47
+      ]
+    },
+    {
+      "id": "nulty-f01-upper-front",
+      "name": "Nulty F01 upper front",
+      "file": "f01-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "f01-upper-front.png"
+    },
+    {
+      "id": "nulty-f01-lower-front",
+      "name": "Nulty F01 lower front",
+      "file": "f01-lower-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        33,
+        32,
+        31,
+        41,
+        42,
+        43
+      ],
+      "preview": "f01-lower-front.png"
+    },
+    {
+      "id": "nulty-f01-upper-arch",
+      "name": "Nulty F01 upper arch",
+      "file": "f01-upper-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ]
+    },
+    {
+      "id": "nulty-f01-lower-arch",
+      "name": "Nulty F01 lower arch",
+      "file": "f01-lower-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47
+      ]
+    },
+    {
+      "id": "nulty-a01-pontic-upper-front",
+      "name": "Nulty A01 pontics upper front",
+      "file": "a01-pontic-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "a01-pontic-upper-front.png"
+    },
+    {
+      "id": "nulty-a01-pontic-lower-front",
+      "name": "Nulty A01 pontics lower front",
+      "file": "a01-pontic-lower-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        33,
+        32,
+        31,
+        41,
+        42,
+        43
+      ],
+      "preview": "a01-pontic-lower-front.png"
+    },
+    {
+      "id": "nulty-a01-pontic-upper-arch",
+      "name": "Nulty A01 pontics upper arch",
+      "file": "a01-pontic-upper-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ]
+    },
+    {
+      "id": "nulty-a01-pontic-lower-arch",
+      "name": "Nulty A01 pontics lower arch",
+      "file": "a01-pontic-lower-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47
+      ]
+    }
+  ]
+}

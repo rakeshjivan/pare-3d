@@ -10,11 +10,19 @@
  * float32 min x y z, float32 step x y z, uint16 x y z per vertex, uint16 a b c per triangle.
  */
 
-export type ToothSetEntry = { id: string; name: string; file: string; teeth: number };
+export type ToothSetEntry = {
+  id: string; name: string; file: string; teeth: number;
+  /** Build 91: a picture of the set for the picker (a PNG beside it). */
+  preview?: string;
+  /** Build 91: "anterior" (canine to canine, for the wax-up) or "arch" (the whole arch, kept for posterior wax-ups). */
+  kind?: "anterior" | "arch";
+  /** Build 91: each tooth's FDI number, in the file's order. */
+  fdi?: number[];
+};
 export type ToothLibraryManifest = { id: string; name: string; credit: string; url: string; sets: ToothSetEntry[] };
 
 /** The libraries that ship with Pare 3D (folders under public/libraries). */
-export const BUILT_IN_LIBRARIES = ["teethy"] as const;
+export const BUILT_IN_LIBRARIES = ["teethy", "nulty"] as const;
 
 const MAGIC = 0x314c5450; // "PTL1"
 

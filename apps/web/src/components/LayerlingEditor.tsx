@@ -10495,23 +10495,30 @@ export function LayerlingEditor({
   const WAX_COLOR = "#f1e7d0";
   type WaxupState = Omit<WaxupView, "marked" | "selected" | "mirror"> & { landmarks: WaxLandmarks | null; guessed: boolean; marks: Array<[number, number, number]> };
   const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [] });
-  const waxLibrary = useRef<ToothLibraryManifest | null>(null);
-  // The sets that ship with Pare 3D, read once the Studio is open.
+  const waxLibraries = useRef<ToothLibraryManifest[] | null>(null);
+  // The sets that ship with Pare 3D, read once the Studio is open. Build 91: every library (Teethy and
+  // Dr Adam Nulty's), the anterior sets in the picker, each with its picture.
   useEffect(() => {
-    if (!WAXUP_ENABLED || !dentalStudio || waxLibrary.current) return;
-    void loadToothLibrary(BUILT_IN_LIBRARIES[0]).then((library) => {
-      waxLibrary.current = library;
-      setWaxup((current) => ({ ...current, builtIn: library.sets.map((set) => ({ id: set.id, name: set.name })), builtInCredit: library.credit }));
-    }).catch(() => undefined);
+    if (!WAXUP_ENABLED || !dentalStudio || waxLibraries.current) return;
+    waxLibraries.current = [];
+    void Promise.all(BUILT_IN_LIBRARIES.map((id) => loadToothLibrary(id).catch(() => null))).then((found) => {
+      const libraries = found.filter((library): library is ToothLibraryManifest => Boolean(library));
+      waxLibraries.current = libraries;
+      const builtIn = libraries.flatMap((library) => library.sets.filter((set) => set.kind !== "arch").map((set) => ({
+        id: set.id, name: set.name, library: library.name, credit: library.credit,
+        preview: set.preview ? `libraries/${library.id}/${set.preview}` : null,
+      })));
+      setWaxup((current) => ({ ...current, builtIn, builtInCredit: null }));
+    });
   }, [dentalStudio]);
   const chooseBuiltInSet = useCallback(async (id: string) => {
-    const library = waxLibrary.current;
+    const library = waxLibraries.current?.find((candidate) => candidate.sets.some((entry) => entry.id === id));
     const set = library?.sets.find((entry) => entry.id === id);
     if (!library || !set) return;
     try {
       const shells = await loadToothSet(library.id, set);
       waxShells.current = shells;
-      setWaxup((current) => ({ ...current, setId: id, setName: set.name, teeth: shells.length, error: null }));
+      setWaxup((current) => ({ ...current, setId: id, setName: set.name, teeth: shells.length, builtInCredit: library.credit, error: null }));
     } catch {
       setWaxup((current) => ({ ...current, error: t("waxup.setFailed") }));
     }

@@ -22,7 +22,7 @@ export type WaxupView = {
   /** The tooth set loaded, and how many teeth it has. */
   setName: string | null;
   /** Build 79: the sets that ship with Pare 3D, and the one chosen (null = none, or one loaded from a file). */
-  builtIn: Array<{ id: string; name: string }>;
+  builtIn: Array<{ id: string; name: string; library?: string; credit?: string; preview?: string | null }>;
   builtInCredit: string | null;
   setId: string | null;
   teeth: number;
@@ -115,13 +115,22 @@ export function WaxupCard({ view, actions, slots, busy, workspace }: { view: Wax
           }}
         />
         {view.builtIn.length ? (
-          <label className="dental-label-field">
-            <span>{t("waxup.builtIn")}</span>
-            <select value={view.setId ?? ""} disabled={working} onChange={(event) => { if (event.currentTarget.value) actions.onBuiltIn(event.currentTarget.value); }}>
-              <option value="">{t(view.setName && !view.setId ? "waxup.ownSet" : "waxup.chooseSet")}</option>
-              {view.builtIn.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
-            </select>
-          </label>
+          // Build 91: the sets as pictures, by library (Teethy, Dr Adam Nulty's).
+          <div className="waxup-sets" role="radiogroup" aria-label={t("waxup.builtIn")}>
+            {[...new Set(view.builtIn.map((set) => set.library ?? ""))].map((library) => (
+              <div key={library} className="waxup-set-library">
+                {library ? <span className="waxup-set-library-name">{library}</span> : null}
+                <div className="waxup-set-grid">
+                  {view.builtIn.filter((set) => (set.library ?? "") === library).map((set) => (
+                    <button key={set.id} type="button" role="radio" aria-checked={view.setId === set.id} className={`waxup-set${view.setId === set.id ? " active" : ""}`} disabled={working} title={set.name} onClick={() => actions.onBuiltIn(set.id)}>
+                      {set.preview ? <img src={set.preview} alt="" loading="lazy" /> : <span className="waxup-set-blank" aria-hidden="true" />}
+                      <span>{set.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : null}
         <button type="button" className="dental-import" disabled={working} onClick={() => file.current?.click()}><Upload size={15} /> {t("waxup.loadSet")}</button>
         <p className="blend-hint">{view.setName ? t("waxup.setLoaded", { name: view.setName, count: view.teeth }) : t("waxup.setHint")}</p>
