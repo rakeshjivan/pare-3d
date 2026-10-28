@@ -16,7 +16,7 @@ export type SculptTool = "select" | "unselect" | LiveBrush;
 export type SculptRefine = "off" | "coarse" | "medium" | "fine";
 /** Build 73: a brush also works mirrored across the part's middle, left-right (x) or front-back (z). */
 export type SculptSymmetry = "off" | "x" | "z";
-export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "grow" | "shrink" | "smoothEdge" | "connected" | "invertConnected" | "tidy" | "invert" | "clear" | "extrude" | "offset" | "bridge" | "align";
+export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "grow" | "shrink" | "smoothEdge" | "connected" | "invertConnected" | "tidy" | "invert" | "clear" | "extrude" | "offset" | "bridge" | "align" | "remeshPart" | "reducePart";
 
 /** Build 92: a soft transform's settings - a move (mm, and out along the selection's facing), turns (degrees), a scale (%) and the soft edge (mm). */
 export type SoftTransform = { x: number; y: number; z: number; out: number; tilt: number; turn: number; roll: number; scale: number; soft: number };
@@ -42,7 +42,7 @@ const TRIM_ACTIONS = ["delete", "fill", "grow", "connected", "invert", "clear"] 
 /** Build 83: Connected and Tidy edge (Meshmixer's Expand to Connected and Optimize Boundary). */
 const SCULPT_ACTIONS = ["fill", "delete", "smooth", "flatten", "grow", "shrink", "smoothEdge", "tidy", "connected", "invert", "clear"] as const;
 /** Build 81: Meshmixer's Edit tools on the selection. */
-const EDIT_ACTIONS = ["extrude", "offset", "bridge", "align"] as const;
+const EDIT_ACTIONS = ["extrude", "offset", "bridge", "align", "remeshPart", "reducePart"] as const;
 const HINTED: ReadonlyArray<SculptSelectionAction> = ["fill", "shrink", "smoothEdge", "tidy", "connected", "grow", "invert", "extrude", "offset", "bridge", "align"];
 
 /** Build 69: Sculpt - brushes that shape a mesh, a brush that selects a patch of it, and the whole part rebuilt. */

@@ -188,3 +188,34 @@ describe("Build 92: deviation map", () => {
     expect(plain).toEqual([1, 1, 1]);
   });
 });
+
+import { remeshRegion } from "@/lib/liveSculpt";
+
+describe("Build 92: Remesh and Reduce the selection only", () => {
+  const sound = (mesh: LiveMesh) => {
+    const edges = new Map<string, number>();
+    for (let t = 0; t < mesh.tCount; t += 1) if (mesh.tAlive[t]) for (let k = 0; k < 3; k += 1) { const a = mesh.tri[t * 3 + k], b = mesh.tri[t * 3 + (k + 1) % 3]; const key = a < b ? `${a},${b}` : `${b},${a}`; edges.set(key, (edges.get(key) ?? 0) + 1); }
+    let more = 0; for (const c of edges.values()) if (c > 2) more += 1;
+    return more;
+  };
+  it("makes the selection finer and leaves everything outside it exactly as it was", () => {
+    const mesh = plate(40, 20, (x, y) => Math.sin(x * 0.5) * Math.cos(y * 0.5));
+    const core = near(mesh, 4);
+    const outside: Array<[number, number, number, number]> = [];
+    for (let v = 0; v < mesh.vCount; v += 1) if (Math.hypot(mesh.pos[v * 3], mesh.pos[v * 3 + 1]) > 4.6) outside.push([v, mesh.pos[v * 3], mesh.pos[v * 3 + 1], mesh.pos[v * 3 + 2]]);
+    const before = mesh.triangleCount();
+    remeshRegion(mesh, core, 0.2);
+    expect(mesh.triangleCount()).toBeGreaterThan(before * 1.5);
+    for (const [v, x, y, z] of outside) { expect(mesh.vAlive[v]).toBe(1); expect(mesh.pos[v * 3]).toBe(x); expect(mesh.pos[v * 3 + 1]).toBe(y); expect(mesh.pos[v * 3 + 2]).toBe(z); }
+    expect(sound(mesh)).toBe(0);
+    // Still on the surface it had.
+    for (let v = 0; v < mesh.vCount; v += 1) if (mesh.vAlive[v]) expect(Math.abs(mesh.pos[v * 3 + 2] - Math.sin(mesh.pos[v * 3] * 0.5) * Math.cos(mesh.pos[v * 3 + 1] * 0.5))).toBeLessThan(0.05);
+  });
+  it("Reduce makes fewer triangles in the selection", () => {
+    const mesh = plate(120, 20);
+    const before = mesh.triangleCount();
+    remeshRegion(mesh, near(mesh, 5), mesh.averageEdge(near(mesh, 5)) * 2);
+    expect(mesh.triangleCount()).toBeLessThan(before * 0.9);
+    expect(sound(mesh)).toBe(0);
+  });
+});

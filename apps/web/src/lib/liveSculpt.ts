@@ -15,6 +15,7 @@
  * The same steps over the whole part, with corners pulled back onto the original surface, are Remesh.
  */
 import * as THREE from "three";
+import { NearestSurface } from "./nearestSurface";
 
 /**
  * Build 89: Meshmixer's brushes. "smooth" is RobustSmooth (weighted by the triangles' shape, so uneven
@@ -1929,6 +1930,38 @@ function remeshPasses(mesh: LiveMesh, edge: number, passes: number, project: (p:
     for (let v = 0; v < mesh.vCount; v += 1) if (mesh.vAlive[v]) all.push(v);
     mesh.refine(all, edge, { project, budget: Number.MAX_SAFE_INTEGER, fixed: (v) => mesh.onBoundary(v), creaseAngle: REMESH_CREASE_ANGLE, always: true });
     onProgress?.((pass + 1) / passes);
+  }
+}
+
+/**
+ * Build 92: Remesh (or Reduce) only the selected corners: their triangles made again at `edge` mm,
+ * kept on the surface they had, while the selection's own border and everything outside it stays as it
+ * was - so the patch still joins the rest exactly. Reduce is the same with a longer edge.
+ */
+export function remeshRegion(mesh: LiveMesh, corners: ArrayLike<number>, edge: number, passes = 4) {
+  const start = mesh.vCount;
+  const inside = new Uint8Array(start);
+  for (let i = 0; i < corners.length; i += 1) if (corners[i] < start) inside[corners[i]] = 1;
+  const chosen = (v: number) => v >= start || inside[v] === 1;
+  // The surface to stay on: the selection's triangles and those round it.
+  const soup: number[] = [];
+  for (let t = 0; t < mesh.tCount; t += 1) {
+    if (!mesh.tAlive[t]) continue;
+    const a = mesh.tri[t * 3], b = mesh.tri[t * 3 + 1], c = mesh.tri[t * 3 + 2];
+    if (!chosen(a) && !chosen(b) && !chosen(c)) continue;
+    for (const v of [a, b, c]) soup.push(mesh.pos[v * 3], mesh.pos[v * 3 + 1], mesh.pos[v * 3 + 2]);
+  }
+  if (!soup.length) return;
+  const surface = new NearestSurface(Float32Array.from(soup), Math.max(0.5, edge * 3));
+  const q = new Float64Array(3);
+  const project = (p: THREE.Vector3) => { if (surface.nearest(p.x, p.y, p.z, q) < Infinity) p.set(q[0], q[1], q[2]); };
+  for (let pass = 0; pass < passes; pass += 1) {
+    const region: number[] = [];
+    for (let v = 0; v < mesh.vCount; v += 1) if (mesh.vAlive[v] && chosen(v)) region.push(v);
+    // The border: chosen corners with a neighbour that is not.
+    const border = new Set<number>();
+    for (const v of region) for (const w of mesh.neighbours(v)) if (!chosen(w)) { border.add(v); break; }
+    mesh.refine(region, edge, { project, budget: Number.MAX_SAFE_INTEGER, fixed: (v) => !chosen(v) || border.has(v) || mesh.onBoundary(v), creaseAngle: REMESH_CREASE_ANGLE, always: true });
   }
 }
 

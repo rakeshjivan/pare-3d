@@ -73,7 +73,7 @@ import { WaxupPointOverlay, markerTriangles, rayHit } from "./workplane/WaxupPoi
 import { WAXUP_LANDMARKS, type WaxupView } from "./workplane/WaxupCard";
 import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
 import { applyToSelection, brushChoice, lassoChoice, type LassoMode, cornerPositions, growChoice, soupFloat32, invertChoice, sculptMeshOf, soupOf, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
-import { LiveMesh, averageEdgeOf, stampBrush, type LiveBrush, type LivePatch } from "@/lib/liveSculpt";
+import { remeshRegion, LiveMesh, averageEdgeOf, stampBrush, type LiveBrush, type LivePatch } from "@/lib/liveSculpt";
 import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
 import { MeshSculptPanel, type SculptBrushOptions, type SoftTransform, type SculptFreezeAction, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
@@ -9495,6 +9495,26 @@ export function LayerlingEditor({
       return;
     }
     if (!count()) return;
+    if (action === "remeshPart" || action === "reducePart") {
+      // Build 92: Remesh or Reduce the selection only, on the live copy - its border and the rest kept.
+      const { points, triangles } = selection.mesh;
+      const at: number[] = [];
+      selection.chosen.forEach((chosen, t) => { if (chosen) for (let k = 0; k < 3; k += 1) { const v = triangles[t * 3 + k]; at.push(points[v * 3], points[v * 3 + 1], points[v * 3 + 2]); } });
+      const core = state.live.cornersAt(at);
+      if (!core.length) return;
+      const edge = action === "remeshPart" ? Math.max(0.03, target.tool.detail) : state.live.averageEdge(core) * 2;
+      state.live.beginPatch();
+      remeshRegion(state.live, core, edge);
+      window.layerlingSculptLive?.(shape.id, state.live.geometry, shape.color);
+      if (state.live.flushGpu()) window.layerlingRedraw?.();
+      const entry = state.live.endPatch();
+      if (entry) { state.undo.push(entry); state.redo = []; state.strokes += 1; state.lastBrush = action; setSculptSteps((n) => n + 1); }
+      // The triangles are new: the selection is gone.
+      state.selection = null;
+      setSculptTool((current) => current ? { ...current, chosen: 0 } : current);
+      setNotice(t(action === "remeshPart" ? "sculpt.selection.remeshPartDone" : "sculpt.selection.reducePartDone", { edge: edge.toFixed(2) }));
+      return;
+    }
     // Build 85: Trim deletes (or erases and fills) at once - the warning about the teeth (builds 75-84) came up
     // even with the teeth well clear, and only got in the way.
     if (action === "fill") {
@@ -17619,7 +17639,7 @@ type SculptSession = {
   centre: Vec3;
   selection: { mesh: SculptMesh; chosen: Uint8Array; stale: boolean } | null;
   strokes: number;
-  lastBrush: SculptTool | "softTransform" | null;
+  lastBrush: SculptTool | "softTransform" | "remeshPart" | "reducePart" | null;
   /** Build 92: the part's triangles when Sculpt took it, and their nearest-point grid once made. */
   original: Float32Array;
   originalSurface: NearestSurface | null;
