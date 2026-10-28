@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readWeights, ToothNet } from "@/lib/toothNet";
 import { classNumber, cleanRegions, liveNeighbours, numberTeeth, transferLabels, toothColour } from "@/lib/toothSegment";
 import { archOrder } from "@/components/workplane/WaxupCard";
+import { fdiKind, fdiNumber } from "@/lib/dentalWaxup";
 
 /* Build 94: the tooth finder's parts that do not need its (separate) weights. */
 
@@ -133,5 +134,14 @@ describe("tooth finder helpers", () => {
     let sum = 0;
     for (let j = 0; j < 19; j += 1) sum += prob[j];
     expect(sum).toBeCloseTo(1, 5);
+  });
+});
+
+describe("fitting to the teeth found", () => {
+  it("reads kind and side back from an FDI number", () => {
+    for (const arch of ["upper", "lower"] as const) for (const q of arch === "upper" ? [1, 2] : [3, 4]) for (let n = 1; n <= 8; n += 1) {
+      const { kind, side } = fdiKind(q * 10 + n, arch);
+      expect(fdiNumber(kind, side, arch)).toBe(q * 10 + n);
+    }
   });
 });
