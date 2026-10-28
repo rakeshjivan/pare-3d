@@ -1,7 +1,7 @@
 import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
 import { beforeAll, describe, expect, it } from "vitest";
 import { analyseDental, makeDentalStudio, pinchedEdges, type DentalStudioOptions } from "@/lib/dentalModel";
-import { articulatorParts, CONDYLE_RADIUS, incisalPins, PIN, PIN_BAND, PIN_CLEAR, PIN_SET, pinTipAt } from "@/lib/dentalArticulator";
+import { articulatorParts, articulatorPinPatch, CONDYLE_RADIUS, incisalPins, PIN, PIN_BAND, PIN_CLEAR, PIN_SET, pinTipAt } from "@/lib/dentalArticulator";
 import type { ArticulatorSides } from "@/lib/dentalArticulator";
 import { hingeOpening } from "@/lib/dentalBase";
 import { weld, toManifold } from "@/lib/dentalMesh";
@@ -184,6 +184,49 @@ describe("Build 78: the kinematic articulator", () => {
       expect(table[i].back).toBeLessThan(table[i].front);
     }
   }, 120_000);
+
+  it("leaves the pin out on request (build 82): opening above 0 turns it on, leaving it out closes to 0", () => {
+    expect(articulatorPinPatch({ pinRaise: 3 })).toEqual({ pinRaise: 3, incisalPin: true });
+    expect(articulatorPinPatch({ pinRaise: 0 })).toEqual({ pinRaise: 0 });
+    expect(articulatorPinPatch({ incisalPin: false })).toEqual({ incisalPin: false, pinRaise: 0 });
+    expect(articulatorPinPatch({ incisalPin: true })).toEqual({ incisalPin: true });
+  });
+
+  it("without a pin (build 82): a true hinge on the condyles, nothing in front of the incisors", () => {
+    const a = articulatorParts(runtime as never, 20, -25, 25, 18, -18, null, 0, { upper: heels, lower: heels });
+    expect(a.rest).toBe(0);
+    expect(runtime.Manifold.intersection(a.upper, a.lower).volume()).toBe(0);
+    // Three points on one ball, two on the other: it turns about the axis and cannot slide or rock.
+    const contactsOf = (c: number) => runtime.Manifold.intersection(a.upper, runtime.Manifold.sphere(CONDYLE_RADIUS + 0.01, 96).translate([c, a.axleY, 0])).decompose().length;
+    expect([contactsOf(a.centres[0]), contactsOf(a.centres[1])]).toEqual([3, 2]);
+    // Nothing of either part forward of the heels' bars (no pin, cup or arms).
+    const ahead = runtime.Manifold.cube([200, 40, 200]).translate([-100, -60, -100]);
+    expect(runtime.Manifold.intersection(a.upper, ahead).isEmpty()).toBe(true);
+    expect(runtime.Manifold.intersection(a.lower, ahead).isEmpty()).toBe(true);
+    expect(hingeOpening(runtime as never, a.upper, a.lower, a.axleY, 90, 0)).toBe(90);
+  });
+
+  it("makes an articulated pair without a pin, closed to the scanned bite, teeth untouched (build 82)", async () => {
+    const upper = syntheticArch({ teethDown: true, front: -2 });
+    const lower = syntheticArch();
+    for (let i = 2; i < lower.length; i += 3) lower[i] -= 26.6;
+    const input = () => ({ arches: [{ id: "x", positions: lower.slice() }, { id: "y", positions: upper.slice() }] });
+    // A raised opening left behind is ignored once the pin is out: nothing holds it.
+    const result = await makeDentalStudio(input(), { ...base, incisalPin: false, pinRaise: 4 }, runtime as never);
+    const withPin = await makeDentalStudio(input(), base, runtime as never);
+    expect(result.parts.length).toBe(2);
+    for (const part of result.parts) expect(pinchedEdges(part.positions)).toBe(0);
+    expect(result.pieces).toEqual([1, 1]);
+    expect(result.opening).toBe(90);
+    expect(result.held).toBeUndefined();
+    expect(result.pins).toBeUndefined();
+    for (const part of result.trueness!) expect(part.within).toBe(1);
+    // No pin, boss, cup or arms in front: each model reaches no further forward than the same pair's teeth do with the pin.
+    const frontOf = (positions: Float32Array) => { let least = Infinity; for (let i = 1; i < positions.length; i += 3) least = Math.min(least, positions[i]); return least; };
+    for (let k = 0; k < 2; k += 1) expect(frontOf(result.parts[k].positions)).toBeGreaterThan(frontOf(withPin.parts[k].positions) + 3);
+    // Less material without the pin's parts.
+    expect(result.parts.reduce((s, p) => s + p.volume, 0)).toBeLessThan(withPin.parts.reduce((s, p) => s + p.volume, 0));
+  }, 180_000);
 
   it("keeps the scanner's bite when the arches come in occlusion, and fits it only when asked", () => {
     const upper = syntheticArch({ teethDown: true, front: -2 });

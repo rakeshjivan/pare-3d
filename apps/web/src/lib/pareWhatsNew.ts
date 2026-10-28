@@ -8,6 +8,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
     items: [
       "Select in Sculpt (and Trim in Dental Studio) has a Lasso, as in Meshmixer: drag a loop freehand, or click its corners and click the first to close it. A new loop replaces the selection, Shift adds, Ctrl takes away; Surface I see, Back side and Through apply as for the brush.",
       "Meshmixer's brush keys: [ and ] for the brush size, Ctrl + wheel for the strength, Ctrl while stroking for the opposite effect, Shift to smooth.",
+      "Dental Studio: articulated models without the pin again - untick Incisal pin and the models hinge on the condyles alone and close on the teeth to the scanned bite. Moving the opening above 0 mm puts the pin back, since the pin is what holds an opening.",
     ],
   },
   {

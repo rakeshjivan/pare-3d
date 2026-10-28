@@ -301,7 +301,9 @@ export function articulatorParts(
     // With the pin in the middle (Kelvin): the first ball in a V-groove aimed at the cup, the second on
     // a flat. With posts either side (build 79): a hinge - the first ball in a three-face seat, the
     // second in a groove along the axis; the posts only stop it closing, so nothing is held twice.
-    const sideMode = Boolean(front?.sides);
+    // Build 82: with no pin at all, the hinge too - the condyles alone make a true hinge axis and the
+    // teeth stop it closing (a Kelvin groove and flat would leave the upper free to slide without the cup).
+    const sideMode = Boolean(front?.sides) || !front;
     const flat = !sideMode && index === 1;
     const along = sideMode && index === 1;
     const x0 = c - SEAT_HALF - (flat || along ? GROOVE_SLIDE : 0), x1 = c + SEAT_HALF + (flat || along ? GROOVE_SLIDE : 0);
@@ -408,4 +410,16 @@ export function articulatorParts(
   const lower = lowerCuts.length ? runtime.Manifold.difference(lowerJoined, keep(runtime.Manifold.union(lowerCuts))) : lowerJoined.translate([0, 0, 0]);
   made.forEach((solid) => solid.delete());
   return { upper, lower, axleY: ay, rest: rest / deg, pinY, bossTop, centres };
+}
+
+/** Build 82: the pin and the opening, as the panel sets them. */
+export type ArticulatorPinSettings = { incisalPin?: boolean; pinRaise?: number };
+/**
+ * Build 82: the incisal pin and the opening go together - an opening above 0 mm is held by the pin,
+ * so raising it turns the pin on; leaving the pin out closes the models to the scanned bite (0 mm).
+ */
+export function articulatorPinPatch(patch: ArticulatorPinSettings): ArticulatorPinSettings {
+  if (patch.incisalPin === false) return { ...patch, pinRaise: 0 };
+  if ((patch.pinRaise ?? 0) > 0) return { ...patch, incisalPin: true };
+  return patch;
 }

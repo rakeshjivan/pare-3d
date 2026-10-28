@@ -104,6 +104,12 @@ export type DentalStudioOptions = {
    * see, photograph and seat an index on.
    */
   pinPlace?: "midline" | "sides";
+  /**
+   * Build 82: the incisal pin (in front, or the posts either side) is made; on unless false. Without
+   * it the models are articulated on the condyles alone, as a true hinge, closing to the scanned bite
+   * on the teeth - so the opening is 0 (a raised opening needs the pin to hold it).
+   */
+  incisalPin?: boolean;
   /** Build 78: soft tissue that would meet the other model in the bite is cut back; on unless false. */
   relief?: boolean;
   /** Build 62: a bevel round the foot of the base for the build plate; on when left out. */
@@ -1078,7 +1084,8 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
       }
     }
     // Build 78: the incisal pin is one of the articulator's three supports, so it is always there.
-    const stop = Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY, ...(Number.isFinite(teethY) ? { teethY } : {}), ...(sides ? { sides } : {}) } : null;
+    // Build 82: unless it is left out - then the condyles alone, a true hinge, closing on the teeth.
+    const stop = options.incisalPin !== false && Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY, ...(Number.isFinite(teethY) ? { teethY } : {}), ...(sides ? { sides } : {}) } : null;
     // Build 65: each model's heels - its rearmost point either side of the middle - so the hinge's
     // bar reaches both, however unevenly a horseshoe's two ends stop.
     const mid = (xMin + xMax) / 2;
@@ -1094,7 +1101,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
       return best.filter((heel): heel is { x: number; y: number } => heel !== null);
     };
     // Build 78: the one articulator - kinematic seats and the incisal pin (lib/dentalArticulator).
-    const raise = Math.max(0, Math.min(PIN_MAX, options.pinRaise ?? 0));
+    const raise = options.incisalPin === false ? 0 : Math.max(0, Math.min(PIN_MAX, options.pinRaise ?? 0));
     const parts = articulatorParts(runtime, back, xMin, xMax, depth, -depth, stop, raise, { upper: heelsOf("upper"), lower: heelsOf("lower") }, options.pinStyle ?? "fused");
     if (stop && Number.isFinite(parts.pinY)) pinGeometry = { axleY: parts.axleY, pinY: parts.pinY };
     if (stop && Number.isFinite(parts.pinY) && options.pinStyle === "set") {
@@ -1225,3 +1232,4 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     pieces,
   };
 }
+
