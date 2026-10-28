@@ -11535,12 +11535,12 @@ function applyViewLook(state: ThreeState | null) {
   state.workplaneLayer.visible = viewLook === "plate";
   const dark = viewLook === "dark";
   state.scene.background = new THREE.Color(dark ? MESHMIXER_BACKGROUND : base.background);
-  state.lights.ambient.intensity = base.ambient * (dark ? 0.55 : 1);
-  state.lights.key.intensity = base.key * (dark ? 0.35 : 1);
-  state.lights.fill.intensity = base.fill * (dark ? 0.3 : 1);
+  state.lights.ambient.intensity = base.ambient * (dark ? 0.4 : 1);
+  state.lights.key.intensity = base.key * (dark ? 0.25 : 1);
+  state.lights.fill.intensity = base.fill * (dark ? 0.2 : 1);
   let head = state.scene.getObjectByName("ViewHeadlight") as THREE.DirectionalLight | undefined;
   if (!head && dark) {
-    head = new THREE.DirectionalLight("#ffffff", 2.6);
+    head = new THREE.DirectionalLight("#ffffff", 2.2);
     head.name = "ViewHeadlight";
     state.scene.add(head, head.target);
   }

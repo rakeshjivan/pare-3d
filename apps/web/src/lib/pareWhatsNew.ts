@@ -4,6 +4,18 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 85,
+    items: [
+      "Sculpt is quicker: each dab of the brush takes a fraction of the time it did (finding the surface under the cursor no longer walks the whole scan), and Refine only reworks the triangles when there is something to split or merge - on a full-arch scan a Coarse stroke now does a frame's work in about a third of the time.",
+      "Strokes are evenly spaced however fast you move, and a quick stroke catches up a frame later instead of leaving gaps.",
+      "Sculpt opens as Meshmixer's brushes do: Strength 29, Refine Coarse.",
+      "A switch at the top of the window sets the view's look: the workplane, no workplane, or Meshmixer's dark grey background with a light that follows the camera.",
+      "Imported STL files come in Meshmixer's light grey, a little glossy, so a scan's surface reads; in Dental Studio the scans and models take the same grey.",
+      "Trim in Dental Studio deletes (or erases and fills) what you selected at once: the warning about the teeth, which came up even with the teeth well clear, is gone.",
+      "Press ` in Sculpt for a speed readout of the last stroke - frames a second, the longest wait, and where the time went.",
+    ],
+  },
+  {
     build: 84,
     items: [
       "Dental Studio's articulator is back to the drop-in ball and cup of builds 63-77, which printed easily, located well and had the least play: each ball slips into a cup a tenth of a millimetre bigger than it, with nothing to snap or force.",

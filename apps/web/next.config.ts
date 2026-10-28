@@ -24,6 +24,8 @@ try {
 const appVersion: string = JSON.parse(readFileSync(path.resolve(process.cwd(), "package.json"), "utf8")).version;
 
 const nextConfig: NextConfig = {
+  // Build 85: source maps on request, for profiling (PARE_SOURCEMAPS=1); never in a release.
+  productionBrowserSourceMaps: process.env.PARE_SOURCEMAPS === "1",
   outputFileTracingRoot: path.resolve(process.cwd()),
   devIndicators: false,
   // Keep the live development compiler isolated from `next build`. Sharing

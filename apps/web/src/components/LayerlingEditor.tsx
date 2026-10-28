@@ -296,8 +296,6 @@ export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 /** Fork (build 24): the face tool's live preview, which can be grabbed and dragged again. */
 const FACE_TOOL_PREVIEW_ID = "face-tool-preview";
 const BLEND_PREVIEW_ID = "blend-preview";
-/** Build 76: Trim warns about the teeth only when at least this many crown triangles are chosen (not a few at a stroke's edge). */
-const TRIM_TEETH_NOISE = 25;
 
 /** MCP actions that only read or change the view, so they still work while the history view is open. */
 const HISTORY_VIEW_MCP_ACTIONS = new Set([
@@ -9335,34 +9333,6 @@ export function LayerlingEditor({
     }
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /**
-   * Build 75: how many chosen triangles are teeth, matched by where they lie. Build 76: the crowns
-   * only (within the Studio's tooth area), not the gum, flaps and palate that area takes in - and
-   * a few at the edge of a stroke are not counted.
-   */
-  const teethInSelection = (shape: WorkplaneShape, selection: { mesh: { points: ArrayLike<number>; triangles: ArrayLike<number> }; chosen: Uint8Array }) => {
-    const studio = dentalStudioRef.current;
-    if (!studio || !Object.values(studio.slots).includes(shape.id)) return 0;
-    const area = dentalAreaFor(shape);
-    const crowns = area ? dentalAreas.current.get(shape.id)?.crowns : undefined;
-    if (!area || !crowns || crowns.length !== area.length) return 0;
-    const world = worldTriangles(shape);
-    const key = (x: number, y: number, z: number) => `${Math.round(x * 1000)},${Math.round(y * 1000)},${Math.round(z * 1000)}`;
-    const teeth = new Set<string>();
-    for (let t = 0; t < area.length; t += 1) {
-      if (!area[t] || !crowns[t]) continue;
-      const o = t * 9;
-      teeth.add(key((world[o] + world[o + 3] + world[o + 6]) / 3, (world[o + 1] + world[o + 4] + world[o + 7]) / 3, (world[o + 2] + world[o + 5] + world[o + 8]) / 3));
-    }
-    const { points, triangles } = selection.mesh;
-    let hit = 0;
-    for (let t = 0; t < selection.chosen.length; t += 1) {
-      if (!selection.chosen[t]) continue;
-      const a = triangles[t * 3] * 3, b = triangles[t * 3 + 1] * 3, c = triangles[t * 3 + 2] * 3;
-      if (teeth.has(key((points[a] + points[b] + points[c]) / 3, (points[a + 1] + points[b + 1] + points[c + 1]) / 3, (points[a + 2] + points[b + 2] + points[c + 2]) / 3))) hit += 1;
-    }
-    return hit >= TRIM_TEETH_NOISE ? hit : 0;
-  };
   const applySculptSelectionRef = useRef<(action: SculptSelectionAction) => void>(() => {});
   const applySculptSelection = useCallback((action: SculptSelectionAction) => {
     flushSculpt();
@@ -9379,16 +9349,8 @@ export function LayerlingEditor({
       return;
     }
     if (!count()) return;
-    // Build 75: Trim warns once before it cuts into the teeth (the crowns Dental Studio keeps);
-    // build 76: before Erase & Fill smooths them over too.
-    if ((action === "delete" || action === "fill") && target.tool.trim && (target.tool.teethWarned !== count() || target.tool.teethAction !== action)) {
-      const hit = teethInSelection(shape, selection);
-      if (hit > 0) {
-        const chosen = count();
-        setSculptTool((current) => current ? { ...current, teethHit: hit, teethWarned: chosen, teethAction: action } : current);
-        return;
-      }
-    }
+    // Build 85: Trim deletes (or erases and fills) at once - the warning about the teeth (builds 75-84) came up
+    // even with the teeth well clear, and only got in the way.
     if (action === "fill") {
       // Build 76: Erase & Fill - the hole each selected area leaves is closed with a smooth patch.
       const result = eraseAndFill(selection.mesh.points, selection.mesh.triangles, selection.chosen);

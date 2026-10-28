@@ -81,6 +81,12 @@ A click beside the plate or [[Esc]] returns the workplane to the base plate. Qui
 
 While a workplane sits on a face, an eye appears next to {{ui:camera.placeWorkplane}}. It hides the workplane without dropping it, for a clear look at the design: new shapes still land on that face, and rotating still turns about it. A click on the eye shows it again, and so does setting a new workplane.
 
+### The look of the view
+
+The switch at the top of the window, beside {{ui:workspace.simpleMode}}, sets how the view looks: **{{ui:view.look.plate}}** (the plate and its grid), **{{ui:view.look.clear}}** (the same light background with nothing under the parts, for a clean look or a screenshot) or a **dark grey background, as Meshmixer's**, with a light that follows the camera so the surface of a scan reads the same whichever way it is turned - the best for sculpting. The workplane still works when it is hidden; only its picture goes. The choice is remembered.
+
+An imported STL comes in light grey and a little glossy, as in Meshmixer, so the bumps and hollows of a scan show (it was blue). Give it any colour you like in its properties.
+
 ## Grid and snapping
 
 The grid shows the size of the plate. At the bottom right is the **snap step**: moving and scaling snap in steps of that size, for example 1 mm. Make it smaller for fine work and larger for rough arranging. {{ui:editor.tool.snapToGrid}} in the ribbon moves the selected shapes afterwards onto the nearest grid crossing. While moving, shapes also snap to other shapes, see [Selecting and arranging](chapter:select-and-arrange).
