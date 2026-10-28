@@ -91,6 +91,10 @@ export function MeshSculptPanel({
   frozen = 0,
   onFreeze,
   soft = null,
+  groupsShown = false,
+  groupAngle = 30,
+  groupCount = 0,
+  onGroups,
   brushOptions,
   onBrushOptions,
   onSoftStart,
@@ -142,8 +146,13 @@ export function MeshSculptPanel({
   /** Build 71: opened from Dental Studio - stands beside its panel instead of over it. */
   besideDental?: boolean;
   /** Build 82: the Select tool paints (brush) or draws a loop (lasso). */
-  selectShape?: "brush" | "lasso";
-  onSelectShape?: (shape: "brush" | "lasso") => void;
+  selectShape?: "brush" | "lasso" | "group";
+  onSelectShape?: (shape: "brush" | "lasso" | "group") => void;
+  /** Build 92: face groups - shown or not, the angle that splits them, how many there are, and the button. */
+  groupsShown?: boolean;
+  groupAngle?: number;
+  groupCount?: number;
+  onGroups?: (show: boolean, angle?: number) => void;
   /** Build 81: Extrude and Offset's distance, mm. */
   editAmount?: number;
   onEditAmount?: (value: number) => void;
@@ -189,13 +198,14 @@ export function MeshSculptPanel({
       {tool === "select" || tool === "unselect" ? (
         <div className="edge-modifier-field edge-kind-switch shell-openings" role="radiogroup" aria-label={t("sculpt.selectShape")}>
           <div className="shell-opening-options">
-            {(["brush", "lasso"] as const).map((value) => (
+            {(["brush", "lasso", "group"] as const).map((value) => (
               <button key={value} type="button" role="radio" aria-checked={selectShape === value} className={selectShape === value ? "active" : ""} disabled={busy} onClick={() => onSelectShape?.(value)}>
                 {t(`sculpt.selectShape.${value}`)}
               </button>
             ))}
           </div>
           {selectShape === "lasso" ? <p className="blend-hint">{t("sculpt.lassoHelp")}</p> : null}
+          {selectShape === "group" ? <p className="blend-hint">{t("sculpt.groupHelp")}</p> : null}
         </div>
       ) : null}
       {(tool === "select" || tool === "unselect") && selectShape === "lasso" ? null : <EdgeModifierSlider label={t("sculpt.size")} value={size} min={4} max={150} step={1} workspace={workspace} disabled={busy} onChange={onSize} />}
@@ -273,6 +283,16 @@ export function MeshSculptPanel({
         </div>
       ) : null}
       <p className="blend-hint" role="status">{chosen ? t("sculpt.chosen", { count: chosen.toLocaleString() }) : t("sculpt.noneChosen")}</p>
+      {!trim && onGroups ? (
+        // Build 92: Meshmixer's Generate Face Groups - shown in colour; Select > Group picks one with a click.
+        <div className="sculpt-groups">
+          <label className="edge-modifier-check" title={t("sculpt.groups.hint")}>
+            <input type="checkbox" checked={groupsShown} disabled={busy} onChange={(event) => onGroups(event.currentTarget.checked)} />
+            <span>{groupsShown && groupCount ? t("sculpt.groups.shownCount", { count: groupCount.toLocaleString() }) : t("sculpt.groups.show")}</span>
+          </label>
+          {groupsShown ? <EdgeModifierSlider label={t("sculpt.groups.angle")} value={groupAngle} min={5} max={60} step={1} unit="°" workspace={workspace} disabled={busy} onChange={(value) => onGroups(true, value)} /> : null}
+        </div>
+      ) : null}
       {teethWarning > 0 ? <p className="dental-status warn sculpt-teeth-warning" role="status" aria-live="assertive">{t("sculpt.trimTeeth", { count: teethWarning.toLocaleString() })}</p> : null}
       <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.selection")}>
         {(trim ? TRIM_ACTIONS : SCULPT_ACTIONS).map((action) => (

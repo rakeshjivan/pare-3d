@@ -122,3 +122,47 @@ describe("Build 92: brush options", () => {
     expect(mid).toBeGreaterThan(0.1);
   });
 });
+
+describe("Build 92: face groups", () => {
+  it("a box comes out as its six faces", () => {
+    const g = new THREE.BoxGeometry(20, 10, 14, 8, 4, 6);
+    const mesh = LiveMesh.fromSoup(Array.from((g.toNonIndexed().getAttribute("position") as THREE.BufferAttribute).array as Float32Array));
+    expect(mesh.generateGroups(30)).toBe(6);
+    // Every triangle of one face in one group.
+    const byGroup = new Map<number, Set<string>>();
+    for (let t = 0; t < mesh.tCount; t += 1) {
+      const n = new THREE.Vector3(); const a = mesh.tri[t * 3], b = mesh.tri[t * 3 + 1], c = mesh.tri[t * 3 + 2];
+      const p = (v: number) => new THREE.Vector3(mesh.pos[v * 3], mesh.pos[v * 3 + 1], mesh.pos[v * 3 + 2]);
+      n.crossVectors(p(b).sub(p(a)), p(c).sub(p(a))).normalize();
+      const key = [n.x, n.y, n.z].map((x) => Math.round(x)).join(",");
+      const g2 = mesh.groupOf(t);
+      if (!byGroup.has(g2)) byGroup.set(g2, new Set());
+      byGroup.get(g2)!.add(key);
+    }
+    for (const keys of byGroup.values()) expect(keys.size).toBe(1);
+  });
+
+  it("a groove between two bumps splits them, and small specks are merged away", () => {
+    const bump = (x: number, y: number) => Math.max(0, 2 - Math.hypot(x + 3, y)) * 1.2 + Math.max(0, 2 - Math.hypot(x - 3, y)) * 1.2 + 0.01 * Math.sin(x * 40) * Math.cos(y * 40);
+    const mesh = plate(120, 20, bump);
+    const count = mesh.generateGroups(30);
+    expect(count).toBeGreaterThan(2);
+    expect(count).toBeLessThan(40);
+    const left = mesh.pick([-3, 0.3, 10], [0, 0, -1])!, right = mesh.pick([3, 0.3, 10], [0, 0, -1])!;
+    expect(mesh.groupOf(left.triangle)).not.toBe(mesh.groupOf(right.triangle));
+  });
+
+  it("paints the groups in colour and takes it away again", () => {
+    const mesh = plate(20, 10, (x) => (x > 0 ? x : 0));
+    mesh.generateGroups(20);
+    mesh.showGroups(true);
+    expect(mesh.painted).toBe(true);
+    mesh.flushGpu();
+    const colors = mesh.geometry.getAttribute("color").array as Float32Array;
+    expect([colors[0], colors[1], colors[2]].some((c) => c !== 1)).toBe(true);
+    mesh.showGroups(false);
+    mesh.flushGpu();
+    expect(mesh.painted).toBe(false);
+    expect((mesh.geometry.getAttribute("color").array as Float32Array)[0]).toBe(1);
+  });
+});

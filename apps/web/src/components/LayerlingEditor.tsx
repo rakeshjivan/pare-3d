@@ -8963,7 +8963,7 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso"; frozen?: number; soft?: SoftTransform | null; brushOptions?: SculptBrushOptions; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso" | "group"; groupsShown?: boolean; groupAngle?: number; groupCount?: number; frozen?: number; soft?: SoftTransform | null; brushOptions?: SculptBrushOptions; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
   /** Build 76: bumped when a stroke is added or stepped back, so Undo and Redo show what they can do. */
   const [, setSculptSteps] = useState(0);
   // Build 85: the speed readout (the ` key in Sculpt): the last stroke's frames, timed.
@@ -9087,8 +9087,53 @@ export function LayerlingEditor({
     const { tool, state } = target;
     if (tool.tool !== "select" && tool.tool !== "unselect") return;
     const selection = sculptSelectionOf(state);
+    if (tool.selectShape === "group") {
+      // Build 92: a click selects (or with Unselect, takes away) the whole face group under it.
+      const last = points[points.length - 1];
+      const ray = last ? window.layerlingScreenRay?.(last[0], last[1]) : null;
+      const hit = ray ? state.live.pick(ray.origin, ray.direction) : null;
+      if (!state.live.groups) { state.live.generateGroups(tool.groupAngle ?? 30); }
+      const g = hit ? state.live.groupOf(hit.triangle) : -1;
+      if (g < 0) return;
+      const map = liveToSelection(state);
+      const groups = state.live.groups!;
+      for (let t = 0; t < map.length; t += 1) if (map[t] >= 0 && groups[t] === g) selection.chosen[map[t]] = tool.tool === "select" ? 1 : 0;
+      setSculptTool((current) => current ? { ...current, chosen: selection.chosen.reduce((a, b) => a + b, 0) } : current);
+      return;
+    }
     brushChoice(selection.mesh, window.layerlingProjectPoints(cornerPositions(selection.mesh)), window.layerlingCameraPosition(), points, tool.size, selection.chosen, tool.tool === "select", tool.reach);
     setSculptTool((current) => current ? { ...current, chosen: selection.chosen.reduce((a, b) => a + b, 0) } : current);
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  /**
+   * Build 92: each live triangle's number in the selection's copy (made from the live triangles in their
+   * order, less any whose corners weld into one), or -1.
+   */
+  const liveToSelection = (state: SculptSession) => {
+    const live = state.live, map = new Int32Array(live.tCount).fill(-1);
+    const r = (v: number, k: number) => Math.round(live.pos[v * 3 + k] * 1e4);
+    const same = (a: number, b: number) => a === b || (r(a, 0) === r(b, 0) && r(a, 1) === r(b, 1) && r(a, 2) === r(b, 2));
+    let j = 0;
+    for (let t = 0; t < live.tCount; t += 1) {
+      if (!live.tAlive[t]) continue;
+      const a = live.tri[t * 3], b = live.tri[t * 3 + 1], c = live.tri[t * 3 + 2];
+      if (same(a, b) || same(b, c) || same(a, c)) continue;
+      map[t] = j++;
+    }
+    return map;
+  };
+  /** Build 92: face groups made (or made again at a new angle) and shown, or hidden. */
+  const sculptGroups = useCallback((show: boolean, angle?: number) => {
+    const target = sculptTarget();
+    if (!target) return;
+    const { shape, state, tool } = target;
+    const groupAngle = angle ?? tool.groupAngle ?? 30;
+    if (show) {
+      if (!state.live.groups || angle !== undefined) state.live.generateGroups(groupAngle);
+      state.live.showGroups(true);
+    } else state.live.showGroups(false);
+    window.layerlingSculptLive?.(shape.id, state.live.geometry, shape.color);
+    if (state.live.flushGpu()) window.layerlingRedraw?.();
+    setSculptTool((current) => current ? { ...current, groupsShown: show, groupAngle, groupCount: state.live.groupCount } : current);
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Build 82: the Select tool's lasso - the triangles inside the loop, as Meshmixer's screen-space lasso. */
   const applySculptLasso = useCallback((loop: TrimPoint[], mode: LassoMode) => {
@@ -17194,6 +17239,10 @@ export function LayerlingEditor({
           onSelection={applySculptSelection}
           frozen={sculptTool.frozen ?? 0}
           soft={sculptTool.soft ?? null}
+          groupsShown={Boolean(sculptTool.groupsShown)}
+          groupAngle={sculptTool.groupAngle ?? 30}
+          groupCount={sculptTool.groupCount ?? 0}
+          onGroups={sculptGroups}
           brushOptions={sculptTool.brushOptions ?? BRUSH_OPTIONS_DEFAULT}
           onBrushOptions={(brushOptions) => { storeBrushOptions(brushOptions); setSculptTool((current) => current ? { ...current, brushOptions } : current); }}
           onSoftStart={softStart}
@@ -17649,7 +17698,8 @@ function readSelectShape(): "brush" | "lasso" {
     return "brush";
   }
 }
-function storeSelectShape(shape: "brush" | "lasso") {
+function storeSelectShape(shape: "brush" | "lasso" | "group") {
+  if (shape === "group") return; // Build 92: a group pick is for the moment, not remembered
   try {
     window.localStorage.setItem("pare3d.selectShape", shape);
   } catch {

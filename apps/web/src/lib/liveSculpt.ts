@@ -272,6 +272,7 @@ export class LiveMesh {
     const alive = new Uint8Array(cap); alive.set(this.vAlive); this.vAlive = alive;
     const cell = new Float64Array(cap); cell.set(this.vCell); this.vCell = cell;
     const mask = new Float32Array(cap); mask.set(this.mask); this.mask = mask;
+    if (this.paint) { const paint = new Float32Array(cap * 3).fill(1); paint.set(this.paint); this.paint = paint; }
     this.allocateGpu();
   }
   private growTriangles(extra: number) {
@@ -641,7 +642,7 @@ export class LiveMesh {
     this.gIdx = new THREE.BufferAttribute(index, 1).setUsage(THREE.DynamicDrawUsage);
     const colors = new Float32Array(vCap * 3).fill(1);
     this.gCol = new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage);
-    for (let v = 0; v < this.vCount; v += 1) if (this.mask[v] > 0) this.tint(v, colors);
+    for (let v = 0; v < this.vCount; v += 1) if (this.mask[v] > 0 || this.paint) this.tint(v, colors);
     this.geometry.setAttribute("color", this.gCol);
     this.geometry.setAttribute("position", this.gPos);
     this.geometry.setAttribute("normal", this.gNrm);
@@ -653,8 +654,23 @@ export class LiveMesh {
   /** Build 90: a frozen corner's colour - towards a soft blue as it is frozen (the material's colour times this). */
   private tint(v: number, colors: Float32Array) {
     const m = Math.max(0, Math.min(1, this.mask[v]));
-    colors[v * 3] = 1 - 0.55 * m; colors[v * 3 + 1] = 1 - 0.4 * m; colors[v * 3 + 2] = 1 - 0.05 * m;
+    // Build 92: over a paint (face groups, the deviation map) when one is shown.
+    const paint = this.paint;
+    const r = paint ? paint[v * 3] : 1, g = paint ? paint[v * 3 + 1] : 1, b = paint ? paint[v * 3 + 2] : 1;
+    colors[v * 3] = r * (1 - 0.55 * m); colors[v * 3 + 1] = g * (1 - 0.4 * m); colors[v * 3 + 2] = b * (1 - 0.05 * m);
   }
+  /**
+   * Build 92: a colour per corner drawn over the part (face groups, the deviation map), or null for
+   * none; capacity-sized like the positions. New corners take the middle of the edge they split.
+   */
+  private paint: Float32Array | null = null;
+  setPaint(colors: Float32Array | null) {
+    if (colors && colors.length < this.pos.length) { const grown = new Float32Array(this.pos.length).fill(1); grown.set(colors.subarray(0, Math.min(colors.length, grown.length))); colors = grown; }
+    this.paint = colors;
+    for (let v = 0; v < this.vCount; v += 1) this.dirtyC.add(v);
+    this.maskShown = true;
+  }
+  get painted() { return this.paint !== null; }
   private refreshAllNormals() {
     const n = new THREE.Vector3(), arr = this.gNrm.array as Float32Array;
     for (let v = 0; v < this.vCount; v += 1) { if (!this.vAlive[v]) continue; this.vertexNormal(v, n); arr[v * 3] = n.x; arr[v * 3 + 1] = n.y; arr[v * 3 + 2] = n.z; }
@@ -1169,6 +1185,128 @@ export class LiveMesh {
   }
 
   // ---------------------------------------------------------------------------------------------
+  // Build 92: Face groups (Meshmixer's Generate Face Groups)
+
+  /** Each triangle's face group (by triangle slot; -1 for removed ones), or null before they are made. */
+  groups: Int32Array | null = null;
+  groupCount = 0;
+  /**
+   * Splits the surface into face groups: patches grown triangle by triangle across edges where the faces
+   * meet at less than `angle` degrees and stay within 1.25 times that of where the patch began - so a crease,
+   * a groove between a tooth and the gum or a sharp edge ends a patch. Patches smaller than `minShare` of
+   * the part go into the neighbour they share most edge with. Returns the number of groups.
+   */
+  generateGroups(angle = 30, minShare = 0.002): number {
+    const T = this.tCount, tri = this.tri;
+    const normals = new Float32Array(T * 3), n = this.faceScratch;
+    for (let t = 0; t < T; t += 1) {
+      if (!this.tAlive[t]) continue;
+      this.faceNormal(t, n);
+      const l = n.length() || 1;
+      normals[t * 3] = n.x / l; normals[t * 3 + 1] = n.y / l; normals[t * 3 + 2] = n.z / l;
+    }
+    const cosEdge = Math.cos((angle * Math.PI) / 180), cosCone = Math.cos((Math.min(89, angle * 1.25) * Math.PI) / 180);
+    const group = new Int32Array(T).fill(-1);
+    const queue = new Int32Array(T);
+    const neighbour = (t: number, k: number) => {
+      // The triangle across edge k of t (corners k, k+1), or -1.
+      const a = tri[t * 3 + k], b = tri[t * 3 + ((k + 1) % 3)];
+      for (const u of this.vTris[a]) if (u !== t && (tri[u * 3] === b || tri[u * 3 + 1] === b || tri[u * 3 + 2] === b)) return u;
+      return -1;
+    };
+    let groups = 0;
+    const sizes: number[] = [];
+    for (let seed = 0; seed < T; seed += 1) {
+      if (!this.tAlive[seed] || group[seed] >= 0) continue;
+      const g = groups++;
+      const sx = normals[seed * 3], sy = normals[seed * 3 + 1], sz = normals[seed * 3 + 2];
+      let head = 0, tail = 0, size = 0;
+      group[seed] = g; queue[tail++] = seed;
+      while (head < tail) {
+        const t = queue[head++];
+        size += 1;
+        for (let k = 0; k < 3; k += 1) {
+          const u = neighbour(t, k);
+          if (u < 0 || group[u] >= 0) continue;
+          const dEdge = normals[t * 3] * normals[u * 3] + normals[t * 3 + 1] * normals[u * 3 + 1] + normals[t * 3 + 2] * normals[u * 3 + 2];
+          const dCone = sx * normals[u * 3] + sy * normals[u * 3 + 1] + sz * normals[u * 3 + 2];
+          if (dEdge < cosEdge || dCone < cosCone) continue;
+          group[u] = g; queue[tail++] = u;
+        }
+      }
+      sizes.push(size);
+    }
+    // Small patches into the neighbour they share most edges with (a few rounds, smallest first).
+    let alive = 0;
+    for (let t = 0; t < T; t += 1) if (this.tAlive[t]) alive += 1;
+    const minimum = Math.max(1, Math.round(alive * minShare));
+    for (let round = 0; round < 4; round += 1) {
+      const target = new Int32Array(groups).fill(-1);
+      const votes = new Map<number, number>();
+      for (let t = 0; t < T; t += 1) {
+        if (!this.tAlive[t]) continue;
+        const g = group[t];
+        if (sizes[g] >= minimum) continue;
+        for (let k = 0; k < 3; k += 1) {
+          const u = neighbour(t, k);
+          if (u < 0 || group[u] === g) continue;
+          const key = g * groups + group[u];
+          votes.set(key, (votes.get(key) ?? 0) + 1);
+        }
+      }
+      const best = new Float64Array(groups);
+      votes.forEach((count, key) => {
+        const g = Math.floor(key / groups), h = key % groups;
+        // Into a big neighbour before a small one; among them, the one with the longest shared edge.
+        const score = count + (sizes[h] >= minimum ? 1e9 : 0);
+        if (score > best[g]) { best[g] = score; target[g] = h; }
+      });
+      let moved = 0;
+      for (let g = 0; g < groups; g += 1) {
+        // Follow merges to where they end (no cycles: a group only moves into a bigger-or-final one).
+        let h = target[g], hops = 0;
+        while (h >= 0 && target[h] >= 0 && hops < 8) { h = target[h]; hops += 1; }
+        if (h >= 0 && h !== g) target[g] = h; else target[g] = -1;
+      }
+      for (let t = 0; t < T; t += 1) if (this.tAlive[t] && target[group[t]] >= 0) { const h = target[group[t]]; sizes[h] += 1; sizes[group[t]] -= 1; group[t] = h; moved += 1; }
+      if (!moved) break;
+    }
+    // Numbered again from 0.
+    const renumber = new Int32Array(groups).fill(-1);
+    let count = 0;
+    for (let t = 0; t < T; t += 1) {
+      if (!this.tAlive[t]) { group[t] = -1; continue; }
+      const g = group[t];
+      if (renumber[g] < 0) renumber[g] = count++;
+      group[t] = renumber[g];
+    }
+    this.groups = group;
+    this.groupCount = count;
+    return count;
+  }
+  /** Colours the corners by face group (a pleasant spread of colours), or takes the colours away. */
+  showGroups(on: boolean) {
+    if (!on || !this.groups) { this.setPaint(null); return; }
+    const paint = new Float32Array(this.pos.length).fill(1);
+    const colour = (g: number) => {
+      // Golden-angle hues, soft: easy to tell apart, gentle on a scan.
+      const h = ((g * 137.508) % 360) / 60, c = 0.38, x = c * (1 - Math.abs((h % 2) - 1));
+      const [r, gg, b] = h < 1 ? [c, x, 0] : h < 2 ? [x, c, 0] : h < 3 ? [0, c, x] : h < 4 ? [0, x, c] : h < 5 ? [x, 0, c] : [c, 0, x];
+      return [0.62 + r, 0.62 + gg, 0.62 + b];
+    };
+    for (let v = 0; v < this.vCount; v += 1) {
+      if (!this.vAlive[v]) continue;
+      const t = this.vTris[v][0];
+      if (t === undefined || this.groups[t] < 0) continue;
+      const [r, g, b] = colour(this.groups[t]);
+      paint[v * 3] = r; paint[v * 3 + 1] = g; paint[v * 3 + 2] = b;
+    }
+    this.setPaint(paint);
+  }
+  /** The face group of a triangle, or -1. */
+  groupOf(t: number) { return this.groups && t < this.groups.length ? this.groups[t] : -1; }
+
+  // ---------------------------------------------------------------------------------------------
   // Build 92: Soft Transform (Meshmixer's Transform with a soft edge)
 
   /**
@@ -1281,6 +1419,7 @@ export class LiveMesh {
     const p = this.pos;
     const m = this.addVertex((p[a * 3] + p[b * 3]) / 2, (p[a * 3 + 1] + p[b * 3 + 1]) / 2, (p[a * 3 + 2] + p[b * 3 + 2]) / 2);
     this.mask[m] = (this.mask[a] + this.mask[b]) / 2;
+    if (this.paint) for (let k = 0; k < 3; k += 1) this.paint[m * 3 + k] = (this.paint[a * 3 + k] + this.paint[b * 3 + k]) / 2;
     for (const t of tris) {
       const i = t * 3;
       const corners = [this.tri[i], this.tri[i + 1], this.tri[i + 2]];
