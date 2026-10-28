@@ -40,20 +40,20 @@ function band(mesh: LiveMesh, y: number, x0: number, x1: number) {
   return { lo, hi };
 }
 
-describe("brush strength like Meshmixer's (build 82)", () => {
+describe("brush strength like Meshmixer's (build 82; build 85 at a person's pace)", () => {
   it("Draw follows about the square of the strength, full strength between Meshmixer's quick and slow strokes", () => {
     const peaks = [0.25, 0.5, 0.75, 1].map((s) => {
       const mesh = plate(160, () => 0);
       stroke(mesh, "draw", [-8, 0], [8, 0], 3, s);
       return band(mesh, 0, -3, 3).hi;
     });
-    // Meshmixer 0.033 / 0.097 / 0.226 / 0.375 (quick) to 0.83 (slow) at full strength.
-    expect(peaks[3]).toBeGreaterThan(0.375);
-    expect(peaks[3]).toBeLessThan(0.83);
-    expect(peaks[0]).toBeGreaterThan(0.015);
-    expect(peaks[0]).toBeLessThan(0.06);
-    expect(peaks[1]).toBeGreaterThan(0.08);
-    expect(peaks[1]).toBeLessThan(0.2);
+    // Build 85: as Meshmixer at an unhurried stroke - its slow stroke reached 0.83 mm at full strength.
+    expect(peaks[3]).toBeGreaterThan(0.7);
+    expect(peaks[3]).toBeLessThan(0.95);
+    expect(peaks[0]).toBeGreaterThan(0.03);
+    expect(peaks[0]).toBeLessThan(0.09);
+    expect(peaks[1]).toBeGreaterThan(0.13);
+    expect(peaks[1]).toBeLessThan(0.33);
     // About the square: a quarter of the strength, near a sixteenth of the raise.
     expect(peaks[3] / peaks[0]).toBeGreaterThan(10);
   });
@@ -65,11 +65,11 @@ describe("brush strength like Meshmixer's (build 82)", () => {
       return band(mesh, 0, -3, 3).hi;
     };
     const low = peak(0.25), high = peak(1);
-    // Meshmixer 0.043 at 25, 0.251 at 100 (quick).
-    expect(high).toBeGreaterThan(0.2);
-    expect(high).toBeLessThan(0.55);
-    expect(low).toBeGreaterThan(0.025);
-    expect(low).toBeLessThan(0.09);
+    // Meshmixer 0.043 at 25, 0.251 at 100 (quick); build 85 at an unhurried pace, 1.67 times.
+    expect(high).toBeGreaterThan(0.4);
+    expect(high).toBeLessThan(0.8);
+    expect(low).toBeGreaterThan(0.05);
+    expect(low).toBeLessThan(0.15);
     expect(high / low).toBeLessThan(10);
   });
 
@@ -80,13 +80,13 @@ describe("brush strength like Meshmixer's (build 82)", () => {
       const { lo, hi } = band(mesh, 0, -3, 3);
       return 1 - (hi - lo) / 2 / 0.3;
     });
-    // Meshmixer: 19%, 50%, 86%.
-    expect(removed[0]).toBeGreaterThan(0.1);
-    expect(removed[0]).toBeLessThan(0.3);
-    expect(removed[1]).toBeGreaterThan(0.38);
-    expect(removed[1]).toBeLessThan(0.62);
-    expect(removed[2]).toBeGreaterThan(0.75);
-    expect(removed[2]).toBeLessThan(0.95);
+    // Meshmixer: 19%, 50%, 86% (one pass); build 85 at an unhurried pace, a little more.
+    expect(removed[0]).toBeGreaterThan(0.18);
+    expect(removed[0]).toBeLessThan(0.42);
+    expect(removed[1]).toBeGreaterThan(0.55);
+    expect(removed[1]).toBeLessThan(0.82);
+    expect(removed[2]).toBeGreaterThan(0.82);
+    expect(removed[2]).toBeLessThan(0.98);
   });
 
   it("the response is defined at every strength and Smooth never moves a corner past its neighbours' average", () => {

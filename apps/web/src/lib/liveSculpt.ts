@@ -1247,15 +1247,22 @@ function sampleCorners(mesh: LiveMesh, count: number) {
  *   - step: the most a corner moves in one dab, as a share of the brush radius
  *   - passes: how many times each dab is applied (Smooth: more passes, not a bigger move)
  */
+/** Build 85: how much more a stroke does than build 82's calibration - Meshmixer at a person's pace. */
+export const BRUSH_PACE = 1.67;
 export function brushResponse(brush: LiveBrush, strength: number): { strength: number; step: number; passes: number } {
   const s = Math.max(0, Math.min(1, strength));
-  if (brush === "draw" || brush === "crease") return { strength: s, step: 0.031 * s, passes: 1 };
-  if (brush === "inflate" || brush === "deflate") return { strength: s, step: 0.021 * Math.pow(s, 0.3), passes: 1 };
+  // Build 85: matched to Meshmixer at an ordinary, unhurried stroke (its slow stroke, a dab at each of
+  // about 80 pointer events over 16 mm) rather than between its quick and slow ones - 1.67 times the
+  // build 82 figures. At a person's pace Meshmixer's brushes build up that much, and Pare 3D's felt weak.
+  if (brush === "draw" || brush === "crease") return { strength: s, step: BRUSH_PACE * 0.031 * s, passes: 1 };
+  if (brush === "inflate" || brush === "deflate") return { strength: s, step: BRUSH_PACE * 0.021 * Math.pow(s, 0.3), passes: 1 };
   if (brush === "smooth") {
     // One pass at weight u takes away about 1 - exp(-0.87 u^0.73) of fine ridges; Meshmixer's
-    // 19 / 50 / 86% at 25 / 53 / 100 is work W = 2.26 s^1.6 in those units, spread over passes.
-    const work = 2.26 * Math.pow(s, 1.6);
-    const passes = Math.max(1, Math.ceil(work));
+    // 19 / 50 / 86% at 25 / 53 / 100 is work W = 2.26 s^1.6 in those units, spread over passes
+    // (build 85: times the same pace, capped so a full-strength stroke cannot wipe out a cusp in one go).
+    const work = Math.min(3.4, BRUSH_PACE * 2.26 * Math.pow(s, 1.6));
+    // No single pass past 0.8 of the work unit, so no corner moves past its neighbours' average.
+    const passes = Math.max(1, Math.ceil(work / 0.8));
     return { strength: Math.pow(work / passes, 1 / 0.73), step: 0.06, passes };
   }
   return { strength: s, step: 0.06, passes: 1 };
