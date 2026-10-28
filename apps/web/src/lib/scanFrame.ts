@@ -50,6 +50,16 @@ export function scanFileCoordinates(mesh: ImportedMesh): Float32Array | null {
  * part is bent (taper, twist) or too flat to tell.
  */
 export function localToWorld(shape: WorkplaneShape): THREE.Matrix4 | null {
+  // Build 91: worked out once per version of the part (a part is a new object whenever it changes) -
+  // it builds the whole drawn mesh to read four corners, half a second on a full-arch scan, and Dental
+  // Studio asked for it several times over on every import.
+  if (localToWorldMemo.has(shape)) { const known = localToWorldMemo.get(shape)!; return known ? known.clone() : null; }
+  const found = localToWorldOnce(shape);
+  localToWorldMemo.set(shape, found);
+  return found ? found.clone() : null;
+}
+const localToWorldMemo = new WeakMap<WorkplaneShape, THREE.Matrix4 | null>();
+function localToWorldOnce(shape: WorkplaneShape): THREE.Matrix4 | null {
   const mesh = shape.importedMesh;
   if (!mesh || mesh.positions.length < 12) return null;
   const world = meshForShape(shape);

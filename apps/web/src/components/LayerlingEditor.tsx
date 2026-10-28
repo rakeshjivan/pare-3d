@@ -14205,6 +14205,9 @@ export function LayerlingEditor({
     const arrived = shapes.filter((shape) => pendingMeshChecks.has(shape.id));
     if (!arrived.length) return;
     arrived.forEach((shape) => pendingMeshChecks.delete(shape.id));
+    // Build 91: with Dental Studio open the scans go straight into it (it closes their openings itself),
+    // so the check - a second or more on two full-arch scans, holding the page - is not made.
+    if (dentalStudioRef.current) return;
     const unsound = arrived.flatMap((shape) => {
       if (!shape.importedMesh?.positions?.length || shape.groupedShapes?.length) return [];
       try {
