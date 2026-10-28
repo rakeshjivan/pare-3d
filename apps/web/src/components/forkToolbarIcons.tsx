@@ -268,6 +268,18 @@ export function ForkToothIcon(props: IconProps) {
   );
 }
 
+/** Build 94: Wax-up Studio - a tooth with wax added at its edge (the wax in the accent colour). */
+export function ForkWaxupIcon(props: IconProps) {
+  return (
+    <ForkIcon {...props}>
+      <path d="M12 12c3-3 7-2 10 0 3-2 7-3 10 0 4 4 2 10 0 14-1 3-1 6-2 9h-4l-2-7c-1-2-4-2-5 0l-2 7h-4c-1-3-1-6-2-9-2-4-3-10 1-14Z" {...SOFT} />
+      <path d="M12 12c3-3 7-2 10 0 3-2 7-3 10 0 4 4 2 10 0 14-1 3-1 6-2 9h-4l-2-7c-1-2-4-2-5 0l-2 7h-4c-1-3-1-6-2-9-2-4-3-10 1-14Z" />
+      <circle cx="38" cy="36" r="7" {...ACCENT} />
+      <path d="M38 32v8M34 36h8" />
+    </ForkIcon>
+  );
+}
+
 /** Fork (build 25): Blend - a wide end and a narrow end joined by a smooth flare, the flare in the accent colour. */
 export function ForkBlendIcon(props: IconProps) {
   return (
@@ -405,6 +417,7 @@ export const FORK_SHORT_LABELS_EN: Readonly<Record<string, string>> = {
   fitCheck: "Fit check",
   roundMesh: "Round",
   dentalModel: "Dental",
+  waxupStudio: "Wax-up",
   roundAll: "Round all",
   texture: "Texture",
   surfaceText: "Text",
@@ -477,6 +490,7 @@ export const FORK_TOOL_HINTS_EN: Readonly<Record<string, string>> = {
   fitCheck: "find parts that overlap or sit too close to print apart or move",
   roundMesh: "round every edge by one radius, also on imported meshes",
   dentalModel: "raw intraoral scans (upper, lower and bite; full arches or quadrants) to printable models",
+  waxupStudio: "a diagnostic wax-up on the scans - the teeth found, a tooth set placed and adjusted, wax-up and IMT models made",
   roundAll: "round every edge by one radius, also where the fillet tool cannot",
   texture: "press a pattern into the surface - knurl, ribs, stone, wood or a picture of your own",
   surfaceText: "click any part to put text on it - it hugs flat and curved surfaces, raised or cut in",

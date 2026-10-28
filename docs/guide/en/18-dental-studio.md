@@ -149,6 +149,18 @@ When the models are made the panel stays open on them. **{{ui:dental.doneButton}
 
 The scans are kept with the models, hidden. Later, select a model and open **{{ui:dental.title}}**: its design opens again the same way. **{{ui:dental.stopMaking}}** (the Cancel button while the models are being made) stops the making at once and leaves everything as it was.
 
+## {{ui:waxStudio.title}}
+
+**{{ui:waxStudio.command}}**, beside **{{ui:dental.title}}** on the toolbar, opens the same steps with a diagnostic wax-up in them (a preview, still being built). Two choices sit above the steps: **{{ui:waxStudio.flow}}** - **{{ui:waxStudio.flowWaxup}}** or **{{ui:waxStudio.flowImt}}** - and **{{ui:waxStudio.arches}}**.
+
+1. Load and trim the scans as for any model.
+2. **{{ui:waxup.findStep}}**: **{{ui:waxup.find}}** marks and numbers every tooth on the scan, in colour, in about ten seconds. The canine-to-canine teeth are chosen at first; click a tooth to add or leave it out. A number shown dashed was put right by the tooth's place in the arch - the network called it something else - so check it. The midline and canine tips are set from the teeth found; **{{ui:waxup.markAgain}}** sets them by hand instead.
+3. **{{ui:waxup.setStep}}**: a set from the libraries that come with Pare 3D, or your own.
+4. **{{ui:waxup.placeStep}}**: the set is laid out from the midline and canines and only the teeth chosen are placed. Adjust tooth by tooth, or with Sculpt.
+5. Make the models. With **{{ui:waxStudio.flowImt}}** Make also makes, for each arch waxed, the pre-op model and the alternate-tooth wax-up (the series 1 index); the full wax-up model is the series 2 index. Print them at a 25-50 micron layer height and make the clear silicone index chairside on them.
+
+The tooth finder is a trained network (CrossTooth, Xi et al., CVPR 2025) that is not part of Pare 3D: load its file (.ptw) once with **{{ui:waxup.loadFinder}}** and this browser keeps it. It runs on your computer; the scan never leaves it. Without it, mark the midline and canines by hand.
+
 ## Accuracy
 
 The Model Builder does not change the scanned tooth surfaces. Bases, hinges, pins and plates are added around the scan, and the teeth are carried through as the scanner recorded them. The accuracy of a finished model therefore depends mainly on:

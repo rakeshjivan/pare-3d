@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 94,
+    items: [
+      "Wax-up Studio (preview), beside Dental Studio on the toolbar: the same steps from scans to models, with the diagnostic wax-up in them, and a choice at the top of a wax-up only or the IMT workflow, on one arch or both.",
+      "The tooth finder marks and numbers every tooth on a scan in about ten seconds, on your own computer: choose the teeth to wax up by number, and the midline and canine tips are set from them - no clicking. Its trained network (CrossTooth) is not part of Pare 3D: you load its file once.",
+      "With IMT, Make also makes the pre-op model and the alternate-tooth wax-up (series 1 index) for each arch waxed, beside the full wax-up (series 2 index).",
+      "The Sculpt brush ring has a dot at its centre: exactly where the brush works.",
+    ],
+  },
+  {
     build: 93,
     items: [
       "Scans are easy to see on the light background again: the workplane look and the plain white look now take most of their light from just above and to the left of your eye, as the dark look does, so the teeth shade properly instead of washing out to white. Coloured parts and shadows look much as before.",

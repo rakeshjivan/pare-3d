@@ -741,7 +741,7 @@ export type WorkplaneShape = {
    * wax-up teeth, every part made with it, and the studio's settings - so the design can be opened
    * again and the models made anew.
    */
-  dentalSource?: { slots: { upper: string | null; lower: string | null; bite: string | null; bite2?: string | null }; wax: string[]; made: string[]; options: Record<string, unknown>; preset: string; patientDetails: "keep" | "remove"; rolesChosen: boolean; biteMode?: "auto" | "fit" };
+  dentalSource?: { slots: { upper: string | null; lower: string | null; bite: string | null; bite2?: string | null }; wax: string[]; made: string[]; options: Record<string, unknown>; preset: string; patientDetails: "keep" | "remove"; rolesChosen: boolean; biteMode?: "auto" | "fit"; waxStudio?: { flow: "waxup" | "imt"; arches: "upper" | "lower" | "both" } };
   waxTooth?: { fdi: number; width: number; length: number; frame: { origin: [number, number, number]; out: [number, number, number]; mesial: [number, number, number]; up: [number, number, number] } };
   name: string;
   kind: ShapeKind;

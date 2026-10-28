@@ -71,7 +71,7 @@ import { CommandPalette, type PaletteCommand } from "./workplane/CommandPalette"
 import { COMMAND_KEYWORDS, SHAPE_KEYWORDS } from "@/lib/commandKeywords";
 import { ExportButton } from "@/components/ExportButton";
 import { OPEN_EXPORT_WINDOW_EVENT, readBambuFormat, readSlicer, SEND_TO_BAMBU_EVENT, slicerName } from "@/lib/bambuSend";
-import { ForkDraftIcon, ForkToothIcon } from "./forkToolbarIcons";
+import { ForkDraftIcon, ForkToothIcon, ForkWaxupIcon } from "./forkToolbarIcons";
 import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon } from "@/components/forkToolbarIcons";
 import { Import, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, Type, Variable } from "lucide-react";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
@@ -82,7 +82,7 @@ import type { CadModifierKind } from "@/lib/cadModifierTypes";
 import type { ShapeAsset, SketchOperation, WorkplaneWorkspaceSettings } from "@/types/layerling";
 import { topTip, type TopPanel } from "@/components/EditorTopActionPanel";
 
-import { OPEN_PARAMETERS_EVENT, MESH_CHECK_EVENT, FILL_HOLE_EVENT, DENTAL_MODEL_EVENT, libraryShapeIds, HISTORY_VIEW_COMMANDS, type ToolbarMode } from "@/lib/editorShared";
+import { OPEN_PARAMETERS_EVENT, MESH_CHECK_EVENT, FILL_HOLE_EVENT, DENTAL_MODEL_EVENT, WAXUP_STUDIO_EVENT, libraryShapeIds, HISTORY_VIEW_COMMANDS, type ToolbarMode } from "@/lib/editorShared";
 
 /* The editor's second toolbar row - the tool groups (Home, Clipboard, History, Shapes, Visibility, Combine, Modify, Mesh, Arrange, Make, Dental) and, in sketch mode, the sketch tools. Moved out of LayerlingEditor (build 55). */
 
@@ -368,6 +368,7 @@ export function SecondaryToolbar({
   onVoronoi,
   lithophaneOpen,
   dentalOpen,
+  waxStudioOpen,
   voronoiOpen,
   shapeCustomizations,
   objects,
@@ -515,6 +516,8 @@ export function SecondaryToolbar({
   onVoronoi?: () => void;
   lithophaneOpen?: boolean;
   dentalOpen?: boolean;
+  /** Build 94: Dental Studio is open as Wax-up Studio. */
+  waxStudioOpen?: boolean;
   voronoiOpen?: boolean;
   /** The shape defaults, so each library entry can show the colour it will be added in. */
   shapeCustomizations: WorkplaneWorkspaceSettings["shapeCustomizations"];
@@ -880,7 +883,9 @@ export function SecondaryToolbar({
   ];
   // Fork (build 47): Dental Studio, in a toolbar section of its own.
   const dentalTools = [
-    { id: "dentalModel", label: t("dental.title"), icon: ForkToothIcon, action: () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), enabled: true, active: Boolean(dentalOpen) },
+    { id: "dentalModel", label: t("dental.title"), icon: ForkToothIcon, action: () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), enabled: true, active: Boolean(dentalOpen) && !waxStudioOpen },
+    // Build 94: Wax-up Studio, beside it - the same steps, with the wax-up.
+    { id: "waxupStudio", label: t("waxStudio.command"), icon: ForkWaxupIcon, action: () => window.dispatchEvent(new Event(WAXUP_STUDIO_EVENT)), enabled: true, active: Boolean(waxStudioOpen) },
   ];
   const arrangeTools = [
     { id: "align", label: t("editor.tool.align"), icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign, active: alignMode },
@@ -1121,6 +1126,7 @@ export function SecondaryToolbar({
       plain("mesh-check", t("meshCheck.command"), manageGroup, hasSelection, () => window.dispatchEvent(new Event(MESH_CHECK_EVENT))),
       plain("fill-hole", t("fillHole.command"), t("editor.group.modify"), hasSelection, () => window.dispatchEvent(new Event(FILL_HOLE_EVENT))),
       plain("dental-model", t("dental.title"), t("editor.group.modify"), true, () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), { icon: ForkToothIcon }),
+      plain("waxup-studio", t("waxStudio.command"), t("editor.group.modify"), true, () => window.dispatchEvent(new Event(WAXUP_STUDIO_EVENT)), { icon: ForkWaxupIcon }),
       // Build 70: the Mesh tools in the search too (Mesh check, Fill hole and Cut below are above).
       ...meshTools.filter((tool) => tool.id === "sculpt" || tool.id === "simplify" || tool.id === "roundMesh").map((tool) => fromTool(tool, t("editor.group.mesh"))),
       plain("send-slicer", t("slicer.sendTo", { app: slicerName(readSlicer()) }), manageGroup, true, () => window.dispatchEvent(new CustomEvent(SEND_TO_BAMBU_EVENT, { detail: { format: readBambuFormat() } })), { icon: Printer }),

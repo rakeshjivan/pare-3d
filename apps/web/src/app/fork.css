@@ -1685,6 +1685,9 @@ html[data-theme="dark"] .dental-slot select, html[data-theme="dark"] .dental-lab
 .dental-brush-overlay circle { fill: none; stroke: #f2a33a; stroke-width: 1.5; }
 .dental-brush-overlay.erase polyline { stroke: rgba(31, 111, 235, 0.35); }
 .dental-brush-overlay.erase circle { stroke: #1f6feb; }
+/* Build 94: the dot at the brush's centre - where the change happens. */
+.dental-brush-overlay circle.brush-dot { fill: #f2a33a; stroke: rgba(0, 0, 0, 0.45); stroke-width: 0.75; }
+.dental-brush-overlay.erase circle.brush-dot { fill: #1f6feb; }
 .dental-area-tools { flex-wrap: wrap; }
 /* Build 69: the Sculpt panel - brushes and selection actions as small buttons, three to a row. */
 .mesh-sculpt-panel .dental-trim-mode, .mesh-sculpt-panel .dental-trim-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
@@ -1948,6 +1951,13 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .waxup-tooth { display: inline-flex; align-items: center; gap: 3px; min-width: 40px; justify-content: center; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border, #d4dae3); background: #f1e7d0; color: #3b3226; font-variant-numeric: tabular-nums; cursor: pointer; }
 .waxup-tooth.active { outline: 2px solid #1f6feb; outline-offset: 1px; }
 .waxup-tooth.warn { border-color: #c47a00; }
+/* Build 94: Wax-up Studio - its choices above the steps, the teeth found (chosen ones filled). */
+.wax-studio-choices { display: grid; gap: 6px; padding: 4px 0 10px; border-bottom: 1px solid var(--border, #d4dae3); margin-bottom: 8px; }
+.waxup-found .waxup-tooth { background: transparent; min-width: 34px; padding: 3px 6px; }
+.waxup-found .waxup-tooth.active { background: #f1e7d0; outline: 2px solid #1f6feb; }
+.waxup-found .waxup-tooth.unsure { border-style: dashed; color: #8a6d3b; }
+.waxup-groups { flex-wrap: wrap; }
+.waxup-groups button { flex: 1 1 auto; font-size: 12px; padding: 4px 6px; }
 .waxup-point-overlay { cursor: crosshair; }
 .waxup-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
 .waxup-table th, .waxup-table td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--border, #d4dae3); }

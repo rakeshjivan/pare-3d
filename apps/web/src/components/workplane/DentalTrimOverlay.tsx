@@ -214,15 +214,15 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live
   const [points, setPoints] = useState<TrimPoint[]>([]);
   // Build 87: the brush ring moves by itself (no React render per mouse move), placed against the view's
   // box measured once per stroke rather than at every move.
-  const ring = useRef<SVGCircleElement | null>(null);
+  // Build 94: the ring and its centre dot (exactly where the brush works) move together.
+  const ring = useRef<SVGGElement | null>(null);
   const hostBox = useRef<DOMRect | null>(null);
   const placeRing = (x: number, y: number) => {
     const circle = ring.current;
     if (!circle) return;
     const box = hostBox.current ?? (hostBox.current = host?.getBoundingClientRect() ?? null);
     if (!box) return;
-    circle.setAttribute("cx", String(x - box.left));
-    circle.setAttribute("cy", String(y - box.top));
+    circle.setAttribute("transform", `translate(${x - box.left} ${y - box.top})`);
     circle.style.visibility = "visible";
   };
   const drawing = useRef(false);
@@ -304,7 +304,10 @@ export function DentalBrushOverlay({ hint, radius, erase, onDone, onCancel, live
       <p className="dental-trim-hint">{hint}</p>
       <svg aria-hidden="true">
         {points.length ? <polyline points={points.map(local).join(" ")} style={{ strokeWidth: radius * 2 }} /> : null}
-        <circle ref={ring} r={radius} style={{ visibility: "hidden" }} />
+        <g ref={ring} style={{ visibility: "hidden" }}>
+          <circle r={radius} />
+          <circle className="brush-dot" r={2.5} />
+        </g>
       </svg>
     </div>,
     host,

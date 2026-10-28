@@ -109,6 +109,7 @@ export function DentalStudioPanel({
   areaShown = true,
   onAreaShown,
   waxup,
+  waxStudio,
   onEditDesign,
   onDone,
   editing = false,
@@ -173,9 +174,11 @@ export function DentalStudioPanel({
   modelsHere?: boolean;
   /** Build 79: the wax-up step. */
   waxup?: { view: WaxupView; actions: WaxupActions };
+  /** Build 94: open as Wax-up Studio - the workflow (wax-up only, or IMT with its index models) and the arches waxed. */
+  waxStudio?: { flow: "waxup" | "imt"; arches: "upper" | "lower" | "both"; onFlow: (flow: "waxup" | "imt") => void; onArches: (arches: "upper" | "lower" | "both") => void };
 }) {
   useLanguage();
-  const title = t("dental.title");
+  const title = t(waxStudio ? "waxStudio.title" : "dental.title");
   const [chosenArch, setArch] = useState<"upper" | "lower">("upper");
   const [folded, setFolded] = useState<Record<number, boolean>>({});
   const [activeCard, setActiveCard] = useState(1);
@@ -259,7 +262,7 @@ export function DentalStudioPanel({
   const n = (k: number) => (waxup || k < 3 ? k : k - 1);
   const stepCount = (pair ? 7 : 6) - (waxup ? 0 : 1);
   // Build 79: the wax-up (card 3) is optional - never the step pointed to next.
-  const nextCard = scansDone ? Array.from({ length: stepCount - 1 }, (_, k) => k + 2).find((number) => (!waxup || number !== 3) && !visited[number]) ?? null : null;
+  const nextCard = scansDone ? Array.from({ length: stepCount - 1 }, (_, k) => k + 2).find((number) => (!waxup || Boolean(waxStudio) || number !== 3) && !visited[number]) ?? null : null;
   const card = (number: number, label: string, done: boolean, hint: string | null, summary: string | null, body: ReactNode) => {
     const isFolded = Boolean(folded[number]);
     return (
@@ -300,7 +303,7 @@ export function DentalStudioPanel({
       <div className="edge-modifier-header movable" title={t("panel.moveHint")} {...handleProps}>
         <div>
           <strong>{title}</strong>
-          <span>{t("dental.subtitle")}</span>
+          <span>{t(waxStudio ? "waxStudio.subtitle" : "dental.subtitle")}</span>
         </div>
         <div className="panel-header-actions">
           {/* Build 77: the Model Builder Guide as a PDF, to keep, print or pass on. */}
@@ -322,6 +325,14 @@ export function DentalStudioPanel({
           </div>
         </div>
       ) : (<>
+      {/* Build 94: Wax-up Studio's two choices, above the steps: the workflow and the arches. */}
+      {waxStudio ? (
+        <div className="wax-studio-choices">
+          {choice(t("waxStudio.flow"), waxStudio.flow, [["waxup", t("waxStudio.flowWaxup")], ["imt", t("waxStudio.flowImt")]], waxStudio.onFlow, t("waxStudio.flowHint"))}
+          {choice(t("waxStudio.arches"), waxStudio.arches, [["upper", t("dental.upper")], ["lower", t("dental.lower")], ["both", t("waxStudio.both")]], waxStudio.onArches)}
+          <p className="blend-hint">{t(waxStudio.flow === "imt" ? "waxStudio.imtHint" : "waxStudio.waxupHint")}</p>
+        </div>
+      ) : null}
       {/* Build 75: the Studio in step cards - scans, preparing them (trim, then the teeth), what the model
           is for, its base, the articulator (a pair), its name. A card folds to one line; the one last
           worked in is marked. */}
@@ -453,7 +464,7 @@ export function DentalStudioPanel({
 
       {/* Build 79: the digital wax-up - optional; a card of its own before the model is chosen. */}
       {waxup ? card(3, t("waxup.step"), waxup.view.placed.length > 0, t("waxup.stepHint"), waxupSummary(waxup.view), (
-        <WaxupCard view={waxup.view} actions={waxup.actions} slots={{ upper: Boolean(slots.upper), lower: Boolean(slots.lower) }} busy={busy || !analysis} workspace={workspace} />
+        <WaxupCard view={waxup.view} actions={waxup.actions} slots={{ upper: Boolean(slots.upper) && waxStudio?.arches !== "lower", lower: Boolean(slots.lower) && waxStudio?.arches !== "upper" }} imt={waxStudio?.flow === "imt"} busy={busy || !analysis} workspace={workspace} />
       )) : null}
 
       {card(n(4), t("dental.step3"), scansDone, t("dental.step3Hint"), modelSummary, (<>
