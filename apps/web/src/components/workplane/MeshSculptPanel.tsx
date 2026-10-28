@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LoaderCircle, Redo2, Undo2, X } from "lucide-react";
+import { Check, LoaderCircle, Redo2, Undo2, X, Gauge } from "lucide-react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
@@ -68,6 +68,8 @@ export function MeshSculptPanel({
   onAmount,
   onRemesh,
   onClose,
+  onSpeed,
+  speedShown = false,
   besideDental = false,
   editAmount = 1,
   onEditAmount,
@@ -113,6 +115,9 @@ export function MeshSculptPanel({
   onAmount: (value: number) => void;
   onRemesh: () => void;
   onClose: () => void;
+  /** Build 85: shows or hides the speed readout (the ` key too). */
+  onSpeed?: () => void;
+  speedShown?: boolean;
   /** Build 71: opened from Dental Studio - stands beside its panel instead of over it. */
   besideDental?: boolean;
   /** Build 82: the Select tool paints (brush) or draws a loop (lasso). */
@@ -134,6 +139,7 @@ export function MeshSculptPanel({
         </div>
         <div className="panel-header-actions">
           <GuideHelpLink section="meshSculpt" />
+          {onSpeed ? <button type="button" className={speedShown ? "active" : undefined} aria-pressed={speedShown} aria-label={t("sculpt.speed.toggle")} title={t("sculpt.speed.toggle")} onClick={onSpeed}><Gauge size={18} /></button> : null}
           <button type="button" aria-label={t("sculpt.done")} onClick={onClose}><X size={20} /></button>
         </div>
       </div>

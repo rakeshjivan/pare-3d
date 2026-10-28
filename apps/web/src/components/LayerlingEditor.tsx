@@ -9528,7 +9528,8 @@ export function LayerlingEditor({
         return;
       }
       // Build 85: ` shows or hides the speed readout.
-      if (event.key === "`" && !event.ctrlKey && !event.metaKey && !(event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable=true]")) {
+      // On a Mac the key left of 1 (or of Z, on an ISO keyboard) gives ` or § - and with some input sources a dead key.
+      if ((event.key === "`" || event.key === "§" || event.code === "Backquote" || event.code === "IntlBackslash") && !event.ctrlKey && !event.metaKey && !(event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable=true]")) {
         event.preventDefault();
         setSculptSpeedShown((shown) => { try { window.localStorage.setItem("pare3d.sculptSpeed", shown ? "off" : "on"); } catch { /* this visit */ } return !shown; });
         return;
@@ -16913,6 +16914,8 @@ export function LayerlingEditor({
       ) : null}
       {sculptTool ? (
         <MeshSculptPanel
+          onSpeed={() => setSculptSpeedShown((shown) => { try { window.localStorage.setItem("pare3d.sculptSpeed", shown ? "off" : "on"); } catch { /* this visit */ } return !shown; })}
+          speedShown={sculptSpeedShown}
           targetName={displayShapeName(shapes.find((shape) => shape.id === sculptTool.shapeId) ?? ({ name: "" } as WorkplaneShape))}
           tool={sculptTool.tool}
           size={sculptTool.size}
