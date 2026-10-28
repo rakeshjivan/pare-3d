@@ -8,6 +8,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
     items: [
       "Select in Sculpt (and Trim in Dental Studio) has a Lasso, as in Meshmixer: drag a loop freehand, or click its corners and click the first to close it. A new loop replaces the selection, Shift adds, Ctrl takes away; Surface I see, Back side and Through apply as for the brush.",
       "Meshmixer's brush keys: [ and ] for the brush size, Ctrl + wheel for the strength, Ctrl while stroking for the opposite effect, Shift to smooth.",
+      "Sculpt's brush strength now works like Meshmixer's, measured side by side on the same test plates: Draw grows with about the square of the strength (fine control at low settings; the old brushes were up to seven times stronger), Inflate more gently, and Smooth takes away what Meshmixer's does at the same setting. Strength runs 1 to 100 in steps of 1. A stroke does the same whatever its speed.",
       "Dental Studio: articulated models without the pin again - untick Incisal pin and the models hinge on the condyles alone and close on the teeth to the scanned bite. Moving the opening above 0 mm puts the pin back, since the pin is what holds an opening.",
     ],
   },

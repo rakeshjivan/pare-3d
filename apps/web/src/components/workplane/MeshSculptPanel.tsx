@@ -162,7 +162,7 @@ export function MeshSculptPanel({
       ) : null}
       {(tool === "select" || tool === "unselect") && selectShape === "lasso" ? null : <EdgeModifierSlider label={t("sculpt.size")} value={size} min={4} max={150} step={1} workspace={workspace} disabled={busy} onChange={onSize} />}
       {tool !== "select" && tool !== "unselect" ? (
-        <EdgeModifierSlider label={t("sculpt.strength")} value={Math.round(strength * 100)} min={5} max={100} step={5} unit="%" workspace={workspace} disabled={busy} onChange={(value) => onStrength(value / 100)} />
+        <EdgeModifierSlider label={t("sculpt.strength")} value={Math.round(strength * 100)} min={1} max={100} step={1} workspace={workspace} disabled={busy} onChange={(value) => onStrength(value / 100)} />
       ) : null}
       {tool && tool !== "select" && tool !== "unselect" ? <p className="blend-hint sculpt-keys">{t("sculpt.keysHint")}</p> : null}
       {tool !== "select" && tool !== "unselect" ? (<>

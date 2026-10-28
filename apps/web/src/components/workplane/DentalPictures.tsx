@@ -144,7 +144,7 @@ export function articulatorOpening(raise: number) {
   return { degrees: (a * 180) / Math.PI, front: part(44, PLANE), back: part(186, PLANE) };
 }
 
-export function ArticulatorPicture({ pinRaise }: { pinRaise: number }) {
+export function ArticulatorPicture({ pinRaise, pin = true }: { pinRaise: number; /** Build 82: false - no pin, boss or cup drawn. */ pin?: boolean }) {
   const raise = Math.max(0, Math.min(10, pinRaise));
   const gap = raise * 2.6;
   const { degrees } = articulatorOpening(raise);
@@ -160,9 +160,11 @@ export function ArticulatorPicture({ pinRaise }: { pinRaise: number }) {
         <rect className="lower" x={jx - 2.6} y={jy} width="5.2" height={PLANE + 36 - jy} />
         <circle className="lower" cx={jx} cy={jy} r={6.2} />
         {/* The pin's boss on an arm along the bottom of the lower base, and the pin on it. */}
-        <rect className="lower" x={pinX - 8} y={PLANE + 45} width={42} height="3" />
-        <rect className="lower" x={pinX - 5} y={TABLE_TOP + 8} width="10" height={PLANE + 46 - TABLE_TOP - 8} />
-        <rect className="upper pin" x={pinX - 1.8} y={TABLE_TOP - gap} width="3.6" height={8 + gap} rx="1.8" />
+        {pin ? (<>
+          <rect className="lower" x={pinX - 8} y={PLANE + 45} width={42} height="3" />
+          <rect className="lower" x={pinX - 5} y={TABLE_TOP + 8} width="10" height={PLANE + 46 - TABLE_TOP - 8} />
+          <rect className="upper pin" x={pinX - 1.8} y={TABLE_TOP - gap} width="3.6" height={8 + gap} rx="1.8" />
+        </>) : null}
       </g>
       {/* The upper model, turned about the condyles by the pin's raise: its seats rest on the balls, its pad on the pin. */}
       <g className="upper-model" transform={degrees ? `rotate(${f(degrees)} ${jx} ${jy})` : undefined}>
@@ -175,8 +177,10 @@ export function ArticulatorPicture({ pinRaise }: { pinRaise: number }) {
         <path className="upper" d={`M${jx - 11} ${PLANE - 42} H${jx + 11} V${jy - 2} H${jx + 4.4} L${jx} ${jy - 8.8} L${jx - 4.4} ${jy - 2} H${jx - 11} Z`} />
         <path className="upper" d={`M${jx - 11} ${jy - 2.5} H${jx - 5.4} A6.8 6.8 0 0 0 ${jx - 3.6} ${jy + 4.6} H${jx - 11} Z`} />
         {/* Build 79: the cup the pin's tip centres itself in, a cone opening downwards. */}
-        <rect className="upper" x={pinX - 8} y={PIN_TOP - 2} width={42} height="3" />
-        <path className="upper" d={`M${pinX - 5} ${PIN_TOP} H${pinX + 5} V${TABLE_TOP + 1.8} H${pinX + 3.6} L${pinX} ${TABLE_TOP - 1.8} L${pinX - 3.6} ${TABLE_TOP + 1.8} H${pinX - 5} Z`} />
+        {pin ? (<>
+          <rect className="upper" x={pinX - 8} y={PIN_TOP - 2} width={42} height="3" />
+          <path className="upper" d={`M${pinX - 5} ${PIN_TOP} H${pinX + 5} V${TABLE_TOP + 1.8} H${pinX + 3.6} L${pinX} ${TABLE_TOP - 1.8} L${pinX - 3.6} ${TABLE_TOP + 1.8} H${pinX - 5} Z`} />
+        </>) : null}
       </g>
       {raise > 0 ? (
         <g className="opening">

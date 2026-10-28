@@ -1170,6 +1170,39 @@ function sampleCorners(mesh: LiveMesh, count: number) {
 }
 
 /** A sensible target edge for Remesh: the part's present average edge. */
+/**
+ * Build 82: how hard a brush works at a strength (0..1), set against Meshmixer 3.5 on a test plate
+ * (16 mm strokes, a 3 mm brush, the same plate in both). Meshmixer's Draw grows with about the
+ * square of its Strength and its Inflate more gently; one pass of its RobustSmooth takes away 19%,
+ * 50% and 86% of 0.3 mm ridges at Strength 25, 53 and 100. Meshmixer puts down a dab at every
+ * pointer event, so a slow stroke there builds up more than a quick one (0.13 to 0.83 mm at full
+ * Strength); Pare 3D spaces its dabs by distance, so a stroke does the same whatever its speed, and
+ * full strength is set between Meshmixer's quick and slow strokes.
+ *   - strength: the weight each dab uses (lib dab multiplies its falloff by it)
+ *   - step: the most a corner moves in one dab, as a share of the brush radius
+ *   - passes: how many times each dab is applied (Smooth: more passes, not a bigger move)
+ */
+export function brushResponse(brush: LiveBrush, strength: number): { strength: number; step: number; passes: number } {
+  const s = Math.max(0, Math.min(1, strength));
+  if (brush === "draw" || brush === "crease") return { strength: s, step: 0.031 * s, passes: 1 };
+  if (brush === "inflate" || brush === "deflate") return { strength: s, step: 0.021 * Math.pow(s, 0.3), passes: 1 };
+  if (brush === "smooth") {
+    // One pass at weight u takes away about 1 - exp(-0.87 u^0.73) of fine ridges; Meshmixer's
+    // 19 / 50 / 86% at 25 / 53 / 100 is work W = 2.26 s^1.6 in those units, spread over passes.
+    const work = 2.26 * Math.pow(s, 1.6);
+    const passes = Math.max(1, Math.ceil(work));
+    return { strength: Math.pow(work / passes, 1 / 0.73), step: 0.06, passes };
+  }
+  return { strength: s, step: 0.06, passes: 1 };
+}
+
+/** Build 82: one dab of a brush at a point, as brushResponse sets it (Ctrl: Draw and Crease dig in). */
+export function stampBrush(mesh: LiveMesh, brush: Exclude<LiveBrush, "move">, centre: Vec3, normal: Vec3, radius: number, triangle: number, strength: number, dig = false) {
+  const response = brushResponse(brush, strength);
+  const step = radius * response.step * (dig ? -1 : 1);
+  for (let k = 0; k < response.passes; k += 1) mesh.dab(brush, centre, normal, radius, mesh.region(centre, radius, triangle), response.strength, step);
+}
+
 export function averageEdgeOf(mesh: LiveMesh) { return mesh.averageEdge(sampleCorners(mesh, 5000)); }
 
 /**

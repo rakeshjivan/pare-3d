@@ -547,7 +547,7 @@ export function DentalStudioPanel({
             {options.hinge ? (
               <div className="dental-hinge-options">
                 {/* Build 78: the one articulator - two seats on ball condyles and the incisal pin. */}
-                <ArticulatorPicture pinRaise={options.pinRaise ?? 0} />
+                <ArticulatorPicture pinRaise={options.incisalPin === false ? 0 : options.pinRaise ?? 0} pin={options.incisalPin !== false} />
                 <p className="blend-hint">{t(options.incisalPin === false ? "dental.articulatorHowNoPin" : (options.pinPlace ?? (waxup?.view.placed.length ? "sides" : "midline")) === "sides" ? "dental.articulatorHowSides" : "dental.articulatorHow")}</p>
                 {/* Build 82: the pin can be left out - the condyles alone, closing to the scanned bite. */}
                 <label className="edge-modifier-check dental-pin-check" title={t("dental.incisalPinHint")}>

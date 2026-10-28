@@ -72,7 +72,7 @@ import { WaxupPointOverlay, markerTriangles, rayHit } from "./workplane/WaxupPoi
 import { WAXUP_LANDMARKS, type WaxupView } from "./workplane/WaxupCard";
 import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
 import { applyToSelection, brushChoice, lassoChoice, type LassoMode, cornerPositions, growChoice, soupFloat32, invertChoice, sculptMeshOf, soupOf, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
-import { LiveMesh, averageEdgeOf, type LiveBrush, type LivePatch } from "@/lib/liveSculpt";
+import { LiveMesh, averageEdgeOf, stampBrush, type LiveBrush, type LivePatch } from "@/lib/liveSculpt";
 import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
 import { MeshSculptPanel, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
@@ -9125,13 +9125,13 @@ export function LayerlingEditor({
     stroke.touched = true;
     const radius = brushRadiusAt(x, y, stroke.sizePx, hit.point);
     const normal = state.live.vertexNormal(state.live.tri[hit.triangle * 3]);
-    const step = radius * 0.06 * (stroke.dig ? -1 : 1);
-    state.live.dab(stroke.brush, hit.point, [normal.x, normal.y, normal.z], radius, state.live.region(hit.point, radius, hit.triangle), stroke.strength, step);
+    // Build 82: strength as Meshmixer's (lib/liveSculpt brushResponse).
+    stampBrush(state.live, stroke.brush, hit.point, [normal.x, normal.y, normal.z], radius, hit.triangle, stroke.strength, stroke.dig);
     stroke.balls.push({ centre: hit.point, radius });
     const twin = mirroredHit(state, stroke.symmetry, ray);
     if (twin) {
       const n = state.live.vertexNormal(state.live.tri[twin.triangle * 3]);
-      state.live.dab(stroke.brush, twin.point, [n.x, n.y, n.z], radius, state.live.region(twin.point, radius, twin.triangle), stroke.strength, step);
+      stampBrush(state.live, stroke.brush, twin.point, [n.x, n.y, n.z], radius, twin.triangle, stroke.strength, stroke.dig);
       stroke.balls.push({ centre: twin.point, radius });
     }
   };
@@ -16916,7 +16916,7 @@ export function LayerlingEditor({
           symmetry={sculptTool.symmetry}
           onRefine={(refine) => { storeSculptRefine(refine); setSculptTool((current) => current ? { ...current, refine } : current); }}
           onSymmetry={(symmetry) => setSculptTool((current) => current ? { ...current, symmetry } : current)}
-          onStrength={(strength) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.05, Math.min(1, strength)) } : current)}
+          onStrength={(strength) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.01, Math.min(1, Math.round(strength * 100) / 100)) } : current)}
           onSelection={applySculptSelection}
           editAmount={sculptTool.editAmount ?? 1}
           onEditAmount={(editAmount) => setSculptTool((current) => current ? { ...current, editAmount } : current)}
@@ -16940,7 +16940,7 @@ export function LayerlingEditor({
           hint={t("sculpt.hint", { brush: t(`sculpt.tool.${sculptTool.tool}`) })}
           radius={sculptTool.size}
           erase={sculptTool.tool === "unselect"}
-          onStrengthWheel={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : (up) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.05, Math.min(1, Math.round((current.strength + (up ? 0.05 : -0.05)) * 20) / 20)) } : current)}
+          onStrengthWheel={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : (up) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.01, Math.min(1, Math.round((current.strength + (up ? 0.05 : -0.05)) * 100) / 100)) } : current)}
           onDone={applySculptStroke}
           onCancel={() => { endSculptStroke(); setSculptTool((current) => current ? { ...current, tool: null } : current); }}
           live={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : { start: startSculptStroke, move: moveSculptStroke, end: endSculptStroke }}
