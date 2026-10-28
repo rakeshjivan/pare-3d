@@ -9001,7 +9001,7 @@ export function LayerlingEditor({
       sculptHidOthers.current = true;
       setDentalHidden(Object.values(studio.slots).filter((id): id is string => Boolean(id) && id !== shape.id));
     }
-    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: 0.5, reach: trim ? readTrimReach() : readSculptReach(), selectShape: readSelectShape(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, panelSteps: 0, panelRedo: 0 };
+    const settings = { shapeId: shape.id, trim, tool: (trim ? "select" : "smooth") as SculptTool, size: 30, strength: SCULPT_STRENGTH, reach: trim ? readTrimReach() : readSculptReach(), selectShape: readSelectShape(), chosen: 0, refine: readSculptRefine(), symmetry: "off" as SculptSymmetry, remeshMode: "remesh" as RemeshMode, amount: 2, error: null, panelSteps: 0, panelRedo: 0 };
     const known = sculptState.current;
     const ready = (state: SculptSession) => Math.max(0.05, Math.round(averageEdgeOf(state.live) * 100) / 100);
     if (known && known.shapeId === shape.id && known.key === projectShapesFingerprint([shape])) {
@@ -17286,16 +17286,23 @@ function undoBytes(entry: SculptUndo) {
   const size = (p: LivePatch) => p.verts.byteLength + p.vData.byteLength + p.tris.byteLength + p.tData.byteLength;
   return size(entry.undo) + size(entry.redo);
 }
+/**
+ * Build 85: Sculpt opens as Meshmixer's does - Strength 29, and Refine at its lightest that still
+ * refines (Meshmixer's Refine 0 with refinement on). The choice of Refine is remembered from build 85
+ * on; the older remembered choice (often Fine, the slowest) is not carried over.
+ */
+const SCULPT_STRENGTH = 0.29;
+const SCULPT_REFINE_KEY = "pare3d.sculptRefine85";
 function readSculptRefine(): SculptRefine {
   try {
-    const stored = window.localStorage.getItem("pare3d.sculptRefine");
-    return stored === "off" || stored === "coarse" || stored === "fine" ? stored : "medium";
+    const stored = window.localStorage.getItem(SCULPT_REFINE_KEY);
+    return stored === "off" || stored === "medium" || stored === "fine" ? stored : "coarse";
   } catch {
-    return "medium";
+    return "coarse";
   }
 }
 function storeSculptRefine(refine: SculptRefine) {
-  try { window.localStorage.setItem("pare3d.sculptRefine", refine); } catch { /* holds for this session */ }
+  try { window.localStorage.setItem(SCULPT_REFINE_KEY, refine); } catch { /* holds for this session */ }
 }
 
 function readSculptReach(): SelectReach {
