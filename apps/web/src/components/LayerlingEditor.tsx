@@ -15771,8 +15771,8 @@ export function LayerlingEditor({
   // Put away automatically while Sculpt (or Trim) is open, back when it closes; the menu's choice is for
   // this visit only, so a new design never opens without its handles.
   const [handlesHidden, setHandlesHidden] = useState(false);
-  const sculptOpen = Boolean(sculptTool);
-  useEffect(() => { window.layerlingTransformHandles?.(handlesHidden || sculptOpen); }, [handlesHidden, sculptOpen]);
+  const handlesAway = Boolean(sculptTool);
+  useEffect(() => { window.layerlingTransformHandles?.(handlesHidden || handlesAway); }, [handlesHidden, handlesAway]);
   const toggleHandlesHidden = () => setHandlesHidden((hidden) => !hidden);
   const handlesItem = (separated: boolean): ShapeContextMenuItem => ({ key: "handles", label: t(handlesHidden ? "contextMenu.showHandles" : "contextMenu.hideHandles"), separated, onSelect: toggleHandlesHidden });
   const shapeContextMenuItems = (): ShapeContextMenuItem[] => {
