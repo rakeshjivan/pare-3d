@@ -18,6 +18,11 @@ export type SculptRefine = "off" | "coarse" | "medium" | "fine";
 export type SculptSymmetry = "off" | "x" | "z";
 export type SculptSelectionAction = "fill" | "delete" | "smooth" | "flatten" | "grow" | "shrink" | "smoothEdge" | "connected" | "invertConnected" | "tidy" | "invert" | "clear" | "extrude" | "offset" | "bridge" | "align";
 
+/** Build 92: a soft transform's settings - a move (mm, and out along the selection's facing), turns (degrees), a scale (%) and the soft edge (mm). */
+export type SoftTransform = { x: number; y: number; z: number; out: number; tilt: number; turn: number; roll: number; scale: number; soft: number };
+const SOFT_MOVES = [["x", "sculpt.soft.x"], ["y", "sculpt.soft.y"], ["z", "sculpt.soft.z"], ["out", "sculpt.soft.out"]] as const;
+const SOFT_TURNS = [["tilt", "sculpt.soft.tilt"], ["turn", "sculpt.soft.turn"], ["roll", "sculpt.soft.roll"]] as const;
+
 /** Build 90: Freeze (Meshmixer's mask) - from the selection, turned the other way round, or cleared. */
 export type SculptFreezeAction = "selection" | "invert" | "clear";
 const FREEZE_ACTIONS: SculptFreezeAction[] = ["selection", "invert", "clear"];
@@ -82,6 +87,10 @@ export function MeshSculptPanel({
   onSelectShape,
   frozen = 0,
   onFreeze,
+  soft = null,
+  onSoftStart,
+  onSoft,
+  onSoftEnd,
 }: {
   targetName: string;
   tool: SculptTool | null;
@@ -136,6 +145,11 @@ export function MeshSculptPanel({
   /** Build 90: corners frozen, and Freeze from selection / Invert / Clear. */
   frozen?: number;
   onFreeze?: (action: SculptFreezeAction) => void;
+  /** Build 92: Soft Transform of the selection - open while `soft` is set. */
+  soft?: SoftTransform | null;
+  onSoftStart?: () => void;
+  onSoft?: (value: SoftTransform) => void;
+  onSoftEnd?: (keep: boolean) => void;
 }) {
   useLanguage();
   const title = t(trim ? "sculpt.trimTitle" : "sculpt.title");
@@ -241,7 +255,27 @@ export function MeshSculptPanel({
       {!trim ? (<>
         <strong className="sculpt-subtitle">{t("sculpt.edit")}</strong>
         <EdgeModifierSlider label={t("sculpt.editDistance")} value={editAmount} min={-10} max={10} step={0.1} workspace={workspace} length disabled={busy} onChange={(value) => onEditAmount?.(value)} />
+        {soft && onSoft ? (
+          // Build 92: Soft Transform - the selection moved, turned and scaled, the surface round it following.
+          <div className="sculpt-soft" role="group" aria-label={t("sculpt.soft.title")}>
+            <strong className="sculpt-subtitle">{t("sculpt.soft.title")}</strong>
+            <p className="blend-hint">{t("sculpt.soft.hint")}</p>
+            <EdgeModifierSlider label={t("sculpt.soft.edge")} value={soft.soft} min={0} max={15} step={0.25} workspace={workspace} length disabled={busy} onChange={(value) => onSoft({ ...soft, soft: value })} />
+            {SOFT_MOVES.map(([key, label]) => (
+              <EdgeModifierSlider key={key} label={t(label)} value={soft[key]} min={-5} max={5} step={0.05} workspace={workspace} length disabled={busy} onChange={(value) => onSoft({ ...soft, [key]: value })} />
+            ))}
+            {SOFT_TURNS.map(([key, label]) => (
+              <EdgeModifierSlider key={key} label={t(label)} value={soft[key]} min={-45} max={45} step={0.5} unit="°" workspace={workspace} disabled={busy} onChange={(value) => onSoft({ ...soft, [key]: value })} />
+            ))}
+            <EdgeModifierSlider label={t("sculpt.soft.scale")} value={soft.scale} min={50} max={150} step={0.5} unit="%" workspace={workspace} disabled={busy} onChange={(value) => onSoft({ ...soft, scale: value })} />
+            <div className="dental-trim-buttons">
+              <button type="button" disabled={busy} onClick={() => onSoftEnd?.(false)}>{t("sculpt.soft.cancel")}</button>
+              <button type="button" className="active" disabled={busy} onClick={() => onSoftEnd?.(true)}>{t("sculpt.soft.apply")}</button>
+            </div>
+          </div>
+        ) : null}
         <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.edit")}>
+          {onSoftStart && !soft ? <button type="button" title={t("sculpt.soft.startHint")} disabled={busy || !chosen} onClick={onSoftStart}>{t("sculpt.soft.start")}</button> : null}
           {EDIT_ACTIONS.map((action) => (
             <button key={action} type="button" title={t(`sculpt.selection.${action}Hint`)} disabled={busy || !chosen || ((action === "extrude" || action === "offset") && !editAmount)} onClick={() => onSelection(action)}>
               {t(`sculpt.selection.${action}`)}

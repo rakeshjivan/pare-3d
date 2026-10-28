@@ -1124,16 +1124,91 @@ export class LiveMesh {
   invertMask() { for (let v = 0; v < this.vCount; v += 1) if (this.vAlive[v]) { this.mask[v] = 1 - this.mask[v]; this.maskChanged(v); } }
   /** Freezes the corners at these points (x y z each; within 1e-4 mm), e.g. a selection's triangles. */
   freezePoints(points: ArrayLike<number>) {
+    let count = 0;
+    for (const v of this.cornersAt(points)) if (this.mask[v] !== 1) { this.mask[v] = 1; this.maskChanged(v); count += 1; }
+    return count;
+  }
+  /** Build 92: the living corners standing at these points (x y z each; within 1e-4 mm, compared at single precision as the part's triangles are kept). */
+  cornersAt(points: ArrayLike<number>): Int32Array {
     const key = (x: number, y: number, z: number) => `${Math.round(x * 1e4)},${Math.round(y * 1e4)},${Math.round(z * 1e4)}`;
     const wanted = new Set<string>();
     for (let k = 0; k + 2 < points.length; k += 3) wanted.add(key(points[k], points[k + 1], points[k + 2]));
-    let count = 0;
+    const out: number[] = [];
     for (let v = 0; v < this.vCount; v += 1) {
-      if (!this.vAlive[v] || this.mask[v] === 1) continue;
-      // Compared at single precision, as the part's triangles are kept.
-      if (wanted.has(key(Math.fround(this.pos[v * 3]), Math.fround(this.pos[v * 3 + 1]), Math.fround(this.pos[v * 3 + 2])))) { this.mask[v] = 1; this.maskChanged(v); count += 1; }
+      if (!this.vAlive[v]) continue;
+      if (wanted.has(key(Math.fround(this.pos[v * 3]), Math.fround(this.pos[v * 3 + 1]), Math.fround(this.pos[v * 3 + 2])))) out.push(v);
     }
-    return count;
+    return Int32Array.from(out);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Build 92: Soft Transform (Meshmixer's Transform with a soft edge)
+
+  /**
+   * The corners a soft transform moves: the chosen ones fully, and those within `soft` mm of them -
+   * measured across the surface (along its edges), so a neighbouring tooth across a gap is not taken -
+   * fading smoothly to none. Weights 0-1, in the order of `verts`.
+   */
+  softWeights(core: ArrayLike<number>, soft: number): { verts: Int32Array; weights: Float32Array } {
+    const n = this.vCount;
+    const dist = new Float64Array(n).fill(Infinity);
+    // A binary heap of (distance, corner).
+    let heapD = new Float64Array(1024), heapV = new Int32Array(1024), size = 0;
+    const push = (d: number, v: number) => {
+      if (size === heapD.length) { const nd = new Float64Array(size * 2); nd.set(heapD); heapD = nd; const nv = new Int32Array(size * 2); nv.set(heapV); heapV = nv; }
+      let i = size++;
+      while (i > 0) { const up = (i - 1) >> 1; if (heapD[up] <= d) break; heapD[i] = heapD[up]; heapV[i] = heapV[up]; i = up; }
+      heapD[i] = d; heapV[i] = v;
+    };
+    const pop = () => {
+      const v = heapV[0], last = --size, d = heapD[last], lv = heapV[last];
+      let i = 0;
+      for (;;) {
+        let c = i * 2 + 1;
+        if (c >= size) break;
+        if (c + 1 < size && heapD[c + 1] < heapD[c]) c += 1;
+        if (heapD[c] >= d) break;
+        heapD[i] = heapD[c]; heapV[i] = heapV[c]; i = c;
+      }
+      heapD[i] = d; heapV[i] = lv;
+      return v;
+    };
+    const out: number[] = [];
+    for (let k = 0; k < core.length; k += 1) { const v = core[k]; if (v < n && this.vAlive[v] && dist[v] !== 0) { dist[v] = 0; push(0, v); } }
+    const done = new Uint8Array(n);
+    const tri = this.tri;
+    while (size) {
+      const d0 = heapD[0];
+      const v = pop();
+      if (done[v] || d0 > dist[v]) continue;
+      done[v] = 1;
+      out.push(v);
+      for (const t of this.vTris[v]) for (let k = 0; k < 3; k += 1) {
+        const w = tri[t * 3 + k];
+        if (done[w]) continue;
+        const d = d0 + this.dist(v, w);
+        if (d < dist[w] && d <= soft) { dist[w] = d; push(d, w); }
+      }
+    }
+    const verts = Int32Array.from(out), weights = new Float32Array(verts.length);
+    for (let i = 0; i < verts.length; i += 1) {
+      const d = dist[verts[i]];
+      const t = soft > 0 ? Math.min(1, d / soft) : d > 0 ? 1 : 0;
+      weights[i] = 1 - t * t * (3 - 2 * t);
+    }
+    return { verts, weights };
+  }
+  /** Moves `verts` from `from` (their positions when the transform began) by `matrix`, each by its weight. */
+  softMove(verts: Int32Array, weights: Float32Array, from: Float64Array, matrix: THREE.Matrix4) {
+    const e = matrix.elements, p = this.pos;
+    for (let i = 0; i < verts.length; i += 1) {
+      const v = verts[i], w = weights[i];
+      const x = from[i * 3], y = from[i * 3 + 1], z = from[i * 3 + 2];
+      const tx = e[0] * x + e[4] * y + e[8] * z + e[12], ty = e[1] * x + e[5] * y + e[9] * z + e[13], tz = e[2] * x + e[6] * y + e[10] * z + e[14];
+      p[v * 3] = x + (tx - x) * w; p[v * 3 + 1] = y + (ty - y) * w; p[v * 3 + 2] = z + (tz - z) * w;
+      this.moved(v);
+    }
+    this.rebin(verts, verts.length);
   }
   /** Where the frozen corners (half or more) are, x y z each - to freeze them again on a new copy of the part. */
   frozenPoints(): Float32Array {

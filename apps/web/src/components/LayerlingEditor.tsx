@@ -75,7 +75,7 @@ import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
 import { applyToSelection, brushChoice, lassoChoice, type LassoMode, cornerPositions, growChoice, soupFloat32, invertChoice, sculptMeshOf, soupOf, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
 import { LiveMesh, averageEdgeOf, stampBrush, type LiveBrush, type LivePatch } from "@/lib/liveSculpt";
 import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
-import { MeshSculptPanel, type SculptFreezeAction, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
+import { MeshSculptPanel, type SoftTransform, type SculptFreezeAction, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
@@ -8962,7 +8962,7 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso"; frozen?: number; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso"; frozen?: number; soft?: SoftTransform | null; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
   /** Build 76: bumped when a stroke is added or stepped back, so Undo and Redo show what they can do. */
   const [, setSculptSteps] = useState(0);
   // Build 85: the speed readout (the ` key in Sculpt): the last stroke's frames, timed.
@@ -9459,6 +9459,73 @@ export function LayerlingEditor({
     state.selection = { mesh: selection.mesh, chosen: kept, stale: false };
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
   applySculptSelectionRef.current = applySculptSelection;
+  // Build 92: Soft Transform - the selection moved, turned or scaled with a soft edge, live on the sculpt copy.
+  const softSession = useRef<{ verts: Int32Array; weights: Float32Array; from: Float64Array; pivot: THREE.Vector3; normal: THREE.Vector3; soft: number; core: Int32Array } | null>(null);
+  const softMatrix = (session: NonNullable<typeof softSession.current>, params: SoftTransform) => {
+    const turn = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(params.tilt), THREE.MathUtils.degToRad(params.turn), THREE.MathUtils.degToRad(params.roll), "XYZ"));
+    const k = params.scale / 100;
+    const move = new THREE.Vector3(params.x, params.y, params.z).addScaledVector(session.normal, params.out);
+    return new THREE.Matrix4().makeTranslation(session.pivot.x + move.x, session.pivot.y + move.y, session.pivot.z + move.z)
+      .multiply(turn).multiply(new THREE.Matrix4().makeScale(k, k, k)).multiply(new THREE.Matrix4().makeTranslation(-session.pivot.x, -session.pivot.y, -session.pivot.z));
+  };
+  const softStart = useCallback(() => {
+    const target = sculptTarget();
+    if (!target) return;
+    const { shape, state } = target;
+    const selection = sculptSelectionOf(state);
+    const { points, triangles } = selection.mesh;
+    const at: number[] = [];
+    selection.chosen.forEach((chosen, t) => { if (chosen) for (let k = 0; k < 3; k += 1) { const v = triangles[t * 3 + k]; at.push(points[v * 3], points[v * 3 + 1], points[v * 3 + 2]); } });
+    const core = state.live.cornersAt(at);
+    if (!core.length) return;
+    const pivot = new THREE.Vector3(), normal = new THREE.Vector3(), n = new THREE.Vector3();
+    for (const v of core) { pivot.x += state.live.pos[v * 3]; pivot.y += state.live.pos[v * 3 + 1]; pivot.z += state.live.pos[v * 3 + 2]; normal.add(state.live.vertexNormal(v, n)); }
+    pivot.divideScalar(core.length);
+    if (normal.lengthSq() < 1e-12) normal.set(0, 1, 0);
+    normal.normalize();
+    const params: SoftTransform = { x: 0, y: 0, z: 0, out: 0, tilt: 0, turn: 0, roll: 0, scale: 100, soft: 2 };
+    const { verts, weights } = state.live.softWeights(core, params.soft);
+    const from = new Float64Array(verts.length * 3);
+    verts.forEach((v, i) => { from[i * 3] = state.live.pos[v * 3]; from[i * 3 + 1] = state.live.pos[v * 3 + 1]; from[i * 3 + 2] = state.live.pos[v * 3 + 2]; });
+    state.live.beginPatch();
+    softSession.current = { verts, weights, from, pivot, normal, soft: params.soft, core };
+    window.layerlingSculptLive?.(shape.id, state.live.geometry, shape.color);
+    setSculptTool((current) => current ? { ...current, soft: params } : current);
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  const softChange = useCallback((params: SoftTransform) => {
+    const session = softSession.current, state = sculptState.current;
+    if (!session || !state) return;
+    if (params.soft !== session.soft) {
+      // A wider or narrower soft edge: back to where it began, then the corners and weights again.
+      state.live.setPositions(session.verts, session.from);
+      const { verts, weights } = state.live.softWeights(session.core, params.soft);
+      const from = new Float64Array(verts.length * 3);
+      verts.forEach((v, i) => { from[i * 3] = state.live.pos[v * 3]; from[i * 3 + 1] = state.live.pos[v * 3 + 1]; from[i * 3 + 2] = state.live.pos[v * 3 + 2]; });
+      Object.assign(session, { verts, weights, from, soft: params.soft });
+    }
+    state.live.softMove(session.verts, session.weights, session.from, softMatrix(session, params));
+    if (state.live.flushGpu()) window.layerlingRedraw?.();
+    setSculptTool((current) => current ? { ...current, soft: params } : current);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const softEnd = useCallback((keep: boolean) => {
+    const session = softSession.current, state = sculptState.current;
+    softSession.current = null;
+    if (session && state) {
+      if (!keep) state.live.setPositions(session.verts, session.from);
+      if (state.live.flushGpu()) window.layerlingRedraw?.();
+      const entry = state.live.endPatch();
+      if (keep && entry) {
+        state.undo.push(entry);
+        state.redo = [];
+        state.strokes += 1;
+        state.lastBrush = "softTransform";
+        setSculptSteps((n) => n + 1);
+      }
+      // The selection is of the same triangles, now somewhere else: its copy made again where they are.
+      if (state.selection && keep) { state.selection.stale = true; sculptSelectionOf(state); }
+    }
+    setSculptTool((current) => current ? { ...current, soft: null } : current);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   /** Build 90: Freeze from the selection, Invert and Clear (Meshmixer's mask). */
   const applySculptFreeze = useCallback((action: SculptFreezeAction) => {
     const target = sculptTarget();
@@ -10256,6 +10323,7 @@ export function LayerlingEditor({
   // The area tinted over the scans while it can be edited.
   useEffect(() => {
     const state = dentalStudioRef.current;
+    highlightDrawn.current = null;
     // Build 74: shown while the teeth are being set (or when asked for), not while a scan is trimmed.
     if (!dentalAreaManual || !state || state.stage === "making" || dentalTrim || (!dentalAreaShown && !dentalAreaTool)) { window.layerlingHighlight?.(null); return; }
     const parts: number[] = [];
@@ -10276,6 +10344,7 @@ export function LayerlingEditor({
   useEffect(() => () => window.layerlingHighlight?.(null), []);
   // Build 69: the triangles chosen with Sculpt's Select brush, tinted (after the dental tint, so it wins while Sculpt is open).
   const sculptWasOpen = useRef(false);
+  const highlightDrawn = useRef<{ mesh: SculptMesh; count: number; sum: number } | null>(null);
   const sculptHidOthers = useRef(false);
   useEffect(() => {
     if (sculptTool || !sculptHidOthers.current) return;
@@ -10285,13 +10354,21 @@ export function LayerlingEditor({
   useEffect(() => {
     const state = sculptState.current;
     if (!sculptTool || !state) {
-      if (sculptWasOpen.current) { sculptWasOpen.current = false; window.layerlingHighlight?.(null); setDentalAreaVersion((version) => version + 1); }
+      if (sculptWasOpen.current) { sculptWasOpen.current = false; window.layerlingHighlight?.(null); highlightDrawn.current = null; setDentalAreaVersion((version) => version + 1); }
       return;
     }
     sculptWasOpen.current = true;
-    if (!sculptTool.chosen) { window.layerlingHighlight?.(null); return; }
+    // Build 92: while a soft transform moves the selection, the tint (drawn where it was) is put away.
+    if (!sculptTool.chosen || sculptTool.soft) { window.layerlingHighlight?.(null); highlightDrawn.current = null; return; }
     const selection = state.selection;
-    if (!selection) { window.layerlingHighlight?.(null); return; }
+    if (!selection) { window.layerlingHighlight?.(null); highlightDrawn.current = null; return; }
+    // Build 92: drawn again only when the selection changed - this ran on every change to the panel (a
+    // slider's every step), copying the whole mesh each time.
+    let sum = 0;
+    for (let t = 0; t < selection.chosen.length; t += 1) if (selection.chosen[t]) sum = (sum + t * 2654435761) % 4294967296;
+    const drawn = highlightDrawn.current;
+    if (drawn && drawn.mesh === selection.mesh && drawn.count === sculptTool.chosen && drawn.sum === sum) return;
+    highlightDrawn.current = { mesh: selection.mesh, count: sculptTool.chosen, sum };
     const world = soupFloat32(selection.mesh);
     const parts = new Float32Array(sculptTool.chosen * 9);
     let at = 0;
@@ -10610,6 +10687,7 @@ export function LayerlingEditor({
     setWaxup((current) => ({ ...current, picking: null, marks: [] }));
     setDentalHidden([]);
     window.layerlingHighlight?.(null);
+    highlightDrawn.current = null;
   }, []);
   const startWaxPicking = useCallback(() => {
     const arch = waxArch();
@@ -17078,6 +17156,10 @@ export function LayerlingEditor({
           onStrength={(strength) => setSculptTool((current) => current ? { ...current, strength: Math.max(0.01, Math.min(1, Math.round(strength * 100) / 100)) } : current)}
           onSelection={applySculptSelection}
           frozen={sculptTool.frozen ?? 0}
+          soft={sculptTool.soft ?? null}
+          onSoftStart={softStart}
+          onSoft={softChange}
+          onSoftEnd={softEnd}
           onFreeze={applySculptFreeze}
           editAmount={sculptTool.editAmount ?? 1}
           onEditAmount={(editAmount) => setSculptTool((current) => current ? { ...current, editAmount } : current)}
@@ -17425,7 +17507,7 @@ type SculptSession = {
   centre: Vec3;
   selection: { mesh: SculptMesh; chosen: Uint8Array; stale: boolean } | null;
   strokes: number;
-  lastBrush: SculptTool | null;
+  lastBrush: SculptTool | "softTransform" | null;
   undo: SculptUndo[];
   redo: SculptUndo[];
 };
