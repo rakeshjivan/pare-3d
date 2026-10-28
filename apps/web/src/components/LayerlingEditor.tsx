@@ -10369,7 +10369,7 @@ export function LayerlingEditor({
     if (!added.length) return;
     const slotted = (Object.values(state.slots).filter(Boolean) as string[]).map((id) => shapesRef.current.find((shape) => shape.id === id)).filter((shape): shape is WorkplaneShape => Boolean(shape));
     const { slots, rolesChosen } = guessDentalSlots([...slotted, ...added].slice(0, 4));
-    analyseDentalStudio({ ...freshDentalState(slots, rolesChosen && state.rolesChosen), preset: state.preset, options: state.options, optionsTouched: state.optionsTouched, advanced: state.advanced });
+    analyseDentalStudio({ ...freshDentalState(slots, rolesChosen && state.rolesChosen), preset: state.preset, options: state.options, optionsTouched: state.optionsTouched, advanced: state.advanced, ...(state.waxStudio ? { waxStudio: state.waxStudio } : {}) });
   }, [dentalCandidateKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // Fork (build 48): trimming a scan by hand - a line drawn over the view round what to keep.
   const [dentalTrim, setDentalTrim] = useState<{ slot: "upper" | "lower"; mode: DentalTrimMode } | null>(null);

@@ -26,9 +26,9 @@ export const TOOTH_MIN_AREA = 6;
 export const SPLIT_BORDER_SHARE = 0.25;
 /** ...and the smaller is less than this share of a typical tooth's area. */
 export const SPLIT_PIECE_SHARE = 0.4;
-/** A crown this many times a front tooth's is a molar's (molars 6-8); and how much a size that disagrees counts against a number. */
+/** A crown this many times a front tooth's is a molar's (6-8); and how much counts against numbering it lower. */
 export const MOLAR_SIZE = 1.7;
-export const SIZE_WEIGHT = 0.5;
+export const SIZE_WEIGHT = 10;
 
 // ---------------------------------------------------------------------------------------------
 // Neighbours
@@ -363,9 +363,11 @@ export function numberTeeth(teeth: Array<{ centre: [number, number, number]; vot
     // score[i][n]: the share of tooth i's area the network numbered n+1.
     const share = side.map((i) => {
       const v = teeth[i].votes, s = v.reduce((a, b) => a + b, 0) || 1;
-      // Size counts too: a crown the size of a molar is not a premolar, nor a small one a molar.
+      // Size counts too: a crown the size of a molar is not a premolar or a front tooth - where
+      // premolars were taken out the network tends to number the molars one short. (A small crown
+      // may still be a molar: partly scanned, or erupting.)
       const big = teeth[i].area > MOLAR_SIZE * front;
-      return Array.from({ length: 8 }, (_, n) => v[n + 1] / s - (big === n + 1 >= 6 ? 0 : SIZE_WEIGHT));
+      return Array.from({ length: 8 }, (_, n) => v[n + 1] / s - (big && n + 1 < 6 ? SIZE_WEIGHT : 0));
     });
     // best[i][n]: best total with tooth i numbered n+1 and numbers rising before it.
     const best = Array.from({ length: k }, () => new Float64Array(8).fill(-Infinity));
