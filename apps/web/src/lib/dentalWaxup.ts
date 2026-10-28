@@ -123,6 +123,23 @@ function endThickness(p: ArrayLike<number>, along: THREE.Vector3, across: THREE.
   return hi - lo;
 }
 
+/** Width along `along` of the third of `p`'s height at the end of `height` that `sign` picks. */
+function endWidth(p: ArrayLike<number>, height: THREE.Vector3, along: THREE.Vector3, sign: 1 | -1, share = 0.3) {
+  let lo = Infinity, hi = -Infinity;
+  const q = new THREE.Vector3();
+  for (let i = 0; i < p.length; i += 3) { const h = q.set(p[i], p[i + 1], p[i + 2]).dot(height); lo = Math.min(lo, h); hi = Math.max(hi, h); }
+  const from = sign > 0 ? hi - share * (hi - lo) : lo, to = sign > 0 ? hi : lo + share * (hi - lo);
+  let a = Infinity, b = -Infinity;
+  for (let i = 0; i < p.length; i += 3) {
+    q.set(p[i], p[i + 1], p[i + 2]);
+    const h = q.dot(height);
+    if (h < from || h > to) continue;
+    const s = q.dot(along);
+    a = Math.min(a, s); b = Math.max(b, s);
+  }
+  return b - a;
+}
+
 /**
  * Turns an arranged set of teeth (separate closed shells, as an arch segment - a Meshmixer part, an
  * OBJ or STL holding several teeth, or a folder of them in one shared frame) into the arch frame.
@@ -156,10 +173,18 @@ export function librarySet(name: string, shells: Float32Array[]): LibrarySet {
   // The middle teeth stand further forward (more labial) than the ends; front is -y, so labial points to -y.
   const midLab = middle.reduce((s, i) => s + along2(i), 0) / middle.length, endLab = ends.reduce((s, i) => s + along2(i), 0) / ends.length;
   if (midLab < endLab) labial.negate();
-  // Incisal: thinner end of the middle teeth.
-  let thinUp = 0;
-  for (const i of middle) thinUp += endThickness(shells[i], height, labial, 1) - endThickness(shells[i], height, labial, -1);
-  if (thinUp > 0) height.negate();
+  // Incisal: build 94 - the end where the middle teeth (incisors) are wider along the arch. An
+  // incisor is widest mesio-distally at its incisal third and narrows to the neck, whatever a
+  // library does at the neck (an open or capped crown, a stub of root). Thickness alone misled: a
+  // capped neck can be thinner labio-lingually than the crown at its height of contour.
+  // Where the widths hardly differ (an egg-shaped stand-in), the thinner end is the edge, as before.
+  let wideUp = 0, meanWidth = 0, thinUp = 0;
+  for (const i of middle) {
+    const up = endWidth(shells[i], height, along, 1), down = endWidth(shells[i], height, along, -1);
+    wideUp += up - down; meanWidth += (up + down) / 2;
+    thinUp += endThickness(shells[i], height, labial, 1) - endThickness(shells[i], height, labial, -1);
+  }
+  if (Math.abs(wideUp) > 0.05 * meanWidth ? wideUp < 0 : thinUp > 0) height.negate();
   // Right-handed: x along, y = -labial (front at -y), z = height.
   const yAxis = labial.clone().negate();
   const xAxis = new THREE.Vector3().crossVectors(yAxis, height).normalize();

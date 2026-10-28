@@ -145,3 +145,25 @@ describe("fitting to the teeth found", () => {
     }
   });
 });
+
+describe("tooth sets the right way up", () => {
+  it("every shipped set has its incisors' wide incisal third at the top (the edge), both arches", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { librarySet } = await import("@/lib/dentalWaxup");
+    const { decodeToothSet } = await import("@/lib/toothLibrary");
+    for (const lib of ["nulty", "teethy"]) {
+      const manifest = JSON.parse(readFileSync(`apps/web/public/libraries/${lib}/manifest.json`, "utf8")) as { sets: Array<{ id: string; file: string }> };
+      for (const entry of manifest.sets) {
+        const set = librarySet(entry.id, decodeToothSet(readFileSync(`apps/web/public/libraries/${lib}/${entry.file}`)));
+        for (const t of set.teeth.filter((x) => x.kind === "central")) {
+          const p = t.positions;
+          let top = -Infinity, bottom = Infinity;
+          for (let i = 2; i < p.length; i += 3) { top = Math.max(top, p[i]); bottom = Math.min(bottom, p[i]); }
+          const h = top - bottom;
+          const width = (z0: number, z1: number) => { let a = Infinity, b = -Infinity; for (let i = 0; i < p.length; i += 3) if (p[i + 2] >= z0 && p[i + 2] <= z1) { a = Math.min(a, p[i]); b = Math.max(b, p[i]); } return b - a; };
+          expect(width(top - 0.3 * h, top), entry.id).toBeGreaterThan(width(bottom, bottom + 0.3 * h));
+        }
+      }
+    }
+  });
+});
