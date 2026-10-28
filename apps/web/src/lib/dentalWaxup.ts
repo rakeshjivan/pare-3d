@@ -1288,8 +1288,27 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
     const pMid = [me.c[0] + pMes.x * (pw.lo + pw.hi) / 2, me.c[1] + pMes.y * (pw.lo + pw.hi) / 2];
     const fromLib = new THREE.Matrix4().makeBasis(mMes, mOut, new THREE.Vector3(0, 0, 1)).invert().multiply(new THREE.Matrix4().makeTranslation(-lMid[0], -lMid[1], -match.top));
     const toPatient = new THREE.Matrix4().makeTranslation(pMid[0], pMid[1], edge).multiply(new THREE.Matrix4().makeBasis(pMes, pOut, new THREE.Vector3(0, 0, 1)));
-    const base = toPatient.clone().multiply(new THREE.Matrix4().makeScale(s, s, k)).multiply(fromLib);
+    let base = toPatient.clone().multiply(new THREE.Matrix4().makeScale(s, s, k)).multiply(fromLib);
+    // Build 94: then the library tooth's surface registered onto the patient's crown (ICP: turn,
+    // move and scale), from the cervical two-thirds and the proximal surfaces - so tip, torque,
+    // rotation and position follow the patient's tooth, and a worn edge does not pull the tooth up.
+    const fit = registerCrown(transformSoup(lp, base), crown.points, margin + FIT_SHARE * (me.top - margin));
+    const fit0 = fit.clone();
+    base = fit.multiply(base);
     let positions = transformSoup(lp, base);
+    // The edge: never short of the patient's (covered by minWax), plus any lengthening - the
+    // length set about the margin, so the cervical end stays where it was fitted.
+    {
+      let top = -Infinity;
+      for (let i = 2; i < positions.length; i += 3) top = Math.max(top, positions[i]);
+      const want = Math.max(top, me.top + minWax) + (options.lengthen ?? 0);
+      if (Math.abs(want - top) > 1e-3 && top - margin > 1) {
+        const kz = (want - margin) / (top - margin);
+        const about = new THREE.Matrix4().makeTranslation(0, 0, margin).multiply(new THREE.Matrix4().makeScale(1, 1, kz)).multiply(new THREE.Matrix4().makeTranslation(0, 0, -margin));
+        base = about.multiply(base);
+        positions = transformSoup(lp, base);
+      }
+    }
     if (mirrored) for (let i = 0; i < positions.length; i += 9) for (let c = 0; c < 3; c += 1) { const t = positions[i + 3 + c]; positions[i + 3 + c] = positions[i + 6 + c]; positions[i + 6 + c] = t; }
     // Out until the wax is minWax proud: the facial surface, and on posterior teeth the occlusal too.
     const posterior = KINDS.indexOf(me.kind) >= 3;
@@ -1323,7 +1342,12 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
       length: edge - margin,
       lengthening: 0,
       extension: edge - me.top,
-      frame: { origin: [pMid[0] + dir.x * shift, pMid[1] + dir.y * shift, edge + dir.z * shift], out: pOut.toArray() as Vec3, mesial: pMes.toArray() as Vec3, up: [0, 0, 1] },
+      frame: (() => {
+        // The tooth's own frame, turned with the fit: the middle of its edge, out, mesial, up.
+        const turn = new THREE.Matrix4().extractRotation(fit0);
+        const o = new THREE.Vector3(pMid[0], pMid[1], edge).applyMatrix4(fit0).add(dir.clone().multiplyScalar(shift));
+        return { origin: o.toArray() as Vec3, out: pOut.clone().applyMatrix4(turn).normalize().toArray() as Vec3, mesial: pMes.clone().applyMatrix4(turn).normalize().toArray() as Vec3, up: new THREE.Vector3(0, 0, 1).applyMatrix4(turn).normalize().toArray() as Vec3 };
+      })(),
     });
   }
   // Neighbours meet at their contacts (the wax closes the gaps the patient's own teeth may have:
@@ -1410,4 +1434,97 @@ function widenToContacts(placed: PlacedTooth[]) {
       tooth.frame = { ...tooth.frame, origin: o.clone().addScaledVector(mes, (gm - gd) / 2).toArray() as Vec3 };
     });
   }
+}
+
+/** Build 94: the share of a crown's height, from its margin, that the fit to the patient's tooth uses. */
+export const FIT_SHARE = 0.67;
+/** How far a fit may scale a library tooth, either way. */
+const FIT_SCALE = 1.2;
+
+/**
+ * Build 94: registers a placed library tooth (soup) onto a patient's crown (its corners): ICP with a
+ * similarity (rotation, translation, one scale; Horn 1987, closed form by quaternions). Each round
+ * pairs the patient's crown points below `below` with their nearest library corners, keeps the
+ * closest 80% (gum the finder took with the crown, a contact), and moves the tooth to fit them.
+ * Returns the move to apply after the tooth's placement.
+ */
+export function registerCrown(tooth: Float32Array, crown: Float32Array, below: number, rounds = 20): THREE.Matrix4 {
+  const lib: number[] = [];
+  const step = Math.max(1, Math.floor(tooth.length / 3 / 4000));
+  for (let i = 0; i < tooth.length / 3; i += step) lib.push(tooth[i * 3], tooth[i * 3 + 1], tooth[i * 3 + 2]);
+  const pat: number[] = [];
+  const n = crown.length / 3;
+  const pStep = Math.max(1, Math.floor(n / 2500));
+  for (let i = 0; i < n; i += pStep) if (crown[i * 3 + 2] <= below) pat.push(crown[i * 3], crown[i * 3 + 1], crown[i * 3 + 2]);
+  let total = new THREE.Matrix4();
+  if (pat.length < 30) return total;
+  let moved = Float32Array.from(lib);
+  let scaleSoFar = 1;
+  const v = new THREE.Vector3();
+  for (let round = 0; round < rounds; round += 1) {
+    const grid = new PointGrid(moved, 1.5);
+    const pairs: Array<[number, number, number]> = [];
+    for (let i = 0; i < pat.length; i += 3) {
+      let hit = grid.nearest(pat[i], pat[i + 1], pat[i + 2]);
+      if (!hit) continue;
+      pairs.push([i, hit[0], hit[1]]);
+    }
+    if (pairs.length < 30) break;
+    pairs.sort((a, b) => a[2] - b[2]);
+    const kept = pairs.slice(0, Math.max(30, Math.floor(pairs.length * 0.8)));
+    // Centroids, then the cross-covariance of library (moving) and patient (target) points.
+    const lc = [0, 0, 0], pc = [0, 0, 0];
+    for (const [pi, li] of kept) for (let k = 0; k < 3; k += 1) { lc[k] += moved[li * 3 + k] / kept.length; pc[k] += pat[pi + k] / kept.length; }
+    const S = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    let sl = 0, sp = 0;
+    for (const [pi, li] of kept) {
+      const a = [moved[li * 3] - lc[0], moved[li * 3 + 1] - lc[1], moved[li * 3 + 2] - lc[2]], b = [pat[pi] - pc[0], pat[pi + 1] - pc[1], pat[pi + 2] - pc[2]];
+      for (let r = 0; r < 3; r += 1) for (let c = 0; c < 3; c += 1) S[r][c] += a[r] * b[c];
+      sl += a[0] * a[0] + a[1] * a[1] + a[2] * a[2]; sp += b[0] * b[0] + b[1] * b[1] + b[2] * b[2];
+    }
+    const [[xx, xy, xz], [yx, yy, yz], [zx, zy, zz]] = S;
+    const N = [
+      [xx + yy + zz, yz - zy, zx - xz, xy - yx],
+      [yz - zy, xx - yy - zz, xy + yx, zx + xz],
+      [zx - xz, xy + yx, -xx + yy - zz, yz + zy],
+      [xy - yx, zx + xz, yz + zy, -xx - yy + zz],
+    ];
+    const q = largestEigenvector4(N);
+    const rot = new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion(q[1], q[2], q[3], q[0]).normalize());
+    // Symmetric scale (Horn), kept within FIT_SCALE of the placement.
+    let scale = sl > 0 ? Math.sqrt(sp / sl) : 1;
+    scale = Math.max(1 / FIT_SCALE / scaleSoFar, Math.min(FIT_SCALE / scaleSoFar, scale));
+    scaleSoFar *= scale;
+    const m = new THREE.Matrix4().makeTranslation(pc[0], pc[1], pc[2]).multiply(new THREE.Matrix4().makeScale(scale, scale, scale)).multiply(rot).multiply(new THREE.Matrix4().makeTranslation(-lc[0], -lc[1], -lc[2]));
+    total = m.clone().multiply(total);
+    for (let i = 0; i < moved.length; i += 3) { v.set(moved[i], moved[i + 1], moved[i + 2]).applyMatrix4(m); moved[i] = v.x; moved[i + 1] = v.y; moved[i + 2] = v.z; }
+    // Settled: the move this round is tiny.
+    const e = m.elements;
+    if (Math.abs(e[12] - 0) + Math.abs(e[13]) + Math.abs(e[14]) < 0.002 && Math.abs(scale - 1) < 1e-4 && 1 - q[0] * q[0] < 1e-7) break;
+  }
+  void moved;
+  return total;
+}
+
+/** The eigenvector of a symmetric 4x4 matrix with the largest eigenvalue (Jacobi rotations). */
+function largestEigenvector4(a: number[][]): number[] {
+  const m = a.map((row) => row.slice());
+  const v = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+  for (let sweep = 0; sweep < 60; sweep += 1) {
+    let off = 0;
+    for (let p = 0; p < 4; p += 1) for (let q = p + 1; q < 4; q += 1) off += m[p][q] * m[p][q];
+    if (off < 1e-20) break;
+    for (let p = 0; p < 4; p += 1) for (let q = p + 1; q < 4; q += 1) {
+      if (Math.abs(m[p][q]) < 1e-15) continue;
+      const theta = (m[q][q] - m[p][p]) / (2 * m[p][q]);
+      const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+      const c = 1 / Math.sqrt(t * t + 1), s = t * c;
+      for (let k = 0; k < 4; k += 1) { const mkp = m[k][p], mkq = m[k][q]; m[k][p] = c * mkp - s * mkq; m[k][q] = s * mkp + c * mkq; }
+      for (let k = 0; k < 4; k += 1) { const mpk = m[p][k], mqk = m[q][k]; m[p][k] = c * mpk - s * mqk; m[q][k] = s * mpk + c * mqk; }
+      for (let k = 0; k < 4; k += 1) { const vkp = v[k][p], vkq = v[k][q]; v[k][p] = c * vkp - s * vkq; v[k][q] = s * vkp + c * vkq; }
+    }
+  }
+  let best = 0;
+  for (let i = 1; i < 4; i += 1) if (m[i][i] > m[best][best]) best = i;
+  return [v[0][best], v[1][best], v[2][best], v[3][best]];
 }
