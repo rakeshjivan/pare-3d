@@ -11572,13 +11572,13 @@ function applyViewLook(state: ThreeState | null) {
   // Build 88: Meshmixer's lighting in the dark look - nearly all of it from the camera, so faces turned
   // to you are bright and hollows and creases fall dark, with only a little soft grey all round (the
   // light blue ground light of the workplane look made scans dull and flat).
-  state.lights.ambient.intensity = dark ? 0.23 : base.ambient;
-  state.lights.ambient.groundColor.set(dark ? "#484848" : "#d6edf5");
+  state.lights.ambient.intensity = dark ? 0.35 : base.ambient;
+  state.lights.ambient.groundColor.set(dark ? "#505050" : "#d6edf5");
   state.lights.key.intensity = dark ? 0 : base.key;
   state.lights.fill.intensity = dark ? 0 : base.fill;
   let head = state.scene.getObjectByName("ViewHeadlight") as THREE.DirectionalLight | undefined;
   if (!head && dark) {
-    head = new THREE.DirectionalLight("#ffffff", 4.1);
+    head = new THREE.DirectionalLight("#ffffff", 3.0);
     head.name = "ViewHeadlight";
     state.scene.add(head, head.target);
   }
@@ -11586,12 +11586,18 @@ function applyViewLook(state: ThreeState | null) {
   state.needsRender = true;
 }
 /** Before each frame: the headlight where the camera is, aimed where it looks. */
+const headOffset = new THREE.Vector3();
 function placeHeadlight(state: ThreeState) {
   if (viewLook !== "dark") return;
   const head = state.scene.getObjectByName("ViewHeadlight") as THREE.DirectionalLight | undefined;
   if (!head) return;
-  head.position.copy(state.camera.position);
-  head.target.position.copy(state.controls.target);
+  // Build 88: a little above and to the left of the eye, as Meshmixer lights - faces square to the view
+  // still shade, and creases fall dark (a light right at the eye leaves a scan flat and washed out).
+  const target = state.controls.target;
+  const distance = state.camera.position.distanceTo(target) || 1;
+  headOffset.set(-0.25, 0.35, 1).normalize().applyQuaternion(state.camera.quaternion).multiplyScalar(distance);
+  head.position.copy(target).add(headOffset);
+  head.target.position.copy(target);
   head.target.updateMatrixWorld();
 }
 
