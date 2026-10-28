@@ -166,3 +166,25 @@ describe("Build 92: face groups", () => {
     expect((mesh.geometry.getAttribute("color").array as Float32Array)[0]).toBe(1);
   });
 });
+
+describe("Build 92: deviation map", () => {
+  it("colours what was added warm and what was taken away cool, with the largest of each", () => {
+    const mesh = plate(60, 20);
+    const original = new NearestSurface(mesh.soup(), 2);
+    const up = mesh.pick([-4, 0, 5], [0, 0, -1])!, down = mesh.pick([4, 0, 5], [0, 0, -1])!;
+    for (let k = 0; k < 4; k += 1) {
+      mesh.dab("inflate", up.point, [0, 0, 1], 2, mesh.region(up.point, 2, up.triangle), 1, 0.1);
+      mesh.dab("deflate", down.point, [0, 0, 1], 2, mesh.region(down.point, 2, down.triangle), 1, 0.1);
+    }
+    const stats = mesh.showDeviation(original);
+    expect(stats.added).toBeGreaterThan(0.2);
+    expect(stats.removed).toBeGreaterThan(0.2);
+    mesh.flushGpu();
+    const colors = mesh.geometry.getAttribute("color").array as Float32Array;
+    const colourAt = (x: number) => { let best = 0, bd = Infinity; for (let v = 0; v < mesh.vCount; v += 1) { const d = Math.hypot(mesh.pos[v * 3] - x, mesh.pos[v * 3 + 1]); if (d < bd) { bd = d; best = v; } } return [colors[best * 3], colors[best * 3 + 1], colors[best * 3 + 2]]; };
+    const warm = colourAt(-4), cool = colourAt(4), plain = colourAt(0);
+    expect(warm[0]).toBeGreaterThan(warm[2]);
+    expect(cool[2]).toBeGreaterThan(cool[0]);
+    expect(plain).toEqual([1, 1, 1]);
+  });
+});

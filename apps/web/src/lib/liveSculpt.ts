@@ -1303,6 +1303,30 @@ export class LiveMesh {
     }
     this.setPaint(paint);
   }
+  /**
+   * Build 92: the deviation map (Meshmixer's Analysis > Deviation) - each corner coloured by how far it
+   * now stands from `original` (the part as Sculpt took it): added in warm colours, taken away in cool
+   * ones, full at `range` mm; within 0.01 mm the part's own colour. Returns the largest added and
+   * taken-away distances (mm).
+   */
+  showDeviation(original: { nearest: (x: number, y: number, z: number, out: Float64Array) => number } | null, range = 0.5) {
+    if (!original) { this.setPaint(null); return { added: 0, removed: 0 }; }
+    const paint = new Float32Array(this.pos.length).fill(1), q = new Float64Array(3), n = this.dabN, p = this.pos;
+    let added = 0, removed = 0;
+    for (let v = 0; v < this.vCount; v += 1) {
+      if (!this.vAlive[v]) continue;
+      const x = p[v * 3], y = p[v * 3 + 1], z = p[v * 3 + 2];
+      const d = original.nearest(x, y, z, q);
+      if (!(d > 0.01)) continue;
+      this.vertexNormal(v, n);
+      const signed = d < Infinity ? ((x - q[0]) * n.x + (y - q[1]) * n.y + (z - q[2]) * n.z >= 0 ? d : -d) : range;
+      const k = Math.min(1, Math.abs(signed) / range);
+      if (signed > 0) { added = Math.max(added, Math.min(d, 99)); paint[v * 3] = 1; paint[v * 3 + 1] = 1 - 0.62 * k; paint[v * 3 + 2] = 1 - 0.85 * k; }
+      else { removed = Math.max(removed, d); paint[v * 3] = 1 - 0.8 * k; paint[v * 3 + 1] = 1 - 0.45 * k; paint[v * 3 + 2] = 1; }
+    }
+    this.setPaint(paint);
+    return { added, removed };
+  }
   /** The face group of a triangle, or -1. */
   groupOf(t: number) { return this.groups && t < this.groups.length ? this.groups[t] : -1; }
 

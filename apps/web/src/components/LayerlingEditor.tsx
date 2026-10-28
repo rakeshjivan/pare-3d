@@ -8963,7 +8963,7 @@ export function LayerlingEditor({
   }, [meshRoundTool, selectedIds]);
 
   // Build 69 / 73: Sculpt - live brushes on a mesh (refined as they go), a brush-painted selection, and Remesh / Offset / Thicken.
-  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso" | "group"; groupsShown?: boolean; groupAngle?: number; groupCount?: number; frozen?: number; soft?: SoftTransform | null; brushOptions?: SculptBrushOptions; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
+  const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso" | "group"; deviation?: { added: number; removed: number } | null; groupsShown?: boolean; groupAngle?: number; groupCount?: number; frozen?: number; soft?: SoftTransform | null; brushOptions?: SculptBrushOptions; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
   /** Build 76: bumped when a stroke is added or stepped back, so Undo and Redo show what they can do. */
   const [, setSculptSteps] = useState(0);
   // Build 85: the speed readout (the ` key in Sculpt): the last stroke's frames, timed.
@@ -8992,7 +8992,9 @@ export function LayerlingEditor({
     const live = LiveMesh.fromSoup(worldTriangles(shape));
     if (frozen?.length) live.freezePoints(frozen);
     const box = live.bounds();
-    sculptState.current = { shapeId: shape.id, key, live, baseEdge: averageEdgeOf(live), centre: [(box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2], selection: null, strokes: 0, lastBrush: null, undo: [], redo: [] };
+    // Build 92: the part as Sculpt first took it, for the deviation map (kept when the copy is made again).
+    const original = known && known.shapeId === shape.id ? known.original : live.soup();
+    sculptState.current = { shapeId: shape.id, key, live, original, originalSurface: known && known.shapeId === shape.id ? known.originalSurface : null, baseEdge: averageEdgeOf(live), centre: [(box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2], selection: null, strokes: 0, lastBrush: null, undo: [], redo: [] };
     return sculptState.current;
   };
   /** The selection works on a welded copy (the selection tools of build 69); made when a selection tool needs it. */
@@ -9133,7 +9135,21 @@ export function LayerlingEditor({
     } else state.live.showGroups(false);
     window.layerlingSculptLive?.(shape.id, state.live.geometry, shape.color);
     if (state.live.flushGpu()) window.layerlingRedraw?.();
-    setSculptTool((current) => current ? { ...current, groupsShown: show, groupAngle, groupCount: state.live.groupCount } : current);
+    setSculptTool((current) => current ? { ...current, groupsShown: show, groupAngle, groupCount: state.live.groupCount, deviation: null } : current);
+  }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Build 92: the deviation map - the part coloured by how far it moved from where Sculpt took it. */
+  const sculptDeviation = useCallback((show: boolean) => {
+    const target = sculptTarget();
+    if (!target) return;
+    const { shape, state } = target;
+    let stats = { added: 0, removed: 0 };
+    if (show) {
+      state.originalSurface ??= new NearestSurface(state.original, 2);
+      stats = state.live.showDeviation(state.originalSurface);
+    } else state.live.showDeviation(null);
+    window.layerlingSculptLive?.(shape.id, state.live.geometry, shape.color);
+    if (state.live.flushGpu()) window.layerlingRedraw?.();
+    setSculptTool((current) => current ? { ...current, deviation: show ? stats : null, groupsShown: false } : current);
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Build 82: the Select tool's lasso - the triangles inside the loop, as Meshmixer's screen-space lasso. */
   const applySculptLasso = useCallback((loop: TrimPoint[], mode: LassoMode) => {
@@ -9431,6 +9447,12 @@ export function LayerlingEditor({
     state.strokes += 1;
     state.lastBrush = stroke.brush;
     if (panelChanges) setSculptSteps((n) => n + 1);
+    // Build 92: the deviation map follows the strokes.
+    if (sculptToolRef.current?.deviation && state.originalSurface) {
+      const stats = state.live.showDeviation(state.originalSurface);
+      if (state.live.flushGpu()) window.layerlingRedraw?.();
+      setSculptTool((current) => current?.deviation ? { ...current, deviation: stats } : current);
+    }
     sculptStat("end", performance.now() - ending, 0);
     if (speedTrack.current) {
       const track = speedTrack.current;
@@ -17239,6 +17261,8 @@ export function LayerlingEditor({
           onSelection={applySculptSelection}
           frozen={sculptTool.frozen ?? 0}
           soft={sculptTool.soft ?? null}
+          deviation={sculptTool.deviation ?? null}
+          onDeviation={sculptDeviation}
           groupsShown={Boolean(sculptTool.groupsShown)}
           groupAngle={sculptTool.groupAngle ?? 30}
           groupCount={sculptTool.groupCount ?? 0}
@@ -17596,6 +17620,9 @@ type SculptSession = {
   selection: { mesh: SculptMesh; chosen: Uint8Array; stale: boolean } | null;
   strokes: number;
   lastBrush: SculptTool | "softTransform" | null;
+  /** Build 92: the part's triangles when Sculpt took it, and their nearest-point grid once made. */
+  original: Float32Array;
+  originalSurface: NearestSurface | null;
   undo: SculptUndo[];
   redo: SculptUndo[];
 };

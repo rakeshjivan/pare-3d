@@ -91,6 +91,8 @@ export function MeshSculptPanel({
   frozen = 0,
   onFreeze,
   soft = null,
+  deviation = null,
+  onDeviation,
   groupsShown = false,
   groupAngle = 30,
   groupCount = 0,
@@ -148,6 +150,9 @@ export function MeshSculptPanel({
   /** Build 82: the Select tool paints (brush) or draws a loop (lasso). */
   selectShape?: "brush" | "lasso" | "group";
   onSelectShape?: (shape: "brush" | "lasso" | "group") => void;
+  /** Build 92: the deviation map - its figures while shown (mm added and taken away), and the switch. */
+  deviation?: { added: number; removed: number } | null;
+  onDeviation?: (show: boolean) => void;
   /** Build 92: face groups - shown or not, the angle that splits them, how many there are, and the button. */
   groupsShown?: boolean;
   groupAngle?: number;
@@ -283,6 +288,16 @@ export function MeshSculptPanel({
         </div>
       ) : null}
       <p className="blend-hint" role="status">{chosen ? t("sculpt.chosen", { count: chosen.toLocaleString() }) : t("sculpt.noneChosen")}</p>
+      {!trim && onDeviation ? (
+        // Build 92: Meshmixer's Analysis > Deviation, against the part as Sculpt took it.
+        <div className="sculpt-deviation">
+          <label className="edge-modifier-check" title={t("sculpt.deviation.hint")}>
+            <input type="checkbox" checked={Boolean(deviation)} disabled={busy} onChange={(event) => onDeviation(event.currentTarget.checked)} />
+            <span>{t("sculpt.deviation.show")}</span>
+          </label>
+          {deviation ? <p className="blend-hint" role="status">{t("sculpt.deviation.figures", { added: deviation.added.toFixed(2), removed: deviation.removed.toFixed(2) })}</p> : null}
+        </div>
+      ) : null}
       {!trim && onGroups ? (
         // Build 92: Meshmixer's Generate Face Groups - shown in colour; Select > Group picks one with a click.
         <div className="sculpt-groups">
