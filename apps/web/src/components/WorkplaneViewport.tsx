@@ -1,5 +1,6 @@
 "use client";
 
+import { readViewLook, type ViewLook } from "@/lib/viewLook";
 import { markEscapeHandled } from "@/lib/escapeHandled";
 import { ArrowDownToLine, Check, ChevronLeft, ChevronRight, Crosshair, Cuboid, Download, Eye, EyeOff, FlipHorizontal, GripVertical, Home, Layers, Minus, MousePointer2, PanelsTopLeft, Plus, Rotate3d, RotateCcw, Ruler, RulerDimensionLine, Slice, Spline, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type DragEvent, type MouseEvent as ReactMouseEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction, type WheelEvent as ReactWheelEvent } from "react";
@@ -684,6 +685,8 @@ declare global {
     layerlingSculptLive?: (shapeId: string, geometry: THREE.BufferGeometry | null, color?: string) => void;
     /** Build 73: draw the next frame (after the live Sculpt geometry changed). */
     layerlingRedraw?: () => void;
+    /** Build 85: the view's look - the workplane, no workplane, or Meshmixer's dark background. */
+    layerlingViewLook?: (look: ViewLook) => void;
     /** Build 73: the camera's ray through a page point (client pixels), in the world. */
     layerlingScreenRay?: (x: number, y: number) => { origin: [number, number, number]; direction: [number, number, number] } | null;
     /** Fork (build 53): where the camera is, in the world. */
@@ -9340,6 +9343,9 @@ export function WorkplaneViewport({
       state.needsRender = true;
     };
     window.layerlingRedraw = () => { const state = threeRef.current; if (state) state.needsRender = true; };
+    viewLook = readViewLook();
+    applyViewLook(threeRef.current);
+    window.layerlingViewLook = (look) => { viewLook = look; applyViewLook(threeRef.current); };
     window.layerlingScreenRay = (x, y) => {
       const state = threeRef.current;
       if (!state) return null;
@@ -9358,7 +9364,7 @@ export function WorkplaneViewport({
       if (state && id) state.scene.traverse((object) => { if (object !== mesh && object.userData.shapeId === id && object.visible) showing += 1; });
       return { drawn: Boolean(mesh), inScene: Boolean(mesh?.parent), hidden: hidden.length, showing, triangles: mesh ? (mesh.geometry.getAttribute("position") as THREE.BufferAttribute).count / 3 : 0 };
     };
-    return () => { clear(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingRedraw; delete window.layerlingScreenRay; };
+    return () => { clear(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingRedraw; delete window.layerlingViewLook; delete window.layerlingScreenRay; };
   }, []);
   // Fork (build 53): Dental Studio's tooth area, tinted over the scan while it is being designated.
   useEffect(() => {
@@ -11513,6 +11519,44 @@ function refreshFrozenObjectMatrix(object: THREE.Object3D) {
   object.updateMatrixWorld(true);
 }
 
+/**
+ * Build 85: the look of the view, as the three-way switch at the top of the window sets it - the
+ * workplane (the plate and its grid), no workplane (the same light background, nothing under the
+ * parts), or Meshmixer's look: a dark grey background with a light that follows the camera, so a scan's
+ * surface reads as it does in Meshmixer whichever way it is turned.
+ */
+let viewLook: ViewLook = "plate";
+const MESHMIXER_BACKGROUND = "#3e3d3b";
+const baseLight = new WeakMap<object, { ambient: number; key: number; fill: number; background: string }>();
+function applyViewLook(state: ThreeState | null) {
+  if (!state) return;
+  const base = baseLight.get(state);
+  if (!base) return;
+  state.workplaneLayer.visible = viewLook === "plate";
+  const dark = viewLook === "dark";
+  state.scene.background = new THREE.Color(dark ? MESHMIXER_BACKGROUND : base.background);
+  state.lights.ambient.intensity = base.ambient * (dark ? 0.55 : 1);
+  state.lights.key.intensity = base.key * (dark ? 0.35 : 1);
+  state.lights.fill.intensity = base.fill * (dark ? 0.3 : 1);
+  let head = state.scene.getObjectByName("ViewHeadlight") as THREE.DirectionalLight | undefined;
+  if (!head && dark) {
+    head = new THREE.DirectionalLight("#ffffff", 2.6);
+    head.name = "ViewHeadlight";
+    state.scene.add(head, head.target);
+  }
+  if (head) head.visible = dark;
+  state.needsRender = true;
+}
+/** Before each frame: the headlight where the camera is, aimed where it looks. */
+function placeHeadlight(state: ThreeState) {
+  if (viewLook !== "dark") return;
+  const head = state.scene.getObjectByName("ViewHeadlight") as THREE.DirectionalLight | undefined;
+  if (!head) return;
+  head.position.copy(state.camera.position);
+  head.target.position.copy(state.controls.target);
+  head.target.updateMatrixWorld();
+}
+
 function rebuildWorkplane(
   state: ThreeState | null,
   workspace: WorkspaceSettings,
@@ -11546,6 +11590,8 @@ function rebuildWorkplane(
   // The fill light stays opposite the main light, so the side facing away is not left black.
   const fillPosition = fillLightPosition(workspace.lightAzimuth);
   state.lights.fill.position.set(fillPosition.x, fillPosition.y, fillPosition.z);
+  baseLight.set(state, { ambient: lightLevels.ambient, key: lightLevels.key, fill: lightLevels.fill, background: palette.sceneBackground });
+  applyViewLook(state);
   state.needsRender = true;
   state.controls.zoomSpeed = orbitControlsZoomSpeed(workspace.zoomSpeed);
 
@@ -12340,6 +12386,7 @@ function drawCutPreviews(state: ThreeState) {
 }
 
 function renderFrame(state: ThreeState) {
+  placeHeadlight(state);
   state.renderer.render(state.scene, state.camera);
   drawCutPreviews(state);
 }
@@ -14326,6 +14373,11 @@ function holeOpacity(shape: WorkplaneShape) {
   return shape.importedMesh ? 0.34 : 0.52;
 }
 
+/** Build 85: an imported mesh (a scan) a little glossy, as Meshmixer draws one, so its surface reads. */
+function shapeRoughness(shape: WorkplaneShape) {
+  return shape.hole ? 0.88 : shape.importedMesh ? 0.36 : 0.57;
+}
+
 function sharedShapeMaterial(shape: WorkplaneShape, vertexColors = false) {
   const seeThrough = !shape.hole && Boolean(shape.transparent);
   const color = shape.hole ? (strongHoles ? STRONG_HOLE_COLOR : "#b7c0c9") : vertexColors ? "#ffffff" : shape.color;
@@ -14334,7 +14386,7 @@ function sharedShapeMaterial(shape: WorkplaneShape, vertexColors = false) {
     vertexColors,
     transparent: Boolean(shape.hole) || seeThrough,
     opacity: shape.hole ? holeOpacity(shape) : seeThrough ? TRANSPARENT_SOLID_OPACITY : 1,
-    roughness: shape.hole ? 0.88 : 0.57,
+    roughness: shapeRoughness(shape),
     depthWrite: !seeThrough,
     side: "double",
   });
@@ -14349,7 +14401,7 @@ function sharedShapeMaterial(shape: WorkplaneShape, vertexColors = false) {
     vertexColors,
     transparent: Boolean(shape.hole) || seeThrough,
     opacity: shape.hole ? holeOpacity(shape) : seeThrough ? TRANSPARENT_SOLID_OPACITY : 1,
-    roughness: shape.hole ? 0.88 : 0.57,
+    roughness: shapeRoughness(shape),
     metalness: 0.02,
     depthWrite: !seeThrough,
     side: THREE.DoubleSide,

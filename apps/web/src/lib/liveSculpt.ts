@@ -179,10 +179,24 @@ export class LiveMesh {
     }
   }
   /** The triangles round the given corners put in their grid cells again, each once. */
-  private rebin(corners: number[]) {
-    const seen = new Set<number>();
-    for (const v of corners) for (const t of this.vTris[v]) if (!seen.has(t)) { seen.add(t); this.binTriangle(t); }
+  private rebin(corners: ArrayLike<number>, count = corners.length) {
+    // Build 85: each triangle once, by a stamp per triangle rather than a set made on every dab.
+    if (this.binMark.length < this.tri.length / 3) this.binMark = new Int32Array(this.tri.length / 3);
+    const mark = this.binMark, stamp = ++this.binStamp;
+    for (let i = 0; i < count; i += 1) for (const t of this.vTris[corners[i]]) if (mark[t] !== stamp) { mark[t] = stamp; this.binTriangle(t); }
   }
+  private binMark = new Int32Array(0);
+  private binStamp = 0;
+  /** Build 85: scratch for the brushes, kept between dabs so a stroke makes next to no garbage. */
+  private faceScratch = new THREE.Vector3();
+  private normalMark = new Int32Array(0);
+  private normalStamp = 0;
+  private normalList = new Int32Array(4096);
+  private dabN = new THREE.Vector3();
+  private dabArea = new THREE.Vector3();
+  private dabCen = new THREE.Vector3();
+  private dabMoves = new Float64Array(4096);
+  private dabCorners = new Int32Array(1024);
   /** After a corner moved: its grid cell, and the cells of its triangles. */
   private moved(v: number) {
     if (this.bulk) { this.dirtyV.add(v); return; }
@@ -307,6 +321,7 @@ export class LiveMesh {
   }
   /** Puts the corners and triangles a patch lists back as it has them. */
   applyPatch(patch: LivePatch) {
+    this.box = null;
     // Past the patch's counts: gone.
     for (let t = patch.tCount; t < this.tCount; t += 1) if (this.tAlive[t]) this.removeTriangle(t);
     for (let v = patch.vCount; v < this.vCount; v += 1) {
@@ -439,8 +454,9 @@ export class LiveMesh {
 
   /** Whole-part work (Remesh, Offset): the grids are left alone while it runs and made again once at the end. */
   private bulk = false;
-  beginBulk() { this.bulk = true; }
+  beginBulk() { this.bulk = true; this.box = null; }
   endBulk() {
+    this.box = null;
     this.bulk = false;
     let edge = 0, n = 0;
     for (let t = 0; t < this.tCount && n < 20000; t += Math.max(1, Math.floor(this.tCount / 20000))) if (this.tAlive[t]) { edge += this.dist(this.tri[t * 3], this.tri[t * 3 + 1]); n += 1; }
@@ -512,7 +528,7 @@ export class LiveMesh {
   /** Area-weighted unit normal at v. */
   vertexNormal(v: number, out = new THREE.Vector3()) {
     out.set(0, 0, 0);
-    const n = new THREE.Vector3();
+    const n = this.faceScratch;
     for (const t of this.vTris[v]) out.add(this.faceNormal(t, n));
     return out.lengthSq() > 0 ? out.normalize() : out.set(0, 0, 1);
   }
@@ -534,6 +550,7 @@ export class LiveMesh {
     this.geometry.setAttribute("normal", this.gNrm);
     this.geometry.setIndex(this.gIdx);
     this.geometry.setDrawRange(0, this.tCount * 3);
+    this.growBox(this.dirtyV);
     this.dirtyV.clear(); this.dirtyT.clear();
   }
   private refreshAllNormals() {
@@ -546,11 +563,21 @@ export class LiveMesh {
   flushGpu() {
     if (!this.dirtyV.size && !this.dirtyT.size) return false;
     // Normals of the changed corners and of their neighbours (their fans changed).
-    const normalSet = new Set<number>();
-    for (const v of this.dirtyV) { if (!this.vAlive[v]) continue; normalSet.add(v); for (const t of this.vTris[v]) for (let k = 0; k < 3; k += 1) normalSet.add(this.tri[t * 3 + k]); }
-    for (const t of this.dirtyT) for (let k = 0; k < 3; k += 1) normalSet.add(this.tri[t * 3 + k]);
+    // Build 85: each corner once, by a stamp per corner, into a list kept between frames.
+    if (this.normalMark.length < this.pos.length / 3) this.normalMark = new Int32Array(this.pos.length / 3);
+    const mark = this.normalMark, stamp = ++this.normalStamp;
+    let list = this.normalList, count = 0;
+    const add = (v: number) => {
+      if (mark[v] === stamp) return;
+      mark[v] = stamp;
+      if (count === list.length) { const next = new Int32Array(list.length * 2); next.set(list); list = this.normalList = next; }
+      list[count++] = v;
+    };
+    for (const v of this.dirtyV) { if (!this.vAlive[v]) continue; add(v); for (const t of this.vTris[v]) for (let k = 0; k < 3; k += 1) add(this.tri[t * 3 + k]); }
+    for (const t of this.dirtyT) for (let k = 0; k < 3; k += 1) add(this.tri[t * 3 + k]);
+    const normalSet = list.subarray(0, count);
     const p = this.gPos.array as Float32Array, nArr = this.gNrm.array as Float32Array, idx = this.gIdx.array as Uint32Array;
-    const n = new THREE.Vector3();
+    const n = this.dabN;
     for (const v of this.dirtyV) { p[v * 3] = this.pos[v * 3]; p[v * 3 + 1] = this.pos[v * 3 + 1]; p[v * 3 + 2] = this.pos[v * 3 + 2]; }
     for (const v of normalSet) { if (!this.vAlive[v]) continue; this.vertexNormal(v, n); nArr[v * 3] = n.x; nArr[v * 3 + 1] = n.y; nArr[v * 3 + 2] = n.z; }
     for (const t of this.dirtyT) {
@@ -558,7 +585,7 @@ export class LiveMesh {
       else { idx[t * 3] = 0; idx[t * 3 + 1] = 0; idx[t * 3 + 2] = 0; }
     }
     const ranges = (set: Iterable<number>, attribute: THREE.BufferAttribute, width: number) => {
-      const sorted = Float64Array.from(set).sort();
+      const sorted = Int32Array.from(set).sort();
       attribute.clearUpdateRanges();
       let start = -1, end = -1;
       for (const i of sorted) {
@@ -587,12 +614,14 @@ export class LiveMesh {
     const h = this.tGrid.h;
     const d = new THREE.Vector3(...direction).normalize();
     // Start where the ray enters the mesh's box.
-    const box = this.bounds();
+    const box = this.pickBounds();
     const ray = new THREE.Ray(new THREE.Vector3(...origin), d);
     const enter = ray.intersectBox(new THREE.Box3(new THREE.Vector3(...box.min).subScalar(h), new THREE.Vector3(...box.max).addScalar(h)), new THREE.Vector3());
     if (!enter) return null;
     let s = enter.distanceTo(ray.origin);
-    const tested = new Set<number>();
+    // Triangles already tried, by a stamp per triangle instead of a set made on every pick.
+    if (this.pickMark.length < this.tri.length / 3) this.pickMark = new Int32Array(this.tri.length / 3);
+    const mark = this.pickMark, stamp = ++this.pickStamp;
     let best: { point: Vec3; triangle: number; t: number } | null = null;
     const steps = Math.ceil((new THREE.Vector3(...box.max).sub(new THREE.Vector3(...box.min)).length() + 4 * h) / (h * 0.5)) + 4;
     const p = new THREE.Vector3();
@@ -603,8 +632,8 @@ export class LiveMesh {
         const list = this.tGrid.cells.get(this.tGrid.key(cx + ox, cy + oy, cz + oz));
         if (!list) continue;
         for (const t of list) {
-          if (tested.has(t)) continue;
-          tested.add(t);
+          if (mark[t] === stamp) continue;
+          mark[t] = stamp;
           const hit = this.rayTriangle(origin, [d.x, d.y, d.z], t);
           if (hit !== null && (!best || hit < best.t)) best = { t: hit, triangle: t, point: [origin[0] + d.x * hit, origin[1] + d.y * hit, origin[2] + d.z * hit] };
         }
@@ -631,6 +660,27 @@ export class LiveMesh {
     if (v < 0 || u + v > 1) return null;
     const dist = (e2x * qx + e2y * qy + e2z * qz) * inv;
     return dist > 1e-9 ? dist : null;
+  }
+  /**
+   * Build 85: the box picking starts from, kept as corners move instead of found afresh by walking
+   * every corner of the mesh on every dab (that walk was most of a dab's time on a full-arch scan).
+   * It only grows while a stroke goes on - a box a little too big costs a step or two of the ray.
+   */
+  private box: { min: Vec3; max: Vec3 } | null = null;
+  private pickMark = new Int32Array(0);
+  private pickStamp = 0;
+  private growBox(corners: Iterable<number>) {
+    const box = this.box;
+    if (!box) return;
+    for (const v of corners) {
+      if (!this.vAlive[v]) continue;
+      for (let k = 0; k < 3; k += 1) { const x = this.pos[v * 3 + k]; if (x < box.min[k]) box.min[k] = x; if (x > box.max[k]) box.max[k] = x; }
+    }
+  }
+  pickBounds() {
+    if (!this.box) { const b = this.bounds(); this.box = { min: [...b.min] as Vec3, max: [...b.max] as Vec3 }; }
+    else this.growBox(this.dirtyV);
+    return this.box;
   }
   bounds() {
     const min: Vec3 = [Infinity, Infinity, Infinity], max: Vec3 = [-Infinity, -Infinity, -Infinity];
@@ -699,10 +749,10 @@ export class LiveMesh {
     if (!region.size) return;
     const weight = (d: number) => { const x = 1 - (d / radius) ** 2; return x > 0 ? x * x * strength : 0; };
     const p = this.pos;
-    const n = new THREE.Vector3();
+    const n = this.dabN;
     // The brush's own facing: the weighted normal of what it covers.
-    const area = new THREE.Vector3();
-    const cen = new THREE.Vector3();
+    const area = this.dabArea.set(0, 0, 0);
+    const cen = this.dabCen.set(0, 0, 0);
     let total = 0;
     for (const [v, d] of region) {
       const w = weight(d);
@@ -716,7 +766,10 @@ export class LiveMesh {
     if (area.lengthSq() < 1e-12) area.set(...normal);
     area.normalize();
     // Moves are worked out from the positions before the dab, then applied together.
-    const moves: Array<[number, number, number, number]> = [];
+    if (this.dabMoves.length < region.size * 3) this.dabMoves = new Float64Array(region.size * 6);
+    if (this.dabCorners.length < region.size) this.dabCorners = new Int32Array(region.size * 2);
+    const moves = this.dabMoves, corners = this.dabCorners;
+    let count = 0;
     for (const [v, d] of region) {
       const w = weight(d);
       if (!w) continue;
@@ -748,14 +801,16 @@ export class LiveMesh {
         const s = brush === "inflate" ? step : -step;
         dx = n.x * s * w; dy = n.y * s * w; dz = n.z * s * w;
       }
-      moves.push([v, dx, dy, dz]);
+      corners[count] = v; moves[count * 3] = dx; moves[count * 3 + 1] = dy; moves[count * 3 + 2] = dz;
+      count += 1;
     }
-    for (const [v, dx, dy, dz] of moves) { p[v * 3] += dx; p[v * 3 + 1] += dy; p[v * 3 + 2] += dz; this.moved(v); }
-    this.rebin(moves.map((m) => m[0]));
+    for (let i = 0; i < count; i += 1) { const v = corners[i]; p[v * 3] += moves[i * 3]; p[v * 3 + 1] += moves[i * 3 + 1]; p[v * 3 + 2] += moves[i * 3 + 2]; this.moved(v); }
+    this.rebin(corners, count);
   }
 
   /** Puts corners back where they were (undo of a stroke that only moved corners). */
   setPositions(corners: ArrayLike<number>, values: ArrayLike<number>) {
+    this.box = null;
     const moved: number[] = [];
     for (let k = 0; k < corners.length; k += 1) {
       const v = corners[k];
@@ -896,7 +951,7 @@ export class LiveMesh {
    * Keeps the triangles touching `corners` near `target` edge length: splits, collapses, flips, then a
    * relax along the surface. `project` (optional) puts a moved corner back onto a surface. Bounded work.
    */
-  refine(corners: Iterable<number>, target: number, options: { relax?: boolean; project?: (p: THREE.Vector3) => void; budget?: number; fixed?: (v: number) => boolean; within?: { centre: Vec3; radius: number }; milliseconds?: number; creaseAngle?: number; collapseBelow?: number } = {}) {
+  refine(corners: Iterable<number>, target: number, options: { relax?: boolean; project?: (p: THREE.Vector3) => void; budget?: number; fixed?: (v: number) => boolean; within?: { centre: Vec3; radius: number }; milliseconds?: number; creaseAngle?: number; collapseBelow?: number; /** Build 85: flip and relax even when nothing was split or collapsed (Remesh). */ always?: boolean } = {}) {
     // Sharp edges (faces meeting at more than `creaseAngle` degrees) are kept, as in VCG's isotropic
     // remeshing (MeshLab): never flipped, collapsed only along their line, and their corners slide only
     // along it; where three or more meet (a box's corner) the corner stays put.
@@ -953,6 +1008,7 @@ export class LiveMesh {
     const queue: Array<[number, number]> = order.map((k) => [long[k * 2], long[k * 2 + 1]]);
     // A guard against a run-away: never more splits in one call than eight per corner it started with.
     work = Math.min(work, Math.max(256, region.size * 8));
+    const startWork = work;
     for (let q = 0; q < queue.length && work > 0; q += 1) {
       if ((q & 31) === 0 && late()) break;
       const [a, b] = queue[q];
@@ -994,6 +1050,10 @@ export class LiveMesh {
       }
       if (this.collapseEdge(a, b, hi)) { work -= 1; region.delete(b); }
     }
+    // Build 85: as Meshmixer's refinement - when nothing under the brush was split or collapsed, the
+    // triangles are as they were after the last dab: flipping and relaxing them again every frame was
+    // most of a refining stroke's time and changed nothing a person could see.
+    if (options.always !== true && work === startWork) return region;
     // Flip towards six neighbours a corner.
     const all = late() ? [] : edgesOf();
     for (let e = 0; e < all.length; e += 2) {
@@ -1225,7 +1285,7 @@ function remeshPasses(mesh: LiveMesh, edge: number, passes: number, project: (p:
   for (let pass = 0; pass < passes; pass += 1) {
     const all: number[] = [];
     for (let v = 0; v < mesh.vCount; v += 1) if (mesh.vAlive[v]) all.push(v);
-    mesh.refine(all, edge, { project, budget: Number.MAX_SAFE_INTEGER, fixed: (v) => mesh.onBoundary(v), creaseAngle: REMESH_CREASE_ANGLE });
+    mesh.refine(all, edge, { project, budget: Number.MAX_SAFE_INTEGER, fixed: (v) => mesh.onBoundary(v), creaseAngle: REMESH_CREASE_ANGLE, always: true });
     onProgress?.((pass + 1) / passes);
   }
 }

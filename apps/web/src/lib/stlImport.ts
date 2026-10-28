@@ -5,6 +5,9 @@ import { createLocalId } from "@/lib/localIds";
 import { zUpToLayerling } from "@/lib/meshCoordinates";
 import type { WorkplaneShape } from "@/types/layerling";
 
+/** Build 85: the colour an imported STL takes - Meshmixer's light grey (it was the import blue). */
+export const SCAN_GREY = "#d2d2d2";
+
 const stlLoader = new STLLoader();
 const SUPPORTED_IMPORT_EXTENSIONS = new Set(["stl", "svg"]);
 
@@ -96,7 +99,8 @@ export function importedShapeFromTriangleSoup(
     id: createLocalId("uploaded-mesh"),
     name: fileName.replace(/\.[^.]+$/, "") || `Imported ${sourceFormat.toUpperCase()}`,
     kind: "mesh",
-    color: "#0098c7",
+    // Build 85: Meshmixer's light grey, so a scan's surface reads as it does there.
+    color: SCAN_GREY,
     x: 10,
     z: -10,
     size: Math.max(width, depth),

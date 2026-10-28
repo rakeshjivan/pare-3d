@@ -76,6 +76,7 @@ import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOO
 import { Import, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, Type, Variable } from "lucide-react";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { SimpleModeSwitch } from "@/components/SimpleModeSwitch";
+import { ViewLookSwitch } from "@/components/ViewLookSwitch";
 import { libraryShapeAssets, shapeAssetColor, shapeAssetLabel, shapeAssetMenuLabel } from "@/lib/shapeCatalog";
 import type { CadModifierKind } from "@/lib/cadModifierTypes";
 import type { ShapeAsset, SketchOperation, WorkplaneWorkspaceSettings } from "@/types/layerling";
@@ -1789,6 +1790,7 @@ export function SecondaryToolbar({
             </div>
             </div>
           ) : null}
+          <ViewLookSwitch />
           <SimpleModeSwitch />
           <InstantTips />
           <ThemeSwitch />

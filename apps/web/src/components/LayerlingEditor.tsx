@@ -215,7 +215,7 @@ import {
   type LylFileHandle,
 } from "@/lib/lylFileAccess";
 import { displayShapeName, iconTagAsset, qrCodeAsset, libraryShapeAssets, makeShapeFromAsset, nameTagAsset, shapeAssetLabel, toolbarShapeAssets } from "@/lib/shapeCatalog";
-import { importedShapeFromStl } from "@/lib/stlImport";
+import { importedShapeFromStl, SCAN_GREY } from "@/lib/stlImport";
 import { exportMeshesToStl } from "@/lib/stlExport";
 import { THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
@@ -8965,6 +8965,10 @@ export function LayerlingEditor({
   const [sculptTool, setSculptTool] = useState<{ editAmount?: number; selectShape?: "brush" | "lasso"; shapeId: string; tool: SculptTool | null; size: number; strength: number; reach: SelectReach; chosen: number; refine: SculptRefine; symmetry: SculptSymmetry; remeshMode: RemeshMode; detail: number; amount: number; busy: boolean; error: string | null; preparing?: boolean; trim?: boolean; teethHit?: number; teethWarned?: number; teethAction?: SculptSelectionAction; panelSteps?: number; panelRedo?: number } | null>(null);
   /** Build 76: bumped when a stroke is added or stepped back, so Undo and Redo show what they can do. */
   const [, setSculptSteps] = useState(0);
+  // Build 85: the speed readout (the ` key in Sculpt): the last stroke's frames, timed.
+  const [sculptSpeedShown, setSculptSpeedShown] = useState(() => { try { return window.localStorage.getItem("pare3d.sculptSpeed") === "on"; } catch { return false; } });
+  const [sculptSpeed, setSculptSpeed] = useState<SculptSpeed | null>(null);
+  const speedTrack = useRef<{ id: number; last: number; frames: number; longest: number; started: number; from: number } | null>(null);
   const sculptToolRef = useRef(sculptTool);
   const ensureDentalAreasRef = useRef<(force?: "upper" | "lower") => Promise<void>>(async () => {});
   sculptToolRef.current = sculptTool;
@@ -9158,7 +9162,7 @@ export function LayerlingEditor({
     list.push([kind, Math.round(work * 10) / 10, Math.round(gpu * 10) / 10, sculptState.current?.live.triangleCount() ?? 0]);
     if (list.length > 400) list.splice(0, list.length - 400);
   };
-  const sculptFrame = () => {
+  const sculptFrame = (drain = false) => {
     const stroke = sculptStroke.current;
     const state = sculptState.current;
     if (!stroke || !state) return;
@@ -9188,18 +9192,29 @@ export function LayerlingEditor({
         }
       }
     } else {
-      // Dabs a fifth of the brush apart along the path.
+      // Dabs a fifth of the brush apart along the path, evenly: the part of a step left over at the end of
+      // one pointer move carries into the next (build 85; each move used to be cut into whole steps of its
+      // own, so dabs bunched or spread with the speed). Past this frame's time the rest waits for the next
+      // frame instead of being dropped, so a quick stroke trails a frame but never leaves gaps.
       const spacing = Math.max(2, stroke.sizePx * 0.2);
-      for (const [x, y] of pending) {
-        const [lx, ly] = stroke.last ?? [x, y];
-        const length = Math.hypot(x - lx, y - ly);
-        if (stroke.last && length < spacing) continue;
-        const count = stroke.last ? Math.max(1, Math.floor(length / spacing)) : 1;
-        for (let k = 1; k <= count; k += 1) {
-          sculptDab(stroke, lx + ((x - lx) * k) / count, ly + ((y - ly) * k) / count);
-          if (performance.now() - started > 24) break;
+      const budget = drain ? Infinity : 12;
+      let i = 0, outOfTime = false;
+      for (; i < pending.length && !outOfTime; i += 1) {
+        const [x, y] = pending[i];
+        if (!stroke.last) { sculptDab(stroke, x, y); stroke.last = [x, y]; continue; }
+        let [lx, ly] = stroke.last;
+        let length = Math.hypot(x - lx, y - ly);
+        while (length >= spacing) {
+          lx += ((x - lx) * spacing) / length; ly += ((y - ly) * spacing) / length;
+          sculptDab(stroke, lx, ly);
+          stroke.last = [lx, ly];
+          length -= spacing;
+          if (performance.now() - started > budget) { outOfTime = length >= spacing; break; }
         }
-        stroke.last = [x, y];
+      }
+      if (outOfTime) {
+        stroke.pending = pending.slice(i - 1).concat(stroke.pending);
+        if (!stroke.frame) stroke.frame = requestAnimationFrame(() => sculptFrame());
       }
       sculptRefineBalls(stroke, Math.max(2, 14 - (performance.now() - started)));
     }
@@ -9241,6 +9256,15 @@ export function LayerlingEditor({
     }
     sculptStroke.current = stroke;
     sculptStat("start", performance.now() - opened, 0);
+    // Build 85: the frames drawn during the stroke, for the speed readout.
+    {
+      if (speedTrack.current) cancelAnimationFrame(speedTrack.current.id);
+      const now = performance.now();
+      const track = { id: 0, last: now, frames: 0, longest: 0, started: now, from: ((window as unknown as { layerlingSculptStats?: unknown[] }).layerlingSculptStats ?? []).length - 1 };
+      const tick = (time: number) => { track.longest = Math.max(track.longest, time - track.last); track.last = time; track.frames += 1; track.id = requestAnimationFrame(tick); };
+      track.id = requestAnimationFrame(tick);
+      speedTrack.current = track;
+    }
     stroke.pending.push([x, y]);
     sculptFrame();
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -9248,7 +9272,7 @@ export function LayerlingEditor({
     const stroke = sculptStroke.current;
     if (!stroke) return;
     stroke.pending.push([x, y]);
-    if (!stroke.frame) stroke.frame = requestAnimationFrame(sculptFrame);
+    if (!stroke.frame) stroke.frame = requestAnimationFrame(() => sculptFrame());
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const endSculptStroke = useCallback(() => {
     const stroke = sculptStroke.current;
@@ -9257,7 +9281,7 @@ export function LayerlingEditor({
     if (!stroke || !state) return;
     if (stroke.frame) cancelAnimationFrame(stroke.frame);
     sculptStroke.current = stroke;
-    sculptFrame();
+    sculptFrame(true);
     sculptStroke.current = null;
     const ending = performance.now();
     // Move stretches the surface: the triangles it pulled are evened out once it lets go.
@@ -9270,7 +9294,7 @@ export function LayerlingEditor({
         // Round where those corners are now (they moved with the cursor).
         const centre: Vec3 = [0, 0, 0];
         for (const v of corners) { centre[0] += state.live.pos[v * 3] / corners.length; centre[1] += state.live.pos[v * 3 + 1] / corners.length; centre[2] += state.live.pos[v * 3 + 2] / corners.length; }
-        state.live.refine(corners, Math.max(0.03, stroke.grab.radius * factor), { within: { centre, radius: reach }, budget: 20000, milliseconds: 300, collapseBelow: state.baseEdge * 0.5 });
+        state.live.refine(corners, Math.max(0.03, stroke.grab.radius * factor), { within: { centre, radius: reach }, budget: 20000, milliseconds: 300, collapseBelow: state.baseEdge * 0.5, always: true });
       }
       if (state.live.flushGpu()) window.layerlingRedraw?.();
     }
@@ -9286,6 +9310,24 @@ export function LayerlingEditor({
     state.lastBrush = stroke.brush;
     setSculptSteps((n) => n + 1);
     sculptStat("end", performance.now() - ending, 0);
+    if (speedTrack.current) {
+      const track = speedTrack.current;
+      cancelAnimationFrame(track.id);
+      speedTrack.current = null;
+      const stats = ((window as unknown as { layerlingSculptStats?: Array<[string, number, number, number]> }).layerlingSculptStats ?? []).slice(Math.max(0, track.from));
+      const frames = stats.filter((row) => row[0] === "frame");
+      const seconds = (performance.now() - track.started) / 1000;
+      setSculptSpeed({
+        brush: stroke.brush, refine: stroke.refine, seconds,
+        fps: seconds > 0 ? track.frames / seconds : 0,
+        longest: track.longest,
+        work: frames.length ? frames.reduce((sum, row) => sum + row[1], 0) / frames.length : 0,
+        workMost: frames.reduce((most, row) => Math.max(most, row[1]), 0),
+        gpu: frames.length ? frames.reduce((sum, row) => sum + row[2], 0) / frames.length : 0,
+        end: stats.find((row) => row[0] === "end")?.[1] ?? 0,
+        triangles: state.live.triangleCount(),
+      });
+    }
     // A selection is of triangles: one the stroke re-made is gone.
     if (state.selection) {
       if (state.live.topologyEdits !== stroke.edits) { const had = state.selection.chosen.some((c) => c); state.selection = null; if (had) { setSculptTool((current) => current ? { ...current, chosen: 0 } : current); setNotice(t("sculpt.selectionGone")); } }
@@ -9520,6 +9562,12 @@ export function LayerlingEditor({
       if (selectKey) {
         event.preventDefault(); event.stopPropagation();
         applySculptSelectionRef.current(selectKey);
+        return;
+      }
+      // Build 85: ` shows or hides the speed readout.
+      if (event.key === "`" && !event.ctrlKey && !event.metaKey && !(event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable=true]")) {
+        event.preventDefault();
+        setSculptSpeedShown((shown) => { try { window.localStorage.setItem("pare3d.sculptSpeed", shown ? "off" : "on"); } catch { /* this visit */ } return !shown; });
         return;
       }
       // Build 82: [ and ] make the brush smaller and larger, as in Meshmixer.
@@ -9789,7 +9837,8 @@ export function LayerlingEditor({
    * the scans: the bite is kept in their frames. The bite scan is hidden (it is only for the fit).
    */
   /** Build 79: the colour arch scans take in Dental Studio (and the models made from them), and the import default they replace. */
-  const DENTAL_SCAN_GREY = "#919191";
+  // Build 85: Meshmixer's light grey (it was #919191), the same as an imported STL now takes.
+  const DENTAL_SCAN_GREY = SCAN_GREY;
   const IMPORT_BLUE = "#0098c7";
   const arrangedDentalScans = (mode: "side" | "occlusion", analysis: DentalAnalysis, slots: Record<DentalSlot, string | null>, changed: Map<string, WorkplaneShape>): Map<string, WorkplaneShape> => {
     const out = new Map(changed);
@@ -9814,7 +9863,7 @@ export function LayerlingEditor({
     placed.forEach(({ arch, shape, place }, i) => {
       const fields = placementFor(shape, new THREE.Matrix4().makeTranslation(shift(boxes[i], arch.role)).multiply(place));
       // Build 79: the arch scans turn model grey (unless given a colour of their own); the bite scan keeps the import blue.
-      const color = !shape.color || shape.color.toLowerCase() === IMPORT_BLUE ? DENTAL_SCAN_GREY : shape.color;
+      const color = !shape.color || shape.color.toLowerCase() === IMPORT_BLUE || shape.color.toLowerCase() === "#919191" ? DENTAL_SCAN_GREY : shape.color;
       if (fields) out.set(shape.id, canonicalizeShape({ ...shape, ...fields, color }));
     });
     for (const slot of ["bite", "bite2"] as const) {
@@ -16960,6 +17009,22 @@ export function LayerlingEditor({
           live={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : { start: startSculptStroke, move: moveSculptStroke, end: endSculptStroke }}
         />
       ) : null}
+      {sculptTool && sculptSpeedShown ? (
+        <div className="sculpt-speed" role="status" aria-live="polite">
+          <strong>{t("sculpt.speed.title")}</strong>
+          {sculptSpeed ? (
+            <dl>
+              <dt>{t("sculpt.speed.fps")}</dt><dd>{Math.round(sculptSpeed.fps)}</dd>
+              <dt>{t("sculpt.speed.longest")}</dt><dd>{Math.round(sculptSpeed.longest)} ms</dd>
+              <dt>{t("sculpt.speed.work")}</dt><dd>{sculptSpeed.work.toFixed(1)} ms ({t("sculpt.speed.most", { ms: Math.round(sculptSpeed.workMost) })})</dd>
+              <dt>{t("sculpt.speed.gpu")}</dt><dd>{sculptSpeed.gpu.toFixed(1)} ms</dd>
+              <dt>{t("sculpt.speed.end")}</dt><dd>{Math.round(sculptSpeed.end)} ms</dd>
+              <dt>{t("sculpt.speed.triangles")}</dt><dd>{sculptSpeed.triangles.toLocaleString()}</dd>
+              <dt>{t("sculpt.speed.brush")}</dt><dd>{t(`sculpt.tool.${sculptSpeed.brush}` as MessageKey)} · {t(`sculpt.refine.${sculptSpeed.refine}` as MessageKey)} · {sculptSpeed.seconds.toFixed(1)} s</dd>
+            </dl>
+          ) : <p>{t("sculpt.speed.none")}</p>}
+        </div>
+      ) : null}
       {textureTool ? (
         <SurfaceTexturePanel
           targetName={displayShapeName(shapes.find((shape) => shape.id === textureTool.shapeId) ?? ({ name: "" } as WorkplaneShape))}
@@ -17266,6 +17331,8 @@ type SculptSession = {
   undo: SculptUndo[];
   redo: SculptUndo[];
 };
+/** Build 85: the speed readout's figures for the last stroke. */
+type SculptSpeed = { brush: LiveBrush; refine: SculptRefine; seconds: number; fps: number; longest: number; work: number; workMost: number; gpu: number; end: number; triangles: number };
 type SculptStroke = {
   brush: LiveBrush;
   sizePx: number;

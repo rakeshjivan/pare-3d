@@ -1954,3 +1954,18 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .dental-made { display: grid; gap: 8px; padding: 4px 0; }
 .dental-made .dental-status svg { vertical-align: -2px; color: var(--ok, #2e7d32); }
 .waxup-table td.warn { color: var(--warn, #b45309); font-weight: 600; }
+
+/* Build 85: the view's look - workplane, no workplane, dark (Meshmixer). */
+.view-look-switch { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--line, #d7dde2); border-radius: 8px; margin-right: 6px; }
+.view-look-switch button { display: inline-grid; place-items: center; width: 26px; height: 22px; border: 0; border-radius: 6px; background: transparent; color: var(--muted, #6b7780); cursor: pointer; }
+.view-look-switch button svg { width: 15px; height: 15px; }
+.view-look-switch button:hover { background: var(--subbar); }
+.view-look-switch button.active { background: var(--primary); color: #fff; }
+
+/* Build 85: Sculpt's speed readout. */
+.sculpt-speed { position: fixed; left: 72px; bottom: 44px; z-index: 40; min-width: 250px; padding: 8px 10px; border-radius: 8px; background: rgba(20, 24, 28, 0.86); color: #f2f5f7; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; pointer-events: none; }
+.sculpt-speed strong { display: block; margin-bottom: 4px; font-family: inherit; }
+.sculpt-speed dl { display: grid; grid-template-columns: auto auto; gap: 1px 12px; margin: 0; }
+.sculpt-speed dt { opacity: 0.75; }
+.sculpt-speed dd { margin: 0; text-align: right; }
+.sculpt-speed p { margin: 0; opacity: 0.8; }
