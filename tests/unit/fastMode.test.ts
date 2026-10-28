@@ -29,5 +29,9 @@ describe("camera inertia and fast mode (#188)", () => {
     expect(viewPixelRatio({ fastMode: false }, 3)).toBe(2);
     expect(viewPixelRatio({ fastMode: false }, 1.25)).toBe(1.25);
     expect(viewPixelRatio({ fastMode: false }, 0)).toBe(1);
+    // Build 88: within the pixel budget - a large view on a Retina screen draws at a little under 2.
+    expect(viewPixelRatio({ fastMode: false }, 2, 1200, 800)).toBe(2);
+    expect(viewPixelRatio({ fastMode: false }, 2, 1700, 1000)).toBeLessThan(2);
+    expect(viewPixelRatio({ fastMode: false }, 2, 1700, 1000)).toBeGreaterThan(1.4);
   });
 });

@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 88,
+    items: [
+      "Scans look as they do in Meshmixer: a near-white grey with a soft sheen, lit from just above and to the left of your eye, so faces turned to you are bright and creases and hollows fall dark (in the dark look, which Model Builder opens in).",
+      "The 3D view draws no more pixels than it needs, whatever the display setting - with a Mac set to More Space it filled 40% more every frame, and Sculpt lagged.",
+      "Scans brought in with the colours of earlier builds take the new grey when Model Builder lays them out.",
+    ],
+  },
+  {
     build: 87,
     items: [
       "Scans and every other mesh are drawn smooth, as Meshmixer draws them: the light flows across the surface instead of showing every triangle (sharp edges, such as a model's base, stay sharp). Sculpted surfaces look as smooth as they are.",
