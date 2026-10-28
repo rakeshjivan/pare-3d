@@ -89,7 +89,7 @@ export type WaxupActions = {
   onLoadFinder: (file: File) => void;
   onFindTeeth: () => void;
   onChoose: (fdi: number) => void;
-  onChooseGroup: (group: "front" | "front-premolars" | "all" | "none") => void;
+  onChooseGroup: (group: "front" | "front-premolars" | "none") => void;
   onTeethShown: (shown: boolean) => void;
   onFit: (fit: "teeth" | "smile") => void;
   onGhost: (opacity: number) => void;
@@ -160,14 +160,15 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
               <>
                 <p className="blend-hint">{t(view.found.length ? "waxup.foundHint" : "waxup.foundNone", { count: view.found.length })}</p>
                 <div className="waxup-teeth waxup-found" role="group" aria-label={t("waxup.chooseTeeth")}>
-                  {[...view.found].sort((a, b) => archOrder(a.fdi) - archOrder(b.fdi)).map((tooth) => (
+                  {/* Build 94: phase 1 is the anterior wax-up - premolar to premolar at most (IMT's range); molars wait for the posterior studio. */}
+                  {[...view.found].filter((tooth) => tooth.fdi % 10 <= 5).sort((a, b) => archOrder(a.fdi) - archOrder(b.fdi)).map((tooth) => (
                     <button key={tooth.fdi} type="button" aria-pressed={view.chosen.includes(tooth.fdi)} className={`waxup-tooth${view.chosen.includes(tooth.fdi) ? " active" : ""}${tooth.agreed ? "" : " unsure"}`} title={t(tooth.agreed ? "waxup.toothFound" : "waxup.toothRenumbered", { fdi: tooth.fdi })} disabled={working} onClick={() => actions.onChoose(tooth.fdi)}>
                       {tooth.fdi}
                     </button>
                   ))}
                 </div>
                 <div className="dental-trim-buttons waxup-groups">
-                  {(["front", "front-premolars", "all", "none"] as const).map((group) => (
+                  {(["front", "front-premolars", "none"] as const).map((group) => (
                     <button key={group} type="button" className="secondary" disabled={working} onClick={() => actions.onChooseGroup(group)}>{t(`waxup.group.${group}`)}</button>
                   ))}
                 </div>
