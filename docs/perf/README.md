@@ -77,8 +77,8 @@ Found and fixed while setting this up: Remesh on a surface rougher than its tria
 end. A 97,000-triangle part came out at 1.46 million triangles after eight minutes. It is now
 seconds, with a regression test (tests/unit/remeshRunaway82.test.ts).
 
-Watch list (input delay over a second in the browser run):
+Watch list (input delay over a second in the browser run), checked with a CPU profile:
 
-- Undo after a Sculpt stroke on a full-arch scan: 2.8 s
-- Dental Studio import of three scans: 3.3 s
-- opening the editor: 1.6 s
+- **Dental Studio import of three full-arch scans:** 3.3 s of input delay. About 5 s of real main-thread work: welding, hole filling and garbage collection. This is the candidate for moving into a worker.
+- **Undo after a Sculpt stroke on a full-arch scan:** 2.8 s of input delay, but only about 0.4 s of it is script. The rest is software drawing re-uploading the mesh, which a graphics card does at once. Not a problem on a Mac.
+- **Opening the editor:** 1.6 s of input delay, while the scripts load.
