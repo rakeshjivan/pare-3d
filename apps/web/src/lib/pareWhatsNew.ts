@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 91,
+    items: [
+      "Sculpt makes far less garbage for the browser to clear up: a brush gathers the surface under it into the same arrays every time instead of new ones for every dab, and the editor is no longer drawn again after every stroke - the pause when you let go is gone.",
+      "Refining strokes do less work: the triangles a stroke changes are put back in their place in the search grid once, when it is next used, not every time they change.",
+      "Dental Studio holds the page far less while scans come in - about half a second at most instead of two and a half seconds on two full-arch scans.",
+      "Bite contacts & clearance in Dental Studio: with the arches in occlusion, colours both by how far each point is from the other arch (overlap in red, orange and yellow; clearance in green and blues), with the largest overlap and the contact area.",
+    ],
+  },
+  {
     build: 90,
     items: [
       "Freeze in Sculpt (Meshmixer's mask): paint over what the brushes must leave alone and it turns blue - no brush moves it and refining leaves its triangles be. Ctrl frees it again; Freeze selection, Invert freeze and Clear freeze in the panel.",

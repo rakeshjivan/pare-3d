@@ -8967,6 +8967,8 @@ export function LayerlingEditor({
   const [, setSculptSteps] = useState(0);
   // Build 85: the speed readout (the ` key in Sculpt): the last stroke's frames, timed.
   const [sculptSpeedShown, setSculptSpeedShown] = useState(() => { try { return window.localStorage.getItem("pare3d.sculptSpeed") === "on"; } catch { return false; } });
+  const sculptSpeedShownRef = useRef(sculptSpeedShown);
+  sculptSpeedShownRef.current = sculptSpeedShown;
   const [sculptSpeed, setSculptSpeed] = useState<SculptSpeed | null>(null);
   const speedTrack = useRef<{ id: number; last: number; frames: number; longest: number; started: number; from: number } | null>(null);
   const sculptToolRef = useRef(sculptTool);
@@ -9287,9 +9289,10 @@ export function LayerlingEditor({
     }
     sculptStroke.current = stroke;
     sculptStat("start", performance.now() - opened, 0);
-    // Build 85: the frames drawn during the stroke, for the speed readout.
-    {
-      if (speedTrack.current) cancelAnimationFrame(speedTrack.current.id);
+    // Build 85: the frames drawn during the stroke, for the speed readout. Build 91: only while the readout
+    // is shown - its figures were set after every stroke, drawing the whole editor again each time.
+    if (speedTrack.current) { cancelAnimationFrame(speedTrack.current.id); speedTrack.current = null; }
+    if (sculptSpeedShownRef.current) {
       const now = performance.now();
       const track = { id: 0, last: now, frames: 0, longest: 0, started: now, from: ((window as unknown as { layerlingSculptStats?: unknown[] }).layerlingSculptStats ?? []).length - 1 };
       const tick = (time: number) => { track.longest = Math.max(track.longest, time - track.last); track.last = time; track.frames += 1; track.id = requestAnimationFrame(tick); };
