@@ -4,6 +4,12 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 98,
+    items: [
+      "Dental Studio and Wax-up Studio hold their scans still: no handles, size marks or distances on them while the studio is open, and a stray drag or turn no longer knocks a scan out of the bite. The studio places them itself - Side by side or In occlusion.",
+    ],
+  },
+  {
     build: 97,
     items: [
       "Bite contacts belong to Dental Studio: shown in occlusion or with the scans side by side - laid open, each arch shows the contacts it makes in the bite, as your scanner shows them. Two loose scans on the plate no longer offer it.",

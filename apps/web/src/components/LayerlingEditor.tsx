@@ -16412,7 +16412,19 @@ export function LayerlingEditor({
   // Put away automatically while Sculpt (or Trim) is open, back when it closes; the menu's choice is for
   // this visit only, so a new design never opens without its handles.
   const [handlesHidden, setHandlesHidden] = useState(false);
-  const handlesAway = Boolean(sculptTool);
+  // Build 98: and while Dental Studio (or Wax-up Studio) is open - the studio places the scans itself
+  // (side by side, in occlusion), and its scans are held still, below.
+  const handlesAway = Boolean(sculptTool) || Boolean(dentalStudio);
+  /**
+   * Build 98: the studio's scans held still while it is open - a stray drag or turn knocked a scan out of
+   * the bite. Locked only in what the view is given (not in the design), so nothing is saved locked.
+   */
+  const studioHeld = useMemo(() => {
+    const slots = dentalStudio?.slots;
+    return new Set(slots ? (Object.values(slots).filter(Boolean) as string[]) : []);
+  }, [dentalStudio?.slots]);
+  const holdStudioScans = useCallback((list: WorkplaneShape[]) => (studioHeld.size ? list.map((shape) => (studioHeld.has(shape.id) && !shape.locked ? { ...shape, locked: true } : shape)) : list), [studioHeld]);
+  const heldViewportShapes = useMemo(() => holdStudioScans(historyView.shapes ?? viewportShapes), [holdStudioScans, historyView.shapes, viewportShapes]);
   useEffect(() => { window.layerlingTransformHandles?.(handlesHidden || handlesAway); }, [handlesHidden, handlesAway]);
   const toggleHandlesHidden = () => setHandlesHidden((hidden) => !hidden);
   const handlesItem = (separated: boolean): ShapeContextMenuItem => ({ key: "handles", label: t(handlesHidden ? "contextMenu.showHandles" : "contextMenu.hideHandles"), separated, onSelect: toggleHandlesHidden });
@@ -16923,7 +16935,7 @@ export function LayerlingEditor({
           <WorkplaneViewport
           projectName={projectName}
           projectId={editorOpen ? projectId ?? null : null}
-          shapes={historyView.shapes ?? viewportShapes}
+          shapes={heldViewportShapes}
           selectedIds={historyViewState ? [] : selectedIds}
           pickOnly={historyView.pickOnly}
           alignMode={alignMode}

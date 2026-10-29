@@ -2285,7 +2285,8 @@ function syncOriginDimensionOverlay(
   if (!state) {
     return;
   }
-  const frame = shapes?.length ? originFrameForShapes(shapes, workplane, accuracy) : null;
+  // Build 98: put away with the handles (Sculpt, Dental Studio, or from the right-click menu).
+  const frame = shapes?.length && !transformHandlesHidden ? originFrameForShapes(shapes, workplane, accuracy) : null;
   syncOriginDimensionWorldLines(state, frame, theme);
   const rect = state.renderer.domElement.getBoundingClientRect();
   const next = frame && (frame.distanceX !== null || frame.distanceZ !== null)
