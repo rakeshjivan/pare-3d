@@ -2044,7 +2044,8 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .bite-scale-words li { color: #5b6573; }
 .bite-range { display: flex; align-items: center; gap: 4px; }
 .bite-range span { margin-right: 4px; color: #5b6573; }
-.bite-range button { flex: 1; padding: 3px 6px; font-size: 12px; }
+.bite-range button { flex: 1; padding: 3px 6px; font-size: 12px; border: 1px solid var(--border, #d4dae3); background: #fff; border-radius: 7px; cursor: pointer; }
+.bite-range button.active { border-color: var(--accent, #1f5fbf); color: var(--accent, #1f5fbf); background: #eef4fd; font-weight: 600; }
 .bite-see-through { display: grid; gap: 4px; padding-top: 4px; border-top: 1px solid var(--border, #d4dae3); }
 .bite-opacity { display: grid; grid-template-columns: 46px 1fr 38px; align-items: center; gap: 6px; }
 .bite-opacity output { text-align: right; font-variant-numeric: tabular-nums; color: #5b6573; }
