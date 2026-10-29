@@ -71,7 +71,7 @@ Arabic, Persian, Urdu and Hebrew are written right to left: the first letter sta
 | Safari on a Mac | yes | no |
 | Tablet and phone | yes, from the device's files | no |
 
-Web pages may not simply read the installed fonts. Only Chrome and Edge have a permission for it, and only on secure pages, over `https` as on layerling.com. When Pare 3D runs over `http`, say on your own server or as a Docker install in your home network, {{ui:font.fromSystem}} is missing; drag the font over from Explorer then. In the other browsers you choose the font file from the fonts folder, with the same result. If you declined the question in Chrome or Edge, allow it again in the site settings, behind the padlock to the left of the address.
+Web pages may not simply read the installed fonts. Only Chrome and Edge have a permission for it, and only on secure pages, over `https`. When Pare 3D runs over `http`, say on your own server or as a Docker install in your home network, {{ui:font.fromSystem}} is missing; drag the font over from Explorer then. In the other browsers you choose the font file from the fonts folder, with the same result. If you declined the question in Chrome or Edge, allow it again in the site settings, behind the padlock to the left of the address.
 
 Pare 3D cannot read WOFF2 files (there is almost always a TTF or OTF version), font collections (`.ttc`, several fonts in one file) or colour emoji fonts. From very large fonts, such as Chinese ones, Pare 3D takes the first 8000 characters. A variable font is read in its default setting, usually the regular weight.
 

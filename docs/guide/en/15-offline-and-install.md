@@ -34,7 +34,7 @@ Pare 3D and this guide are in English. The colour scheme at the top right offers
 
 ## Running it yourself
 
-Pare 3D is free software (AGPL-3.0), based on [layerling](https://github.com/henmedia/layerling). Its source is on [GitHub](https://github.com/rakeshjivan/pare-3d): anyone may read it, build it and run their own copy, as long as they share their changes the same way. The MCP bridge for AI assistants comes with layerling's development server, see [Building with an AI](chapter:ai-with-mcp).
+Pare 3D is free software (AGPL-3.0); see [Licences and credits](chapter:licences-and-credits). Its source is on [GitHub](https://github.com/rakeshjivan/pare-3d): anyone may read it, build it and run their own copy, as long as they share their changes the same way. The MCP bridge for AI assistants comes with Pare 3D's development server, see [Building with an AI](chapter:ai-with-mcp).
 
 ## Help and feedback
 

@@ -3,15 +3,15 @@ title: Building with an AI (MCP)
 summary: How an AI assistant such as Gemini, Claude or Codex creates and changes shapes, groups them and takes pictures of the view in your open editor.
 ---
 
-Pare 3D's source, like layerling's it is based on, comes with an MCP server. MCP is a standard through which an AI assistant can use tools in other programs. With it an AI client such as Gemini, Claude or Codex sees an open editor tab and works in it: it creates shapes, changes dimensions, groups, cuts, rounds edges, reads out the scene and takes pictures of the view. You describe the part, the AI builds it, you watch and can step in at any moment.
+Pare 3D's source comes with an MCP server. MCP is a standard through which an AI assistant can use tools in other programs. With it an AI client such as Gemini, Claude or Codex sees an open editor tab and works in it: it creates shapes, changes dimensions, groups, cuts, rounds edges, reads out the scene and takes pictures of the view. You describe the part, the AI builds it, you watch and can step in at any moment.
 
 The bridge between AI client and editor runs **locally on your computer**. Keep in mind, though: what the AI reads, meaning the scene and the pictures of the view, goes to the provider of your AI client, like any other input there.
 
-> **Important:** The MCP bridge exists only in the development server that you start yourself from the source code. The Pare 3D app for Mac and Windows does not include it, and neither do layerling.com or other copies with static hosting. A copy you host yourself, such as the Docker image on a NAS, can switch it on with an access token; see "A copy on a NAS or server" below.
+> **Important:** The MCP bridge exists only in the development server that you start yourself from the source code. The Pare 3D app for Mac and Windows does not include it, and neither do copies with static hosting. A copy you host yourself, such as the Docker image on a NAS, can switch it on with an access token; see "A copy on a NAS or server" below.
 
 ## Setting up
 
-1. Get the source from [GitHub](https://github.com/rakeshjivan/pare-3d) (or layerling's, [henmedia/layerling](https://github.com/henmedia/layerling)) and start it in the project folder with `npm run dev`. Node.js must be installed. On Windows the quick-start line in the README takes care of that.
+1. Get the source from [GitHub](https://github.com/rakeshjivan/pare-3d) and start it in the project folder with `npm run dev`. Node.js must be installed. On Windows the quick-start line in the README takes care of that.
 2. Open an editor tab, for example `http://127.0.0.1:3000/?editor=1`. You can leave that to the AI: when no editor is open, the first tool that needs one starts your browser with an editor and waits until it has connected. That works for a Pare 3D on your own computer; a copy on a NAS or server needs you to open the editor. Set `LAYERLING_MCP_OPEN_EDITOR=0` for the MCP server to switch it off.
 3. Connect your AI client to the MCP server. The client starts it itself with `node scripts/layerling-mcp-server.mjs`.
 
@@ -31,7 +31,7 @@ Copy the skill from `docs/skills/layerling-mcp-skill` into your Codex skills fol
 
 Antigravity auto-discovers the workspace skill in `.agents/skills/layerling-mcp-skill`. For Gemini CLI, copy the skill from `docs/skills/layerling-mcp-skill` into your global skills folder (`~/.gemini/skills/`), add the server to your settings using `docs/mcp/gemini-config.example.json`, and restart the client.
 
-The detailed instructions for each client are in the [README on GitHub](https://github.com/henmedia/layerling/blob/main/README.md#layerling-mcp-skill).
+The detailed instructions for each client are in the [README on GitHub](https://github.com/rakeshjivan/pare-3d/blob/main/README.md#layerling-mcp-skill).
 
 ## A copy on a NAS or server
 

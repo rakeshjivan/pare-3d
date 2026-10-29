@@ -2075,3 +2075,7 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .gimbal-overlay.locked .gimbal-hit { cursor: not-allowed; }
 .gimbal-overlay.locked .gimbal-line { opacity: 0.35; }
 .snap-units.handle-style { margin-left: 6px; }
+
+/* Build 99: the footer's build number, beside Open source and Licences & credits. */
+.dashboard-legal .footer-build { color: inherit; opacity: 0.85; }
+.dashboard-legal-group > .footer-build + a, .dashboard-legal-group > a + a { margin-left: 10px; }

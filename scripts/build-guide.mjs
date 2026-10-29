@@ -15,7 +15,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const guideSource = join(root, "docs", "guide");
 const publicDirectory = join(root, "apps", "web", "public");
-const SITE = "https://layerling.com";
+// Pare 3D: the guide's own web address, once it has one (PARE_SITE_URL); without it no canonical links,
+// share picture or sitemap point anywhere else.
+const SITE = (process.env.PARE_SITE_URL ?? "").replace(/\/$/, "");
 
 // The languages and what the guide needs to know about each one live in
 // apps/web/src/lib/languages.ts, which the interface reads too.
@@ -87,7 +89,9 @@ export function renderFooter({ language, messages, environment, version }) {
   // the project's support page, unless NEXT_PUBLIC_SUPPORT_HINT=off.
   const ownSponsorUrl = environment.NEXT_PUBLIC_SPONSOR_URL?.trim();
   const supportOff = environment.NEXT_PUBLIC_SUPPORT_HINT?.trim().toLowerCase() === "off";
-  const sponsorUrl = ownSponsorUrl || (supportOff ? "" : "https://layerling.com/support.html");
+  // Pare 3D: no support page of its own yet - only an operator's own address shows.
+  void supportOff;
+  const sponsorUrl = ownSponsorUrl || "";
   const sponsorNeedsLang = !ownSponsorUrl || sponsorUrl.startsWith("/");
   if (sponsorUrl) left.push(link(sponsorNeedsLang ? `${sponsorUrl}${sponsorUrl.includes("?") ? "&" : "?"}lang=${language}` : sponsorUrl, environment.NEXT_PUBLIC_SPONSOR_LABEL?.trim() || messages["dashboard.sponsor"], external));
   const imprintUrl = environment.NEXT_PUBLIC_IMPRINT_URL?.trim();
@@ -96,7 +100,8 @@ export function renderFooter({ language, messages, environment, version }) {
   if (privacyUrl) left.push(link(privacyUrl, environment.NEXT_PUBLIC_PRIVACY_LABEL?.trim() || fallback.privacy));
   // Trimmed build: only the source link the AGPL asks for.
   void version;
-  const right = [link(SOURCE_CODE, "Source (AGPL-3.0)", external)];
+  // Pare 3D: open source, and the licences and credits (AGPL-3.0's notices) a click away.
+  const right = [link(SOURCE_CODE, "Open source", external), link(`/${LANGUAGE_INFO[language].guideDir ?? "guide"}/licences-and-credits.html`, "Licences & credits")];
   const group = (items) => `<div>${items.join('<span class="dot" aria-hidden="true">&middot;</span>')}</div>`;
   const trademark = messages["footer.trademark"] ? `<p class="trademark">${escapeHtml(messages["footer.trademark"])}</p>` : "";
   return `<footer class="site-footer">${group(left)}${group(right)}${trademark}</footer>`;
@@ -374,31 +379,32 @@ export function renderShortcuts(groups, messages, language) {
 }
 
 export const STYLE = `
+/* Pare 3D's own look: the program's blue (#1766ba) on cool greys, light and dark. */
 :root {
   color-scheme: light;
-  --ground: #fbf8f0; --card: #ffffff; --ink: #231a11; --muted: #7a6650; --edge: #ede4d4;
-  --accent: #ad6206; --accent-ink: #ffffff; --tint: #f6ecd9; --code: #f3ece0;
+  --ground: #f4f6f9; --card: #ffffff; --ink: #1d2630; --muted: #5b6573; --edge: #dce2e9;
+  --accent: #1766ba; --accent-ink: #ffffff; --tint: #e8f0fa; --code: #eef2f6;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --ground: #17130e; --card: #201a13; --ink: #f1e9dc; --muted: #b3a48d; --edge: #362d21;
-    --accent: #f0a23a; --accent-ink: #1c1408; --tint: #2b2116; --code: #2a2218;
+    --ground: #14181d; --card: #1b2027; --ink: #e6eaef; --muted: #9aa4b0; --edge: #2b323b;
+    --accent: #5aa2ec; --accent-ink: #0d1622; --tint: #1f2a37; --code: #212831;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --ground: #17130e; --card: #201a13; --ink: #f1e9dc; --muted: #b3a48d; --edge: #362d21;
-  --accent: #f0a23a; --accent-ink: #1c1408; --tint: #2b2116; --code: #2a2218;
+  --ground: #14181d; --card: #1b2027; --ink: #e6eaef; --muted: #9aa4b0; --edge: #2b323b;
+  --accent: #5aa2ec; --accent-ink: #0d1622; --tint: #1f2a37; --code: #212831;
 }
-/* Graphite is the dark theme with the warm browns turned grey (the program's own Graphite, see scripts/generate-graphite-theme.mjs); the orange accent stays. */
+/* Graphite: the dark theme in plain greys; the blue stays. */
 :root[data-theme="dark"][data-palette="graphite"] {
   --ground: #1a1a1a; --card: #202020; --ink: #e7e7e7; --muted: #8d8d8d; --edge: #303030;
   --accent-ink: #191919; --tint: #262626; --code: #272727;
 }
 * { box-sizing: border-box; }
 html { scroll-padding-top: 76px; }
-body { margin: 0; background: var(--ground); color: var(--ink); font: 16px/1.7 "Avenir Next", Avenir, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 16px/1.7 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; }
 a { color: var(--accent); }
 .bar { position: sticky; top: 0; z-index: 5; background: var(--ground); border-bottom: 1px solid var(--edge); }
 .bar-inner { max-width: 1100px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 14px; }
@@ -669,6 +675,7 @@ function pageShell({ language, title, description, path, alternates, chapters, c
     .map((chapter) => `<li><a href="/${strings.dir}/${chapter.slug}.html"${chapter.slug === current ? ' aria-current="page"' : ""}>${escapeHtml(chapter.title)}</a></li>`)
     .join("");
   const alternateLinks = Object.entries(alternates)
+    .filter(() => Boolean(SITE))
     .map(([code, href]) => `<link rel="alternate" hreflang="${code}" href="${SITE}${href}">`)
     .join("\n    ");
   return `<!doctype html>
@@ -678,11 +685,10 @@ function pageShell({ language, title, description, path, alternates, chapters, c
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(description)}">
-    <link rel="canonical" href="${SITE}${englishPath ?? path}">
+    ${SITE ? `<link rel="canonical" href="${SITE}${englishPath ?? path}">` : ""}
     ${englishPath || noindex ? '<meta name="robots" content="noindex">\n    ' : ""}${alternateLinks}
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:description" content="${escapeHtml(description)}">
-    <meta property="og:image" content="${SITE}/assets/layerling/layerling-social.png">
     <link rel="icon" href="/assets/pare3d/pare3d-icon.svg">
     <script>${THEME_SCRIPT}</script>
     <style>${STYLE}</style>
@@ -926,7 +932,7 @@ export async function buildGuide({ log = console.log } = {}) {
     const links = Object.entries(alternates).map(([code, href]) => `\n    <xhtml:link rel="alternate" hreflang="${code}" href="${SITE}${href}"/>`).join("");
     return `  <url>\n    <loc>${SITE}${path}</loc>${links}\n  </url>`;
   };
-  await writeFile(
+  if (SITE) await writeFile(
     join(publicDirectory, "sitemap.xml"),
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls.map(entry).join("\n")}\n</urlset>\n`,
   );

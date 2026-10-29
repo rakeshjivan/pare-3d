@@ -86,7 +86,7 @@ The switch **mm | in** beside {{ui:inspector.snapGrid}} changes the unit, the pl
 
 ### The footer
 
-At the foot of the window: {{ui:dashboard.userGuide}} opens this guide, and **Based on layerling · Source** leads to the free software Pare 3D is built on and to Pare 3D's own source code.
+At the foot of the window: {{ui:dashboard.userGuide}} opens this guide, and **Open source** leads to Pare 3D's source code, and **Licences & credits** to the licences and the people and projects whose work is in it.
 
 ## Your first part
 

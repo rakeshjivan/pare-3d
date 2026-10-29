@@ -8,6 +8,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
     items: [
       "A gimbal, as in Meshmixer, Medit and Bambu Studio: switch Box / Gimbal beside Snap Grid. Gimbal gives three arrows to move a part along (red, green up, blue) and three rings to turn it on, about its middle - no box, sizes or distances on the part. Box keeps Tinkercad's handles. Your choice is remembered.",
       "With the gimbal, Dental Studio and Wax-up Studio show it too (the scans themselves stay held in the bite); with the box, the studio keeps its handles put away.",
+      "The user guide in Pare 3D's own blue look, light and dark, with a new Licences and credits page: where the code comes from (layerling and SketchForge, AGPL-3.0), the tooth libraries, the tooth finder and the open-source libraries. The footer now reads Open source · Licences & credits.",
     ],
   },
   {

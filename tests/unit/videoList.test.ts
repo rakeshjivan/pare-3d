@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LAYERLING_VIDEOS } from "@/lib/layerlingVideos";
-import { README_LANGUAGES, chapterVideoLines, discussionBody, readmeVideoLines, withVideoLines } from "../../scripts/sync-videos.mjs";
+import { README_LANGUAGES, discussionBody, readmeVideoLines, withVideoLines } from "../../scripts/sync-videos.mjs";
 
 const guideRoot = join(process.cwd(), "docs", "guide");
 const languages = readdirSync(guideRoot, { withFileTypes: true })
@@ -28,18 +28,11 @@ describe("the video list in the guide", () => {
     }
   });
 
-  it("is checked in the languages that have the chapter", () => {
-    expect(languages.filter((language) => chapterVideoLinks(language) !== null).length).toBeGreaterThanOrEqual(1);
-  });
+  // Pare 3D (build 99): the guide has no chapter of videos about layerling any more.
 });
 
 describe("the video lists of the READMEs and the discussion", () => {
-  it("are the lines of the guide chapter of their language, between the markers, in the same order", () => {
-    for (const [file, language] of Object.entries(README_LANGUAGES)) {
-      const readme = readFileSync(join(process.cwd(), file), "utf8");
-      expect(readmeVideoLines(readme), `${file}: run npm run videos:sync`).toEqual(chapterVideoLines(language));
-    }
-  });
+  // Pare 3D (build 99): no guide chapter to match the README lists against (the videos are layerling's).
 
   it("name the videos of the app list, in the same order, in every README", () => {
     const expected = LAYERLING_VIDEOS.map((video) => video.url);

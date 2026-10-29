@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { graphiteGrey } from "../../scripts/generate-graphite-theme.mjs";
 import { STYLE, THEME_SCRIPT } from "../../scripts/build-guide.mjs";
 
 /*
@@ -24,13 +23,14 @@ describe("the guide in Graphite", () => {
     expect(Object.keys(graphite).sort()).toEqual(["accent-ink", "card", "code", "edge", "ground", "ink", "muted", "tint"]);
   });
 
-  it("uses the greys the program's Graphite works out", () => {
+  // Pare 3D (build 99): the guide's dark theme is its own blue-grey, not the warm browns Graphite was
+  // worked out from; Graphite is plain neutral greys.
+  it("is plain neutral greys", () => {
     for (const [name, value] of Object.entries(graphite)) {
-      const source = dark[name];
-      expect(source, name).toBeTruthy();
-      const number = parseInt(source.slice(1), 16);
-      const grey = graphiteGrey((number >> 16) & 255, (number >> 8) & 255, number & 255) as number[];
-      expect(value, name).toBe(`#${grey.map((part) => part.toString(16).padStart(2, "0")).join("")}`);
+      expect(dark[name], name).toBeTruthy();
+      const n = parseInt(value.slice(1), 16);
+      expect((n >> 16) & 255, name).toBe((n >> 8) & 255);
+      expect((n >> 8) & 255, name).toBe(n & 255);
     }
   });
 });

@@ -1,6 +1,2 @@
 User-agent: *
 Allow: /
-Disallow: /store.php
-Disallow: /kontakt.php
-
-Sitemap: https://layerling.com/sitemap.xml

@@ -133,18 +133,21 @@ describe("guide footer", () => {
     expect(full).toContain('href="/impressum.html">Impressum');
     expect(full).toContain('href="/datenschutz.html">Datenschutz');
     expect(full).toContain("https://example.org/spende");
-    expect(full).toContain("Source (AGPL-3.0)"); // fork: only the source link on the right
+    // Pare 3D (build 99): Open source and the licences & credits page on the right.
+    expect(full).toContain(">Open source<");
+    expect(full).toContain("licences-and-credits.html");
     const bare = renderFooter({ language: "en", messages: await loadMessages("en"), version: "1.0.0", environment: {} });
     expect(bare).not.toMatch(/Imprint|Privacy|impressum/i);
     expect(bare).not.toContain("Discussions"); // fork: no community link
   });
 
-  it("links the project's support page by default and drops it when switched off", async () => {
+  it("links no support page of its own, only one the installation sets (Pare 3D, build 99)", async () => {
     const messages = await loadMessages("en");
     const byDefault = renderFooter({ language: "en", messages, version: "1.0.0", environment: {} });
-    expect(byDefault).toContain("https://layerling.com/support.html?lang=en");
-    const off = renderFooter({ language: "en", messages, version: "1.0.0", environment: { NEXT_PUBLIC_SUPPORT_HINT: "off" } });
-    expect(off).not.toContain("support.html");
+    expect(byDefault).not.toContain("support.html");
+    expect(byDefault).not.toContain("layerling.com");
+    const own = renderFooter({ language: "en", messages, version: "1.0.0", environment: { NEXT_PUBLIC_SPONSOR_URL: "https://example.org/give" } });
+    expect(own).toContain("https://example.org/give");
   });
 });
 
