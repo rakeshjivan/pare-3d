@@ -10005,6 +10005,8 @@ export function LayerlingEditor({
   // Build 84: the bite contacts & clearance map - on, being worked out, its summary.
   const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; /** Build 96: the two parts (upper first), and whether they are the studio's. */ ids: [string, string]; studio: boolean; /** Build 96: the contacts and overlaps only. */ contactOnly?: boolean; /** Build 97: each arch's opacity in occlusion, 0..1. */ upperOpacity?: number; lowerOpacity?: number; /** Build 97: how far the colours reach, mm. */ range?: number } | null>(null);
   /** Build 96: the last map worked out, kept to colour again (Contact only) without working it out again. */
+  // Build 101: each made model's triangles where they stand in the bite, from Make - its contacts are measured there.
+  const madeBiteRef = useRef(new Map<string, Float32Array>());
   const biteMapLast = useRef<{ key: string; upperId: string; lowerId: string; upper: Float32Array; lower: Float32Array; upperColor: string; lowerColor: string; /** Where the arches stood when last drawn. */ drawn?: string } | null>(null);
   const biteMapRun = useRef(0);
   const biteMapRef = useRef(biteMap);
@@ -10590,6 +10592,8 @@ export function LayerlingEditor({
     // Build 97: always measured in the bite the studio worked out - side by side, or moved anywhere by
     // hand, the contacts stay on the arches, as they are in the patient's bite.
     let occUpper = upper, occLower = lower;
+    // Build 101: made models are measured where Make built them in the bite, however they are laid out to print.
+    const upperBite = onModels ? madeBiteRef.current.get(upper.id) : undefined, lowerBite = onModels ? madeBiteRef.current.get(lower.id) : undefined;
     if (studio.analysis && !onModels) {
       const arranged = arrangedDentalScans("occlusion", studio.analysis, studio.slots, new Map());
       occUpper = arranged.get(upper.id) ?? upper;
@@ -10606,7 +10610,8 @@ export function LayerlingEditor({
     setBiteMap((current) => current ? { ...current, busy: true, key, error: undefined } : current);
     window.setTimeout(async () => {
       try {
-        const up = Float32Array.from(worldTriangles(occUpper)), low = Float32Array.from(worldTriangles(occLower));
+        let up = Float32Array.from(worldTriangles(occUpper)), low = Float32Array.from(worldTriangles(occLower));
+        if (upperBite && lowerBite && upperBite.length === up.length && lowerBite.length === low.length) { up = Float32Array.from(upperBite); low = Float32Array.from(lowerBite); }
         const map = await biteContactsInBackground(up, low);
         if (run !== biteMapRun.current) return;
         biteMapLast.current = { key, upperId: upper.id, lowerId: lower.id, upper: map.upper, lower: map.lower, upperColor: upper.color || "#919191", lowerColor: lower.color || "#919191" };
@@ -10799,7 +10804,7 @@ export function LayerlingEditor({
     }, 30);
     stopDentalTrim();
   }, [analyseDentalStudio, commitShapes, dentalTrim, stopDentalTrim]);
-  const applyDentalStudio = useCallback(() => {
+  const applyDentalStudio = useCallback((occlusionNow?: { lowerPose?: number[]; raise: number } | null) => {
     const state = dentalStudioRef.current;
     if (!state || !state.analysis) return;
     let input = dentalInput(state);
@@ -10807,11 +10812,14 @@ export function LayerlingEditor({
     // Build 95: Wax-up Studio with the bite opened: the models are made at the designed vertical
     // dimension - the lower moved to the opened bite - so the articulator closes to it (a fixed pair
     // at the new bite, the pin at rest); the occlusion was worked out there.
-    const opened = state.waxStudio ? waxupRef.current.occlusion.result : null;
+    const opened = state.waxStudio ? (occlusionNow ?? waxupRef.current.occlusion.result) : null;
     const openedPose = opened?.lowerPose && opened.raise > 0 && state.slots.lower ? new THREE.Matrix4().fromArray(opened.lowerPose) : null;
     if (openedPose) {
       const lowerId = state.slots.lower!;
-      input = { ...input, arches: input.arches.map((arch) => (arch.id === lowerId ? { ...arch, positions: transformSoup(Float32Array.from(arch.positions), openedPose), ...(arch.wax ? { wax: transformSoup(Float32Array.from(arch.wax), openedPose) } : {}) } : arch)) };
+      // Build 101: the pair set up in the bite as scanned (its frames, its roles, the bite scan's check) and
+      // only then the lower opened: set up already opened, the arches no longer touch, so the overjet took
+      // the lower for the upper and the bite scan lined it up again - the models came out wrong.
+      input = { ...input, open: { id: lowerId, matrix: openedPose.toArray() }, arches: input.arches.map((arch) => (arch.id === lowerId && arch.wax ? { ...arch, wax: transformSoup(Float32Array.from(arch.wax), openedPose) } : arch)) };
     }
     const fixedInput = input;
     const involved = [state.slots.upper, state.slots.lower, state.slots.bite, state.slots.bite2].filter((id): id is string => Boolean(id));
@@ -10865,6 +10873,8 @@ export function LayerlingEditor({
           // Build 94: in IMT the full wax-up model is the series 2 index model.
           const series2 = state.waxStudio?.flow === "imt" && input.arches.some((arch) => arch.id === part.id && arch.wax?.length);
           made.set(part.id, canonicalizeShape({ ...shapeWithWorldPositions(meshShapeFromPositions(series2 ? `${name} - ${t("waxup.imtSeries2")}` : name, shape.color, positions), positions), dental: "model" }));
+          // Build 101: the model as it stands in the bite (wherever it is laid out), for its contacts map.
+          if (part.toBite) madeBiteRef.current.set(made.get(part.id)!.id, Float32Array.from(fromZUp(transformSoup(Float32Array.from(part.positions), new THREE.Matrix4().fromArray(part.toBite)), offset)));
         });
         // Build 79: the wax-up is in the model now - its teeth are kept, hidden, as used.
         const waxedArches = new Set(input.arches.filter((arch) => arch.wax?.length).map((arch) => arch.id));
@@ -10977,7 +10987,7 @@ export function LayerlingEditor({
   // Build 79: the digital wax-up - a tooth set over an arch's anterior teeth, from three landmarks.
   const WAX_COLOR = "#f1e7d0";
   type WaxupState = Omit<WaxupView, "marked" | "selected" | "mirror" | "found" | "chosen"> & { landmarks: WaxLandmarks | null; guessed: boolean; marks: Array<[number, number, number]> };
-  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: BUILT_IN_FINDER.name, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 0, red: null, checks: null, occlusion: { ready: false, busy: false, raise: 2, scheme: "canine", guidance: 30, bennett: 15, result: null } });
+  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: BUILT_IN_FINDER.name, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 0, red: null, checks: null, occlusion: { ready: false, busy: false, raise: 0, scheme: "canine", guidance: 30, bennett: 15, result: null } });
   // Build 94: the teeth found on each scan (by its part id): each scan triangle's FDI (as the studio
   // reads the scan), the teeth, the landmarks from them, and the teeth chosen for the wax-up.
   type FoundTeeth = { key: string; input: Float32Array; fdi: Uint8Array; teeth: ScanTeeth["teeth"]; landmarks: WaxLandmarks | null; chosen: number[] };
@@ -11328,10 +11338,12 @@ export function LayerlingEditor({
     if (!biteMap?.on) window.layerlingColorOverlay?.(toothOverlay.current);
   }, [dentalStudio?.waxStudio, dentalStudio?.slots.upper, dentalStudio?.slots.lower, waxFound, waxup.teethShown, shapes, dentalHidden, biteMap?.on]); // eslint-disable-line react-hooks/exhaustive-deps
   // Build 94: the occlusion of the wax-up at the opened bite (both arches), in the worker.
-  const workOcclusion = useCallback(async () => {
+  // Build 101: which wax the occlusion was worked out for - Make works it out again when the wax has changed since.
+  const waxFingerprint = () => projectShapesFingerprint(shapesRef.current.filter((shape) => shape.dental === "wax" && !shape.hidden));
+  const workOcclusion = useCallback(async (): Promise<{ lowerPose?: number[]; raise: number } | null> => {
     waxRecordRef.current();
     const state = dentalStudioRef.current;
-    if (!state?.slots.upper || !state.slots.lower) return;
+    if (!state?.slots.upper || !state.slots.lower) return null;
     const input = dentalInput(state);
     const arch = (slot: "upper" | "lower") => {
       const shape = shapesRef.current.find((candidate) => candidate.id === state.slots[slot]);
@@ -11344,7 +11356,7 @@ export function LayerlingEditor({
       return { shape, soup, toInput, fdi: found && found.input.length === soup.length ? found.fdi : null, wax, waxSoups: wax.map((w) => ({ fdi: w.waxTooth!.fdi, positions: transformSoup(Float32Array.from(worldTriangles(w)), toInput) })) };
     };
     const up = arch("upper"), low = arch("lower");
-    if (!up || !low) return;
+    if (!up || !low) return null;
     const current = waxupRef.current.occlusion;
     setWaxup((latest) => ({ ...latest, occlusion: { ...latest.occlusion, busy: true }, error: null }));
     try {
@@ -11361,6 +11373,7 @@ export function LayerlingEditor({
         });
       }
       if (changed.size) commitShapes(shapesRef.current.map((shape) => changed.get(shape.id) ?? shape), [], t("waxup.occlusionDone"));
+      const waxKey = waxFingerprint();
       // The findings summed by movement, teeth and kind.
       const sums = new Map<string, { text: string; count: number; nonworking: boolean }>();
       for (const f of result.sweep.findings) {
@@ -11370,11 +11383,31 @@ export function LayerlingEditor({
         entry.count += 1;
         sums.set(text, entry);
       }
-      setWaxup((latest) => ({ ...latest, occlusion: { ...latest.occlusion, busy: false, result: { rest: result.rest.map((r) => ({ fdi: r.fdi, gap: r.gap })), openings: result.openings, findings: [...sums.values()], carved: result.carved, missing: result.sweep.guidanceMissing.length, lowerPose: result.lowerPose, raise: current.raise } } }));
+      setWaxup((latest) => ({ ...latest, occlusion: { ...latest.occlusion, busy: false, result: { rest: result.rest.map((r) => ({ fdi: r.fdi, gap: r.gap })), openings: result.openings, findings: [...sums.values()], carved: result.carved, fitted: result.fitted, missing: result.sweep.guidanceMissing.length, lowerPose: result.lowerPose, raise: current.raise, waxKey } } }));
+      return { lowerPose: result.lowerPose, raise: current.raise };
     } catch (error) {
       setWaxup((latest) => ({ ...latest, occlusion: { ...latest.occlusion, busy: false }, error: error instanceof Error ? localizedError(error.message) : String(error) }));
+      return null;
     }
   }, [commitShapes, dentalInput, waxFound]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Build 101: Make in Wax-up Studio fits the wax to the bite first, unless that was just done for this
+  // wax and this opening - at the patient's own bite unless the bite was opened on purpose.
+  const makeDentalModels = async () => {
+    const state = dentalStudioRef.current;
+    const occlusion = waxupRef.current.occlusion;
+    const waxed = shapesRef.current.some((shape) => shape.dental === "wax" && !shape.hidden);
+    if (state?.waxStudio && state.slots.upper && state.slots.lower && waxed) {
+      const fresh = occlusion.result && occlusion.result.raise === occlusion.raise && occlusion.result.waxKey === waxFingerprint();
+      if (!fresh) {
+        setNotice(t("waxup.fittingBite"));
+        const worked = await workOcclusion();
+        if (!worked) return;
+        applyDentalStudio(worked);
+        return;
+      }
+    }
+    applyDentalStudio();
+  };
   // Build 94: the ghost view - the wax teeth see-through while Wax-up Studio is open.
   const waxGhostIds = dentalStudio?.waxStudio ? shapes.filter((shape) => shape.dental === "wax" && !shape.hidden).map((shape) => shape.id).join(",") : "";
   useEffect(() => {
@@ -17661,7 +17694,7 @@ export function LayerlingEditor({
           })}
           onOptionsChange={(patch) => setDentalStudio((current) => current && current.stage === "ready" ? { ...current, options: { ...current.options, ...patch }, optionsTouched: true, error: null } : current)}
           onAdvancedChange={(advanced) => setDentalStudio((current) => current ? { ...current, advanced } : current)}
-          onApply={applyDentalStudio}
+          onApply={() => void makeDentalModels()}
           onImport={() => fileInputRef.current?.click()}
           patientDetails={dentalStudio.patientDetails}
           onPatientDetails={(patientDetails) => {

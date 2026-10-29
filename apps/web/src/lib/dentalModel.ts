@@ -64,6 +64,12 @@ export type DentalStudioInput = {
   /** Roles the person chose; the rest are worked out. */
   roles?: Record<string, DentalRole>;
   /**
+   * Build 101: one arch moved (column-major, in the input's coordinates) once the pair is set up in the
+   * bite as scanned - Wax-up Studio's opened bite: the frames, roles and levels come from the closed
+   * bite, and the lower is then built where the opening puts it.
+   */
+  open?: { id: string; matrix: number[] };
+  /**
    * Build 74: the arches already stand in occlusion as the bite scan placed them (the fit was locked
    * into them once), so no bite scan is needed and none is fitted again - trimming, sculpting or
    * cutting the palate away cannot move the bite.
@@ -141,7 +147,7 @@ export type DentalStudioOptions = {
 export type DentalSmooth = "off" | "low" | "high";
 const SMOOTH_ROUNDS: Record<DentalSmooth, number> = { off: 0, low: 3, high: 10 };
 
-export type DentalPart = { id: string; role: DentalRole; positions: Float32Array; height: number; volume: number };
+export type DentalPart = { id: string; role: DentalRole; positions: Float32Array; height: number; volume: number; /** Build 101: of a pair, the move from where the part is laid out back to the bite it was built in (column-major) - to measure the models' contacts wherever they are laid. */ toBite?: number[] };
 /** `surface`: per part, the share of the scan's surface kept above each depth (mm below the occlusal plane). */
 export type DentalStudioResult = { parts: DentalPart[]; worn: number; keptDepth: number[]; voxel: number | null; warnings: string[]; surface: Array<Record<number, number>>; /** Build 60: how far the printed articulator opens, degrees. */ opening?: number; /** Build 65: the solid pieces each part is made of - 1 when it holds together. */ pieces?: number[]; /** Build 71: a raised pin holds the bite open this much, mm: at the pin, the front teeth and the back teeth. */ held?: { pin: number; front: number; back: number }; /** Build 78: the incisal pin set, laid out to print, and what each pin does. */ pins?: { positions: Float32Array; raises: number[] }; pinTable?: Array<{ pin: number; front: number; back: number }>; /** Build 78: per part, how the scan's crowns came through (toothTrueness). */ trueness?: ToothTrueness[]; /** Build 78: per part, soft tissue cut back clear of the other model in the bite, mm². */ relieved?: number[]; /** Build 78: per part, soft tissue the other model's teeth meet in the bite (kept as a contact), mm². */ contactArea?: number[] };
 
@@ -351,6 +357,10 @@ function prepare(input: DentalStudioInput): Prepared {
     lowerFrame = ownLower;
     upperFrame = ownUpper;
   }
+  if (input.open) {
+    const moved = cleaned.find(({ id }) => id === input.open!.id);
+    if (moved) applyMatrix(moved.clean.mesh, new THREE.Matrix4().fromArray(input.open.matrix));
+  }
   const arches = cleaned.map(({ id, clean }, i) => {
     const frame = i === upperIndex ? upperFrame : lowerFrame;
     return { id, role: roles[i], clean, frame, ...depthIn(clean.mesh, frame), palate: palates[i], canines: canines[i], partial: partials[i] };
@@ -375,7 +385,7 @@ function inputKey(input: DentalStudioInput) {
     for (let i = 0; i < p.length; i += step) s += p[i] * ((i % 7) + 1);
     return `${p.length}:${s.toFixed(4)}`;
   };
-  return JSON.stringify([input.arches.map((a) => [a.id, sum(a.positions)]), input.bite ? sum(input.bite) : null, input.bite2 ? sum(input.bite2) : null, input.roles ?? {}, Boolean(input.locked), input.biteMode ?? "auto"]);
+  return JSON.stringify([input.arches.map((a) => [a.id, sum(a.positions)]), input.bite ? sum(input.bite) : null, input.bite2 ? sum(input.bite2) : null, input.roles ?? {}, Boolean(input.locked), input.biteMode ?? "auto", input.open ?? null]);
 }
 
 function prepared(input: DentalStudioInput): Prepared {
@@ -1170,32 +1180,38 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     split.forEach((piece) => piece.delete());
     pieces.push(loose);
     if (loose > 1 && !warnings.includes("loose")) warnings.push("loose");
+    // Build 101: how it is laid out from the bite it was built in.
+    const laid = new THREE.Matrix4();
     // The model's own height, as built (the scan's highest point may have been trimmed away).
     const own = solid.boundingBox();
     // Build 71: in occlusion, the upper stands open on its raised pin - turned about the axle, not lifted.
     if (pair && options.layout !== "print" && rest && arch.role === "upper") {
       const turned = solid.translate([0, -rest.axleY, 0]).rotate([-rest.degrees, 0, 0]).translate([0, rest.axleY, 0]);
+      laid.premultiply(new THREE.Matrix4().makeTranslation(0, -rest.axleY, 0)).premultiply(new THREE.Matrix4().makeRotationX((-rest.degrees * Math.PI) / 180)).premultiply(new THREE.Matrix4().makeTranslation(0, rest.axleY, 0));
       toFree.push(solid);
       solid = turned;
     }
     if (!pair || options.layout === "print") {
       if (pair && arch.role === "upper") {
         const turned = transformSolid(solid, FLIP);
+        laid.premultiply(FLIP);
         toFree.push(solid);
         solid = turned;
       }
       const lifted = solid.translate([0, 0, depth]);
+      laid.premultiply(new THREE.Matrix4().makeTranslation(0, 0, depth));
       toFree.push(solid);
       solid = lifted;
       const box = solid.boundingBox();
       if (pair) {
         const placed = solid.translate([offsetX - box.min[0], 0, 0]);
+        laid.premultiply(new THREE.Matrix4().makeTranslation(offsetX - box.min[0], 0, 0));
         toFree.push(solid);
         solid = placed;
         offsetX += box.max[0] - box.min[0] + 8;
       }
     }
-    out.push({ id: arch.id, role: arch.role, positions: solidPositions(solid), height: own.max[2] - own.min[2], volume: solid.volume() });
+    out.push({ id: arch.id, role: arch.role, positions: solidPositions(solid), height: own.max[2] - own.min[2], volume: solid.volume(), ...(pair ? { toBite: laid.clone().invert().toArray() } : {}) });
     toFree.push(solid);
   });
   if (pair && options.layout === "print") {
@@ -1203,7 +1219,10 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     let minX = Infinity, maxX = -Infinity;
     out.forEach((part) => { for (let i = 0; i < part.positions.length; i += 3) { minX = Math.min(minX, part.positions[i]); maxX = Math.max(maxX, part.positions[i]); } });
     const mid = (minX + maxX) / 2;
-    out.forEach((part) => { for (let i = 0; i < part.positions.length; i += 3) part.positions[i] -= mid; });
+    out.forEach((part) => {
+      for (let i = 0; i < part.positions.length; i += 3) part.positions[i] -= mid;
+      if (part.toBite) part.toBite = new THREE.Matrix4().fromArray(part.toBite).multiply(new THREE.Matrix4().makeTranslation(mid, 0, 0)).toArray();
+    });
   }
   // Build 78: the pin set lies on the plate in front of the models, ready to print with them.
   if (pinSet && out.length) {

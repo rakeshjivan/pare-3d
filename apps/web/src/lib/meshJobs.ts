@@ -193,6 +193,8 @@ function copiedInput(input: DentalStudioInput): DentalStudioInput {
     ...(input.locked ? { locked: true } : {}),
     // Build 79: "Line up on the bite scan" goes along too - left behind, the worker kept the scanner's bite.
     ...(input.biteMode ? { biteMode: input.biteMode } : {}),
+    // Build 101: Wax-up Studio's opened bite goes along too - left behind, the worker made the models closed.
+    ...(input.open ? { open: { id: input.open.id, matrix: [...input.open.matrix] } } : {}),
   };
 }
 

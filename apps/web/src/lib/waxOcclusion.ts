@@ -1,5 +1,6 @@
 /**
- * Build 94: occlusion for a wax-up at an increased vertical dimension - a virtual articulator, the
+ * Build 94: occlusion for a wax-up at an increased vertical dimension (build 101: or at the patient's
+ * own bite, unopened - the default; the wax then fits the bite as it is) - a virtual articulator, the
  * posterior wax brought into even contact at the opened bite, and the jaw moved through protrusion
  * and both lateral excursions to find (and carve away) wax interferences.
  *
@@ -35,6 +36,14 @@ export const EXCURSION_CLEAR = 0.1;
 /** How far the condyles travel in the sweep, mm, and in what steps. */
 export const SWEEP_TRAVEL = 5;
 export const SWEEP_STEP = 0.5;
+/** Wax this little inside the opposing teeth is touching, not in them, mm. */
+export const FIT_TOLERANCE = 0.01;
+/** How deep inside the opposing teeth wax is looked for, mm. */
+const FIT_REACH = 3;
+/** Rounds of the fit to the bite (the second catches what the first one's trims brought near). */
+const FIT_ROUNDS = 3;
+/** How far a trim against the opposing teeth is feathered into the wax around it, mm. */
+export const FEATHER = 0.8;
 /** The most the opening at the incisors may be raised, mm (Abduo & Lyons 2012). */
 export const OVD_MAX = 5;
 
@@ -198,6 +207,51 @@ export function thin(s: Surface, cap: number): Surface {
   return { p: pick(s.p, 3), n: pick(s.n, 3), fdi: pick(s.fdi, 1), wax: pick(s.wax, 1) };
 }
 
+/**
+ * Build 101: lines straight along z through a triangle soup - where a point is inside the surface
+ * (crossed an odd number of times going one way along z) and how far it is to where it comes out.
+ */
+export class VerticalCaster {
+  private cells = new Map<number, number[]>();
+  constructor(private soup: Float32Array, private cell = 0.6) {
+    for (let t = 0; t < soup.length / 9; t += 1) {
+      const o = t * 9;
+      const x0 = Math.floor(Math.min(soup[o], soup[o + 3], soup[o + 6]) / cell), x1 = Math.floor(Math.max(soup[o], soup[o + 3], soup[o + 6]) / cell);
+      const y0 = Math.floor(Math.min(soup[o + 1], soup[o + 4], soup[o + 7]) / cell), y1 = Math.floor(Math.max(soup[o + 1], soup[o + 4], soup[o + 7]) / cell);
+      for (let ix = x0; ix <= x1; ix += 1) for (let iy = y0; iy <= y1; iy += 1) {
+        const k = ix * 1000003 + iy;
+        const list = this.cells.get(k);
+        if (list) list.push(t); else this.cells.set(k, [t]);
+      }
+    }
+  }
+  /** Inside: the distance along `dir` (+1 up, -1 down) to the surface's nearest crossing; -1 outside (or past `reach`). */
+  exit(px: number, py: number, pz: number, dir: 1 | -1, reach: number): number {
+    // A hair off any shared edge or corner, so a crossing is counted once.
+    const x = px + 1.3e-5, y = py + 0.7e-5;
+    const list = this.cells.get(Math.floor(x / this.cell) * 1000003 + Math.floor(y / this.cell));
+    if (!list) return -1;
+    const s = this.soup;
+    let crossings = 0, nearest = Infinity;
+    for (const t of list) {
+      const o = t * 9;
+      const ax = s[o], ay = s[o + 1], bx = s[o + 3], by = s[o + 4], cx = s[o + 6], cy = s[o + 7];
+      const det = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+      if (Math.abs(det) < 1e-12) continue;
+      const u = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / det;
+      const v = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / det;
+      const w = 1 - u - v;
+      if (u < 0 || v < 0 || w < 0) continue;
+      const z = u * s[o + 2] + v * s[o + 5] + w * s[o + 8];
+      const along = (z - pz) * dir;
+      if (along <= 0) continue;
+      crossings += 1;
+      if (along < nearest) nearest = along;
+    }
+    return crossings % 2 === 1 && nearest <= reach ? nearest : -1;
+  }
+}
+
 export type WaxTooth = { fdi: number; positions: Float32Array };
 export type OcclusionInput = {
   upperScan: Float32Array; upperFdi: Uint8Array | null; lowerScan: Float32Array; lowerFdi: Uint8Array | null;
@@ -217,6 +271,8 @@ export type OcclusionResult = {
   sweep: SweepReport;
   /** Wax carved away, mm at most, per tooth. */
   carved: Array<{ fdi: number; mm: number }>;
+  /** Build 101: wax trimmed back to the opposing teeth at the bite it is made for, mm at most, per tooth. */
+  fitted: Array<{ fdi: number; mm: number }>;
   /** Build 95: the lower's move to the opened bite (the designed vertical dimension), in the input's frame, column-major. */
   lowerPose?: number[];
 };
@@ -250,8 +306,9 @@ export function occlusionWork(input: OcclusionInput): OcclusionResult {
   let upperWax: WaxTooth[] = input.upperWax.map((t) => ({ fdi: t.fdi, positions: Float32Array.from(t.positions) }));
   let lowerWax: WaxTooth[] = input.lowerWax.map((t) => ({ fdi: t.fdi, positions: Float32Array.from(t.positions) }));
   const keepLower = (z: number) => z > -7, keepUpper = (z: number) => z < 7;
-  const surfaces = () => {
-    const lower = thin(surfaceOf(input.lowerScan, input.lowerFdi, lowerWax, keepLower), 30000);
+  const surfaces = (full = false) => {
+    const all = surfaceOf(input.lowerScan, input.lowerFdi, lowerWax, keepLower);
+    const lower = full ? all : thin(all, 30000);
     const upper = surfaceOf(input.upperScan, input.upperFdi, upperWax, keepUpper);
     orientSurface(lower, 1); orientSurface(upper, -1);
     return { lower, upper, upperGrid: new PointGrid(upper.p, 1.5), lowerGrid: new PointGrid(lower.p, 1.5) };
@@ -291,6 +348,85 @@ export function occlusionWork(input: OcclusionInput): OcclusionResult {
     };
     lowerWax = lowerWax.map((t) => adjust(t, false));
     upperWax = upperWax.map((t) => adjust(t, true));
+  }
+  // 2b. Build 101: the wax complies with the bite - no wax inside the opposing teeth (or their wax)
+  // at the bite it is made for (the original bite unless the user opened it). Wax that would be
+  // is trimmed back to the opposing surface, just touching (feathered over FEATHER mm); the front
+  // teeth too, on the side facing the opposing arch (the smile's labial side never meets it).
+  const fitted = new Map<number, number>();
+  for (let round = 0; round < FIT_ROUNDS; round += 1) {
+    const inverse = restPose.clone().invert();
+    // Each arch whole (scan and wax), as triangles. Wax is inside the opposing arch where a line from it
+    // straight through the occlusal plane, away from that arch, crosses the arch's surface an odd number
+    // of times; it is trimmed back along that line to where it comes out - the way the articulator closes,
+    // as a technician grinds wax in. (A nearest-point reading takes a thin incisal edge's far side.)
+    const join = (scan: Float32Array, wax: WaxTooth[]) => { const all = new Float32Array(scan.length + wax.reduce((n, w) => n + w.positions.length, 0)); all.set(scan); let at = scan.length; for (const w of wax) { all.set(w.positions, at); at += w.positions.length; } return all; };
+    const lowerCast = new VerticalCaster(join(input.lowerScan, lowerWax)), upperCast = new VerticalCaster(join(input.upperScan, upperWax));
+    const fit = (tooth: WaxTooth, isUpper: boolean): WaxTooth => {
+      const pts = tooth.positions;
+      const count = pts.length / 3;
+      // Into the opposing arch's frame (the upper stays; the lower is at the rest pose).
+      const to = isUpper ? inverse : restPose, back = isUpper ? restPose : inverse;
+      const te = to.elements;
+      // Upper wax in the lower comes out upwards; lower wax in the upper, downwards.
+      const dir = isUpper ? 1 : -1;
+      const cast = isUpper ? lowerCast : upperCast;
+      const push = new Float32Array(count * 3);
+      const inside: number[] = [];
+      for (let i = 0; i < count; i += 1) {
+        const x0 = pts[i * 3], y0 = pts[i * 3 + 1], z0 = pts[i * 3 + 2];
+        const x = te[0] * x0 + te[4] * y0 + te[8] * z0 + te[12], y = te[1] * x0 + te[5] * y0 + te[9] * z0 + te[13], z = te[2] * x0 + te[6] * y0 + te[10] * z0 + te[14];
+        const depth = cast.exit(x, y, z, dir, FIT_REACH);
+        if (!(depth > FIT_TOLERANCE)) continue;
+        push[i * 3 + 2] = dir * depth;
+        inside.push(i);
+      }
+      if (!inside.length) return tooth;
+      // Feathered: corners near a trimmed one move part of the way, so no step is left.
+      const moved = new Float32Array(push);
+      const size = new Float32Array(count);
+      for (const i of inside) size[i] = Math.hypot(push[i * 3], push[i * 3 + 1], push[i * 3 + 2]);
+      // The corners in cells FEATHER across, to find those near a trimmed one.
+      const cellOf = (j: number) => `${Math.floor(pts[j * 3] / FEATHER)},${Math.floor(pts[j * 3 + 1] / FEATHER)},${Math.floor(pts[j * 3 + 2] / FEATHER)}`;
+      const cells = new Map<string, number[]>();
+      for (let j = 0; j < count; j += 1) { const key = cellOf(j); const list = cells.get(key); if (list) list.push(j); else cells.set(key, [j]); }
+      const around = (i: number) => {
+        const cx = Math.floor(pts[i * 3] / FEATHER), cy = Math.floor(pts[i * 3 + 1] / FEATHER), cz = Math.floor(pts[i * 3 + 2] / FEATHER);
+        const found: number[] = [];
+        for (let dx = -1; dx <= 1; dx += 1) for (let dy = -1; dy <= 1; dy += 1) for (let dz = -1; dz <= 1; dz += 1) { const list = cells.get(`${cx + dx},${cy + dy},${cz + dz}`); if (list) for (const j of list) found.push(j); }
+        return found;
+      };
+      // Largest trims first, so each corner keeps the strongest pull on it.
+      inside.sort((x, y) => size[y] - size[x]);
+      const pulled = new Float32Array(count);
+      for (const i of inside) pulled[i] = size[i];
+      for (const i of inside) {
+        for (const j of around(i)) {
+          if (pulled[j] >= size[i]) continue;
+          const r = Math.hypot(pts[j * 3] - pts[i * 3], pts[j * 3 + 1] - pts[i * 3 + 1], pts[j * 3 + 2] - pts[i * 3 + 2]);
+          if (r >= FEATHER) continue;
+          const f = 1 - r / FEATHER;
+          if (size[i] * f > pulled[j]) { pulled[j] = size[i] * f; for (let k = 0; k < 3; k += 1) moved[j * 3 + k] = push[i * 3 + k] * f; }
+        }
+      }
+      // Pushes are in the opposing frame: rotate them back (directions only).
+      const rot = new THREE.Matrix3().setFromMatrix4(back);
+      const e = rot.elements;
+      const out = Float32Array.from(pts);
+      let most = 0;
+      for (let j = 0; j < count; j += 1) {
+        const x = moved[j * 3], y = moved[j * 3 + 1], z = moved[j * 3 + 2];
+        if (!x && !y && !z) continue;
+        out[j * 3] += e[0] * x + e[3] * y + e[6] * z;
+        out[j * 3 + 1] += e[1] * x + e[4] * y + e[7] * z;
+        out[j * 3 + 2] += e[2] * x + e[5] * y + e[8] * z;
+        most = Math.max(most, Math.hypot(x, y, z));
+      }
+      fitted.set(tooth.fdi, Math.max(fitted.get(tooth.fdi) ?? 0, most));
+      return { fdi: tooth.fdi, positions: out };
+    };
+    upperWax = upperWax.map((t) => fit(t, true));
+    lowerWax = lowerWax.map((t) => fit(t, false));
   }
   // 3. The movements.
   const findings: SweepFinding[] = [];
@@ -378,6 +514,20 @@ export function occlusionWork(input: OcclusionInput): OcclusionResult {
   const n = final.lower.p.length / 3;
   const d = new Float32Array(n), near = new Int32Array(n);
   distances(final.lower.p, restPose, final.upper, final.upperGrid, d, near);
+  // Build 101: a point-to-plane reading is a clearance only; inside the opposing teeth (by the vertical
+  // line, as the fit reads it) the gap is how deep, below 0 - so the readout matches what is made.
+  {
+    const join = (scan: Float32Array, wax: WaxTooth[]) => { const all = new Float32Array(scan.length + wax.reduce((m, w) => m + w.positions.length, 0)); all.set(scan); let at = scan.length; for (const w of wax) { all.set(w.positions, at); at += w.positions.length; } return all; };
+    const cast = new VerticalCaster(join(input.upperScan, upperWax));
+    const e = restPose.elements;
+    for (let i = 0; i < n; i += 1) {
+      if (near[i] < 0) continue;
+      const x0 = final.lower.p[i * 3], y0 = final.lower.p[i * 3 + 1], z0 = final.lower.p[i * 3 + 2];
+      const x = e[0] * x0 + e[4] * y0 + e[8] * z0 + e[12], y = e[1] * x0 + e[5] * y0 + e[9] * z0 + e[13], z = e[2] * x0 + e[6] * y0 + e[10] * z0 + e[14];
+      const depth = cast.exit(x, y, z, -1, FIT_REACH);
+      d[i] = depth > 0 ? -depth : Math.max(0, d[i]);
+    }
+  }
   const best = new Map<number, ToothContact>();
   for (let i = 0; i < n; i += 1) {
     const fdi = final.lower.fdi[i];
@@ -399,6 +549,7 @@ export function occlusionWork(input: OcclusionInput): OcclusionResult {
     rest: [...best.values()].sort((x, y) => x.fdi - y.fdi),
     sweep: { findings, guidanceMissing },
     carved: [...lowerDone.map((x, k) => ({ fdi: lowerWax[k].fdi, mm: x.mm })), ...upperDone.map((x, k) => ({ fdi: upperWax[k].fdi, mm: x.mm }))].filter((x) => x.mm > 0),
+    fitted: [...fitted].filter(([, mm]) => mm > 0.005).map(([fdi, mm]) => ({ fdi, mm })).sort((x, y) => x.fdi - y.fdi),
   };
 }
 
