@@ -4,5 +4,5 @@
  * it; the live release leaves it off).
  */
 
-/** Dental Studio's digital wax-up (build 79), being developed further in test builds. */
+/** Dental Studio's digital wax-up (build 79) and Wax-up Studio (build 94), being developed further in test builds. */
 export const WAXUP_ENABLED = process.env.NEXT_PUBLIC_PARE_WAXUP === "on";

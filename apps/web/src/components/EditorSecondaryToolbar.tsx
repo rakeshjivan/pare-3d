@@ -72,6 +72,7 @@ import { COMMAND_KEYWORDS, SHAPE_KEYWORDS } from "@/lib/commandKeywords";
 import { ExportButton } from "@/components/ExportButton";
 import { OPEN_EXPORT_WINDOW_EVENT, readBambuFormat, readSlicer, SEND_TO_BAMBU_EVENT, slicerName } from "@/lib/bambuSend";
 import { ForkDraftIcon, ForkToothIcon, ForkWaxupIcon } from "./forkToolbarIcons";
+import { WAXUP_ENABLED } from "@/lib/pareFeatures";
 import { FORK_OVERFLOW_TOOLS, FORK_SHORT_LABELS_EN, FORK_TOOL_HINTS_EN, FORK_TOOL_ICONS, ForkBlendIcon, ForkHomeIcon, ForkReadyPartsIcon, ForkShapesIcon, ForkSpaceOutIcon } from "@/components/forkToolbarIcons";
 import { Import, PaintBucket, ScanSearch, Scissors, Settings as LucideSettings, ShieldCheck, Spline, Squircle, Type, Variable } from "lucide-react";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
@@ -884,8 +885,9 @@ export function SecondaryToolbar({
   // Fork (build 47): Dental Studio, in a toolbar section of its own.
   const dentalTools = [
     { id: "dentalModel", label: t("dental.title"), icon: ForkToothIcon, action: () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), enabled: true, active: Boolean(dentalOpen) && !waxStudioOpen },
-    // Build 94: Wax-up Studio, beside it - the same steps, with the wax-up.
-    { id: "waxupStudio", label: t("waxStudio.command"), icon: ForkWaxupIcon, action: () => window.dispatchEvent(new Event(WAXUP_STUDIO_EVENT)), enabled: true, active: Boolean(waxStudioOpen) },
+    // Build 94: Wax-up Studio, beside it - the same steps, with the wax-up. Build 95: in test builds
+    // only, until its steps are clear and it does the work by itself.
+    ...(WAXUP_ENABLED ? [{ id: "waxupStudio", label: t("waxStudio.command"), icon: ForkWaxupIcon, action: () => window.dispatchEvent(new Event(WAXUP_STUDIO_EVENT)), enabled: true, active: Boolean(waxStudioOpen) }] : []),
   ];
   const arrangeTools = [
     { id: "align", label: t("editor.tool.align"), icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign, active: alignMode },
@@ -1126,7 +1128,7 @@ export function SecondaryToolbar({
       plain("mesh-check", t("meshCheck.command"), manageGroup, hasSelection, () => window.dispatchEvent(new Event(MESH_CHECK_EVENT))),
       plain("fill-hole", t("fillHole.command"), t("editor.group.modify"), hasSelection, () => window.dispatchEvent(new Event(FILL_HOLE_EVENT))),
       plain("dental-model", t("dental.title"), t("editor.group.modify"), true, () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), { icon: ForkToothIcon }),
-      plain("waxup-studio", t("waxStudio.command"), t("editor.group.modify"), true, () => window.dispatchEvent(new Event(WAXUP_STUDIO_EVENT)), { icon: ForkWaxupIcon }),
+      ...(WAXUP_ENABLED ? [plain("waxup-studio", t("waxStudio.command"), t("editor.group.modify"), true, () => window.dispatchEvent(new Event(WAXUP_STUDIO_EVENT)), { icon: ForkWaxupIcon })] : []),
       // Build 70: the Mesh tools in the search too (Mesh check, Fill hole and Cut below are above).
       ...meshTools.filter((tool) => tool.id === "sculpt" || tool.id === "simplify" || tool.id === "roundMesh").map((tool) => fromTool(tool, t("editor.group.mesh"))),
       plain("send-slicer", t("slicer.sendTo", { app: slicerName(readSlicer()) }), manageGroup, true, () => window.dispatchEvent(new CustomEvent(SEND_TO_BAMBU_EVENT, { detail: { format: readBambuFormat() } })), { icon: Printer }),

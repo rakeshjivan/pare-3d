@@ -151,7 +151,7 @@ The scans are kept with the models, hidden. Later, select a model and open **{{u
 
 ## {{ui:waxStudio.title}}
 
-**{{ui:waxStudio.command}}**, beside **{{ui:dental.title}}** on the toolbar, opens the same steps with a diagnostic wax-up in them (a preview, still being built). For now it waxes the anterior teeth - canine to canine, or premolar to premolar, the range IMT is used for; a posterior studio, for occlusal wax-ups, is to follow. Two choices sit above the steps: **{{ui:waxStudio.flow}}** - **{{ui:waxStudio.flowWaxup}}** or **{{ui:waxStudio.flowImt}}** - and **{{ui:waxStudio.arches}}**.
+**{{ui:waxStudio.command}}**, beside **{{ui:dental.title}}** on the toolbar, opens the same steps with a diagnostic wax-up in them. It is in test builds only for now, while its steps are made clearer. For now it waxes the anterior teeth - canine to canine, or premolar to premolar, the range IMT is used for; a posterior studio, for occlusal wax-ups, is to follow. Two choices sit above the steps: **{{ui:waxStudio.flow}}** - **{{ui:waxStudio.flowWaxup}}** or **{{ui:waxStudio.flowImt}}** - and **{{ui:waxStudio.arches}}**.
 
 1. Load and trim the scans as for any model.
 2. **{{ui:waxup.findStep}}**: **{{ui:waxup.find}}** marks and numbers every tooth on the scan, in colour, in about ten seconds. The canine-to-canine teeth are chosen at first; click a tooth to add or leave it out. A number shown dashed was put right by the tooth's place in the arch - the network called it something else - so check it. The midline and canine tips are set from the teeth found; **{{ui:waxup.markAgain}}** sets them by hand instead.

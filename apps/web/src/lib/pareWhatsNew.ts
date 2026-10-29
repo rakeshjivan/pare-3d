@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 95,
+    items: [
+      "Deviation from the original in Sculpt no longer holds the page up: it now shows in under half a second on a full-arch scan (it took about ten seconds, after every stroke).",
+      "Wax-up Studio goes back to test builds for now: its steps are being made clearer, with Undo, and more of the work done for you. Everything else from build 94 stays.",
+    ],
+  },
+  {
     build: 94,
     items: [
       "Wax-up Studio (preview), beside Dental Studio on the toolbar: the same steps from scans to models, with the diagnostic wax-up in them, and a choice at the top of a wax-up only or the IMT workflow, on one arch or both.",
