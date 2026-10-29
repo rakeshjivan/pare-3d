@@ -5,11 +5,11 @@
  * floating card), and the floating card itself - shown whenever two dental scans or models are
  * selected, or the studio has both arches, so the contacts are always one click away.
  */
-import { LoaderCircle, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpToLine, LoaderCircle, ScanFace, X } from "lucide-react";
 import { CONTACT_TICKS, contactGradient, type BiteContactStats } from "@/lib/biteContacts";
 import { t } from "@/lib/i18n";
 
-export type BiteMapView = { on: boolean; busy: boolean; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; contactOnly?: boolean } | null;
+export type BiteMapView = { on: boolean; busy: boolean; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; contactOnly?: boolean; upperOpacity?: number; lowerOpacity?: number } | null;
 
 /** Build 96: the scale as the scanner programs show it - a bar from 2 mm (green) down to contact (red) and overlap (blue to purple). */
 function ContactScale({ contactOnly }: { contactOnly: boolean }) {
@@ -52,8 +52,20 @@ export function BiteContactsDetails({ biteMap, onContactOnly }: { biteMap: NonNu
   </>);
 }
 
-/** The floating card: a button while off; the legend and summary while on. */
-export function BiteContactsCard({ biteMap, onToggle, onContactOnly, hint }: { biteMap: BiteMapView; onToggle: (on: boolean) => void; onContactOnly: (on: boolean) => void; hint?: string | null }) {
+/**
+ * The floating card: a button while off; the scale and summary while on. Build 97: in occlusion, a
+ * slider for each arch's opacity and views from above and below, to look through one arch at the
+ * contacts on the other (as Exocad's viewer does); laid side by side, each arch shows the contacts it
+ * makes in the bite.
+ */
+export function BiteContactsCard({ biteMap, inBite, onToggle, onContactOnly, onOpacity, onLook }: {
+  biteMap: BiteMapView;
+  inBite: boolean;
+  onToggle: (on: boolean) => void;
+  onContactOnly: (on: boolean) => void;
+  onOpacity: (arch: "upper" | "lower", value: number) => void;
+  onLook: (from: "above" | "below" | "front") => void;
+}) {
   const on = Boolean(biteMap?.on);
   if (!on) {
     return (
@@ -62,10 +74,20 @@ export function BiteContactsCard({ biteMap, onToggle, onContactOnly, hint }: { b
           <span className="bite-contacts-swatch" aria-hidden="true" style={{ background: contactGradient(2, 0).replace("to bottom", "to right") }} />
           {t("dental.biteMapShow")}
         </button>
-        {hint ? <p className="blend-hint">{hint}</p> : null}
       </div>
     );
   }
+  const slider = (arch: "upper" | "lower") => {
+    const value = Math.round(((arch === "upper" ? biteMap?.upperOpacity : biteMap?.lowerOpacity) ?? 1) * 100);
+    const label = t(arch === "upper" ? "dental.biteOpacityUpper" : "dental.biteOpacityLower");
+    return (
+      <label className="bite-opacity">
+        <span>{label}</span>
+        <input type="range" min={0} max={100} step={5} value={value} aria-label={label} onChange={(event) => onOpacity(arch, Number(event.currentTarget.value) / 100)} />
+        <output>{value}%</output>
+      </label>
+    );
+  };
   return (
     <div className="bite-contacts-card" role="region" aria-label={t("dental.biteMap")}>
       <div className="bite-contacts-head">
@@ -73,6 +95,17 @@ export function BiteContactsCard({ biteMap, onToggle, onContactOnly, hint }: { b
         <button type="button" className="icon-button" title={t("dental.biteMapHide")} aria-label={t("dental.biteMapHide")} onClick={() => onToggle(false)}><X size={14} /></button>
       </div>
       <BiteContactsDetails biteMap={biteMap!} onContactOnly={onContactOnly} />
+      {inBite ? (
+        <div className="bite-see-through" role="group" aria-label={t("dental.biteSeeThrough")}>
+          {slider("upper")}
+          {slider("lower")}
+          <div className="bite-look">
+            <button type="button" title={t("dental.biteLookAboveHint")} onClick={() => onLook("above")}><ArrowDownToLine size={14} aria-hidden="true" /> {t("dental.biteLookAbove")}</button>
+            <button type="button" title={t("dental.biteLookBelowHint")} onClick={() => onLook("below")}><ArrowUpToLine size={14} aria-hidden="true" /> {t("dental.biteLookBelow")}</button>
+            <button type="button" onClick={() => onLook("front")}><ScanFace size={14} aria-hidden="true" /> {t("dental.biteLookFront")}</button>
+          </div>
+        </div>
+      ) : <p className="blend-hint">{t("dental.biteSideNote")}</p>}
     </div>
   );
 }

@@ -9993,9 +9993,9 @@ export function LayerlingEditor({
   };
   const [dentalStudio, setDentalStudio] = useState<DentalStudioState | null>(null);
   // Build 84: the bite contacts & clearance map - on, being worked out, its summary.
-  const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; /** Build 96: the two parts (upper first), and whether they are the studio's. */ ids: [string, string]; studio: boolean; /** Build 96: the contacts and overlaps only. */ contactOnly?: boolean } | null>(null);
+  const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; /** Build 96: the two parts (upper first), and whether they are the studio's. */ ids: [string, string]; studio: boolean; /** Build 96: the contacts and overlaps only. */ contactOnly?: boolean; /** Build 97: each arch's opacity in occlusion, 0..1. */ upperOpacity?: number; lowerOpacity?: number } | null>(null);
   /** Build 96: the last map worked out, kept to colour again (Contact only) without working it out again. */
-  const biteMapLast = useRef<{ key: string; upperId: string; lowerId: string; up: Float32Array; low: Float32Array; upper: Float32Array; lower: Float32Array; upperColor: string; lowerColor: string } | null>(null);
+  const biteMapLast = useRef<{ key: string; upperId: string; lowerId: string; upper: Float32Array; lower: Float32Array; upperColor: string; lowerColor: string; /** Where the arches stood when last drawn. */ drawn?: string } | null>(null);
   const biteMapRun = useRef(0);
   const biteMapRef = useRef(biteMap);
   biteMapRef.current = biteMap;
@@ -10534,86 +10534,106 @@ export function LayerlingEditor({
     return id ? isDentalPart(shapes.find((shape) => shape.id === id)) : false;
   }, [sculptTool?.shapeId, shapes, isDentalPart]);
   /**
-   * Build 96: the two arches the bite contacts are for - Dental Studio's upper and lower (once worked
-   * out), or else two dental scans or models selected anywhere.
+   * Build 96: the two arches the bite contacts are for - Dental Studio's upper and lower, once worked
+   * out. Build 97: in the studio only (two loose scans on the plate are not in a bite), in occlusion or
+   * laid side by side.
    */
   const biteCandidate = useMemo<{ ids: [string, string]; studio: boolean } | null>(() => {
-    if (dentalStudio) {
-      const { upper, lower } = dentalStudio.slots;
-      return upper && lower && dentalStudio.analysis ? { ids: [upper, lower], studio: true } : null;
-    }
-    if (selectedShapes.length < 2 || selectedShapes.length > 6 || sculptTool) return null;
-    // Two dental parts among those selected (anything else selected with them is passed over).
-    const arches = selectedShapes.filter((shape) => isDentalPart(shape));
-    if (arches.length !== 2) return null;
-    // Upper first (the higher of the two), so the summary reads the same as in the studio.
-    const [a, b] = arches;
-    const height = (shape: WorkplaneShape) => shape.z ?? 0;
-    return { ids: height(a) >= height(b) ? [a.id, b.id] : [b.id, a.id], studio: false };
-  }, [dentalStudio, selectedShapes, sculptTool, isDentalPart]);
+    if (!dentalStudio) return null;
+    const { upper, lower } = dentalStudio.slots;
+    return upper && lower && dentalStudio.analysis ? { ids: [upper, lower], studio: true } : null;
+  }, [dentalStudio]);
+  /** Build 97: the map's colours drawn on the arches where they stand now (in occlusion or side by side). */
+  const drawBiteMap = (only: boolean) => {
+    const last = biteMapLast.current;
+    const upper = last ? shapesRef.current.find((shape) => shape.id === last.upperId) : undefined;
+    const lower = last ? shapesRef.current.find((shape) => shape.id === last.lowerId) : undefined;
+    if (!last || !upper || !lower) return;
+    const up = Float32Array.from(worldTriangles(upper)), low = Float32Array.from(worldTriangles(lower));
+    // The same triangles in the same order, wherever the arch stands; a part changed since is left plain.
+    const items = [];
+    if (up.length / 3 === last.upper.length) items.push({ shapeId: upper.id, positions: up, colors: contactColors(last.upper, last.upperColor, only) });
+    if (low.length / 3 === last.lower.length) items.push({ shapeId: lower.id, positions: low, colors: contactColors(last.lower, last.lowerColor, only) });
+    last.drawn = projectShapesFingerprint([upper, lower]);
+    window.layerlingColorOverlay?.(items.length ? items : null);
+  };
   // Build 84: the bite contacts map, worked out in the background whenever the arches move in the bite,
-  // and drawn over the two scans while it is on (in occlusion only).
+  // and drawn over the two scans while it is on. Build 97: laid side by side too - measured where the
+  // studio puts them in occlusion, shown on each arch laid open, as the scanner programs do.
   useEffect(() => {
-    // Build 96: the studio's arches, or two parts chosen outside it.
-    const ids = biteMap?.studio ? [dentalStudio?.slots.upper, dentalStudio?.slots.lower] : biteMap?.ids ?? [];
-    const upper = ids[0] ? shapes.find((shape) => shape.id === ids[0]) : undefined;
-    const lower = ids[1] ? shapes.find((shape) => shape.id === ids[1]) : undefined;
-    // A part gone (deleted): the map goes too.
-    if (biteMap?.on && !biteMap.studio && (!upper || !lower)) { setBiteMap(null); window.layerlingColorOverlay?.(null); return; }
-    if (!biteMap?.on || (biteMap.studio && (!dentalStudio || dentalStudio.layout !== "occlusion")) || !upper || !lower) {
+    const studio = dentalStudio;
+    const upper = studio?.slots.upper ? shapes.find((shape) => shape.id === studio.slots.upper) : undefined;
+    const lower = studio?.slots.lower ? shapes.find((shape) => shape.id === studio.slots.lower) : undefined;
+    if (!biteMap?.on || !studio || !upper || !lower) {
       // Build 94: the teeth found, when Wax-up Studio shows them.
       window.layerlingColorOverlay?.(toothOverlay.current);
       return;
     }
-    const key = projectShapesFingerprint([upper, lower]);
-    // Worked out already for these positions (or being worked out now).
-    if (biteMap.key === key) return;
+    let occUpper = upper, occLower = lower;
+    if (studio.layout !== "occlusion" && studio.analysis) {
+      const arranged = arrangedDentalScans("occlusion", studio.analysis, studio.slots, new Map());
+      occUpper = arranged.get(upper.id) ?? upper;
+      occLower = arranged.get(lower.id) ?? lower;
+    }
+    const key = projectShapesFingerprint([occUpper, occLower]);
+    // Worked out already for the bite (or being worked out now): only drawn again where the arches stand.
+    if (biteMap.key === key) {
+      const last = biteMapLast.current;
+      if (!biteMap.busy && last && last.key === key && last.drawn !== projectShapesFingerprint([upper, lower])) drawBiteMap(Boolean(biteMap.contactOnly));
+      return;
+    }
     const run = ++biteMapRun.current;
     setBiteMap((current) => current ? { ...current, busy: true, key, error: undefined } : current);
     window.setTimeout(async () => {
       try {
-        const up = Float32Array.from(worldTriangles(upper)), low = Float32Array.from(worldTriangles(lower));
+        const up = Float32Array.from(worldTriangles(occUpper)), low = Float32Array.from(worldTriangles(occLower));
         const map = await biteContactsInBackground(up, low);
         if (run !== biteMapRun.current) return;
-        const only = Boolean(biteMapRef.current?.contactOnly);
-        biteMapLast.current = { key, upperId: upper.id, lowerId: lower.id, up, low, upper: map.upper, lower: map.lower, upperColor: upper.color || "#919191", lowerColor: lower.color || "#919191" };
-        window.layerlingColorOverlay?.([
-          { shapeId: upper.id, positions: up, colors: contactColors(map.upper, upper.color || "#919191", only) },
-          { shapeId: lower.id, positions: low, colors: contactColors(map.lower, lower.color || "#919191", only) },
-        ]);
+        biteMapLast.current = { key, upperId: upper.id, lowerId: lower.id, upper: map.upper, lower: map.lower, upperColor: upper.color || "#919191", lowerColor: lower.color || "#919191" };
+        drawBiteMap(Boolean(biteMapRef.current?.contactOnly));
         setBiteMap((current) => current?.on ? { ...current, busy: false, key, upper: map.upperStats, lower: map.lowerStats } : current);
       } catch (error) {
         if (run !== biteMapRun.current) return;
         setBiteMap((current) => current ? { ...current, busy: false, key, error: error instanceof Error ? error.message : String(error) } : current);
       }
     }, 30);
-  }, [biteMap?.on, biteMap?.key, biteMap?.studio, biteMap?.ids, dentalStudio?.layout, dentalStudio?.slots.upper, dentalStudio?.slots.lower, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [biteMap?.on, biteMap?.key, biteMap?.busy, dentalStudio?.layout, dentalStudio?.slots.upper, dentalStudio?.slots.lower, dentalStudio?.analysis, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
   // Build 96: Contact only on or off - the map worked out already, coloured again.
   useEffect(() => {
     const last = biteMapLast.current;
     if (!biteMap?.on || biteMap.busy || !last || last.key !== biteMap.key) return;
-    const only = Boolean(biteMap.contactOnly);
-    window.layerlingColorOverlay?.([
-      { shapeId: last.upperId, positions: last.up, colors: contactColors(last.upper, last.upperColor, only) },
-      { shapeId: last.lowerId, positions: last.low, colors: contactColors(last.lower, last.lowerColor, only) },
-    ]);
+    drawBiteMap(Boolean(biteMap.contactOnly));
   }, [biteMap?.contactOnly]); // eslint-disable-line react-hooks/exhaustive-deps
-  // The studio's map goes when Dental Studio closes (one made outside it stays).
+  // Build 97: each arch's opacity, in occlusion, to look through one at the contacts on the other (as
+  // Exocad's viewer does) - put back when the map is off or the arches are laid side by side.
+  useEffect(() => {
+    const studio = dentalStudio;
+    if (!biteMap?.on || !studio || studio.layout !== "occlusion" || !studio.slots.upper || !studio.slots.lower) { window.layerlingPartOpacity?.(null); return; }
+    window.layerlingPartOpacity?.({ [studio.slots.upper]: biteMap.upperOpacity ?? 1, [studio.slots.lower]: biteMap.lowerOpacity ?? 1 });
+  }, [biteMap?.on, biteMap?.upperOpacity, biteMap?.lowerOpacity, dentalStudio?.layout, dentalStudio?.slots.upper, dentalStudio?.slots.lower]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => window.layerlingPartOpacity?.(null), []);
+  // The map goes when Dental Studio closes.
   const studioOpen = Boolean(dentalStudio);
   useEffect(() => {
     if (studioOpen) return;
     setBiteMap((current) => {
-      if (current?.studio) { window.layerlingColorOverlay?.(null); return null; }
+      if (current) { window.layerlingColorOverlay?.(null); return null; }
       return current;
     });
   }, [studioOpen]);
-  /** Build 96: the bite contacts on or off - in the studio it shows the scans in occlusion first. */
+  /** Build 96: the bite contacts on or off. */
   const toggleBiteMap = (on: boolean) => {
-    if (!on) { setBiteMap(null); window.layerlingColorOverlay?.(null); return; }
+    if (!on) { setBiteMap(null); window.layerlingColorOverlay?.(toothOverlay.current); return; }
     const candidate = biteCandidate;
     if (!candidate) return;
-    if (candidate.studio && dentalStudio && dentalStudio.layout !== "occlusion") layOutDentalScans("occlusion");
     setBiteMap({ on: true, busy: true, key: "", ids: candidate.ids, studio: candidate.studio });
+  };
+  /** Build 97: look at the arches in occlusion from above (through the upper onto the lower) or from below. */
+  const lookAtBite = (from: "above" | "below" | "front") => {
+    const studio = dentalStudioRef.current;
+    const ids = [studio?.slots.upper, studio?.slots.lower].filter(Boolean) as string[];
+    if (!ids.length) return;
+    window.layerlingShowParts?.(ids, from === "above" ? [0, 1, 0] : from === "below" ? [0, -1, 0] : [0, 0.15, 1]);
   };
   // The area tinted over the scans while it can be edited.
   useEffect(() => {
@@ -17710,10 +17730,14 @@ export function LayerlingEditor({
           live={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : { start: startSculptStroke, move: moveSculptStroke, end: endSculptStroke }}
         />
       ) : null}
-      {/* Build 96: the bite contacts, one click away whenever two arches are there to show them for. */}
-      {!sculptTool && dentalStudio?.stage !== "making" && (biteMap?.on || biteCandidate) ? (
-        <BiteContactsCard biteMap={biteMap} onToggle={toggleBiteMap} onContactOnly={(contactOnly) => setBiteMap((current) => current ? { ...current, contactOnly } : current)}
-          hint={biteMap?.on ? null : biteCandidate?.studio ? (dentalStudio?.layout !== "occlusion" ? t("dental.biteMapToBite") : null) : t("dental.biteMapPair")} />
+      {/* Build 96: the bite contacts, one click away in Dental Studio (build 97: there only). */}
+      {!sculptTool && dentalStudio && dentalStudio.stage !== "making" && (biteMap?.on || biteCandidate) ? (
+        <BiteContactsCard biteMap={biteMap}
+          inBite={dentalStudio.layout === "occlusion"}
+          onToggle={toggleBiteMap}
+          onContactOnly={(contactOnly) => setBiteMap((current) => current ? { ...current, contactOnly } : current)}
+          onOpacity={(arch, value) => setBiteMap((current) => current ? { ...current, [arch === "upper" ? "upperOpacity" : "lowerOpacity"]: value } : current)}
+          onLook={lookAtBite} />
       ) : null}
       {sculptTool && !sculptTool.trim && sculptTool.chosen > 0 && !sculptTool.soft ? (
         <SculptSelectionBar count={sculptTool.chosen} busy={sculptTool.busy} onAction={(action) => applySculptSelectionRef.current(action)} onSoft={softStart} onDone={() => applySculptSelectionRef.current("clear")} />

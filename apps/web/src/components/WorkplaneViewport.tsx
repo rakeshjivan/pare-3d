@@ -693,6 +693,8 @@ declare global {
     layerlingTransformHandles?: (hidden: boolean) => void;
     /** Build 94: draws these parts see-through at `opacity` (1: as usual). */
     layerlingGhost?: (ids: string[], opacity: number) => void;
+    /** Build 97: parts drawn see-through, each at its own opacity (0..1) - the bite contacts' arch sliders; null for none. */
+    layerlingPartOpacity?: (opacities: Record<string, number> | null) => void;
     layerlingStrokeMotion?: () => void;
     /** Build 87: work to run at the start of each drawn frame (Sculpt's stroke), or null. */
     layerlingOnFrame?: (run: (() => void) | null) => void;
@@ -9403,6 +9405,7 @@ export function WorkplaneViewport({
     window.layerlingTransformHandles = (hidden) => { transformHandlesHidden = hidden; const state = threeRef.current; if (state) state.needsRender = true; };
     // Build 94: the wax-up's ghost view.
     window.layerlingGhost = (ids, opacity) => { ghost = { ids: new Set(ids), opacity }; const state = threeRef.current; if (state) state.needsRender = true; };
+    window.layerlingPartOpacity = (opacities) => { partOpacity = new Map(Object.entries(opacities ?? {}).filter(([, value]) => value < 0.999)); const state = threeRef.current; if (state) state.needsRender = true; };
     // Build 85: a Sculpt stroke draws at standard resolution while it goes on, as turning the view does,
     // and at full sharpness again as soon as it stops - a quarter of the pixels on a Retina screen.
     window.layerlingStrokeMotion = () => {
@@ -9432,7 +9435,7 @@ export function WorkplaneViewport({
       if (state && id) state.scene.traverse((object) => { if (object !== mesh && object.userData.shapeId === id && object.visible) showing += 1; });
       return { drawn: Boolean(mesh), inScene: Boolean(mesh?.parent), hidden: hidden.length, showing, triangles: mesh ? (mesh.geometry.getAttribute("position") as THREE.BufferAttribute).count / 3 : 0 };
     };
-    return () => { clear(); clearOverlay(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingColorOverlay; delete window.layerlingRedraw; delete window.layerlingViewLook; delete window.layerlingStrokeMotion; delete window.layerlingOnFrame; beforeFrame = null; delete window.layerlingScreenRay; };
+    return () => { clear(); clearOverlay(); delete window.layerlingSculptPreview; delete window.layerlingSculptLive; delete window.layerlingColorOverlay; delete window.layerlingPartOpacity; delete window.layerlingRedraw; delete window.layerlingViewLook; delete window.layerlingStrokeMotion; delete window.layerlingOnFrame; beforeFrame = null; delete window.layerlingScreenRay; };
   }, []);
   // Fork (build 53): Dental Studio's tooth area, tinted over the scan while it is being designated.
   useEffect(() => {
@@ -11606,15 +11609,21 @@ let transformHandlesHidden = false;
 /** Build 94: Wax-up Studio's ghost view - these parts (the wax teeth) drawn see-through at this opacity. */
 let ghost: { ids: Set<string>; opacity: number } = { ids: new Set(), opacity: 1 };
 let ghostShown = false;
+/** Build 97: parts at an opacity of their own (the bite contacts' sliders) - a part's colour overlay too. */
+let partOpacity = new Map<string, number>();
 /** Each frame: the ghost parts get a see-through copy of their material (the original kept to put back). */
 function applyGhost(state: ThreeState) {
-  const active = ghost.opacity < 0.999 && ghost.ids.size > 0;
+  const active = (ghost.opacity < 0.999 && ghost.ids.size > 0) || partOpacity.size > 0;
   if (!active && !ghostShown) return;
   state.scene.traverse((object) => {
     const mesh = object as THREE.Mesh;
     if (!mesh.isMesh) return;
     const own = mesh.userData.ghostOriginal as THREE.Material | undefined;
-    const wanted = active && ghost.ids.has(mesh.userData.shapeId as string);
+    const id = (mesh.userData.shapeId ?? mesh.userData.colorOverlayOf) as string | undefined;
+    let opacity = 1;
+    if (id && ghost.opacity < 0.999 && ghost.ids.has(id)) opacity = ghost.opacity;
+    if (id && partOpacity.has(id)) opacity = Math.min(opacity, partOpacity.get(id)!);
+    const wanted = active && opacity < 0.999;
     if (wanted) {
       // A material replaced since (the part redrawn) is taken as the new original.
       const current = mesh.material as THREE.Material;
@@ -11627,8 +11636,8 @@ function applyGhost(state: ThreeState) {
       }
       const m = mesh.userData.ghostMaterial as THREE.Material;
       m.transparent = true;
-      m.opacity = ghost.opacity;
-      m.depthWrite = ghost.opacity > 0.9;
+      m.opacity = opacity;
+      m.depthWrite = opacity > 0.9;
       mesh.renderOrder = 2;
     } else if (own) {
       if (mesh.material === mesh.userData.ghostMaterial) mesh.material = own;

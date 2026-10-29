@@ -2042,6 +2042,12 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .bite-scale-ticks li, .bite-scale-words li { position: absolute; left: 6px; transform: translateY(-50%); font-size: 11px; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bite-scale-ticks li::before { content: ""; position: absolute; left: -6px; top: 50%; width: 4px; border-top: 1px solid #6b7480; }
 .bite-scale-words li { color: #5b6573; }
+.bite-see-through { display: grid; gap: 4px; padding-top: 4px; border-top: 1px solid var(--border, #d4dae3); }
+.bite-opacity { display: grid; grid-template-columns: 46px 1fr 38px; align-items: center; gap: 6px; }
+.bite-opacity output { text-align: right; font-variant-numeric: tabular-nums; color: #5b6573; }
+.bite-look { display: flex; flex-wrap: wrap; gap: 4px; }
+.bite-look button { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border, #d4dae3); background: #fff; border-radius: 7px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+.bite-look button:hover { background: #f1f5fb; }
 .sculpt-radial { position: fixed; z-index: 70; width: 0; height: 0; pointer-events: none; }
 .sculpt-radial button { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; min-width: 74px; padding: 6px 9px; border-radius: 999px; border: 1px solid var(--border, #d4dae3); background: rgba(255, 255, 255, 0.97); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2); font-size: 12px; font-weight: 600; cursor: pointer; }
 .sculpt-radial button.active { color: var(--accent, #1f5fbf); border-color: var(--accent, #1f5fbf); }

@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 97,
+    items: [
+      "Bite contacts belong to Dental Studio: shown in occlusion or with the scans side by side - laid open, each arch shows the contacts it makes in the bite, as your scanner shows them. Two loose scans on the plate no longer offer it.",
+      "In occlusion, a slider for each arch's opacity and views from above and below: turn the upper down and look through it at the contacts on the lower (or the other way round), as Exocad's viewer does.",
+    ],
+  },
+  {
     build: 96,
     items: [
       "Sculpt's selection bar no longer follows the selection round the model: it sits on one row below the toolbar, shows how much is selected, and can be dragged anywhere by its grip (double-click the grip to put it back).",

@@ -364,7 +364,7 @@ export function DentalStudioPanel({
             </div>
           ) : null}
           {/* Build 84: the bite contacts & clearance map, in occlusion. */}
-          {onBiteMap && analysis && slots.upper && slots.lower && layout === "occlusion" ? (
+          {onBiteMap && analysis && slots.upper && slots.lower ? (
             <div className="dental-bite-map">
               <label className="edge-modifier-check" title={t("dental.biteMapHint")}>
                 <input type="checkbox" checked={Boolean(biteMap?.on)} disabled={busy} onChange={(event) => onBiteMap(event.currentTarget.checked)} />
