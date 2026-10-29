@@ -296,6 +296,9 @@ export function DentalStudioPanel({
   const waxAutoTried = useRef(new Set<string>());
   useEffect(() => {
     if (!waxStep || !wv || !waxup) return;
+    // The other arch chosen further on, with nothing placed on it yet: back to Find teeth for it.
+    const past = ["choose", "set", "place", "adjust", "occlusion", "make"].includes(waxStep);
+    if (past && !wv.placed.length && !waxAutoDone.current.has(wv.slot)) { setWaxStepId("find"); return; }
     if (waxStep === "find" && !waxAutoDone.current.has(wv.slot)) { waxAutoDone.current.add(wv.slot); setWaxAuto(true); }
   }, [waxStep, wv?.slot]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

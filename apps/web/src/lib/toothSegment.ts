@@ -12,11 +12,14 @@
  *    most. The quadrant from the side of the midline - so a numbering slip, or a tooth the network
  *    gave the other side's label, is put right.
  * 5. Each triangle of the full scan takes the label of the nearest reduced triangle.
+ * 6. Build 101: the border between the teeth and the gum settled again on the full scan, into the
+ *    margin's groove (lib/gumLine), so the gum line is clean rather than stepped.
  */
 import * as THREE from "three";
 import { weld, type Mesh } from "@/lib/dentalMesh";
 import { simplifyTrianglePositions } from "@/lib/meshSimplify";
 import type { Neighbours, ToothNet } from "@/lib/toothNet";
+import { refineGumLine } from "@/lib/gumLine";
 
 /** The network's points: its input is always this many. */
 export const NET_POINTS = 16000;
@@ -445,11 +448,12 @@ export async function findTeeth(soup: Float32Array, arch: "upper" | "lower", net
     full[t] = fdiOfRegion[r - 1];
     for (let k = 0; k < 3; k += 1) if (soup[o + k * 3 + 2] > top[r - 1][2]) top[r - 1] = [soup[o + k * 3], soup[o + k * 3 + 1], soup[o + k * 3 + 2]];
   }
+  const clean = refineGumLine(soup, full).labels;
   onProgress?.(1);
   const teeth: FoundTooth[] = info.map((e, i) => ({ fdi: numbers[i].fdi, centre: e.centre, top: top[i], area: e.area, confidence: e.conf, agreed: numbers[i].agreed }))
     .filter((tooth) => tooth.fdi > 0)
     .sort((a, b) => a.fdi - b.fdi);
-  return { fdi: full, teeth, seconds: (Date.now() - started) / 1000 };
+  return { fdi: clean, teeth, seconds: (Date.now() - started) / 1000 };
 }
 
 /**
