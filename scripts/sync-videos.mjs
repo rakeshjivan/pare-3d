@@ -20,7 +20,8 @@ const END = "<!-- videos:end -->";
 const DISCUSSION_NUMBER = 296;
 
 /** README file -> the guide language its list is taken from. */
-export const README_LANGUAGES = { "README.md": "en" };
+// Pare 3D (build 99): its README carries no list of the layerling videos.
+export const README_LANGUAGES = {};
 
 /** The lines of the video chapter of a language: "- [title](https://...) - channel (language). description". */
 export function chapterVideoLines(language, base = root) {
