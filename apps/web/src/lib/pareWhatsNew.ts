@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 96,
+    items: [
+      "Sculpt's selection bar no longer follows the selection round the model: it sits on one row below the toolbar, shows how much is selected, and can be dragged anywhere by its grip (double-click the grip to put it back).",
+      "Smooth, Soft transform and Delete clear the selection once done, and Done on the bar clears it and closes the bar - no Esc needed to start a new selection. Grow, Shrink, Smooth edge and Invert keep the bar open.",
+      "Sculpt's dental presets show only on dental scans and models.",
+      "Bite contacts, the way your scanner shows them: green 2 mm away through yellow and orange to red at contact, blue to purple where the scans overlap, with a scale bar and Contact only - so it can be checked against the scanner's own occlusion map. A button at the bottom left of the view whenever two dental arches are selected, in Dental Studio or not.",
+    ],
+  },
+  {
     build: 95,
     items: [
       "Deviation from the original in Sculpt no longer holds the page up: it now shows in under half a second on a full-arch scan (it took about ten seconds, after every stroke).",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bandOf, biteContactMap, contactColors, signedDistances } from "@/lib/biteContacts";
+import { biteContactMap, contactColor, contactColors, signedDistances } from "@/lib/biteContacts";
 
 /** A flat sheet at height z (n x n squares over [-10, 10]), facing up or down. */
 function sheet(z: number, up: boolean, n = 40, bump?: (x: number, y: number) => number) {
@@ -37,14 +37,19 @@ describe("bite contacts & clearance (build 84)", () => {
   });
 
   it("bands, colours and the summary", () => {
-    expect(bandOf(-0.2)?.key).toBe("overlapDeep");
-    expect(bandOf(-0.07)?.key).toBe("overlap");
-    expect(bandOf(-0.01)?.key).toBe("touch");
-    expect(bandOf(0.02)?.key).toBe("close");
-    expect(bandOf(0.07)?.key).toBe("near");
-    expect(bandOf(0.15)?.key).toBe("clear");
-    expect(bandOf(0.3)).toBeNull();
-    expect(bandOf(Number.NaN)).toBeNull();
+    // Build 96: the scanner programs' scale - red at contact, yellow at 1 mm, green at 2 mm, blue to
+    // purple in overlap, nothing beyond 2 mm; Contact only keeps under 0.10 mm and the overlaps.
+    const red = contactColor(0.01)!, yellow = contactColor(1)!, green = contactColor(2)!, blue = contactColor(-0.01)!, purple = contactColor(-0.5)!;
+    expect(red[0]).toBeGreaterThan(0.8); expect(red[1]).toBeLessThan(0.25);
+    expect(yellow[0]).toBeGreaterThan(0.9); expect(yellow[1]).toBeGreaterThan(0.8);
+    expect(green[1]).toBeGreaterThan(0.6); expect(green[0]).toBeLessThan(0.2);
+    expect(blue[2]).toBeGreaterThan(0.9); expect(blue[0]).toBeLessThan(0.3);
+    expect(purple[0]).toBeGreaterThan(0.4); expect(purple[2]).toBeGreaterThan(0.8);
+    expect(contactColor(2.5)).toBeNull();
+    expect(contactColor(Number.NaN)).toBeNull();
+    expect(contactColor(0.5, true)).toBeNull();
+    expect(contactColor(0.05, true)).not.toBeNull();
+    expect(contactColor(-0.1, true)).not.toBeNull();
     const lower = sheet(0, true);
     const upper = sheet(0.15, false, 40, (x, y) => -0.27 * Math.exp(-(x * x + y * y) / 4));
     const map = biteContactMap(upper, lower);
@@ -54,8 +59,17 @@ describe("bite contacts & clearance (build 84)", () => {
     const colors = contactColors(map.upper, "#919191");
     expect(colors.length).toBe(map.upper.length * 3);
     // A far corner keeps the scan's grey.
-    const far = Array.from(map.upper).findIndex((v) => !Number.isFinite(v) || v > 0.2);
+    const far = Array.from(map.upper).findIndex((v) => !Number.isFinite(v) || v > 2);
     if (far >= 0) expect(colors[far * 3]).toBeCloseTo(0x91 / 255, 3);
+  });
+
+  it("measures out to 2 mm, the far part to the nearest corner (build 96)", () => {
+    const lower = sheet(0, true, 80);
+    const upper = sheet(1.2, false, 80);
+    const d = Array.from(signedDistances(upper, lower)).filter((v) => Number.isFinite(v));
+    expect(d.length).toBeGreaterThan(1000);
+    for (const v of d) expect(Math.abs(v - 1.2)).toBeLessThan(0.15);
+    expect(Array.from(signedDistances(sheet(2.5, false, 20), lower)).every((v) => !Number.isFinite(v))).toBe(true);
   });
 
   it("is quick on a scan-sized pair", () => {

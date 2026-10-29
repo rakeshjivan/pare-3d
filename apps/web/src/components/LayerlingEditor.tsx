@@ -9993,8 +9993,12 @@ export function LayerlingEditor({
   };
   const [dentalStudio, setDentalStudio] = useState<DentalStudioState | null>(null);
   // Build 84: the bite contacts & clearance map - on, being worked out, its summary.
-  const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; /** Build 96: the two parts (upper first), and whether they are the studio's. */ ids: [string, string]; studio: boolean } | null>(null);
+  const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; /** Build 96: the two parts (upper first), and whether they are the studio's. */ ids: [string, string]; studio: boolean; /** Build 96: the contacts and overlaps only. */ contactOnly?: boolean } | null>(null);
+  /** Build 96: the last map worked out, kept to colour again (Contact only) without working it out again. */
+  const biteMapLast = useRef<{ key: string; upperId: string; lowerId: string; up: Float32Array; low: Float32Array; upper: Float32Array; lower: Float32Array; upperColor: string; lowerColor: string } | null>(null);
   const biteMapRun = useRef(0);
+  const biteMapRef = useRef(biteMap);
+  biteMapRef.current = biteMap;
   const dentalStudioRef = useRef(dentalStudio);
   dentalStudioRef.current = dentalStudio;
   const dentalRun = useRef(0);
@@ -10571,9 +10575,11 @@ export function LayerlingEditor({
         const up = Float32Array.from(worldTriangles(upper)), low = Float32Array.from(worldTriangles(lower));
         const map = await biteContactsInBackground(up, low);
         if (run !== biteMapRun.current) return;
+        const only = Boolean(biteMapRef.current?.contactOnly);
+        biteMapLast.current = { key, upperId: upper.id, lowerId: lower.id, up, low, upper: map.upper, lower: map.lower, upperColor: upper.color || "#919191", lowerColor: lower.color || "#919191" };
         window.layerlingColorOverlay?.([
-          { shapeId: upper.id, positions: up, colors: contactColors(map.upper, upper.color || "#919191") },
-          { shapeId: lower.id, positions: low, colors: contactColors(map.lower, lower.color || "#919191") },
+          { shapeId: upper.id, positions: up, colors: contactColors(map.upper, upper.color || "#919191", only) },
+          { shapeId: lower.id, positions: low, colors: contactColors(map.lower, lower.color || "#919191", only) },
         ]);
         setBiteMap((current) => current?.on ? { ...current, busy: false, key, upper: map.upperStats, lower: map.lowerStats } : current);
       } catch (error) {
@@ -10582,6 +10588,16 @@ export function LayerlingEditor({
       }
     }, 30);
   }, [biteMap?.on, biteMap?.key, biteMap?.studio, biteMap?.ids, dentalStudio?.layout, dentalStudio?.slots.upper, dentalStudio?.slots.lower, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Build 96: Contact only on or off - the map worked out already, coloured again.
+  useEffect(() => {
+    const last = biteMapLast.current;
+    if (!biteMap?.on || biteMap.busy || !last || last.key !== biteMap.key) return;
+    const only = Boolean(biteMap.contactOnly);
+    window.layerlingColorOverlay?.([
+      { shapeId: last.upperId, positions: last.up, colors: contactColors(last.upper, last.upperColor, only) },
+      { shapeId: last.lowerId, positions: last.low, colors: contactColors(last.lower, last.lowerColor, only) },
+    ]);
+  }, [biteMap?.contactOnly]); // eslint-disable-line react-hooks/exhaustive-deps
   // The studio's map goes when Dental Studio closes (one made outside it stays).
   const studioOpen = Boolean(dentalStudio);
   useEffect(() => {
@@ -17696,7 +17712,7 @@ export function LayerlingEditor({
       ) : null}
       {/* Build 96: the bite contacts, one click away whenever two arches are there to show them for. */}
       {!sculptTool && dentalStudio?.stage !== "making" && (biteMap?.on || biteCandidate) ? (
-        <BiteContactsCard biteMap={biteMap} onToggle={toggleBiteMap}
+        <BiteContactsCard biteMap={biteMap} onToggle={toggleBiteMap} onContactOnly={(contactOnly) => setBiteMap((current) => current ? { ...current, contactOnly } : current)}
           hint={biteMap?.on ? null : biteCandidate?.studio ? (dentalStudio?.layout !== "occlusion" ? t("dental.biteMapToBite") : null) : t("dental.biteMapPair")} />
       ) : null}
       {sculptTool && !sculptTool.trim && sculptTool.chosen > 0 && !sculptTool.soft ? (
