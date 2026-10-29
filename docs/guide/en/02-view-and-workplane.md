@@ -87,6 +87,10 @@ The switch at the top of the window, beside {{ui:workspace.simpleMode}}, sets ho
 
 An imported STL comes in light grey and a little glossy, as in Meshmixer, so the bumps and hollows of a scan show (it was blue). Give it any colour you like in its properties.
 
+## Box or gimbal
+
+Beside {{ui:inspector.snapGrid}} at the bottom of the properties window, the switch **{{ui:handleStyle.box}} | {{ui:handleStyle.gimbal}}** sets how a selected part is moved and turned. **{{ui:handleStyle.box}}** is Tinkercad's way: resize corners, sizes on the part, the lift arrow and three turning arrows. **{{ui:handleStyle.gimbal}}** is the way of Meshmixer, Medit and Bambu Studio: three arrows to move the part along - red and blue across the plate, green up - and three rings to turn it on, all about its middle, with no box, sizes or distances on the part. Drag an arrow and the part moves along it by the snap step, the distance shown as it goes; drag a ring and it turns, the angle shown. The arrows and rings stand on the part's own axes, so they turn with it. Sizes are typed in the properties window. The choice is kept on this computer. In Dental Studio and Wax-up Studio the gimbal shows too, while the box is put away; the scans themselves stay held in the bite either way.
+
 ## Grid and snapping
 
 The grid shows the size of the plate. At the bottom right is the **snap step**: moving and scaling snap in steps of that size, for example 1 mm. Make it smaller for fine work and larger for rough arranging. {{ui:editor.tool.snapToGrid}} in the ribbon moves the selected shapes afterwards onto the nearest grid crossing. While moving, shapes also snap to other shapes, see [Selecting and arranging](chapter:select-and-arrange).

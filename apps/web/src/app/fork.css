@@ -2057,3 +2057,21 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .sculpt-radial button.active { color: var(--accent, #1f5fbf); border-color: var(--accent, #1f5fbf); }
 .sculpt-radial button.hover { background: var(--accent, #1f5fbf); color: #fff; }
 .sculpt-radial-hint { position: absolute; top: 132px; transform: translate(-50%, -50%); white-space: nowrap; font-size: 11px; color: #fff; background: rgba(0, 0, 0, 0.55); padding: 2px 7px; border-radius: 6px; }
+
+/* Build 99: the gimbal - arrows to move along, rings to turn on (Meshmixer, Medit, Bambu Studio). */
+.gimbal-overlay { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.gimbal-overlay svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.gimbal-overlay .gimbal-hit { pointer-events: stroke; stroke: transparent; stroke-width: 16; fill: none; cursor: grab; }
+.gimbal-overlay .gimbal-hit:active { cursor: grabbing; }
+.gimbal-overlay .gimbal-line { pointer-events: none; fill: none; stroke-width: 3; stroke-linecap: round; }
+.gimbal-ring .gimbal-line { stroke-width: 2.5; opacity: 0.9; }
+.gimbal-overlay .axis-x .gimbal-line, .gimbal-head.axis-x path { stroke: #e0352b; fill: #e0352b; }
+.gimbal-overlay .axis-y .gimbal-line, .gimbal-head.axis-y path { stroke: #2aa52f; fill: #2aa52f; }
+.gimbal-overlay .axis-z .gimbal-line, .gimbal-head.axis-z path { stroke: #2f6fe0; fill: #2f6fe0; }
+.gimbal-ring .gimbal-line { fill: none !important; }
+.gimbal-overlay g:hover .gimbal-line { stroke-width: 4.5; opacity: 1; }
+.gimbal-overlay .faint { opacity: 0.18; }
+.gimbal-middle { fill: #fff; stroke: #3a4452; stroke-width: 1.5; pointer-events: none; }
+.gimbal-overlay.locked .gimbal-hit { cursor: not-allowed; }
+.gimbal-overlay.locked .gimbal-line { opacity: 0.35; }
+.snap-units.handle-style { margin-left: 6px; }

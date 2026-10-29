@@ -347,6 +347,16 @@ export type TransformOverlayState = {
   rotationPlanes: Record<RotationAxis, RotationPlaneView>;
   /** Screen position of the rotation pivot the user set; null without one. */
   pivotMarker: { x: number; y: number } | null;
+  /** Build 99: the gimbal (the handle style switched to it); absent or null with the box. */
+  gimbal?: GimbalView | null;
+};
+
+/** Build 99: the gimbal on the screen - its middle, an arrow tip per axis and a ring path per axis. */
+export type GimbalView = {
+  x: number;
+  y: number;
+  arrows: Array<{ axis: RotationAxis; x: number; y: number }>;
+  rings: Array<{ axis: RotationAxis; path: string }>;
 };
 
 export type RotationReadout = {

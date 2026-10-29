@@ -82,6 +82,7 @@ import { MeshSculptPanel, type SculptBrushOptions, type SoftTransform, type Scul
 import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import { SculptSelectionBar } from "./workplane/SculptSelectionBar";
 import { BiteContactsCard } from "./workplane/BiteContactsCard";
+import { useHandleStyle } from "@/lib/handleStyle";
 import { RADIAL_TOOLS, SculptRadialMenu, radialIndex } from "./workplane/SculptRadialMenu";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
@@ -16414,7 +16415,10 @@ export function LayerlingEditor({
   const [handlesHidden, setHandlesHidden] = useState(false);
   // Build 98: and while Dental Studio (or Wax-up Studio) is open - the studio places the scans itself
   // (side by side, in occlusion), and its scans are held still, below.
-  const handlesAway = Boolean(sculptTool) || Boolean(dentalStudio);
+  // Build 99: with the gimbal there is no box or sizes to tidy away: it shows in the studio too (the scans
+  // themselves stay held, below; wax-up teeth and other parts move and turn with it).
+  const handleStyleNow = useHandleStyle();
+  const handlesAway = Boolean(sculptTool) || (Boolean(dentalStudio) && handleStyleNow === "box");
   /**
    * Build 98: the studio's scans held still while it is open - a stray drag or turn knocked a scan out of
    * the bite. Locked only in what the view is given (not in the design), so nothing is saved locked.

@@ -160,6 +160,7 @@ import {
 } from "@/lib/bentTubeGeometry";
 import { displayStepFromMillimeters, formatFractionalInches, showsInchFractions, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, measurementOptionLabel, millimetersToDisplay, parseMeasurementInput, resolveMeasurementInput } from "@/lib/measurementUnits";
 import { t, type MessageKey } from "@/lib/i18n";
+import { setHandleStyle, useHandleStyle } from "@/lib/handleStyle";
 import { localizedError } from "@/lib/userErrors";
 import { displayShapeName, makeShapeFromAsset, renamedShapeName } from "@/lib/shapeCatalog";
 import { cylinderToEllipsePatch } from "@/lib/cylinderToEllipse";
@@ -4386,6 +4387,8 @@ export function SnapGridControl({
   onObjectSnapChange?: (enabled: boolean) => void;
 }) {
   const label = (size: GridSize) => customSnapGridLabel(size, customGrids) ?? measurementOptionLabel(size);
+  // Build 99: the box (Tinkercad) or the gimbal (Meshmixer), in the 3D editor.
+  const style = useHandleStyle();
   // The menu goes onto the page itself: the corner of the 3D view lies under the toolbar and its pinned Shapes
   // panel, so no z-index within it could bring the menu over them (#616, still behind it after 1.93.0).
   const selectRef = useRef<HTMLButtonElement>(null);
@@ -4421,6 +4424,12 @@ export function SnapGridControl({
         <span className="snap-units" role="group" aria-label={t("inspector.unitsSwitch")} title={t("inspector.unitsSwitch")}>
           <button type="button" data-help={t("inspector.unitsSwitch")} aria-pressed={units === "Metric (Default)"} onClick={() => onUnitsChange("Metric (Default)")}>mm</button>
           <button type="button" data-help={t("inspector.unitsSwitch")} aria-pressed={units === "Imperial"} onClick={() => onUnitsChange("Imperial")}>in</button>
+        </span>
+      ) : null}
+      {onObjectSnapChange ? (
+        <span className="snap-units handle-style" role="group" aria-label={t("handleStyle.label")} title={t("handleStyle.hint")}>
+          <button type="button" data-help={t("handleStyle.hint")} aria-pressed={style === "box"} onClick={() => setHandleStyle("box")}>{t("handleStyle.box")}</button>
+          <button type="button" data-help={t("handleStyle.hint")} aria-pressed={style === "gimbal"} onClick={() => setHandleStyle("gimbal")}>{t("handleStyle.gimbal")}</button>
         </span>
       ) : null}
       {snapOpen && menuPlace ? createPortal(

@@ -27,6 +27,9 @@ import { spreadAlignHandles } from "@/lib/alignHandleSpread";
 import { AlignOverlay, MirrorOverlay, type AlignOverlayState, type MirrorOverlayState } from "@/components/workplane/ActionOverlays";
 import { MoveDimensionOverlay } from "@/components/workplane/MoveDimensionOverlay";
 import { OriginDimensionOverlay } from "@/components/workplane/OriginDimensionOverlay";
+import { GimbalOverlay } from "@/components/workplane/GimbalOverlay";
+import { useHandleStyle, type HandleStyle } from "@/lib/handleStyle";
+import type { GimbalView } from "@/components/workplane/transformOverlayTypes";
 import { SelectionInspector, ShapeInspector, SnapGridControl, type IconTagControls, type QrCodeControls, type ShapeInspectorUpdateOptions, type TextLayerPatch } from "@/components/workplane/ShapeInspector";
 import type { NameTagStack } from "@/lib/nameTag";
 import { WorkspaceSettingsModal } from "@/components/workplane/WorkspaceSettingsModal";
@@ -820,6 +823,8 @@ type TransformDragState = {
   scaleAnchorPoint?: THREE.Vector3;
   scaleStartPoint?: THREE.Vector3;
   liftAxis?: THREE.Vector3;
+  /** Build 99: a gimbal arrow - moved along this axis by the snap step, its distance shown (not the elevation). */
+  gimbalMove?: boolean;
   liftPlane?: THREE.Plane;
   liftStartPoint?: THREE.Vector3;
   liftHandlePoint?: THREE.Vector3;
@@ -2286,7 +2291,7 @@ function syncOriginDimensionOverlay(
     return;
   }
   // Build 98: put away with the handles (Sculpt, Dental Studio, or from the right-click menu).
-  const frame = shapes?.length && !transformHandlesHidden ? originFrameForShapes(shapes, workplane, accuracy) : null;
+  const frame = shapes?.length && !transformHandlesHidden && handleStyleNow !== "gimbal" ? originFrameForShapes(shapes, workplane, accuracy) : null;
   syncOriginDimensionWorldLines(state, frame, theme);
   const rect = state.renderer.domElement.getBoundingClientRect();
   const next = frame && (frame.distanceX !== null || frame.distanceZ !== null)
@@ -5899,7 +5904,7 @@ export function WorkplaneViewport({
   }, [onDuplicateShapesMoved]);
 
   const beginTransform = useCallback(
-    (kind: TransformHandleKind, handleKey: string, event: ReactPointerEvent<Element>) => {
+    (kind: TransformHandleKind, handleKey: string, event: ReactPointerEvent<Element>, moveAlong?: THREE.Vector3) => {
       if (event.button !== 0) {
         return;
       }
@@ -5946,9 +5951,9 @@ export function WorkplaneViewport({
       const scaleStartPoint = scalePlane ? toRawPlanePoint(event.clientX, event.clientY, scalePlane) ?? undefined : undefined;
       const scaleSigns = kind === "scale" ? resizeSignsForHandle(resizeHandleKey) : undefined;
       const scaleAnchorPoint = kind === "scale" && scaleSigns ? resizeAnchorPointForFrame(frame, scaleSigns) : undefined;
-      const liftAxis = kind === "lift" ? lift.axis : kind === "height" ? frame.yAxis.clone().normalize() : undefined;
+      const liftAxis = kind === "lift" ? (moveAlong?.clone().normalize() ?? lift.axis) : kind === "height" ? frame.yAxis.clone().normalize() : undefined;
       const liftHandlePoint = liftAxis
-        ? (kind === "lift"
+        ? (moveAlong ? frame.center.clone() : kind === "lift"
             ? lift.pointAt(handlesLowerSide ? lift.low : lift.high).addScaledVector(liftAxis, liftOffset)
             : framePoint(frame, 0, handlesLowerSide ? frame.min.y : frame.max.y, 0).addScaledVector(liftAxis, liftOffset))
         : undefined;
@@ -5957,7 +5962,7 @@ export function WorkplaneViewport({
         : undefined;
       const liftStartPoint = liftPlane ? toRawPlanePoint(event.clientX, event.clientY, liftPlane) ?? undefined : undefined;
       const liftStartValue = kind === "lift"
-        ? lift.elevation
+        ? (moveAlong ? 0 : lift.elevation)
         : undefined;
       if (kind === "scale" && !scaleStartPoint) {
         return;
@@ -6011,6 +6016,7 @@ export function WorkplaneViewport({
         scaleAnchorPoint,
         scaleStartPoint,
         liftAxis,
+        gimbalMove: Boolean(moveAlong),
         liftPlane,
         liftStartPoint,
         liftHandlePoint,
@@ -6055,6 +6061,26 @@ export function WorkplaneViewport({
     },
     [beginLiftDuplicate, clearMoveDimensions, onInteractionActiveChange, rememberResizeAnchor, toRawPlanePoint],
   );
+
+  // Build 99: the gimbal's arrows move along the selection's own axes; its rings turn about them.
+  const [gimbalActive, setGimbalActive] = useState<{ kind: "move" | "turn"; axis: RotationAxis } | null>(null);
+  const beginGimbalMove = useCallback((axis: RotationAxis, event: ReactPointerEvent<Element>) => {
+    const frame = selectionFrameForShapes(shapesRef.current, selectedIdsRef.current, placementWorkplaneRef.current);
+    if (!frame) return;
+    const along = (axis === "x" ? frame.xAxis : axis === "y" ? frame.yAxis : frame.zAxis).clone().normalize();
+    setGimbalActive({ kind: "move", axis });
+    beginTransform("lift", `gimbal-move-${axis}`, event, along);
+  }, [beginTransform]);
+  const beginGimbalTurn = useCallback((axis: RotationAxis, event: ReactPointerEvent<Element>) => {
+    setGimbalActive({ kind: "turn", axis });
+    beginTransform("rotate", `gimbal-rotate-${axis}`, event);
+  }, [beginTransform]);
+  const gimbalStyle = useHandleStyle();
+  useEffect(() => {
+    handleStyleNow = gimbalStyle;
+    const state = threeRef.current;
+    if (state) state.needsRender = true;
+  }, [gimbalStyle]);
 
   // The pivot marker can be dragged to a new place (#140); it is set where it is let go.
   const beginPivotDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
@@ -6236,7 +6262,10 @@ export function WorkplaneViewport({
           ? currentPoint.clone().sub(transform.liftStartPoint).dot(axis)
           : 0;
         // The bottom lands on the grid of the workplane, not a step from where it stood.
-        const delta = liftDeltaOnGrid(liftGeometryForFrame(transform.selectionFrame, placementWorkplaneRef.current).low, rawDelta, step);
+        // Build 99: a gimbal arrow moves by whole snap steps from where the part stood.
+        const delta = transform.gimbalMove
+          ? (step > 0 ? Math.round(rawDelta / step) * step : rawDelta)
+          : liftDeltaOnGrid(liftGeometryForFrame(transform.selectionFrame, placementWorkplaneRef.current).low, rawDelta, step);
         transform.items.forEach((item) => {
           const nextCenter = item.startCenter.clone().addScaledVector(axis, delta);
           onUpdateShape(item.id, {
@@ -6254,7 +6283,7 @@ export function WorkplaneViewport({
           setRotationReadout({
             x: readoutPoint.x + 28,
             y: readoutPoint.y - 30,
-            text: formatMeasure((transform.liftStartValue ?? 0) + delta, workspaceRef.current.accuracy),
+            text: transform.gimbalMove ? `${delta >= 0 ? "+" : "−"}${formatMeasure(Math.abs(delta), workspaceRef.current.accuracy)}` : formatMeasure((transform.liftStartValue ?? 0) + delta, workspaceRef.current.accuracy),
           });
         }
         return true;
@@ -10656,7 +10685,22 @@ export function WorkplaneViewport({
           {!workplaneMode && !splitActive && originDimensionsEnabled && originDimensionOverlay ? (
             <OriginDimensionOverlay overlay={originDimensionOverlay} />
           ) : null}
-          {!workplaneMode && !splitActive && !pivotPickMode && !layFlatPickMode && !mateFacePick && !cadFacePick && transformOverlay && !alignMode && !mirrorMode && !tapeMode && !tapeDeleteMode && !tapeMoveMode && !modifierActive ? (
+          {!workplaneMode && !splitActive && !pivotPickMode && !layFlatPickMode && !mateFacePick && !cadFacePick && transformOverlay && transformOverlay.gimbal && !alignMode && !mirrorMode && !tapeMode && !tapeDeleteMode && !tapeMoveMode && !modifierActive ? (
+            <GimbalOverlay
+              view={transformOverlay.gimbal}
+              width={transformOverlay.width}
+              height={transformOverlay.height}
+              active={gimbalActive}
+              readout={rotationReadout}
+              locked={selectionLocked}
+              onMove={beginGimbalMove}
+              onTurn={beginGimbalTurn}
+              onDrag={updateTransform}
+              onEnd={(event) => { setGimbalActive(null); finishTransform(event); }}
+              onBeginCameraDrag={beginCameraDragFromOverlay}
+              onCameraWheel={forwardCameraWheelFromOverlay}
+            />
+          ) : !workplaneMode && !splitActive && !pivotPickMode && !layFlatPickMode && !mateFacePick && !cadFacePick && transformOverlay && !alignMode && !mirrorMode && !tapeMode && !tapeDeleteMode && !tapeMoveMode && !modifierActive ? (
             <TransformOverlay
               box={transformOverlay}
               measureKey={pinnedMeasureKey ?? hoverMeasureKey}
@@ -11607,6 +11651,8 @@ let viewLook: ViewLook = "plate";
 let viewFastMode = false;
 /** Build 90: the selection's handles, sizes and lines put away (right-click menu), so a mesh is not resized by accident. */
 let transformHandlesHidden = false;
+/** Build 99: the box (Tinkercad) or the gimbal (Meshmixer) - set from the switch beside Snap Grid. */
+let handleStyleNow: HandleStyle = "box";
 /** Build 94: Wax-up Studio's ghost view - these parts (the wax teeth) drawn see-through at this opacity. */
 let ghost: { ids: Set<string>; opacity: number } = { ids: new Set(), opacity: 1 };
 let ghostShown = false;
@@ -13209,6 +13255,53 @@ function updateTransformOverlayDom(state: ThreeState, next: TransformOverlayStat
   });
 }
 
+/**
+ * Build 99: the gimbal on the screen - an arrow along each axis to move by, and a ring round each to turn
+ * on, about `center`, a fixed size on the screen however near the camera is. An arrow or ring seen edge
+ * on is left out (nothing to take hold of).
+ */
+const GIMBAL_ARROW = 86;
+const GIMBAL_RING = 66;
+function gimbalGeometry(
+  project: (point: THREE.Vector3) => { x: number; y: number; visible: boolean },
+  center: THREE.Vector3,
+  axes: Record<RotationAxis, THREE.Vector3>,
+  cameraDistance: number,
+): GimbalView {
+  const c = project(center);
+  const step = Math.max(0.05, cameraDistance * 0.01);
+  // Screen pixels per millimetre at the middle, the largest of the three axes (all three see the same distance).
+  const perMm = Math.max(0.0001, ...(["x", "y", "z"] as const).map((axis) => {
+    const p = project(center.clone().addScaledVector(axes[axis], step));
+    return Math.hypot(p.x - c.x, p.y - c.y) / step;
+  }));
+  const arrows: GimbalView["arrows"] = [];
+  const rings: GimbalView["rings"] = [];
+  (["x", "y", "z"] as const).forEach((axis) => {
+    const a = axes[axis].clone().normalize();
+    const tipWorld = center.clone().addScaledVector(a, GIMBAL_ARROW / perMm);
+    const tip = project(tipWorld);
+    const length = Math.hypot(tip.x - c.x, tip.y - c.y);
+    // Pointing at the camera (or away): too short on the screen to take hold of.
+    if (tip.visible && length > 18) arrows.push({ axis, x: tip.x, y: tip.y });
+    // The ring: the circle round this axis, drawn through 48 points.
+    const u = Math.abs(a.y) < 0.9 ? new THREE.Vector3(0, 1, 0).cross(a).normalize() : new THREE.Vector3(1, 0, 0).cross(a).normalize();
+    const v = a.clone().cross(u).normalize();
+    const r = GIMBAL_RING / perMm;
+    const points: string[] = [];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let k = 0; k <= 48; k += 1) {
+      const angle = (k / 48) * Math.PI * 2;
+      const p = project(center.clone().addScaledVector(u, Math.cos(angle) * r).addScaledVector(v, Math.sin(angle) * r));
+      points.push(`${k ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`);
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+    // Seen edge on, a ring is a line: no ring to take hold of.
+    if (Math.min(maxX - minX, maxY - minY) > 10) rings.push({ axis, path: points.join(" ") });
+  });
+  return { x: c.x, y: c.y, arrows, rings };
+}
+
 function syncTransformOverlay(
   state: ThreeState,
   shapes: WorkplaneShape[],
@@ -13292,7 +13385,8 @@ function syncTransformOverlay(
   };
   const bottomCenterWorld = framePoint(frame, 0, footprintY, 0);
   const topCenterWorld = framePoint(frame, 0, oppositeY, 0);
-  syncTransformGuideWorldLines(state, [
+  const gimbalStyle = handleStyleNow === "gimbal";
+  syncTransformGuideWorldLines(state, gimbalStyle ? null : [
     [topCenterWorld, bottomCenterWorld],
     [footprintWorld.nearLeft, footprintWorld.nearRight],
     [footprintWorld.nearRight, footprintWorld.farRight],
@@ -13477,21 +13571,26 @@ function syncTransformOverlay(
     return { x: screenCenter.x, y: screenCenter.y, radius: planeRadius };
   };
   const makeWorldPoint = (point: THREE.Vector3) => ({ x: point.x, y: point.y, z: point.z });
+  // Build 99: the gimbal's rings all turn about the middle (or the pivot set), where they are drawn.
+  const ringCenter = gimbalStyle ? (customPivot ?? frame.center) : null;
   const rotationWheels: Record<RotationAxis, { x: number; y: number; radius: number }> = {
-    x: makeWheel(xFaceCenter),
-    y: makeWheel(yFaceCenter),
-    z: makeWheel(zFaceCenter),
+    x: makeWheel(ringCenter ?? xFaceCenter),
+    y: makeWheel(ringCenter ?? yFaceCenter),
+    z: makeWheel(ringCenter ?? zFaceCenter),
   };
   const rotationPlaneCenters: Record<RotationAxis, { x: number; y: number; z: number }> = {
-    x: makeWorldPoint(xFaceCenter),
-    y: makeWorldPoint(yFaceCenter),
-    z: makeWorldPoint(zFaceCenter),
+    x: makeWorldPoint(ringCenter ?? xFaceCenter),
+    y: makeWorldPoint(ringCenter ?? yFaceCenter),
+    z: makeWorldPoint(ringCenter ?? zFaceCenter),
   };
   const rotationPlanes: Record<RotationAxis, RotationPlaneView> = {
-    x: makePlaneView(xFaceCenter, zFootAxis, yFootAxis, xFootAxis),
-    y: makePlaneView(yFaceCenter, xFootAxis, zFootAxis, yFootAxis),
-    z: makePlaneView(zFaceCenter, xFootAxis, yFootAxis, zFootAxis),
+    x: makePlaneView(ringCenter ?? xFaceCenter, zFootAxis, yFootAxis, xFootAxis),
+    y: makePlaneView(ringCenter ?? yFaceCenter, xFootAxis, zFootAxis, yFootAxis),
+    z: makePlaneView(ringCenter ?? zFaceCenter, xFootAxis, yFootAxis, zFootAxis),
   };
+  const gimbal = gimbalStyle && centerPoint.visible && !cameraInsideSelection
+    ? gimbalGeometry(project, ringCenter ?? frame.center, { x: xFootAxis, y: yFootAxis, z: zFootAxis }, cameraDistance)
+    : null;
 
   const handles = [
     { point: bottom.nearLeft, handle: { key: "near-left", className: "corner", kind: "scale" as const, x: bottom.nearLeft.x, y: bottom.nearLeft.y, title: t("transform.resize") } },
@@ -13568,10 +13667,12 @@ function syncTransformOverlay(
     width: rect.width,
     height: rect.height,
     guides: [],
-    handles: sizeFixed ? handles.filter((handle) => handle.kind !== "scale" && handle.kind !== "height") : handles,
-    rotateHandles,
-    dimensions: dimensionMarks,
-    alwaysVisibleDimensionKeys,
+    // Build 99: the gimbal has no box, sizes or turning arrows of its own.
+    handles: gimbalStyle ? [] : sizeFixed ? handles.filter((handle) => handle.kind !== "scale" && handle.kind !== "height") : handles,
+    rotateHandles: gimbalStyle ? [] : rotateHandles,
+    dimensions: gimbalStyle ? {} : dimensionMarks,
+    alwaysVisibleDimensionKeys: gimbalStyle ? [] : alwaysVisibleDimensionKeys,
+    gimbal,
     rotationWheel: rotationWheels.y,
     rotationWheels,
     rotationPlaneCenters,

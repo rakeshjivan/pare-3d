@@ -4,6 +4,13 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 99,
+    items: [
+      "A gimbal, as in Meshmixer, Medit and Bambu Studio: switch Box / Gimbal beside Snap Grid. Gimbal gives three arrows to move a part along (red, green up, blue) and three rings to turn it on, about its middle - no box, sizes or distances on the part. Box keeps Tinkercad's handles. Your choice is remembered.",
+      "With the gimbal, Dental Studio and Wax-up Studio show it too (the scans themselves stay held in the bite); with the box, the studio keeps its handles put away.",
+    ],
+  },
+  {
     build: 98,
     items: [
       "Dental Studio and Wax-up Studio hold their scans still: no handles, size marks or distances on them while the studio is open, and a stray drag or turn no longer knocks a scan out of the bite. The studio places them itself - Side by side or In occlusion.",
