@@ -51,6 +51,9 @@ export type WaxupView = {
   /** Build 94: the teeth found on this arch (FDI; agreed = the network's own number), and those chosen for the wax-up. */
   found: Array<{ fdi: number; agreed: boolean }> | null;
   chosen: number[];
+  /** Build 101: the wax-up's own Undo and Redo. */
+  canUndo?: boolean;
+  canRedo?: boolean;
   /** The teeth shown in colour over the scan. */
   teethShown: boolean;
   /** Build 94: each library tooth fitted to the patient's own (teeth found), or the set laid out by smile design from the landmarks. */
@@ -81,6 +84,8 @@ export type WaxupActions = {
   onArcDepth: (mm: number | null) => void;
   onProportions: (value: "natural" | "library") => void;
   onPlace: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
   onRemove: () => void;
   onSelect: (id: string) => void;
   onNudge: (id: string, nudge: ToothNudge, amount: number) => void;
@@ -115,7 +120,11 @@ export function waxupSummary(view: WaxupView) {
 /** Build 94: teeth in arch order (upper right to left, lower left to right), for the chips. */
 export const archOrder = (fdi: number) => { const q = Math.floor(fdi / 10), n = fdi % 10; return q === 1 || q === 4 ? -n : n; };
 
-export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }: { view: WaxupView; actions: WaxupActions; slots: { upper: boolean; lower: boolean }; busy: boolean; workspace: WorkplaneWorkspaceSettings; imt?: boolean }) {
+/** Build 101: Wax-up Studio's steps that live in this card (shown one at a time; all of them without a step). */
+export type WaxupPart = "find" | "choose" | "set" | "place" | "adjust" | "occlusion";
+
+export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, part }: { view: WaxupView; actions: WaxupActions; slots: { upper: boolean; lower: boolean }; busy: boolean; workspace: WorkplaneWorkspaceSettings; imt?: boolean; part?: WaxupPart }) {
+  const show = (which: WaxupPart) => !part || part === which;
   const file = useRef<HTMLInputElement>(null);
   const finderFile = useRef<HTMLInputElement>(null);
   const working = busy || view.busy;
@@ -133,8 +142,8 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
   const first = sorted.filter((tooth) => imtFirstInjection(tooth.fdi));
   return (
     <div className="waxup-card">
-      <p className="blend-hint">{t("waxup.hint")}</p>
-      {slots.upper && slots.lower ? (
+      {part ? null : <p className="blend-hint">{t("waxup.hint")}</p>}
+      {slots.upper && slots.lower && part !== "occlusion" ? (
         <div className="dental-trim-mode" role="radiogroup" aria-label={t("waxup.arch")}>
           {(["upper", "lower"] as const).map((slot) => (
             <button key={slot} type="button" role="radio" aria-checked={view.slot === slot} className={view.slot === slot ? "active" : ""} disabled={working} onClick={() => actions.onSlot(slot)}>
@@ -145,18 +154,22 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
       ) : null}
 
       {/* Build 94: the teeth found on the scan, and those to wax up. */}
+      {show("find") || show("choose") ? (
       <div className="dental-substep">
-        <h4 className="dental-substep-title">{t("waxup.findStep")}</h4>
+        {part ? null : <h4 className="dental-substep-title">{t("waxup.findStep")}</h4>}
         <input ref={finderFile} type="file" accept=".ptw" hidden onChange={(event) => { const f = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (f) actions.onLoadFinder(f); }} />
         {view.finder.name ? (
           <>
+            {show("find") ? (<>
             <div className="dental-trim-buttons">
               <button type="button" className={view.found ? "" : "active"} disabled={working || view.finder.busy} onClick={actions.onFindTeeth}>
                 {view.finder.busy ? <LoaderCircle className="edge-modifier-spinner" size={15} /> : null} {t(view.found ? "waxup.findAgain" : "waxup.find")}
               </button>
             </div>
             {view.finder.busy && view.finder.progress !== null ? <p className="blend-hint" role="status">{t("waxup.finding", { share: Math.round(view.finder.progress * 100) })}</p> : null}
-            {view.found ? (
+            </>) : null}
+            {view.found && part === "find" ? <p className="blend-hint">{t(view.found.length ? "waxup.foundHint" : "waxup.foundNone", { count: view.found.length })}</p> : null}
+            {view.found && show("choose") ? (
               <>
                 <p className="blend-hint">{t(view.found.length ? "waxup.foundHint" : "waxup.foundNone", { count: view.found.length })}</p>
                 <div className="waxup-teeth waxup-found" role="group" aria-label={t("waxup.chooseTeeth")}>
@@ -177,8 +190,8 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
                   <span>{t("waxup.showTeeth")}</span>
                 </label>
               </>
-            ) : <p className="blend-hint">{t("waxup.findHint")}</p>}
-            <p className="blend-hint">{t("waxup.finderLoaded", { name: view.finder.name })} <button type="button" className="link-button" disabled={working} onClick={() => finderFile.current?.click()}>{t("waxup.finderChange")}</button></p>
+            ) : show("find") && !view.found ? <p className="blend-hint">{t("waxup.findHint")}</p> : show("choose") && !view.found ? <p className="blend-hint">{t("waxup.chooseNeedsFind")}</p> : null}
+            {show("find") ? <p className="blend-hint">{t("waxup.finderLoaded", { name: view.finder.name })} <button type="button" className="link-button" disabled={working} onClick={() => finderFile.current?.click()}>{t("waxup.finderChange")}</button></p> : null}
           </>
         ) : (
           <>
@@ -187,9 +200,11 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
           </>
         )}
       </div>
+      ) : null}
 
+      {show("set") ? (
       <div className="dental-substep">
-        <h4 className="dental-substep-title">{t("waxup.setStep")}</h4>
+        {part ? null : <h4 className="dental-substep-title">{t("waxup.setStep")}</h4>}
         <input
           ref={file}
           type="file"
@@ -224,7 +239,9 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
         <p className="blend-hint">{view.setName ? t("waxup.setLoaded", { name: view.setName, count: view.teeth }) : t("waxup.setHint")}</p>
         {view.setId && view.builtInCredit ? <p className="blend-hint">{view.builtInCredit}</p> : null}
       </div>
+      ) : null}
 
+      {!part || (part === "place" && !fitTeeth) ? (
       <div className="dental-substep">
         <h4 className="dental-substep-title">{t("waxup.markStep")}</h4>
         <p className="blend-hint">{view.picking !== null ? t(WAXUP_LANDMARKS[view.picking]) : view.marked === 3 ? t(view.found ? "waxup.markedFound" : "waxup.marked") : t("waxup.markHint")}</p>
@@ -232,9 +249,12 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
           <button type="button" className={view.marked === 3 ? "" : "active"} disabled={working || view.picking !== null} onClick={actions.onMark}>{t(view.marked === 3 ? "waxup.markAgain" : "waxup.mark")}</button>
         </div>
       </div>
+      ) : null}
 
+      {show("place") || show("adjust") ? (
       <div className="dental-substep">
-        <h4 className="dental-substep-title">{t("waxup.placeStep")}</h4>
+        {part ? null : <h4 className="dental-substep-title">{t("waxup.placeStep")}</h4>}
+        {show("place") ? (<>
         {view.found?.length ? (
           <div className="dental-trim-mode" role="radiogroup" aria-label={t("waxup.fit")}>
             {(["teeth", "smile"] as const).map((value) => (
@@ -280,7 +300,10 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
           </button>
           {view.placed.length ? <button type="button" className="secondary" disabled={working} onClick={actions.onRemove}>{t("waxup.remove")}</button> : null}
         </div>
-        {view.placed.length ? (
+        {view.placed.length && part === "place" ? <p className="blend-hint">{t("waxup.placedLive", { count: view.placed.length })}</p> : null}
+        </>) : null}
+        {part === "adjust" && !view.placed.length ? <p className="blend-hint">{t("waxup.adjustNeedsPlace")}</p> : null}
+        {view.placed.length && show("adjust") ? (
           <>
             <div className="waxup-teeth" role="group" aria-label={t("waxup.teeth")}>
               {[...view.placed].sort((a, b) => a.fdi - b.fdi).map((tooth) => {
@@ -353,7 +376,8 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
           </>
         ) : null}
       </div>
-      {view.occlusion.ready ? (
+      ) : null}
+      {view.occlusion.ready && show("occlusion") ? (
         <div className="dental-substep">
           <h4 className="dental-substep-title">{t("waxup.occlusionStep")}</h4>
           <p className="blend-hint">{t("waxup.occlusionHint")}</p>
@@ -388,7 +412,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false }
           ) : null}
         </div>
       ) : null}
-      {view.placed.length ? (
+      {view.placed.length && (show("adjust") || part === "occlusion") ? (
         // Build 94: what only the patient can tell - checked chairside with the mock-up (Spear, Vig & Brundo, Abduo).
         <details className="waxup-checks">
           <summary>{t("waxup.chairside")}</summary>

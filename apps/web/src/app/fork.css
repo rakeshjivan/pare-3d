@@ -2079,3 +2079,23 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 /* Build 99: the footer's build number, beside Open source and Licences & credits. */
 .dashboard-legal .footer-build { color: inherit; opacity: 0.85; }
 .dashboard-legal-group > .footer-build + a, .dashboard-legal-group > a + a { margin-left: 10px; }
+
+/* Build 101: Wax-up Studio one step at a time. */
+.wax-stepper { display: grid; gap: 6px; margin: 4px 0 8px; }
+.wax-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.wax-steps button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border, #d4dae3); background: #fff; border-radius: 999px; padding: 3px 9px 3px 4px; font-size: 12px; cursor: pointer; color: #3a4452; }
+.wax-steps button:disabled { opacity: 0.45; cursor: default; }
+.wax-steps button.current { border-color: var(--primary, #1766ba); color: var(--primary, #1766ba); background: #eef4fd; font-weight: 600; }
+.wax-step-number { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #e6ebf1; font-size: 11px; font-weight: 700; }
+.wax-steps button.current .wax-step-number { background: var(--primary, #1766ba); color: #fff; }
+.wax-steps button.done .wax-step-number { background: #2e9b4f; color: #fff; }
+.wax-step-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wax-step-undo { display: inline-flex; gap: 2px; }
+.wax-step-undo .icon-button { border: 1px solid var(--border, #d4dae3); background: #fff; border-radius: 6px; padding: 3px 6px; cursor: pointer; }
+.wax-step-undo .icon-button:disabled { opacity: 0.4; cursor: default; }
+.wax-step-nav { display: flex; justify-content: space-between; gap: 8px; margin: 8px 0 4px; }
+.wax-step-nav button { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Build 101: handles hidden from the right-click menu - said on screen, with the way back. */
+.handles-hidden-chip { position: fixed; z-index: 55; left: 50%; top: 150px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.97); box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18); font-size: 12px; }
+.handles-hidden-chip button { border: 0; border-radius: 999px; padding: 4px 10px; background: var(--accent, #2f5fb3); color: #fff; font: inherit; cursor: pointer; }
