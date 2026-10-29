@@ -694,6 +694,7 @@ declare global {
     layerlingViewLook?: (look: ViewLook) => void;
     /** Build 90: hides (or shows again) the selection's resize handles, sizes and guide lines. */
     layerlingTransformHandles?: (hidden: boolean) => void;
+    layerlingResetInteraction?: () => void;
     /** Build 94: draws these parts see-through at `opacity` (1: as usual). */
     layerlingGhost?: (ids: string[], opacity: number) => void;
     /** Build 97: parts drawn see-through, each at its own opacity (0..1) - the bite contacts' arch sliders; null for none. */
@@ -9433,6 +9434,14 @@ export function WorkplaneViewport({
     applyViewLook(threeRef.current);
     window.layerlingViewLook = (look) => { viewLook = look; applyViewLook(threeRef.current); };
     window.layerlingTransformHandles = (hidden) => { transformHandlesHidden = hidden; const state = threeRef.current; if (state) state.needsRender = true; };
+    // Build 101: a way back from a drag whose release never arrived (the view would keep its handles away,
+    // its turning off and its right-click menu shut until a reload).
+    window.layerlingResetInteraction = () => {
+      cancelActiveDragRef.current();
+      rightPressRef.current = null;
+      const state = threeRef.current;
+      if (state) { state.controls.enabled = true; state.needsRender = true; }
+    };
     // Build 94: the wax-up's ghost view.
     window.layerlingGhost = (ids, opacity) => { ghost = { ids: new Set(ids), opacity }; const state = threeRef.current; if (state) state.needsRender = true; };
     window.layerlingPartOpacity = (opacities) => { partOpacity = new Map(Object.entries(opacities ?? {}).filter(([, value]) => value < 0.999)); const state = threeRef.current; if (state) state.needsRender = true; };

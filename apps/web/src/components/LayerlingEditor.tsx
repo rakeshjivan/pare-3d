@@ -16506,6 +16506,14 @@ export function LayerlingEditor({
   const handlesAway = Boolean(sculptTool);
   const heldViewportShapes = historyView.shapes ?? viewportShapes;
   useEffect(() => { window.layerlingTransformHandles?.(handlesHidden || handlesAway); }, [handlesHidden, handlesAway]);
+  // Build 101: closing Dental Studio puts the view back as it should be - handles as chosen, no drag left held.
+  const studioIsOpen = Boolean(dentalStudio);
+  useEffect(() => {
+    if (studioIsOpen) return;
+    window.layerlingResetInteraction?.();
+    window.layerlingTransformHandles?.(handlesHidden || handlesAway);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studioIsOpen]);
   const toggleHandlesHidden = () => setHandlesHidden((hidden) => !hidden);
   const handlesItem = (separated: boolean): ShapeContextMenuItem => ({ key: "handles", label: t(handlesHidden ? "contextMenu.showHandles" : "contextMenu.hideHandles"), separated, onSelect: toggleHandlesHidden });
   // Build 100: the Box / Gimbal switch in the right-click menu too - beside Snap Grid it was out of sight
