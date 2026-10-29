@@ -8,6 +8,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
     items: [
       "Bite contacts belong to Dental Studio: shown in occlusion or with the scans side by side - laid open, each arch shows the contacts it makes in the bite, as your scanner shows them. Two loose scans on the plate no longer offer it.",
       "In occlusion, a slider for each arch's opacity and views from above and below: turn the upper down and look through it at the contacts on the lower (or the other way round), as Exocad's viewer does.",
+      "Bite contacts are measured in the studio's bite and stay on the arches wherever they are moved. A range of 0.5, 1 or 2 mm (0.5 mm colours just the occlusal tables and the contacts), to match your scanner's occlusion view.",
+      "The overlap figure is now the deepest over at least half a square millimetre of the arch, and a point beside the other scan's edge or a flap no longer counts as overlap - lone spikes made it read too deep.",
     ],
   },
   {

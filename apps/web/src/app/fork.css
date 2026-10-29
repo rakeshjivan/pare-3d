@@ -2037,11 +2037,14 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .bite-contacts-swatch { display: inline-block; width: 34px; height: 10px; border-radius: 3px; }
 .bite-scale { position: relative; height: 150px; margin: 4px 0 10px; display: grid; grid-template-columns: 16px 46px 1fr; }
 .bite-scale-bar { width: 16px; height: 100%; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
-.bite-scale.contact-only .bite-scale-bar { -webkit-mask: linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 86.4%, #000 86.4%); mask: linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 86.4%, #000 86.4%); }
+.bite-scale.contact-only .bite-scale-bar { -webkit-mask: linear-gradient(to bottom, rgba(0, 0, 0, 0.18) var(--contact-only-at), #000 var(--contact-only-at)); mask: linear-gradient(to bottom, rgba(0, 0, 0, 0.18) var(--contact-only-at), #000 var(--contact-only-at)); }
 .bite-scale-ticks, .bite-scale-words { list-style: none; margin: 0; padding: 0; position: relative; height: 100%; }
 .bite-scale-ticks li, .bite-scale-words li { position: absolute; left: 6px; transform: translateY(-50%); font-size: 11px; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bite-scale-ticks li::before { content: ""; position: absolute; left: -6px; top: 50%; width: 4px; border-top: 1px solid #6b7480; }
 .bite-scale-words li { color: #5b6573; }
+.bite-range { display: flex; align-items: center; gap: 4px; }
+.bite-range span { margin-right: 4px; color: #5b6573; }
+.bite-range button { flex: 1; padding: 3px 6px; font-size: 12px; }
 .bite-see-through { display: grid; gap: 4px; padding-top: 4px; border-top: 1px solid var(--border, #d4dae3); }
 .bite-opacity { display: grid; grid-template-columns: 46px 1fr 38px; align-items: center; gap: 6px; }
 .bite-opacity output { text-align: right; font-variant-numeric: tabular-nums; color: #5b6573; }

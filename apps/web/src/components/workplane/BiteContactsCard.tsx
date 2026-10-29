@@ -6,36 +6,47 @@
  * selected, or the studio has both arches, so the contacts are always one click away.
  */
 import { ArrowDownToLine, ArrowUpToLine, LoaderCircle, ScanFace, X } from "lucide-react";
-import { CONTACT_TICKS, contactGradient, type BiteContactStats } from "@/lib/biteContacts";
+import { CONTACT_RANGES, contactGradient, contactTicks, type BiteContactStats } from "@/lib/biteContacts";
 import { t } from "@/lib/i18n";
 
-export type BiteMapView = { on: boolean; busy: boolean; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; contactOnly?: boolean; upperOpacity?: number; lowerOpacity?: number } | null;
+export type BiteMapView = { on: boolean; busy: boolean; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; contactOnly?: boolean; upperOpacity?: number; lowerOpacity?: number; range?: number } | null;
 
 /** Build 96: the scale as the scanner programs show it - a bar from 2 mm (green) down to contact (red) and overlap (blue to purple). */
-function ContactScale({ contactOnly }: { contactOnly: boolean }) {
-  const top = 2, bottom = -0.2;
+function ContactScale({ contactOnly, range }: { contactOnly: boolean; range: number }) {
+  const top = range, bottom = -0.2;
+  const pos = (value: number) => `${((top - value) / (top - bottom)) * 100}%`;
   return (
-    <div className={`bite-scale${contactOnly ? " contact-only" : ""}`} aria-label={t("dental.biteMapLegend")}>
-      <div className="bite-scale-bar" style={{ background: contactGradient(top, bottom) }} aria-hidden="true" />
+    <div className={`bite-scale${contactOnly ? " contact-only" : ""}`} aria-label={t("dental.biteMapLegend")}
+      style={{ ["--contact-only-at" as string]: pos(0.1) }}>
+      <div className="bite-scale-bar" style={{ background: contactGradient(top, bottom, range) }} aria-hidden="true" />
       <ol className="bite-scale-ticks">
-        {CONTACT_TICKS.map((tick) => (
-          <li key={tick} style={{ top: `${((top - tick) / (top - bottom)) * 100}%` }}>{tick.toFixed(2)}</li>
+        {contactTicks(range).map((tick) => (
+          <li key={tick} style={{ top: pos(tick) }}>{tick.toFixed(2)}</li>
         ))}
       </ol>
       <ul className="bite-scale-words">
-        <li style={{ top: "0%" }}>{t("dental.biteScaleFar")}</li>
-        <li style={{ top: `${(top / (top - bottom)) * 100}%` }}>{t("dental.biteScaleContact")}</li>
+        <li style={{ top: "0%" }}>{t("dental.biteScaleFar", { range: range.toString() })}</li>
+        <li style={{ top: pos(0) }}>{t("dental.biteScaleContact")}</li>
         <li style={{ top: "100%" }}>{t("dental.biteScaleOverlap")}</li>
       </ul>
     </div>
   );
 }
 
-export function BiteContactsDetails({ biteMap, onContactOnly }: { biteMap: NonNullable<BiteMapView>; onContactOnly?: (on: boolean) => void }) {
+export function BiteContactsDetails({ biteMap, onContactOnly, onRange }: { biteMap: NonNullable<BiteMapView>; onContactOnly?: (on: boolean) => void; onRange?: (range: number) => void }) {
+  const range = biteMap.range ?? 2;
   const overlap = biteMap.upper && biteMap.lower ? Math.max(biteMap.upper.maxOverlap, biteMap.lower.maxOverlap) : 0;
   const contact = biteMap.upper && biteMap.lower ? (biteMap.upper.contactArea + biteMap.lower.contactArea) / 2 : 0;
   return (<>
-    <ContactScale contactOnly={Boolean(biteMap.contactOnly)} />
+    <ContactScale contactOnly={Boolean(biteMap.contactOnly)} range={range} />
+    {onRange ? (
+      <div className="dental-trim-mode bite-range" role="radiogroup" aria-label={t("dental.biteRange")} title={t("dental.biteRangeHint")}>
+        <span>{t("dental.biteRange")}</span>
+        {CONTACT_RANGES.map((value) => (
+          <button key={value} type="button" role="radio" aria-checked={range === value} className={range === value ? "active" : ""} onClick={() => onRange(value)}>{value} mm</button>
+        ))}
+      </div>
+    ) : null}
     {onContactOnly ? (
       <label className="edge-modifier-check" title={t("dental.biteContactOnlyHint")}>
         <input type="checkbox" checked={Boolean(biteMap.contactOnly)} onChange={(event) => onContactOnly(event.currentTarget.checked)} />
@@ -58,11 +69,12 @@ export function BiteContactsDetails({ biteMap, onContactOnly }: { biteMap: NonNu
  * contacts on the other (as Exocad's viewer does); laid side by side, each arch shows the contacts it
  * makes in the bite.
  */
-export function BiteContactsCard({ biteMap, inBite, onToggle, onContactOnly, onOpacity, onLook }: {
+export function BiteContactsCard({ biteMap, inBite, onToggle, onContactOnly, onRange, onOpacity, onLook }: {
   biteMap: BiteMapView;
   inBite: boolean;
   onToggle: (on: boolean) => void;
   onContactOnly: (on: boolean) => void;
+  onRange: (range: number) => void;
   onOpacity: (arch: "upper" | "lower", value: number) => void;
   onLook: (from: "above" | "below" | "front") => void;
 }) {
@@ -94,7 +106,7 @@ export function BiteContactsCard({ biteMap, inBite, onToggle, onContactOnly, onO
         <strong>{t("dental.biteMap")}</strong>
         <button type="button" className="icon-button" title={t("dental.biteMapHide")} aria-label={t("dental.biteMapHide")} onClick={() => onToggle(false)}><X size={14} /></button>
       </div>
-      <BiteContactsDetails biteMap={biteMap!} onContactOnly={onContactOnly} />
+      <BiteContactsDetails biteMap={biteMap!} onContactOnly={onContactOnly} onRange={onRange} />
       {inBite ? (
         <div className="bite-see-through" role="group" aria-label={t("dental.biteSeeThrough")}>
           {slider("upper")}

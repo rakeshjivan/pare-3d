@@ -27,16 +27,26 @@ export const CONTACT_REACH = 2;
 export const CONTACT_ONLY = 0.1;
 /** Within this the distance is measured to the nearest point of a triangle; further out to the nearest corner. */
 const EXACT_REACH = 0.25;
+/** Deeper than this the scans do not run into each other in a real bite: further out is always clearance. */
+const OVERLAP_DEEPEST = 0.6;
+/** Build 97: a point counts as overlap only when it lies behind the other surface, not beside its edge: the line to the nearest point within this cosine of the surface's facing. */
+const BEHIND_COS = 0.5;
 /** The scale's marks for its key (mm). */
 export const CONTACT_TICKS = [2, 1.5, 1, 0.5, 0, -0.2];
+/** Build 97: the ranges the scale can be set to (mm) - the scanner programs let you narrow it so only the occlusal tables colour. */
+export const CONTACT_RANGES = [0.5, 1, 2] as const;
+/** The scale's marks for a range (mm). */
+export const contactTicks = (range: number) => [range, range * 0.75, range * 0.5, range * 0.25, 0, CONTACT_STOPS[0].at];
 
 const hexRgb = (hex: string): [number, number, number] => [parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255];
 const STOP_RGB = CONTACT_STOPS.map((stop) => hexRgb(stop.color));
 
 /** The scale's colour at a distance (r, g, b in 0..1), or null where it is not coloured. */
-export function contactColor(distance: number, contactOnly = false): [number, number, number] | null {
-  if (!Number.isFinite(distance) || distance > CONTACT_REACH) return null;
+export function contactColor(distance: number, contactOnly = false, range: number = CONTACT_REACH): [number, number, number] | null {
+  if (!Number.isFinite(distance) || distance > range) return null;
   if (contactOnly && distance >= CONTACT_ONLY) return null;
+  // Build 97: a narrower range stretches the clearance colours over it (green at its far end).
+  if (distance > 0) distance *= CONTACT_REACH / range;
   if (distance <= CONTACT_STOPS[0].at) return STOP_RGB[0];
   for (let i = 1; i < CONTACT_STOPS.length; i += 1) {
     const lo = CONTACT_STOPS[i - 1], hi = CONTACT_STOPS[i];
@@ -51,9 +61,10 @@ export function contactColor(distance: number, contactOnly = false): [number, nu
 }
 
 /** The scale as a CSS gradient, from `from` mm (top) to `to` mm (bottom). */
-export function contactGradient(from = CONTACT_REACH, to = CONTACT_STOPS[0].at): string {
+export function contactGradient(from = CONTACT_REACH, to = CONTACT_STOPS[0].at, range: number = from): string {
   const span = from - to;
-  const stops = [...CONTACT_STOPS].reverse().map((stop) => `${stop.color} ${(((from - stop.at) / span) * 100).toFixed(1)}%`);
+  const at = (stop: { at: number }) => (stop.at > 0 ? stop.at * range / CONTACT_REACH : stop.at);
+  const stops = [...CONTACT_STOPS].reverse().map((stop) => `${stop.color} ${(((from - at(stop)) / span) * 100).toFixed(1)}%`);
   return `linear-gradient(to bottom, ${stops.join(", ")})`;
 }
 
@@ -128,6 +139,7 @@ export function signedDistances(from: ArrayLike<number>, to: ArrayLike<number>, 
     }
   }
   const q = new Float64Array(3);
+  const grazing = new Uint8Array(corners);
   const r2 = reach * reach;
   let positive = 0, negative = 0;
   for (let c = 0; c < corners; c += 1) {
@@ -147,11 +159,15 @@ export function signedDistances(from: ArrayLike<number>, to: ArrayLike<number>, 
     const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
     const side = (px - bx) * nx + (py - by) * ny + (pz - bz) * nz;
     const d = Math.sqrt(best);
+    // Build 97: beside an open edge of the other scan (its rim, a flap) the nearest point is on the edge
+    // and the line to it runs along the surface: that is clearance, never overlap.
+    const facing = d > 1e-6 ? Math.abs(side) / (d * (Math.hypot(nx, ny, nz) || 1)) : 1;
+    if (facing < BEHIND_COS) { out[c] = d; grazing[c] = 1; continue; }
     out[c] = side < 0 ? -d : d;
     if (d > 0.05) { if (side < 0) negative += 1; else positive += 1; }
   }
   const flip = negative > positive;
-  if (flip) for (let c = 0; c < corners; c += 1) out[c] = -out[c];
+  if (flip) for (let c = 0; c < corners; c += 1) if (!grazing[c]) out[c] = -out[c];
   if (reachAll > reach) farDistances(from, to, reachAll, out, flip);
   return out;
 }
@@ -160,9 +176,8 @@ export function signedDistances(from: ArrayLike<number>, to: ArrayLike<number>, 
  * Build 96: the distance from each corner still unmeasured to the nearest corner of `to`, within
  * `reach` - on a scan (corners a few tenths of a millimetre apart) within about 0.1 mm of the surface
  * distance, which the broad colours of the scale do not show. The corners of `to` (one per point - the
- * soup repeats them) are kept in a k-d tree. The sign is the side of the corner's triangle (turned
- * round with `flip`); a point counts as overlap only when it lies well behind that surface and less
- * than 0.6 mm deep - deeper "overlap" this far out is a scan's edge or the far side of a tooth.
+ * soup repeats them) are kept in a k-d tree. The sign is the side of the corner's surface (turned round
+ * with `flip`): overlap only straight behind it (not beside an edge or flap) and less than 0.6 mm deep.
  */
 function farDistances(from: ArrayLike<number>, to: ArrayLike<number>, reach: number, out: Float32Array, flip: boolean) {
   const count = Math.floor(to.length / 9);
@@ -205,10 +220,10 @@ function farDistances(from: ArrayLike<number>, to: ArrayLike<number>, reach: num
     if (found.i < 0) { done.set(id, Number.NaN); continue; }
     const i = found.i;
     const d = Math.sqrt(found.d2);
+    // Overlap only straight behind the other surface (not beside its edge) and no deeper than a real bite runs.
     const nl = Math.hypot(nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]) || 1;
     const cos = ((px - P[i * 3]) * nrm[i * 3] + (py - P[i * 3 + 1]) * nrm[i * 3 + 1] + (pz - P[i * 3 + 2]) * nrm[i * 3 + 2]) / (nl * (d || 1));
-    const behind = (flip ? -cos : cos) < -0.7 && d < 0.6;
-    out[c] = behind ? -d : d;
+    out[c] = (flip ? -cos : cos) < -0.7 && d < OVERLAP_DEEPEST ? -d : d;
     done.set(id, out[c]);
   }
 }
@@ -285,7 +300,7 @@ class KdTree {
 }
 
 export type BiteContactStats = {
-  /** The deepest overlap (mm, positive), 0 if none. */
+  /** The deepest overlap (mm, positive) over at least 0.5 mm² of the arch, 0 if none. */
   maxOverlap: number;
   /** The area of this arch's surface in overlap, and within 0.05 mm (touching), mm². */
   overlapArea: number;
@@ -305,22 +320,36 @@ function areaWhere(soup: ArrayLike<number>, distances: Float32Array, test: (d: n
   return area;
 }
 
+/** Build 97: the overlap reported is the deepest that covers this much of the arch (mm²) - not a lone spike or flap. */
+const OVERLAP_AREA = 0.5;
+
 export function contactStats(soup: ArrayLike<number>, distances: Float32Array): BiteContactStats {
-  let deepest = 0;
-  for (const d of distances) if (Number.isFinite(d) && d < deepest) deepest = d;
+  // Triangles in overlap, deepest first, until they cover OVERLAP_AREA: that depth is reported.
+  const over: Array<[number, number]> = [];
+  for (let t = 0; t * 9 < soup.length; t += 1) {
+    const a = distances[t * 3], b = distances[t * 3 + 1], c = distances[t * 3 + 2];
+    if (!(a < 0 && b < 0 && c < 0)) continue;
+    const o = t * 9;
+    const ux = soup[o + 3] - soup[o], uy = soup[o + 4] - soup[o + 1], uz = soup[o + 5] - soup[o + 2];
+    const vx = soup[o + 6] - soup[o], vy = soup[o + 7] - soup[o + 1], vz = soup[o + 8] - soup[o + 2];
+    over.push([-(a + b + c) / 3, Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2]);
+  }
+  over.sort((x, y) => y[0] - x[0]);
+  let covered = 0, deepest = 0;
+  for (const [depth, area] of over) { covered += area; deepest = depth; if (covered >= OVERLAP_AREA) break; }
   return {
-    maxOverlap: -deepest,
+    maxOverlap: deepest,
     overlapArea: areaWhere(soup, distances, (d) => Number.isFinite(d) && d < 0),
     contactArea: areaWhere(soup, distances, (d) => Number.isFinite(d) && d < 0.05),
   };
 }
 
 /** Per-corner colours (r, g, b in 0..1) for a soup: the scale's colours, `base` where uncoloured. */
-export function contactColors(distances: Float32Array, base: string, contactOnly = false): Float32Array {
+export function contactColors(distances: Float32Array, base: string, contactOnly = false, range: number = CONTACT_REACH): Float32Array {
   const fallback = hexRgb(base);
   const out = new Float32Array(distances.length * 3);
   for (let c = 0; c < distances.length; c += 1) {
-    const color = contactColor(distances[c], contactOnly) ?? fallback;
+    const color = contactColor(distances[c], contactOnly, range) ?? fallback;
     out[c * 3] = color[0]; out[c * 3 + 1] = color[1]; out[c * 3 + 2] = color[2];
   }
   return out;

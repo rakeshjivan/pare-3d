@@ -9993,7 +9993,7 @@ export function LayerlingEditor({
   };
   const [dentalStudio, setDentalStudio] = useState<DentalStudioState | null>(null);
   // Build 84: the bite contacts & clearance map - on, being worked out, its summary.
-  const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; /** Build 96: the two parts (upper first), and whether they are the studio's. */ ids: [string, string]; studio: boolean; /** Build 96: the contacts and overlaps only. */ contactOnly?: boolean; /** Build 97: each arch's opacity in occlusion, 0..1. */ upperOpacity?: number; lowerOpacity?: number } | null>(null);
+  const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; /** Build 96: the two parts (upper first), and whether they are the studio's. */ ids: [string, string]; studio: boolean; /** Build 96: the contacts and overlaps only. */ contactOnly?: boolean; /** Build 97: each arch's opacity in occlusion, 0..1. */ upperOpacity?: number; lowerOpacity?: number; /** Build 97: how far the colours reach, mm. */ range?: number } | null>(null);
   /** Build 96: the last map worked out, kept to colour again (Contact only) without working it out again. */
   const biteMapLast = useRef<{ key: string; upperId: string; lowerId: string; upper: Float32Array; lower: Float32Array; upperColor: string; lowerColor: string; /** Where the arches stood when last drawn. */ drawn?: string } | null>(null);
   const biteMapRun = useRef(0);
@@ -10544,7 +10544,7 @@ export function LayerlingEditor({
     return upper && lower && dentalStudio.analysis ? { ids: [upper, lower], studio: true } : null;
   }, [dentalStudio]);
   /** Build 97: the map's colours drawn on the arches where they stand now (in occlusion or side by side). */
-  const drawBiteMap = (only: boolean) => {
+  const drawBiteMap = (only: boolean, range = biteMapRef.current?.range ?? 2) => {
     const last = biteMapLast.current;
     const upper = last ? shapesRef.current.find((shape) => shape.id === last.upperId) : undefined;
     const lower = last ? shapesRef.current.find((shape) => shape.id === last.lowerId) : undefined;
@@ -10552,8 +10552,8 @@ export function LayerlingEditor({
     const up = Float32Array.from(worldTriangles(upper)), low = Float32Array.from(worldTriangles(lower));
     // The same triangles in the same order, wherever the arch stands; a part changed since is left plain.
     const items = [];
-    if (up.length / 3 === last.upper.length) items.push({ shapeId: upper.id, positions: up, colors: contactColors(last.upper, last.upperColor, only) });
-    if (low.length / 3 === last.lower.length) items.push({ shapeId: lower.id, positions: low, colors: contactColors(last.lower, last.lowerColor, only) });
+    if (up.length / 3 === last.upper.length) items.push({ shapeId: upper.id, positions: up, colors: contactColors(last.upper, last.upperColor, only, range) });
+    if (low.length / 3 === last.lower.length) items.push({ shapeId: lower.id, positions: low, colors: contactColors(last.lower, last.lowerColor, only, range) });
     last.drawn = projectShapesFingerprint([upper, lower]);
     window.layerlingColorOverlay?.(items.length ? items : null);
   };
@@ -10604,8 +10604,8 @@ export function LayerlingEditor({
   useEffect(() => {
     const last = biteMapLast.current;
     if (!biteMap?.on || biteMap.busy || !last || last.key !== biteMap.key) return;
-    drawBiteMap(Boolean(biteMap.contactOnly));
-  }, [biteMap?.contactOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+    drawBiteMap(Boolean(biteMap.contactOnly), biteMap.range ?? 2);
+  }, [biteMap?.contactOnly, biteMap?.range]); // eslint-disable-line react-hooks/exhaustive-deps
   // Build 97: each arch's opacity, in occlusion, to look through one at the contacts on the other (as
   // Exocad's viewer does) - put back when the map is off or the arches are laid side by side.
   useEffect(() => {
@@ -17738,6 +17738,7 @@ export function LayerlingEditor({
           inBite={dentalStudio.layout === "occlusion"}
           onToggle={toggleBiteMap}
           onContactOnly={(contactOnly) => setBiteMap((current) => current ? { ...current, contactOnly } : current)}
+          onRange={(range) => setBiteMap((current) => current ? { ...current, range } : current)}
           onOpacity={(arch, value) => setBiteMap((current) => current ? { ...current, [arch === "upper" ? "upperOpacity" : "lowerOpacity"]: value } : current)}
           onLook={lookAtBite} />
       ) : null}

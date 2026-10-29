@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biteContactMap, contactColor, contactColors, signedDistances } from "@/lib/biteContacts";
+import { biteContactMap, contactColor, contactColors, contactStats, signedDistances } from "@/lib/biteContacts";
 
 /** A flat sheet at height z (n x n squares over [-10, 10]), facing up or down. */
 function sheet(z: number, up: boolean, n = 40, bump?: (x: number, y: number) => number) {
@@ -53,7 +53,9 @@ describe("bite contacts & clearance (build 84)", () => {
     const lower = sheet(0, true);
     const upper = sheet(0.15, false, 40, (x, y) => -0.27 * Math.exp(-(x * x + y * y) / 4));
     const map = biteContactMap(upper, lower);
-    expect(map.upperStats.maxOverlap).toBeCloseTo(0.12, 2);
+    // Build 97: the deepest over half a square millimetre - a little under the very tip.
+    expect(map.upperStats.maxOverlap).toBeGreaterThan(0.09);
+    expect(map.upperStats.maxOverlap).toBeLessThanOrEqual(0.121);
     expect(map.upperStats.overlapArea).toBeGreaterThan(1);
     expect(map.upperStats.contactArea).toBeGreaterThan(map.upperStats.overlapArea);
     const colors = contactColors(map.upper, "#919191");
@@ -70,6 +72,27 @@ describe("bite contacts & clearance (build 84)", () => {
     expect(d.length).toBeGreaterThan(1000);
     for (const v of d) expect(Math.abs(v - 1.2)).toBeLessThan(0.15);
     expect(Array.from(signedDistances(sheet(2.5, false, 20), lower)).every((v) => !Number.isFinite(v))).toBe(true);
+  });
+
+  it("a narrower range stretches the scale; beside the other scan's edge is never overlap (build 97)", () => {
+    expect(contactColor(0.8, false, 0.5)).toBeNull();
+    // 0.25 mm in a 0.5 mm range takes the colour 1 mm has in the 2 mm range.
+    expect(contactColor(0.25, false, 0.5)).toEqual(contactColor(1, false, 2));
+    // A sheet ending at x = 10; points just past its edge, a little below its plane, sit beside it.
+    const lower = sheet(0, true, 40);
+    const beside: number[] = [];
+    for (let i = 0; i < 20; i += 1) beside.push(10.2, -5 + i * 0.5, -0.05, 10.3, -5 + i * 0.5, -0.05, 10.25, -4.8 + i * 0.5, -0.05);
+    for (const v of signedDistances(beside, lower)) if (Number.isFinite(v)) expect(v).toBeGreaterThan(0);
+  });
+
+  it("reports the overlap over half a square millimetre, not a lone spike (build 97)", () => {
+    const lower = sheet(0, true);
+    // A broad 0.1 mm overlap and one sharp 0.5 mm spike.
+    const upper = sheet(0.15, false, 40, (x, y) => -0.25 * Math.exp(-(x * x + y * y) / 8) - 0.55 * Math.exp(-((x - 6) ** 2 + (y - 6) ** 2) / 0.02));
+    const d = signedDistances(upper, lower);
+    const stats = contactStats(upper, d);
+    expect(stats.maxOverlap).toBeGreaterThan(0.07);
+    expect(stats.maxOverlap).toBeLessThan(0.2);
   });
 
   it("is quick on a scan-sized pair", () => {
