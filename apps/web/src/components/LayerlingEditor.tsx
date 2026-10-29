@@ -131,7 +131,7 @@ import { checkBeforeSending, CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, PrintCheckP
 import { belowBedCutter } from "@/lib/cutBelowBed";
 import { fillHoleAt, isManifoldSolid, makeSolidPositions, meshHealth, pendingMeshChecks, shapeWithWorldPositions, tidyOpenSurface } from "@/lib/meshRepair";
 import { worldTriangles } from "@/lib/blend";
-import { NearestSurface } from "@/lib/nearestSurface";
+import { NearestSurface, DeviationProbe } from "@/lib/nearestSurface";
 import { repairStlPositions } from "@/lib/stlRepair";
 import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
 import { toolLayout, toolPocketPositions, tracedSolidPositions, type ToolBinOptions, type TraceOptions, type TraceResult } from "@/lib/photoTrace";
@@ -9184,7 +9184,8 @@ export function LayerlingEditor({
     const { shape, state } = target;
     let stats = { added: 0, removed: 0 };
     if (show) {
-      state.originalSurface ??= new NearestSurface(state.original, 2);
+      // Build 95: the fast look-up (it froze the page on a full scan when every corner searched the original).
+      state.originalSurface ??= new DeviationProbe(state.original);
       stats = state.live.showDeviation(state.originalSurface);
     } else state.live.showDeviation(null);
     window.layerlingSculptLive?.(shape.id, state.live.geometry, shape.color);
@@ -17965,7 +17966,7 @@ type SculptSession = {
   lastBrush: SculptTool | "softTransform" | "remeshPart" | "reducePart" | null;
   /** Build 92: the part's triangles when Sculpt took it, and their nearest-point grid once made. */
   original: Float32Array;
-  originalSurface: NearestSurface | null;
+  originalSurface: DeviationProbe | null;
   undo: SculptUndo[];
   redo: SculptUndo[];
 };

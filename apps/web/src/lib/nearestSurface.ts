@@ -76,3 +76,30 @@ function closest(px: number, py: number, pz: number, t: ArrayLike<number>, o: nu
   out[0] = qx; out[1] = qy; out[2] = qz;
   return (px - qx) ** 2 + (py - qy) ** 2 + (pz - qz) ** 2;
 }
+
+/**
+ * Build 95: the deviation map's look-up, fast on a scan of 300,000 triangles. Corners that have not
+ * moved (still exactly at one of the original's corners - nearly all of them) answer at once; the
+ * rest search the original's triangles near them (to 0.6 mm, past which the map's colour is full
+ * anyway), and only those further still look wider, to tell added from taken away.
+ */
+export class DeviationProbe {
+  private corners = new Set<number>();
+  private near: NearestSurface;
+  private far: NearestSurface | null = null;
+  constructor(private readonly soup: Float32Array) {
+    for (let i = 0; i + 2 < soup.length; i += 3) this.corners.add(DeviationProbe.hash(soup[i], soup[i + 1], soup[i + 2]));
+    this.near = new NearestSurface(soup, 0.6);
+  }
+  private static hash(x: number, y: number, z: number) {
+    const ix = Math.round(x * 1e4), iy = Math.round(y * 1e4), iz = Math.round(z * 1e4);
+    return ((ix * 73856093) ^ (iy * 19349663) ^ (iz * 83492791)) >>> 0;
+  }
+  nearest(x: number, y: number, z: number, out: Float64Array | number[]): number {
+    if (this.corners.has(DeviationProbe.hash(x, y, z))) { out[0] = x; out[1] = y; out[2] = z; return 0; }
+    const d = this.near.nearest(x, y, z, out);
+    if (d < Infinity) return d;
+    this.far ??= new NearestSurface(this.soup, 3);
+    return this.far.nearest(x, y, z, out);
+  }
+}

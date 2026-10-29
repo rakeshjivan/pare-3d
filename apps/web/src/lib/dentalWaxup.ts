@@ -1190,7 +1190,11 @@ function drapeCervical(tooth: PlacedTooth, scan: Mesh, normals: ArrayLike<number
 // Build 94: each library tooth fitted to the patient's own tooth
 
 /** A patient's tooth found on the scan (lib/toothSegment): its number and its crown's corners, arch frame. */
-export type PatientCrown = { fdi: number; points: Float32Array };
+export type PatientCrown = {
+  fdi: number; points: Float32Array;
+  /** Build 95: the gingival margin - the crown's corners on its border with the gum, as found. */
+  margin?: Float32Array;
+};
 
 /** FDI number to kind and side in the arch frame (the inverse of fdiNumber). */
 export function fdiKind(fdi: number, arch: "upper" | "lower"): { kind: ToothKind; side: -1 | 1 } {
@@ -1252,6 +1256,7 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
   });
   const libMesial = mesialDirections(lib.map((t) => ({ key: t.i, side: t.tooth.side, rank: t.rank, c: t.c })));
   const placed: PlacedTooth[] = [];
+  const placedFdi: number[] = [];
   for (const crown of crowns) {
     const me = info.find((t) => t.crown.fdi === crown.fdi);
     if (!me) continue;
@@ -1374,6 +1379,7 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
     const moveOut = new THREE.Matrix4().makeTranslation(dir.x * shift, dir.y * shift, dir.z * shift);
     positions = transformSoup(positions, moveOut);
     const matrix = moveOut.clone().multiply(base);
+    placedFdi.push(crown.fdi);
     placed.push({
       tooth: { ...match.tooth, side: me.side },
       matrix,
@@ -1396,7 +1402,13 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
   if (options.blend !== false) {
     // Smile-designed teeth have their widths by design: only gaps are closed, overlaps left (they are contacts).
     widenToContacts(placed, ideal >= 0.5);
-    for (const entry of placed) drapeCervical(entry, scan, normals);
+    // Build 95: each tooth's cervical end on the patient's gingival margin as found, all round;
+    // where the margin was not found, sunk into the surface as before.
+    placed.forEach((entry, i) => {
+      const margin = crowns.find((c) => c.fdi === placedFdi[i])?.margin;
+      if (margin && margin.length >= MARGIN_MIN_POINTS * 3) blendToMargin(entry, margin);
+      else drapeCervical(entry, scan, normals);
+    });
   }
   return placed;
 }
@@ -1415,7 +1427,7 @@ export function planWaxupOnTeeth(scan: ArrayLike<number>, shells: Float32Array[]
     if (!list) byFdi.set(fdi[t], (list = []));
     for (let k = 0; k < 9; k += 1) list.push(local[t * 9 + k]);
   }
-  const all: PatientCrown[] = [...byFdi].map(([n, list]) => ({ fdi: n, points: Float32Array.from(list) }));
+  const all: PatientCrown[] = [...byFdi].map(([n, list]) => ({ fdi: n, points: Float32Array.from(list), margin: gingivalMarginOf(local, fdi, n) }));
   const placed = placeOnTeeth(set, mesh, normals, all.filter((c) => chosen.includes(c.fdi)), all, arch, options);
   const checks = smileChecks(placed.map((p) => ({ fdi: fdiNumber(p.tooth.kind, p.tooth.side, arch), positions: p.positions })), arch);
   return {
@@ -1791,4 +1803,145 @@ export function smileChecks(teeth: Array<{ fdi: number; positions: Float32Array 
     out.push({ key: "waxup.check.tilt", level: Math.abs(tiltA - tiltB) > TILT_WARN || tiltA < -1 || tiltB < -1 ? "warn" : "ok", values: { ...pair, a1: f(tiltA, 0), b1: f(tiltB, 0) } });
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Build 95: the wax ends on the gingival margin
+
+/** A margin found from fewer corners than this is not used. */
+export const MARGIN_MIN_POINTS = 40;
+/** The wax's cervical end stands this far coronal to the margin, mm (on the tooth, off the gum). */
+export const MARGIN_INSET = 0.1;
+/** How much of the tooth's height above the margin the cervical blend reaches. */
+export const MARGIN_BLEND_SHARE = 0.35;
+/** The margin's height and distance from the tooth's axis, in this many directions round it. */
+const MARGIN_BINS = 48;
+/** Margin corners further than this from the margin's middle height are left out, mm. */
+const MARGIN_SPREAD = 3.5;
+/** The most a wax corner is moved to meet the margin, mm. */
+const MARGIN_MOVE_MAX = 2.5;
+
+/**
+ * The gingival margin of tooth `n` on a scan (soup, its triangles' FDI numbers): the corners its
+ * triangles share with gum triangles (the finder's border between tooth and gum - not where it
+ * meets a neighbouring tooth).
+ */
+export function gingivalMarginOf(soup: Float32Array, fdi: Uint8Array, n: number): Float32Array {
+  // The tooth's extent, and the gum corners near it.
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let t = 0; t < fdi.length; t += 1) {
+    if (fdi[t] !== n) continue;
+    for (let k = 0; k < 3; k += 1) { const o = t * 9 + k * 3; x0 = Math.min(x0, soup[o]); x1 = Math.max(x1, soup[o]); y0 = Math.min(y0, soup[o + 1]); y1 = Math.max(y1, soup[o + 1]); }
+  }
+  if (!Number.isFinite(x0)) return new Float32Array(0);
+  const gum: number[] = [];
+  for (let t = 0; t < fdi.length; t += 1) {
+    if (fdi[t]) continue;
+    for (let k = 0; k < 3; k += 1) {
+      const o = t * 9 + k * 3;
+      if (soup[o] < x0 - 1 || soup[o] > x1 + 1 || soup[o + 1] < y0 - 1 || soup[o + 1] > y1 + 1) continue;
+      gum.push(soup[o], soup[o + 1], soup[o + 2]);
+    }
+  }
+  if (!gum.length) return new Float32Array(0);
+  const grid = new PointGrid(gum, 0.5);
+  const out: number[] = [];
+  const seen = new Set<string>();
+  for (let t = 0; t < fdi.length; t += 1) {
+    if (fdi[t] !== n) continue;
+    for (let k = 0; k < 3; k += 1) {
+      const o = t * 9 + k * 3;
+      const hit = grid.nearest(soup[o], soup[o + 1], soup[o + 2]);
+      if (!hit || hit[1] > 1e-3) continue;
+      const key = `${Math.round(soup[o] * 1e3)},${Math.round(soup[o + 1] * 1e3)},${Math.round(soup[o + 2] * 1e3)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(soup[o], soup[o + 1], soup[o + 2]);
+    }
+  }
+  return Float32Array.from(out);
+}
+
+/**
+ * Build 95: a wax tooth's cervical end brought onto the patient's gingival margin all round (arch
+ * frame, teeth up). Round the tooth's axis in MARGIN_BINS directions, the margin's height and distance
+ * from the axis (smoothed); the wax's cervical part in each direction is stretched or squeezed along
+ * the axis so its end stands MARGIN_INSET coronal to the margin there, easing to nothing at
+ * MARGIN_BLEND_SHARE of the tooth's height, and drawn in towards the tooth's surface at the margin -
+ * a feather edge onto the tooth, the gum untouched.
+ */
+export function blendToMargin(tooth: PlacedTooth, margin: Float32Array) {
+  const p = tooth.positions;
+  let mx = 0, my = 0;
+  const m = margin.length / 3;
+  for (let i = 0; i < margin.length; i += 3) { mx += margin[i] / m; my += margin[i + 1] / m; }
+  const binOf = (x: number, y: number) => ((Math.atan2(y - my, x - mx) / (Math.PI * 2)) + 1) % 1 * MARGIN_BINS;
+  // The margin's height and radius in each direction.
+  // Robustly: margin corners far from the rest (gum the finder took with the tooth, a stray border)
+  // are left out, and each direction takes the median of its own.
+  const radii = Array.from({ length: m }, (_, k) => Math.hypot(margin[k * 3] - mx, margin[k * 3 + 1] - my)).sort((a, b) => a - b);
+  const rMid = radii[Math.floor(m / 2)] || 1;
+  const zsAll = Array.from({ length: m }, (_, k) => margin[k * 3 + 2]).sort((a, b) => a - b);
+  const zMid = zsAll[Math.floor(m / 2)];
+  const binsZ: number[][] = Array.from({ length: MARGIN_BINS }, () => []), binsR: number[][] = Array.from({ length: MARGIN_BINS }, () => []);
+  for (let i = 0; i < margin.length; i += 3) {
+    const r = Math.hypot(margin[i] - mx, margin[i + 1] - my);
+    if (r < 0.5 * rMid || r > 1.6 * rMid || Math.abs(margin[i + 2] - zMid) > MARGIN_SPREAD) continue;
+    const b = Math.floor(binOf(margin[i], margin[i + 1])) % MARGIN_BINS;
+    binsZ[b].push(margin[i + 2]); binsR[b].push(r);
+  }
+  const median = (list: number[]) => { const l = [...list].sort((a, b) => a - b); return l[Math.floor(l.length / 2)]; };
+  const sumZ = new Float64Array(MARGIN_BINS), sumR = new Float64Array(MARGIN_BINS), count = new Float64Array(MARGIN_BINS);
+  for (let b = 0; b < MARGIN_BINS; b += 1) if (binsZ[b].length) { sumZ[b] = median(binsZ[b]); sumR[b] = median(binsR[b]); count[b] = 1; }
+  const filled = (sum: Float64Array) => {
+    const v = Array.from(sum, (x, b) => (count[b] ? x / count[b] : NaN));
+    if (v.every((x) => Number.isNaN(x))) return null;
+    // Gaps from their nearest found neighbours each way, by distance round the circle.
+    const out = v.map((x, b) => {
+      if (!Number.isNaN(x)) return x;
+      let l = 1, r = 1;
+      while (Number.isNaN(v[(b - l + MARGIN_BINS) % MARGIN_BINS])) l += 1;
+      while (Number.isNaN(v[(b + r) % MARGIN_BINS])) r += 1;
+      return (v[(b - l + MARGIN_BINS) % MARGIN_BINS] * r + v[(b + r) % MARGIN_BINS] * l) / (l + r);
+    });
+    let smooth = out;
+    for (let pass = 0; pass < 4; pass += 1) smooth = smooth.map((x, b) => (smooth[(b - 1 + MARGIN_BINS) % MARGIN_BINS] + 2 * x + smooth[(b + 1) % MARGIN_BINS]) / 4);
+    return smooth;
+  };
+  const zm = filled(sumZ), rm = filled(sumR);
+  if (!zm || !rm) return;
+  const at = (arr: number[], f: number) => { const b0 = Math.floor(f) % MARGIN_BINS, b1 = (b0 + 1) % MARGIN_BINS, u = f - Math.floor(f); return arr[b0] * (1 - u) + arr[b1] * u; };
+  // The wax's lowest point in each direction.
+  const low = new Array<number>(MARGIN_BINS).fill(Infinity);
+  let top = -Infinity;
+  for (let i = 0; i < p.length; i += 3) {
+    top = Math.max(top, p[i + 2]);
+    // The cap's middle (near the axis) belongs to no direction.
+    if (Math.hypot(p[i] - mx, p[i + 1] - my) < 0.4 * rMid) continue;
+    const b = Math.floor(binOf(p[i], p[i + 1])) % MARGIN_BINS;
+    low[b] = Math.min(low[b], p[i + 2]);
+  }
+  let lowFilled = low.map((x) => (Number.isFinite(x) ? x : Math.min(...low.filter(Number.isFinite))));
+  for (let pass = 0; pass < 2; pass += 1) lowFilled = lowFilled.map((x, b) => (lowFilled[(b - 1 + MARGIN_BINS) % MARGIN_BINS] + 2 * x + lowFilled[(b + 1) % MARGIN_BINS]) / 4);
+  const meanMargin = zm.reduce((a, b) => a + b, 0) / MARGIN_BINS;
+  const band = Math.max(1, MARGIN_BLEND_SHARE * (top - meanMargin));
+  for (let i = 0; i < p.length; i += 3) {
+    const f = binOf(p[i], p[i + 1]);
+    const zt = at(zm, f) + MARGIN_INSET, lo = at(lowFilled, f), up = zt + band;
+    const z = p[i + 2];
+    if (z >= up || lo >= up - 0.05) continue;
+    // [lo, up] onto [zt, up]: the end on the margin, the rest of the band eased.
+    let z2 = zt + ((z - lo) * (up - zt)) / (up - lo);
+    // Never pulled far: a margin read wrongly cannot drag the wax up the gum.
+    z2 = Math.max(z - MARGIN_MOVE_MAX, Math.min(z + MARGIN_MOVE_MAX, z2));
+    p[i + 2] = z2;
+    // In towards the tooth's surface at the margin, fully at the end and not at all at the band's top.
+    const w = Math.max(0, Math.min(1, 1 - (z2 - zt) / band));
+    const ease = w * w * (3 - 2 * w);
+    const dx = p[i] - mx, dy = p[i + 1] - my, r = Math.hypot(dx, dy);
+    if (r < 0.4 * rMid) continue;
+    const target = at(rm, f);
+    const r2 = r + Math.max(-1, Math.min(1, target - r)) * ease;
+    p[i] = mx + (dx / r) * r2; p[i + 1] = my + (dy / r) * r2;
+  }
 }
