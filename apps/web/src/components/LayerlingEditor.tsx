@@ -81,6 +81,7 @@ import { defaultRemeshDetail, type RemeshMode } from "@/lib/meshRemesh";
 import { MeshSculptPanel, type SculptBrushOptions, type SoftTransform, type SculptFreezeAction, type SculptRefine, type SculptSelectionAction, type SculptSymmetry, type SculptTool } from "./workplane/MeshSculptPanel";
 import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import { SculptSelectionBar } from "./workplane/SculptSelectionBar";
+import { BiteContactsCard } from "./workplane/BiteContactsCard";
 import { RADIAL_TOOLS, SculptRadialMenu, radialIndex } from "./workplane/SculptRadialMenu";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
@@ -9111,19 +9112,6 @@ export function LayerlingEditor({
     brushChoice(selection.mesh, window.layerlingProjectPoints(cornerPositions(selection.mesh)), window.layerlingCameraPosition(), points, tool.size, selection.chosen, tool.tool === "select", tool.reach);
     setSculptTool((current) => current ? { ...current, chosen: selection.chosen.reduce((a, b) => a + b, 0) } : current);
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Build 94: the selection's middle (in the scene), for the bar of actions beside it.
-  const sculptSelectionAnchor = useMemo<[number, number, number] | null>(() => {
-    const open = sculptTool;
-    const state = sculptState.current;
-    if (!open?.chosen || !state || state.shapeId !== open.shapeId || !state.selection) return null;
-    const { mesh, chosen } = state.selection;
-    let x = 0, y = 0, z = 0, n = 0;
-    for (let t = 0; t < chosen.length; t += 1) {
-      if (!chosen[t]) continue;
-      for (let k = 0; k < 3; k += 1) { const c = mesh.triangles[t * 3 + k] * 3; x += mesh.points[c]; y += mesh.points[c + 1]; z += mesh.points[c + 2]; n += 1; }
-    }
-    return n ? [x / n, y / n, z / n] : null;
-  }, [sculptTool?.chosen, sculptTool?.shapeId]); // eslint-disable-line react-hooks/exhaustive-deps
   /**
    * Build 94: a double-click selects the whole face group under it (Meshmixer): on its own it takes
    * the place of the selection, with Shift it is added, with Ctrl taken away. Groups are made first if
@@ -9617,13 +9605,14 @@ export function LayerlingEditor({
     applyToSelection(selection.mesh, selection.chosen, action);
     const positions = soupOf(selection.mesh);
     commitSculpt(shape, positions, t("sculpt.selectionDone", { action: t(`sculpt.selection.${action}`) }), true);
-    // The live copy follows (same triangles, same order), and the selection stays.
-    const kept = selection.chosen;
+    // The live copy follows (same triangles, same order). Build 96: the part changed, the selection is
+    // done with - it clears (and its bar closes), ready for a new one.
     const frozen = state.live.frozenPoints();
     state.live.dispose();
     state.live = LiveMesh.fromSoup(positions);
     if (frozen.length) state.live.freezePoints(frozen);
-    state.selection = { mesh: selection.mesh, chosen: kept, stale: false };
+    state.selection = { mesh: selection.mesh, chosen: new Uint8Array(selection.chosen.length), stale: false };
+    setSculptTool((current) => current ? { ...current, chosen: 0 } : current);
   }, [sculptTool]); // eslint-disable-line react-hooks/exhaustive-deps
   applySculptSelectionRef.current = applySculptSelection;
   // Build 92: Soft Transform - the selection moved, turned or scaled with a soft edge, live on the sculpt copy.
@@ -9690,8 +9679,10 @@ export function LayerlingEditor({
       }
       // The selection is of the same triangles, now somewhere else: its copy made again where they are.
       if (state.selection && keep) { state.selection.stale = true; sculptSelectionOf(state); }
+      // Build 96: moved, the selection is done with - it clears, ready for a new one (kept when cancelled).
+      if (state.selection && keep) state.selection.chosen = new Uint8Array(state.selection.chosen.length);
     }
-    setSculptTool((current) => current ? { ...current, soft: null } : current);
+    setSculptTool((current) => current ? { ...current, soft: null, ...(keep ? { chosen: 0 } : {}) } : current);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   /** Build 90: Freeze from the selection, Invert and Clear (Meshmixer's mask). */
   const applySculptFreeze = useCallback((action: SculptFreezeAction) => {
@@ -10002,7 +9993,7 @@ export function LayerlingEditor({
   };
   const [dentalStudio, setDentalStudio] = useState<DentalStudioState | null>(null);
   // Build 84: the bite contacts & clearance map - on, being worked out, its summary.
-  const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string } | null>(null);
+  const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; /** Build 96: the two parts (upper first), and whether they are the studio's. */ ids: [string, string]; studio: boolean } | null>(null);
   const biteMapRun = useRef(0);
   const dentalStudioRef = useRef(dentalStudio);
   dentalStudioRef.current = dentalStudio;
@@ -10512,13 +10503,58 @@ export function LayerlingEditor({
   useEffect(() => {
     if (dentalAreaManual && dentalStudio?.analysis) void ensureDentalAreas();
   }, [dentalAreaManual, dentalStudio?.analysis, dentalStudio?.slots.upper, dentalStudio?.slots.lower, ensureDentalAreas]);
+  /**
+   * Build 96: whether a part is a dental scan or model - Dental Studio's (a scan in a slot, a model or
+   * wax-up it made), a mesh named like one (upper, lower, maxilla, mandible, jaw, arch, bite, tooth,
+   * teeth), or an open scan with one long edge round it. The shape test welds the mesh, so it is kept
+   * per part and version.
+   */
+  const dentalPartMemo = useRef(new Map<string, { key: unknown; dental: boolean }>());
+  const isDentalPart = useCallback((shape: WorkplaneShape | undefined) => {
+    if (!shape) return false;
+    if (shape.dental || shape.dentalSource || shape.waxTooth || shape.waxFor) return true;
+    const studio = dentalStudioRef.current;
+    if (studio && Object.values(studio.slots).includes(shape.id)) return true;
+    if (/upper|lower|maxill|mandib|\bjaw|arch|\bbite|tooth|teeth|occlus|_upp|_low/i.test(shape.name)) return true;
+    const positions = shape.importedMesh?.positions;
+    if (!positions) return false;
+    const memo = dentalPartMemo.current.get(shape.id);
+    if (memo && memo.key === positions) return memo.dental;
+    let dental = false;
+    try { dental = looksLikeDentalScan(positions); } catch { dental = false; }
+    dentalPartMemo.current.set(shape.id, { key: positions, dental });
+    return dental;
+  }, []);
+  const sculptOnDental = useMemo(() => {
+    const id = sculptTool?.shapeId;
+    return id ? isDentalPart(shapes.find((shape) => shape.id === id)) : false;
+  }, [sculptTool?.shapeId, shapes, isDentalPart]);
+  /**
+   * Build 96: the two arches the bite contacts are for - Dental Studio's upper and lower (once worked
+   * out), or else two dental scans or models selected anywhere.
+   */
+  const biteCandidate = useMemo<{ ids: [string, string]; studio: boolean } | null>(() => {
+    if (dentalStudio) {
+      const { upper, lower } = dentalStudio.slots;
+      return upper && lower && dentalStudio.analysis ? { ids: [upper, lower], studio: true } : null;
+    }
+    if (selectedShapes.length !== 2 || sculptTool) return null;
+    if (!selectedShapes.every((shape) => isDentalPart(shape))) return null;
+    // Upper first (the higher of the two), so the summary reads the same as in the studio.
+    const [a, b] = selectedShapes;
+    const height = (shape: WorkplaneShape) => shape.z ?? 0;
+    return { ids: height(a) >= height(b) ? [a.id, b.id] : [b.id, a.id], studio: false };
+  }, [dentalStudio, selectedShapes, sculptTool, isDentalPart]);
   // Build 84: the bite contacts map, worked out in the background whenever the arches move in the bite,
   // and drawn over the two scans while it is on (in occlusion only).
   useEffect(() => {
-    const upperId = dentalStudio?.slots.upper, lowerId = dentalStudio?.slots.lower;
-    const upper = upperId ? shapes.find((shape) => shape.id === upperId) : undefined;
-    const lower = lowerId ? shapes.find((shape) => shape.id === lowerId) : undefined;
-    if (!biteMap?.on || !dentalStudio || dentalStudio.layout !== "occlusion" || !upper || !lower) {
+    // Build 96: the studio's arches, or two parts chosen outside it.
+    const ids = biteMap?.studio ? [dentalStudio?.slots.upper, dentalStudio?.slots.lower] : biteMap?.ids ?? [];
+    const upper = ids[0] ? shapes.find((shape) => shape.id === ids[0]) : undefined;
+    const lower = ids[1] ? shapes.find((shape) => shape.id === ids[1]) : undefined;
+    // A part gone (deleted): the map goes too.
+    if (biteMap?.on && !biteMap.studio && (!upper || !lower)) { setBiteMap(null); window.layerlingColorOverlay?.(null); return; }
+    if (!biteMap?.on || (biteMap.studio && (!dentalStudio || dentalStudio.layout !== "occlusion")) || !upper || !lower) {
       // Build 94: the teeth found, when Wax-up Studio shows them.
       window.layerlingColorOverlay?.(toothOverlay.current);
       return;
@@ -10543,9 +10579,24 @@ export function LayerlingEditor({
         setBiteMap((current) => current ? { ...current, busy: false, key, error: error instanceof Error ? error.message : String(error) } : current);
       }
     }, 30);
-  }, [biteMap?.on, biteMap?.key, dentalStudio?.layout, dentalStudio?.slots.upper, dentalStudio?.slots.lower, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
-  // The map goes when Dental Studio closes.
-  useEffect(() => { if (!dentalStudio) { setBiteMap(null); window.layerlingColorOverlay?.(null); } }, [dentalStudio]);
+  }, [biteMap?.on, biteMap?.key, biteMap?.studio, biteMap?.ids, dentalStudio?.layout, dentalStudio?.slots.upper, dentalStudio?.slots.lower, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The studio's map goes when Dental Studio closes (one made outside it stays).
+  const studioOpen = Boolean(dentalStudio);
+  useEffect(() => {
+    if (studioOpen) return;
+    setBiteMap((current) => {
+      if (current?.studio) { window.layerlingColorOverlay?.(null); return null; }
+      return current;
+    });
+  }, [studioOpen]);
+  /** Build 96: the bite contacts on or off - in the studio it shows the scans in occlusion first. */
+  const toggleBiteMap = (on: boolean) => {
+    if (!on) { setBiteMap(null); window.layerlingColorOverlay?.(null); return; }
+    const candidate = biteCandidate;
+    if (!candidate) return;
+    if (candidate.studio && dentalStudio && dentalStudio.layout !== "occlusion") layOutDentalScans("occlusion");
+    setBiteMap({ on: true, busy: true, key: "", ids: candidate.ids, studio: candidate.studio });
+  };
   // The area tinted over the scans while it can be edited.
   useEffect(() => {
     const state = dentalStudioRef.current;
@@ -17429,7 +17480,7 @@ export function LayerlingEditor({
           layout={dentalStudio.layout}
           onLayout={layOutDentalScans}
           biteMap={biteMap}
-          onBiteMap={(on) => setBiteMap(on ? { on: true, busy: true, key: "" } : null)}
+          onBiteMap={toggleBiteMap}
           onFitBite={() => { if (dentalStudio) analyseDentalStudio({ ...dentalStudio, biteMode: "fit" }); }}
           biteLocked={Boolean(dentalStudio.analysis?.pair?.bite?.locked)}
           onRestore={(slot) => void restoreDentalScan(slot)}
@@ -17607,7 +17658,7 @@ export function LayerlingEditor({
           onGroups={sculptGroups}
           brushOptions={sculptTool.brushOptions ?? BRUSH_OPTIONS_DEFAULT}
           onBrushOptions={(brushOptions) => { storeBrushOptions(brushOptions); setSculptTool((current) => current ? { ...current, brushOptions } : current); }}
-          onPreset={(preset) => setSculptTool((current) => current ? { ...current, tool: preset.tool, size: preset.size, strength: preset.strength, brushOptions: { ...(current.brushOptions ?? { falloff: "smooth", lazy: 0, hold: false, depth: 0 }), falloff: preset.falloff } } : current)}
+          onPreset={!sculptOnDental ? undefined : (preset) => setSculptTool((current) => current ? { ...current, tool: preset.tool, size: preset.size, strength: preset.strength, brushOptions: { ...(current.brushOptions ?? { falloff: "smooth", lazy: 0, hold: false, depth: 0 }), falloff: preset.falloff } } : current)}
           onSoftStart={softStart}
           onSoft={softChange}
           onSoftEnd={softEnd}
@@ -17641,8 +17692,13 @@ export function LayerlingEditor({
           live={sculptTool.tool === "select" || sculptTool.tool === "unselect" ? undefined : { start: startSculptStroke, move: moveSculptStroke, end: endSculptStroke }}
         />
       ) : null}
-      {sculptTool && !sculptTool.trim && sculptTool.chosen > 0 && !sculptTool.soft && sculptSelectionAnchor ? (
-        <SculptSelectionBar anchor={sculptSelectionAnchor} busy={sculptTool.busy} onAction={(action) => applySculptSelectionRef.current(action)} onSoft={softStart} />
+      {/* Build 96: the bite contacts, one click away whenever two arches are there to show them for. */}
+      {!sculptTool && dentalStudio?.stage !== "making" && (biteMap?.on || biteCandidate) ? (
+        <BiteContactsCard biteMap={biteMap} onToggle={toggleBiteMap}
+          hint={biteMap?.on ? null : biteCandidate?.studio ? (dentalStudio?.layout !== "occlusion" ? t("dental.biteMapToBite") : null) : t("dental.biteMapPair")} />
+      ) : null}
+      {sculptTool && !sculptTool.trim && sculptTool.chosen > 0 && !sculptTool.soft ? (
+        <SculptSelectionBar count={sculptTool.chosen} busy={sculptTool.busy} onAction={(action) => applySculptSelectionRef.current(action)} onSoft={softStart} onDone={() => applySculptSelectionRef.current("clear")} />
       ) : null}
       {sculptTool && sculptRadial ? <SculptRadialMenu x={sculptRadial.x} y={sculptRadial.y} hover={sculptRadial.hover} current={sculptTool.tool} onPick={(tool) => { pickSculptToolRef.current(tool); setSculptRadial(null); }} /> : null}
       {sculptTool && sculptSpeedShown ? (

@@ -2016,10 +2016,26 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .sculpt-tools.two { grid-template-columns: repeat(2, 1fr); }
 .sculpt-view-aids { display: grid; gap: 4px; margin-top: 6px; }
 .sculpt-selection button.danger { color: #b42318; border-color: #e4a29b; }
-.sculpt-selection-bar { position: fixed; z-index: 60; display: flex; flex-wrap: wrap; gap: 4px; max-width: 360px; padding: 5px; border-radius: 10px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22); pointer-events: auto; }
+.sculpt-selection-bar { position: fixed; z-index: 60; top: 96px; left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: min(640px, calc(100vw - 32px)); padding: 5px 6px; border-radius: 10px; background: rgba(255, 255, 255, 0.97); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22); pointer-events: auto; }
+.sculpt-selection-bar.placed { transform: none; }
 .sculpt-selection-bar button { border: 1px solid var(--border, #d4dae3); background: #fff; border-radius: 7px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
 .sculpt-selection-bar button.danger { color: #b42318; border-color: #e4a29b; }
 .sculpt-selection-bar button:hover { background: #f1f5fb; }
+.sculpt-selection-bar .sculpt-bar-grip { border: 0; background: transparent; padding: 4px 2px; cursor: grab; color: #7a8594; touch-action: none; }
+.sculpt-selection-bar .sculpt-bar-grip:active { cursor: grabbing; }
+.sculpt-bar-count { font-size: 12px; font-weight: 600; color: #3a4452; padding-right: 2px; white-space: nowrap; }
+.sculpt-bar-group { display: flex; gap: 4px; padding-left: 6px; border-left: 1px solid var(--border, #d4dae3); }
+.sculpt-selection-bar .sculpt-bar-done { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; background: var(--accent, #1f5fbf); border-color: var(--accent, #1f5fbf); color: #fff; font-weight: 600; }
+.sculpt-selection-bar .sculpt-bar-done:hover { background: #194f9f; }
+.bite-contacts-card { position: fixed; z-index: 55; left: 16px; bottom: 16px; width: min(300px, calc(100vw - 32px)); display: grid; gap: 6px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.97); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2); font-size: 12px; }
+.bite-contacts-card.closed { width: auto; max-width: 260px; padding: 6px; }
+.bite-contacts-card .blend-hint { margin: 0; }
+.bite-contacts-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.bite-contacts-head .icon-button { border: 0; background: transparent; cursor: pointer; padding: 2px; color: #5b6573; }
+.bite-contacts-open { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border, #d4dae3); background: #fff; border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.bite-contacts-open:hover { background: #f1f5fb; }
+.bite-contacts-dots { display: inline-flex; gap: 2px; }
+.bite-contacts-dots i { width: 8px; height: 8px; border-radius: 50%; display: block; }
 .sculpt-radial { position: fixed; z-index: 70; width: 0; height: 0; pointer-events: none; }
 .sculpt-radial button { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; min-width: 74px; padding: 6px 9px; border-radius: 999px; border: 1px solid var(--border, #d4dae3); background: rgba(255, 255, 255, 0.97); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2); font-size: 12px; font-weight: 600; cursor: pointer; }
 .sculpt-radial button.active { color: var(--accent, #1f5fbf); border-color: var(--accent, #1f5fbf); }

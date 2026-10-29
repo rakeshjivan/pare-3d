@@ -1,6 +1,6 @@
 "use client";
 
-import { CONTACT_BANDS, type BiteContactStats } from "@/lib/biteContacts";
+import type { BiteContactStats } from "@/lib/biteContacts";
 import { PIN_MAX, PIN_STEP, PIN_WARN, articulatorPinPatch } from "@/lib/dentalArticulator";
 
 /** Build 78: a bite scan further than this from the scanner's bite (mm RMS) is pointed out. */
@@ -370,23 +370,7 @@ export function DentalStudioPanel({
                 <input type="checkbox" checked={Boolean(biteMap?.on)} disabled={busy} onChange={(event) => onBiteMap(event.currentTarget.checked)} />
                 <span>{t("dental.biteMap")}</span>
               </label>
-              {biteMap?.on ? (<>
-                <ul className="dental-bite-legend" aria-label={t("dental.biteMapLegend")}>
-                  {CONTACT_BANDS.map((band) => (
-                    <li key={band.key}><span className="swatch" style={{ background: band.color }} aria-hidden="true" />{t(`dental.biteBand.${band.key}` as "dental.biteBand.close")}</li>
-                  ))}
-                </ul>
-                {biteMap.busy ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.biteMapWorking")}</p> : null}
-                {biteMap.error ? <p className="dental-status warn" role="status">{biteMap.error}</p> : null}
-                {!biteMap.busy && biteMap.upper && biteMap.lower ? (() => {
-                  const overlap = Math.max(biteMap.upper.maxOverlap, biteMap.lower.maxOverlap);
-                  const contact = (biteMap.upper.contactArea + biteMap.lower.contactArea) / 2;
-                  return <p className={`dental-status ${overlap > 0.1 ? "warn" : ""}`} role="status">{overlap > 0.005
-                    ? t("dental.biteMapOverlap", { overlap: overlap.toFixed(2), area: contact.toFixed(1) })
-                    : t("dental.biteMapClear", { area: contact.toFixed(1) })}</p>;
-                })() : null}
-                <p className="blend-hint">{t("dental.biteMapNote")}</p>
-              </>) : null}
+              {biteMap?.on ? <p className="blend-hint">{t("dental.biteMapNote")}</p> : null}
             </div>
           ) : null}
         </div>
