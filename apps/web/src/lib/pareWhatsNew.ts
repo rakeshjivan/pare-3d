@@ -4,6 +4,15 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 101,
+    items: [
+      "Bite contacts on the finished models: after Make, the map is measured on the models in the bite they were made in (however they are laid out to print), and a hidden scan is no longer drawn over them.",
+      "Smooth the scan's edge now starts on High.",
+      "Handles hidden from the right-click menu now say so, with a Show button, so a selected part never looks stuck; closing Dental Studio puts the handles and the view back as they should be.",
+      "Wax-up Studio (test builds): one step at a time with Back, Next and Undo; the tooth finder built in; Find teeth carries on by itself to the teeth placed; a clean gum line; the bite kept as scanned unless you open it on purpose, with the wax trimmed to fit it; models at an opened bite made correctly.",
+    ],
+  },
+  {
     build: 100,
     items: [
       "Dental Studio's scans move and turn freely again at every step, with the box or the gimbal - holding them still (builds 98 and 99) was too restrictive. Side by side and In occlusion still put them back where the studio places them.",

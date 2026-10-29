@@ -398,8 +398,9 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
           </div>
           {view.occlusion.result ? (
             <div className="waxup-occlusion">
-              <p className="blend-hint">{t("waxup.openings", { list: view.occlusion.result.openings.filter((o) => o.fdi).map((o) => `${o.fdi} ${o.mm.toFixed(1)}`).join(", ") })}</p>
-              <p className="blend-hint">{t("waxup.restContacts", { list: view.occlusion.result.rest.map((r) => `${r.fdi} ${r.gap.toFixed(2)}`).join(", ") })}</p>
+              {/* Build 101: only what there is to say - no openings at the bite as scanned, no list without the opposing teeth found. */}
+              {view.occlusion.result.raise > 0 && view.occlusion.result.openings.some((o) => o.fdi) ? <p className="blend-hint">{t("waxup.openings", { list: view.occlusion.result.openings.filter((o) => o.fdi).map((o) => `${o.fdi} ${o.mm.toFixed(1)}`).join(", ") })}</p> : null}
+              {view.occlusion.result.rest.length ? <p className="blend-hint">{t("waxup.restContacts", { list: view.occlusion.result.rest.map((r) => `${r.fdi} ${r.gap.toFixed(2)}`).join(", ") })}</p> : null}
               {view.occlusion.result.findings.length ? (
                 <ul className="waxup-checks">
                   {view.occlusion.result.findings.map((f, i) => <li key={i} className="warn"><AlertTriangle size={12} aria-hidden="true" /> {f.text} ({f.count})</li>)}
