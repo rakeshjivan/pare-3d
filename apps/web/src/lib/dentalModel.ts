@@ -618,7 +618,8 @@ function buildArch(
   const keptKeys = new Set<string>();
   const fringe = distanceFromEdge(cut, EDGE_FRINGE);
   for (const i of new Set(cut.f)) if (fringe[i] > EDGE_FRINGE) keptKeys.add(`${cut.v[i * 3]},${cut.v[i * 3 + 1]},${cut.v[i * 3 + 2]}`);
-  smoothEdge(cut, SMOOTH_ROUNDS[options.smooth ?? "low"], teeth);
+  // Build 101: High unless chosen otherwise - the edge alone moves (the teeth are kept), shrink-free.
+  smoothEdge(cut, SMOOTH_ROUNDS[options.smooth ?? "high"], teeth);
   let closed;
   try {
     closed = closeToFloor(cut, floor, 400, guard, 0);

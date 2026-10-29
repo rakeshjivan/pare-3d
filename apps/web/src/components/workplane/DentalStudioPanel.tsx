@@ -550,7 +550,7 @@ export function DentalStudioPanel({
               <input type="checkbox" checked={following} disabled={busy} onChange={(event) => onOptionsChange({ gum: event.currentTarget.checked ? 3 : null })} />
               <span>{t("dental.gumFollow")}</span>
             </label>
-            {choice(t("dental.smooth"), options.smooth ?? "low", [["off", t("dental.smooth.off")], ["low", t("dental.smooth.low")], ["high", t("dental.smooth.high")]], (smooth) => onOptionsChange({ smooth }))}
+            {choice(t("dental.smooth"), options.smooth ?? "high", [["off", t("dental.smooth.off")], ["low", t("dental.smooth.low")], ["high", t("dental.smooth.high")]], (smooth) => onOptionsChange({ smooth }))}
             {/* Build 78: soft tissue that would stop the models closing is trimmed, as on a cast's heels;
                 the orthodontic records preset keeps the scans whole. */}
             {pair ? (

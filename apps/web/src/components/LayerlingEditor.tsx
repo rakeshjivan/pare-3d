@@ -64,7 +64,7 @@ import { hullPositions, type FitReport } from "@/lib/partTools";
 import { smallestRoundingRadius, type MeshRoundMode } from "@/lib/meshRound";
 import { analyseDentalInBackground, biteContactsInBackground, stopMeshJobs, checkFitInBackground, dentalAreaInBackground, makeDentalStudioInBackground, remeshInBackground, roundMeshInBackground, textureMeshInBackground, trimDentalScanInBackground, waxupInBackground, findTeethInBackground, resetToothFinder, occlusionInBackground } from "@/lib/meshJobs";
 import { AVERAGE_ARTICULATOR } from "@/lib/waxOcclusion";
-import { loadStoredFinder, storeFinder } from "@/lib/toothFinderStore";
+import { BUILT_IN_FINDER, finderBytes, loadStoredFinder, storeFinder } from "@/lib/toothFinderStore";
 import { toothColour, transferLabels, type ScanTeeth } from "@/lib/toothSegment";
 import { transformSoup } from "@/lib/dentalMesh";
 import { BUILT_IN_LIBRARIES, loadToothLibrary, loadToothSet, type ToothLibraryManifest } from "@/lib/toothLibrary";
@@ -5899,6 +5899,11 @@ export function LayerlingEditor({
       ? t("status.edgeCancelledRedo")
       : workplaneChanged ? t(placementWorkplaneIsBase(nextWorkplane) ? "status.redoWorkplaneBase" : "status.redoWorkplaneFace") : t("status.redo"));
   }, [invalidateCadModifierSession, setOpenGroupLevels, syncProjectShapes]);
+  // Build 101: for Wax-up Studio's Undo, which walks the history to where a wax-up step began.
+  const undoRef = useRef(undo);
+  undoRef.current = undo;
+  const redoRef = useRef(redo);
+  redoRef.current = redo;
 
   /**
    * Der Verlaufsblick oeffnet beim aktuellen Stand; von dort fuehrt der Schieber
@@ -10959,7 +10964,7 @@ export function LayerlingEditor({
   // Build 79: the digital wax-up - a tooth set over an arch's anterior teeth, from three landmarks.
   const WAX_COLOR = "#f1e7d0";
   type WaxupState = Omit<WaxupView, "marked" | "selected" | "mirror" | "found" | "chosen"> & { landmarks: WaxLandmarks | null; guessed: boolean; marks: Array<[number, number, number]> };
-  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: null, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 0, red: null, checks: null, occlusion: { ready: false, busy: false, raise: 2, scheme: "canine", guidance: 30, bennett: 15, result: null } });
+  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: BUILT_IN_FINDER.name, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 0, red: null, checks: null, occlusion: { ready: false, busy: false, raise: 2, scheme: "canine", guidance: 30, bennett: 15, result: null } });
   // Build 94: the teeth found on each scan (by its part id): each scan triangle's FDI (as the studio
   // reads the scan), the teeth, the landmarks from them, and the teeth chosen for the wax-up.
   type FoundTeeth = { key: string; input: Float32Array; fdi: Uint8Array; teeth: ScanTeeth["teeth"]; landmarks: WaxLandmarks | null; chosen: number[] };
@@ -10996,6 +11001,54 @@ export function LayerlingEditor({
   }, []);
   const waxupRef = useRef(waxup);
   waxupRef.current = waxup;
+  /**
+   * Build 101: Wax-up Studio's own Undo and Redo - every step (placing, the sliders, nudges, the teeth
+   * chosen, the set, the occlusion) records the wax-up's settings with the design's place in its history;
+   * Undo puts both back together, so the teeth, the sliders and the lists always agree.
+   */
+  const waxFoundRef = useRef(waxFound);
+  waxFoundRef.current = waxFound;
+  type WaxSnap = { index: number; waxup: WaxupState; found: Record<string, FoundTeeth> };
+  const waxUndoStack = useRef<WaxSnap[]>([]);
+  const waxRedoStack = useRef<WaxSnap[]>([]);
+  const waxLastRecord = useRef(0);
+  const [, setWaxHistoryTick] = useState(0);
+  const waxSnapNow = (): WaxSnap => ({ index: historyIndexRef.current, waxup: waxupRef.current, found: waxFoundRef.current });
+  /** Before a wax-up change; `coalesce` joins a slider's drag into one step. */
+  const waxRecord = (coalesce = false) => {
+    const now = Date.now();
+    if (coalesce && now - waxLastRecord.current < 700) { waxLastRecord.current = now; return; }
+    waxLastRecord.current = now;
+    waxUndoStack.current.push(waxSnapNow());
+    if (waxUndoStack.current.length > 60) waxUndoStack.current.shift();
+    waxRedoStack.current = [];
+    setWaxHistoryTick((n) => n + 1);
+  };
+  /** The design's history moved to this place, a step at a time (stops if a step will not go). */
+  const waxHistoryTo = (index: number) => {
+    for (let guard = 0; guard < 500 && historyIndexRef.current > index; guard += 1) { const was = historyIndexRef.current; undoRef.current(); if (historyIndexRef.current === was) break; }
+    for (let guard = 0; guard < 500 && historyIndexRef.current < index; guard += 1) { const was = historyIndexRef.current; redoRef.current(); if (historyIndexRef.current === was) break; }
+  };
+  const waxRestore = (snap: WaxSnap) => {
+    waxHistoryTo(snap.index);
+    setWaxup({ ...snap.waxup, busy: false, picking: null, finder: { ...waxupRef.current.finder, busy: false, progress: null }, occlusion: { ...snap.waxup.occlusion, busy: false } });
+    setWaxFound(snap.found);
+    setWaxHistoryTick((n) => n + 1);
+  };
+  const waxUndo = () => {
+    const snap = waxUndoStack.current.pop();
+    if (!snap || waxupRef.current.busy) { if (snap) waxUndoStack.current.push(snap); return; }
+    waxRedoStack.current.push(waxSnapNow());
+    waxRestore(snap);
+    setNotice(t("waxup.undone"));
+  };
+  const waxRedo = () => {
+    const snap = waxRedoStack.current.pop();
+    if (!snap || waxupRef.current.busy) { if (snap) waxRedoStack.current.push(snap); return; }
+    waxUndoStack.current.push(waxSnapNow());
+    waxRestore(snap);
+    setNotice(t("waxup.redone"));
+  };
   const waxShells = useRef<Float32Array[] | null>(null);
   /** The arch the wax-up is on (the slot chosen, or the one there is), and the move from the scene to the studio's coordinates. */
   const waxArch = useCallback(() => {
@@ -11165,7 +11218,7 @@ export function LayerlingEditor({
   }, [commitShapes, waxArch]); // eslint-disable-line react-hooks/exhaustive-deps
   // Build 94: the tooth finder. Its weights are the user's (kept in this browser); found once per scan.
   useEffect(() => {
-    if (!dentalStudio?.waxStudio || waxupRef.current.finder.name) return;
+    if (!dentalStudio?.waxStudio) return;
     void loadStoredFinder().then((stored) => { if (stored) setWaxup((current) => ({ ...current, finder: { ...current.finder, name: stored.name } })); });
   }, [dentalStudio?.waxStudio]); // eslint-disable-line react-hooks/exhaustive-deps
   const loadToothFinder = useCallback(async (file: File) => {
@@ -11186,7 +11239,7 @@ export function LayerlingEditor({
     if (!arch || waxupRef.current.finder.busy) return;
     setWaxup((current) => ({ ...current, slot: arch.slot, finder: { ...current.finder, busy: true, progress: 0 }, error: null }));
     try {
-      const found = await findTeethInBackground(arch.scan, arch.slot, async () => (await loadStoredFinder())?.bytes ?? null, (share) => setWaxup((current) => ({ ...current, finder: { ...current.finder, progress: share } })));
+      const found = await findTeethInBackground(arch.scan, arch.slot, finderBytes, (share) => setWaxup((current) => ({ ...current, finder: { ...current.finder, progress: share } })));
       // At first the front teeth (canine to canine) are chosen - the usual anterior wax-up.
       const chosen = found.teeth.filter((tooth) => tooth.fdi % 10 <= 3).map((tooth) => tooth.fdi);
       setWaxFound((current) => ({ ...current, [arch.shape.id]: { key: `${arch.scan.length}`, input: arch.scan, fdi: found.fdi, teeth: found.teeth, landmarks: found.landmarks, chosen } }));
@@ -11199,7 +11252,7 @@ export function LayerlingEditor({
       }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setWaxup((current) => ({ ...current, finder: { ...current.finder, busy: false, progress: null, ...(message === "tooth-finder-missing" ? { name: null } : {}) }, error: message === "tooth-finder-missing" ? t("waxup.finderNone") : t("waxup.findFailed", { error: localizedError(message) }) }));
+      setWaxup((current) => ({ ...current, finder: { ...current.finder, busy: false, progress: null }, error: message === "tooth-finder-missing" ? t("waxup.finderNone") : t("waxup.findFailed", { error: localizedError(message) }) }));
     }
   }, [waxArch]);
   const waxFoundHere = (() => {

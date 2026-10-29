@@ -97,7 +97,7 @@ The **{{ui:dental.heightTitle}}** box shows the model as it stacks up, with a pi
 
 ### {{ui:dental.moreScan}}
 
-**{{ui:dental.moreScan}}**, under the height, holds the last two: **{{ui:dental.gumFollow}}** - a band of gum all round the teeth and nothing more, so the palate and the floor of the mouth go and the model is a horseshoe (its depth is then the {{ui:dental.gumHeight}} slider) - and **{{ui:dental.smooth}}** (smoothing the ragged edge where the scan stops, never the teeth).
+**{{ui:dental.moreScan}}**, under the height, holds the last two: **{{ui:dental.gumFollow}}** - a band of gum all round the teeth and nothing more, so the palate and the floor of the mouth go and the model is a horseshoe (its depth is then the {{ui:dental.gumHeight}} slider) - and **{{ui:dental.smooth}}** (smoothing the ragged edge where the scan stops, never the teeth; {{ui:dental.smooth.high}} unless you choose otherwise).
 
 ## Step 5 · {{ui:dental.step4}}
 

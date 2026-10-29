@@ -1,6 +1,9 @@
 /*
  * Build 94: the tooth finder's weights, kept in this browser's IndexedDB once the user has loaded
- * them (they are not part of Pare 3D). One record: the file's bytes and its name.
+ * them. One record: the file's bytes and its name.
+ * Build 101: CrossTooth (Xi et al., CVPR 2025, used with the authors' permission) comes with Pare 3D,
+ * at /models/crosstooth.ptw: fetched the first time teeth are found, then kept here for offline use. A
+ * file the user loads still takes its place.
  */
 const DB_NAME = "pare3d-tooth-finder";
 const STORE = "weights";
@@ -40,4 +43,22 @@ export async function storeFinder(name: string, bytes: ArrayBuffer) {
 }
 export async function forgetFinder() {
   await run("readwrite", (s) => s.delete(KEY));
+}
+
+/** Build 101: the tooth finder that comes with Pare 3D. */
+export const BUILT_IN_FINDER = { name: "CrossTooth (built in)", url: "/models/crosstooth.ptw" };
+
+/** The tooth finder's bytes: the one kept in this browser, or else the built-in one (fetched, then kept). */
+export async function finderBytes(): Promise<ArrayBuffer | null> {
+  const stored = await loadStoredFinder();
+  if (stored) return stored.bytes;
+  try {
+    const response = await fetch(BUILT_IN_FINDER.url);
+    if (!response.ok) return null;
+    const bytes = await response.arrayBuffer();
+    try { await storeFinder(BUILT_IN_FINDER.name, bytes); } catch { /* used this time, fetched again next */ }
+    return bytes;
+  } catch {
+    return null;
+  }
 }

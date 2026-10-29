@@ -50,6 +50,8 @@ export function precachePaths(relativeFiles) {
     if (path.startsWith("/_next/static/media/") && path.endsWith(".wasm")) continue;
     // Fetched when a text needs Japanese; the service worker stores it then (FONT_CACHE).
     if (path.startsWith("/fonts/japanese/")) continue;
+    // Build 101 (Pare 3D): the tooth finder's network (27 MB) is fetched when teeth are first found and kept by the page itself.
+    if (path.startsWith("/models/")) continue;
     // The guide's pages are small text and worth having offline; its pictures
     // are not, and would triple the download for a page few people open.
     if (/^\/(anleitung|guide|handleiding)\/img\//.test(path)) continue;
