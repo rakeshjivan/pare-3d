@@ -3774,6 +3774,8 @@ export const MESSAGES_EN = {
   "sculpt.tool.smooth": "Smooth",
   "contextMenu.hideHandles": "Hide handles and sizes",
   "contextMenu.showHandles": "Show handles and sizes",
+  "contextMenu.useGimbal": "Use the gimbal (Meshmixer style)",
+  "contextMenu.useBox": "Use the box (Tinkercad style)",
   "sculpt.tool.softTransform": "Soft transform",
   "sculpt.soft.title": "Soft transform",
   "sculpt.soft.start": "Soft transform",

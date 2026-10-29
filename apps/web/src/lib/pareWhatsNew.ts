@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 100,
+    items: [
+      "Dental Studio's scans move and turn freely again at every step, with the box or the gimbal - holding them still (builds 98 and 99) was too restrictive. Side by side and In occlusion still put them back where the studio places them.",
+      "Box or gimbal from the right-click menu too, so it can be switched while Dental Studio covers the Snap Grid corner.",
+      "Trim and fill starts on Surface I see, so only the surface facing you is selected; Back side and Through are a click away and your choice is remembered.",
+    ],
+  },
+  {
     build: 99,
     items: [
       "A gimbal, as in Meshmixer, Medit and Bambu Studio: switch Box / Gimbal beside Snap Grid. Gimbal gives three arrows to move a part along (red, green up, blue) and three rings to turn it on, about its middle - no box, sizes or distances on the part. Box keeps Tinkercad's handles. Your choice is remembered.",

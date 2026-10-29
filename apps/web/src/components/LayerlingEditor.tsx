@@ -82,7 +82,7 @@ import { MeshSculptPanel, type SculptBrushOptions, type SoftTransform, type Scul
 import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import { SculptSelectionBar } from "./workplane/SculptSelectionBar";
 import { BiteContactsCard } from "./workplane/BiteContactsCard";
-import { useHandleStyle } from "@/lib/handleStyle";
+import { setHandleStyle, useHandleStyle } from "@/lib/handleStyle";
 import { RADIAL_TOOLS, SculptRadialMenu, radialIndex } from "./workplane/SculptRadialMenu";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
@@ -16413,25 +16413,17 @@ export function LayerlingEditor({
   // Put away automatically while Sculpt (or Trim) is open, back when it closes; the menu's choice is for
   // this visit only, so a new design never opens without its handles.
   const [handlesHidden, setHandlesHidden] = useState(false);
-  // Build 98: and while Dental Studio (or Wax-up Studio) is open - the studio places the scans itself
-  // (side by side, in occlusion), and its scans are held still, below.
-  // Build 99: with the gimbal there is no box or sizes to tidy away: it shows in the studio too (the scans
-  // themselves stay held, below; wax-up teeth and other parts move and turn with it).
-  const handleStyleNow = useHandleStyle();
-  const handlesAway = Boolean(sculptTool) || (Boolean(dentalStudio) && handleStyleNow === "box");
-  /**
-   * Build 98: the studio's scans held still while it is open - a stray drag or turn knocked a scan out of
-   * the bite. Locked only in what the view is given (not in the design), so nothing is saved locked.
-   */
-  const studioHeld = useMemo(() => {
-    const slots = dentalStudio?.slots;
-    return new Set(slots ? (Object.values(slots).filter(Boolean) as string[]) : []);
-  }, [dentalStudio?.slots]);
-  const holdStudioScans = useCallback((list: WorkplaneShape[]) => (studioHeld.size ? list.map((shape) => (studioHeld.has(shape.id) && !shape.locked ? { ...shape, locked: true } : shape)) : list), [studioHeld]);
-  const heldViewportShapes = useMemo(() => holdStudioScans(historyView.shapes ?? viewportShapes), [holdStudioScans, historyView.shapes, viewportShapes]);
+  // Build 100: the studio's scans move and turn freely again, with the box or the gimbal (builds 98-99
+  // held them still and put the box away in the studio, which was too restrictive).
+  const handlesAway = Boolean(sculptTool);
+  const heldViewportShapes = historyView.shapes ?? viewportShapes;
   useEffect(() => { window.layerlingTransformHandles?.(handlesHidden || handlesAway); }, [handlesHidden, handlesAway]);
   const toggleHandlesHidden = () => setHandlesHidden((hidden) => !hidden);
   const handlesItem = (separated: boolean): ShapeContextMenuItem => ({ key: "handles", label: t(handlesHidden ? "contextMenu.showHandles" : "contextMenu.hideHandles"), separated, onSelect: toggleHandlesHidden });
+  // Build 100: the Box / Gimbal switch in the right-click menu too - beside Snap Grid it was out of sight
+  // while Dental Studio covered the right of the window.
+  const handleStyleChoice = useHandleStyle();
+  const handleStyleItem = (): ShapeContextMenuItem => ({ key: "handleStyle", label: t(handleStyleChoice === "gimbal" ? "contextMenu.useBox" : "contextMenu.useGimbal"), onSelect: () => setHandleStyle(handleStyleChoice === "gimbal" ? "box" : "gimbal") });
   const shapeContextMenuItems = (): ShapeContextMenuItem[] => {
     if (!shapeContextMenu) return [];
     // The bodies under the pointer, front to back: a row marks its body through what stands in front, a click selects it,
@@ -16462,7 +16454,7 @@ export function LayerlingEditor({
       if (shapes.some((shape) => !shape.hole && !shape.hidden && !shape.locked && !isNonSolidShapeKind(shape.kind))) items.push({ key: "cutBelow", label: t("contextMenu.cutBelow"), separated: true, onSelect: () => void cutPartsBelowBed([]) });
       if (shapes.some((shape) => shape.hidden)) items.push({ key: "showHidden", label: t("contextMenu.showHidden"), shortcut: "Ctrl+Shift+H", onSelect: showHidden });
       if (referencePoints(notes).length > 0) items.push({ key: "removePoints", label: t("contextMenu.removeAllPoints", { count: referencePoints(notes).length }), danger: true, separated: true, onSelect: removeAllReferencePoints });
-      items.push(handlesItem(true));
+      items.push(handlesItem(true), handleStyleItem());
       return items;
     }
     const allHoles = selectedShapes.every((shape) => shape.hole);
@@ -16564,7 +16556,7 @@ export function LayerlingEditor({
     if (!selectionLocked) {
       items.push({ key: "scalePercent", label: t("scalePercent.title"), separated: true, onSelect: toggleScalePercentTool });
     }
-    items.push(handlesItem(selectionLocked));
+    items.push(handlesItem(selectionLocked), handleStyleItem());
     items.push(
       { key: "hide", label: t("contextMenu.hide"), shortcut: "Ctrl+H", separated: true, onSelect: toggleHidden },
       { key: "lock", label: t(allLocked ? "contextMenu.unlock" : "contextMenu.lock"), shortcut: "Ctrl+L", onSelect: toggleLocked },
@@ -18162,18 +18154,20 @@ function readSculptReach(): SelectReach {
     return "front";
   }
 }
-/** Build 77: Trim reaches right through the scan unless the person chose otherwise - a palate or a flap is cut in one stroke, with no hidden layer left behind. */
+/** Build 100: Trim selects the surface you see unless the person chose otherwise (it reached right through
+ * the scan from build 77, which took hidden surface with it). Remembered under a new key, so the old default
+ * is not carried over. */
 function readTrimReach(): SelectReach {
   try {
-    const stored = window.localStorage.getItem("pare3d.trimReach");
-    return stored === "back" || stored === "front" ? stored : "through";
+    const stored = window.localStorage.getItem("pare3d.trimReach2");
+    return stored === "back" || stored === "through" ? stored : "front";
   } catch {
-    return "through";
+    return "front";
   }
 }
 function storeTrimReach(reach: SelectReach) {
   try {
-    window.localStorage.setItem("pare3d.trimReach", reach);
+    window.localStorage.setItem("pare3d.trimReach2", reach);
   } catch {
     // Holds for this visit.
   }
