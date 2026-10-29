@@ -10569,8 +10569,10 @@ export function LayerlingEditor({
       window.layerlingColorOverlay?.(toothOverlay.current);
       return;
     }
+    // Build 97: always measured in the bite the studio worked out - side by side, or moved anywhere by
+    // hand, the contacts stay on the arches, as they are in the patient's bite.
     let occUpper = upper, occLower = lower;
-    if (studio.layout !== "occlusion" && studio.analysis) {
+    if (studio.analysis) {
       const arranged = arrangedDentalScans("occlusion", studio.analysis, studio.slots, new Map());
       occUpper = arranged.get(upper.id) ?? upper;
       occLower = arranged.get(lower.id) ?? lower;
