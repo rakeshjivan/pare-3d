@@ -2016,8 +2016,8 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .sculpt-tools.two { grid-template-columns: repeat(2, 1fr); }
 .sculpt-view-aids { display: grid; gap: 4px; margin-top: 6px; }
 .sculpt-selection button.danger { color: #b42318; border-color: #e4a29b; }
-.sculpt-selection-bar { position: fixed; z-index: 60; top: 96px; left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: min(640px, calc(100vw - 32px)); padding: 5px 6px; border-radius: 10px; background: rgba(255, 255, 255, 0.97); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22); pointer-events: auto; }
-.sculpt-selection-bar.placed { transform: none; }
+@media (max-width: 700px) { .sculpt-selection-bar:not(.placed) { left: 16px; top: 140px; } }
+.sculpt-selection-bar { position: fixed; z-index: 60; top: 180px; left: 110px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: min(780px, calc(100vw - 32px)); padding: 5px 6px; border-radius: 10px; background: rgba(255, 255, 255, 0.97); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22); pointer-events: auto; }
 .sculpt-selection-bar button { border: 1px solid var(--border, #d4dae3); background: #fff; border-radius: 7px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
 .sculpt-selection-bar button.danger { color: #b42318; border-color: #e4a29b; }
 .sculpt-selection-bar button:hover { background: #f1f5fb; }
