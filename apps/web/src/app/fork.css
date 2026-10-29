@@ -2027,7 +2027,7 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .sculpt-bar-group { display: flex; gap: 4px; padding-left: 6px; border-left: 1px solid var(--border, #d4dae3); }
 .sculpt-selection-bar .sculpt-bar-done { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; background: var(--accent, #1f5fbf); border-color: var(--accent, #1f5fbf); color: #fff; font-weight: 600; }
 .sculpt-selection-bar .sculpt-bar-done:hover { background: #194f9f; }
-.bite-contacts-card { position: fixed; z-index: 55; left: 16px; bottom: 16px; width: min(300px, calc(100vw - 32px)); display: grid; gap: 6px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.97); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2); font-size: 12px; }
+.bite-contacts-card { position: fixed; z-index: 55; left: 84px; bottom: 100px; width: min(300px, calc(100vw - 100px)); display: grid; gap: 6px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.97); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2); font-size: 12px; }
 .bite-contacts-card.closed { width: auto; max-width: 260px; padding: 6px; }
 .bite-contacts-card .blend-hint { margin: 0; }
 .bite-contacts-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }

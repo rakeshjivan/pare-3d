@@ -10538,10 +10538,12 @@ export function LayerlingEditor({
       const { upper, lower } = dentalStudio.slots;
       return upper && lower && dentalStudio.analysis ? { ids: [upper, lower], studio: true } : null;
     }
-    if (selectedShapes.length !== 2 || sculptTool) return null;
-    if (!selectedShapes.every((shape) => isDentalPart(shape))) return null;
+    if (selectedShapes.length < 2 || selectedShapes.length > 6 || sculptTool) return null;
+    // Two dental parts among those selected (anything else selected with them is passed over).
+    const arches = selectedShapes.filter((shape) => isDentalPart(shape));
+    if (arches.length !== 2) return null;
     // Upper first (the higher of the two), so the summary reads the same as in the studio.
-    const [a, b] = selectedShapes;
+    const [a, b] = arches;
     const height = (shape: WorkplaneShape) => shape.z ?? 0;
     return { ids: height(a) >= height(b) ? [a.id, b.id] : [b.id, a.id], studio: false };
   }, [dentalStudio, selectedShapes, sculptTool, isDentalPart]);
