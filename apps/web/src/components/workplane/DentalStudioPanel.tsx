@@ -283,7 +283,8 @@ export function DentalStudioPanel({
       case "scans": return scansDone;
       case "find": return Boolean(wv.found?.length);
       case "choose": return wv.chosen.length > 0;
-      case "set": return Boolean(wv.setName);
+      // Build 103: and made for this arch (an upper set is no set for the lower teeth).
+      case "set": { const arch = wv.builtIn.find((set) => set.id === wv.setId)?.arch; return Boolean(wv.setName) && (!arch || arch === wv.slot); }
       case "place": return wv.placed.length > 0;
       default: return true;
     }

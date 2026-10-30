@@ -11052,8 +11052,12 @@ export function LayerlingEditor({
   }, [dentalStudio?.waxStudio]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Build 102: the sets of an exocad library the user loaded, by id (kept for the session). */
   const waxOwnSets = useRef(new Map<string, { name: string; shells: Float32Array[] }>());
+  /** Build 103: the set chosen for each arch, to come back to when that arch is chosen again. */
+  const waxSetByArch = useRef<Partial<Record<"upper" | "lower", string>>>({});
   const chooseBuiltInSet = useCallback(async (id: string) => {
     waxRecordRef.current();
+    const arch = waxupRef.current.builtIn.find((set) => set.id === id)?.arch;
+    if (arch) waxSetByArch.current[arch] = id;
     const own = waxOwnSets.current.get(id);
     if (own) {
       waxShells.current = own.shells;
@@ -18085,11 +18089,21 @@ export function LayerlingEditor({
             actions: {
               onSet: (files) => void loadWaxSet(files),
               onBuiltIn: (id) => void chooseBuiltInSet(id),
-              onSlot: (slot) => setWaxup((current) => {
-                const id = dentalStudioRef.current?.slots[slot];
-                const found = id ? waxFound[id] : undefined;
-                return { ...current, slot, landmarks: found?.landmarks ?? null, guessed: false, placed: [] };
-              }),
+              onSlot: (slot) => {
+                // Build 103: a set made for the other arch is not carried over (an upper set was placed on
+                // the lower teeth); the set last chosen for this arch comes back.
+                const current = waxupRef.current;
+                const setArch = current.builtIn.find((set) => set.id === current.setId)?.arch;
+                const remembered = waxSetByArch.current[slot];
+                const keep = !setArch || setArch === slot;
+                if (!keep) waxShells.current = null;
+                setWaxup((now) => {
+                  const id = dentalStudioRef.current?.slots[slot];
+                  const found = id ? waxFound[id] : undefined;
+                  return { ...now, slot, landmarks: found?.landmarks ?? null, guessed: false, placed: [], ...(keep ? {} : { setId: null, setName: null, teeth: 0 }) };
+                });
+                if (!keep && remembered) void chooseBuiltInSet(remembered);
+              },
               onMark: startWaxPicking,
               onLengthen: (lengthen) => { waxRecord(true); setWaxup((current) => ({ ...current, lengthen })); },
               onCentralRatio: (centralRatio) => { waxRecord(true); setWaxup((current) => ({ ...current, centralRatio })); },
