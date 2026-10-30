@@ -76,8 +76,10 @@ const gainOf = (event: { shiftKey: boolean; altKey: boolean }) => (event.shiftKe
 
 export type GimbalTooth = { frame: ToothFrame; width: number; length: number };
 
-export function ToothGimbal({ tooth, disabled, totals, onPreview, onCommit }: {
+export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview, onCommit }: {
   tooth: GimbalTooth;
+  /** Build 103: false - only the readout and the keys (the tooth itself is dragged). */
+  handles?: boolean;
   disabled?: boolean;
   /** The tooth's change so far and its sizes, shown when nothing is being moved. */
   totals?: string;
@@ -339,7 +341,7 @@ export function ToothGimbal({ tooth, disabled, totals, onPreview, onCommit }: {
   const label = readout ?? totals ?? null;
   return (
     <>
-      <svg ref={svgRef} className={`tooth-gimbal${disabled ? " disabled" : ""}`} aria-label={t("toothGimbal.label")} role="group">
+      <svg ref={svgRef} className={`tooth-gimbal${disabled ? " disabled" : ""}`} aria-label={t("toothGimbal.label")} role="group" style={handles ? undefined : { display: "none" }}>
         {ring("turn", 0)}
         {ring("tip", 1)}
         {ring("torque", 2)}

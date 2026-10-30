@@ -286,11 +286,18 @@ export function DentalStudioPanel({
       // Build 103: and made for this arch (an upper set is no set for the lower teeth).
       case "set": { const arch = wv.builtIn.find((set) => set.id === wv.setId)?.arch; return Boolean(wv.setName) && (!arch || arch === wv.slot); }
       case "place": return wv.placed.length > 0;
+      case "adjust": return wv.stage === "adapted" && wv.placed.length > 0 && !wv.busy;
       default: return true;
     }
   };
   const waxIndex = waxSteps && waxStep ? waxSteps.indexOf(waxStep) : -1;
   const goWax = (id: WaxStepId) => setWaxStepId(id);
+  // Build 103: Position shows the whole library teeth; from Adapt on they are fitted to the patient's.
+  useEffect(() => {
+    if (!waxStep || !waxup) return;
+    const adapted = ["adjust", "occlusion", "make"].includes(waxStep);
+    if ((waxup.view.stage === "adapted") !== adapted) waxup.actions.onStage(adapted ? "adapted" : "position");
+  }, [waxStep]); // eslint-disable-line react-hooks/exhaustive-deps
   // Straight through from Find teeth to the teeth placed, once per arch.
   const [waxAuto, setWaxAuto] = useState(false);
   const waxAutoDone = useRef(new Set<string>());
@@ -309,7 +316,8 @@ export function DentalStudioPanel({
     if (waxStep === "find") { if (waxStepDone("find")) next(); else if (!once("find", waxup.actions.onFindTeeth)) setWaxAuto(false); return; }
     if (waxStep === "choose") { if (waxStepDone("choose")) next(); else if (!once("choose", () => waxup.actions.onChooseGroup("front"))) setWaxAuto(false); return; }
     if (waxStep === "set") { if (waxStepDone("set")) next(); else if (!waxSetsHere.length || !once("set", () => waxup.actions.onBuiltIn(waxSetsHere[0].id))) setWaxAuto(false); return; }
-    if (waxStep === "place") { if (waxStepDone("place")) next(); else if (!waxPlaceable || !once("place", waxup.actions.onPlace)) setWaxAuto(false); return; }
+    // Build 103: the run stops at Position - the dentist confirms the teeth before they are fitted.
+    if (waxStep === "place") { if (waxStepDone("place")) setWaxAuto(false); else if (!waxPlaceable || !once("place", waxup.actions.onPlace)) setWaxAuto(false); return; }
     setWaxAuto(false);
   }, [waxAuto, waxStep, busy, wv?.busy, wv?.finder.busy, wv?.found?.length, wv?.chosen.length, wv?.setName, wv?.placed.length, wv?.slot]); // eslint-disable-line react-hooks/exhaustive-deps
   const waxStepper = waxSteps && waxStep && wv && waxup ? (
@@ -536,7 +544,7 @@ export function DentalStudioPanel({
       {/* Build 101: in Wax-up Studio's steps, the step's own part of it, on its own. */}
       {waxup && waxSteps && waxPart ? (
         <section className="dental-section dental-card current wax-step-body" aria-label={t(`waxStudio.step.${waxPart}` as "waxStudio.step.scans")}>
-          <WaxupCard part={waxPart} view={waxup.view} actions={waxup.actions} slots={{ upper: Boolean(slots.upper) && waxStudio?.arches !== "lower", lower: Boolean(slots.lower) && waxStudio?.arches !== "upper" }} imt={waxStudio?.flow === "imt"} busy={busy || !analysis} workspace={workspace} />
+          <WaxupCard part={waxPart} view={waxup.view} actions={{ ...waxup.actions, onConfirm: () => { setWaxAuto(false); goWax("adjust"); } }} slots={{ upper: Boolean(slots.upper) && waxStudio?.arches !== "lower", lower: Boolean(slots.lower) && waxStudio?.arches !== "upper" }} imt={waxStudio?.flow === "imt"} busy={busy || !analysis} workspace={workspace} />
         </section>
       ) : null}
       {waxup && !waxSteps ? card(3, t(waxStudio ? "waxup.stepStudio" : "waxup.step"), waxup.view.placed.length > 0, t(waxStudio ? "waxup.stepStudioHint" : "waxup.stepHint"), waxupSummary(waxup.view), (

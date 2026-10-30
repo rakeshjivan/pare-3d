@@ -70,7 +70,7 @@ scope.onmessage = async (event: MessageEvent<MeshJobRequest | { archPartFor: num
     } else if (job.kind === "waxup") {
       const { guessLandmarks, planWaxup, planWaxupOnTeeth } = await import("@/lib/dentalWaxup");
       // Build 94: tooth by tooth on the teeth found, or set out from the landmarks.
-      const plan = job.shells ? (job.teeth ? planWaxupOnTeeth(job.scan, job.shells, job.teeth.fdi, job.teeth.chosen, job.teeth.arch, { lengthen: job.options.lengthen, ideal: job.teeth.ideal, red: job.teeth.red, centralRatio: job.teeth.centralRatio, arcDepth: job.teeth.arcDepth, adjust: job.teeth.adjust }) : planWaxup(job.scan, job.shells, job.landmarks, job.options)) : null;
+      const plan = job.shells ? (job.teeth ? planWaxupOnTeeth(job.scan, job.shells, job.teeth.fdi, job.teeth.chosen, job.teeth.arch, { lengthen: job.options.lengthen, ideal: job.teeth.ideal, red: job.teeth.red, centralRatio: job.teeth.centralRatio, arcDepth: job.teeth.arcDepth, adjust: job.teeth.adjust, blend: job.teeth.blend }) : planWaxup(job.scan, job.shells, job.landmarks, job.options)) : null;
       const reply: MeshJobResponse = { id: job.id, ok: true, kind: "waxup", plan, landmarks: plan ? plan.landmarks ?? job.landmarks : guessLandmarks(job.scan) };
       scope.postMessage(reply, plan ? plan.teeth.map((tooth) => tooth.positions.buffer as ArrayBuffer) : []);
     } else if (job.kind === "findTeeth") {

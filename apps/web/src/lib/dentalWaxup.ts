@@ -2111,6 +2111,19 @@ export function blendToMargin(tooth: PlacedTooth, margin: Float32Array) {
 }
 
 /**
+ * Build 103: the whole set's move as each tooth's own adjustment: `width` the change of the intercanine
+ * width (each side's canine moves half of it distally, the teeth between in proportion), `depth` the set
+ * forward (out of the arch) or back, `midline` the set along the arch to the patient's left, `height` the
+ * edges longer (towards the occlusal plane). All mm.
+ */
+export function setMoveAdjust(move: { width: number; depth: number; midline: number; height: number }, fdi: number): ToothAdjust {
+  const rank = fdi % 10, quadrant = Math.floor(fdi / 10);
+  const patientsRight = quadrant === 1 || quadrant === 4;
+  const mesial = -(move.width / 2) * (rank / 3) + (patientsRight ? move.midline : -move.midline);
+  return { mesial, out: move.depth, up: move.height };
+}
+
+/**
  * Build 103: the directions along the arch from tooth `fdi` to its neighbours that are waxed too (the
  * mesial one - across the midline for a central - and the distal one), for the cut-back to reach into
  * the embrasures between waxed teeth and never into a tooth that is not waxed.

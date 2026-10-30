@@ -11,7 +11,7 @@ import type { WaxLandmarks, WaxupOptions, WaxupPlan } from "@/lib/dentalWaxup";
 import type { ScanTeeth } from "@/lib/toothSegment";
 import type { OcclusionInput, OcclusionResult } from "@/lib/waxOcclusion";
 /** Build 94: fit the set tooth by tooth to the teeth found: each scan triangle's FDI, the teeth chosen. */
-export type WaxTeethFit = { fdi: Uint8Array; chosen: number[]; arch: "upper" | "lower"; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number; adjust?: Record<number, import("@/lib/dentalWaxup").ToothAdjust> };
+export type WaxTeethFit = { fdi: Uint8Array; chosen: number[]; arch: "upper" | "lower"; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number; adjust?: Record<number, import("@/lib/dentalWaxup").ToothAdjust>; /** Build 103: false - the whole library teeth (Position); true - fitted to the patient's (Adapt). */ blend?: boolean };
 import type { WorkplaneShape } from "@/types/layerling";
 import type { SurfaceTextureOptions, SurfaceTextureResult } from "@/lib/surfaceTexture";
 import type { RemeshOptions, RemeshResult } from "@/lib/meshRemesh";
@@ -397,7 +397,7 @@ export function waxupInBackground(scan: Float32Array, shells: null): Promise<Wax
 export async function waxupInBackground(scan: Float32Array, shells: Float32Array[] | null, landmarks: WaxLandmarks | null = null, options: Omit<WaxupOptions, "landmarks"> = {}, teeth?: WaxTeethFit): Promise<WaxupPlan | WaxLandmarks | null> {
   const here = async () => {
     const { guessLandmarks, planWaxup, planWaxupOnTeeth } = await import("@/lib/dentalWaxup");
-    if (shells && teeth) return planWaxupOnTeeth(scan, shells, teeth.fdi, teeth.chosen, teeth.arch, { lengthen: options.lengthen, ideal: teeth.ideal, red: teeth.red, centralRatio: teeth.centralRatio, arcDepth: teeth.arcDepth, adjust: teeth.adjust });
+    if (shells && teeth) return planWaxupOnTeeth(scan, shells, teeth.fdi, teeth.chosen, teeth.arch, { lengthen: options.lengthen, ideal: teeth.ideal, red: teeth.red, centralRatio: teeth.centralRatio, arcDepth: teeth.arcDepth, adjust: teeth.adjust, blend: teeth.blend });
     return shells ? planWaxup(scan, shells, landmarks, options) : guessLandmarks(scan);
   };
   const target = meshWorker();
