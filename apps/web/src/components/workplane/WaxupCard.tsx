@@ -8,6 +8,9 @@
 import { AlertTriangle, Check, LoaderCircle, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { EGGSHELL_MAX_WALL, EGGSHELL_MIN_WALL, EGGSHELL_WALL } from "@/lib/dentalEggshell";
+import type { WaxRestrict } from "@/components/workplane/WaxToothDrag";
+/** Build 103: a confirmed tooth's colour, by FDI (each tooth its own, as Meshmixer shows them). */
+export const WAX_CONFIRMED_COLOURS: Record<number, string> = { 11: "#e0605a", 21: "#e0605a", 12: "#4f9fd8", 22: "#4f9fd8", 13: "#5bb878", 23: "#5bb878", 31: "#e0605a", 41: "#e0605a", 32: "#4f9fd8", 42: "#4f9fd8", 33: "#5bb878", 43: "#5bb878", 14: "#c98ad6", 24: "#c98ad6", 15: "#e3b04b", 25: "#e3b04b", 34: "#c98ad6", 44: "#c98ad6", 35: "#e3b04b", 45: "#e3b04b" };
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { t } from "@/lib/i18n";
 import type { MessageKey } from "@/lib/messages.en";
@@ -45,6 +48,11 @@ export type WaxupView = {
   stage: "position" | "adapted";
   setMove: WaxSetMove;
   chain: boolean;
+  /** Build 103 (exocad): which way a dragged tooth moves, and whether every tooth moves with it. */
+  restrict: WaxRestrict;
+  moveAll: boolean;
+  /** Build 103: the teeth confirmed (FDI): each in its own colour, held where it is until double-clicked. */
+  confirmed: number[];
   /** Build 79: also make a model with wax on alternate teeth only (injection moulding, first injection). */
   alternate: boolean;
   selected: string | null;
@@ -101,6 +109,10 @@ export type WaxupActions = {
   /** Build 103: the whole set moved (mm), chain or single-tooth moves, and the position confirmed (on to Adapt). */
   onSetMove: (patch: Partial<WaxSetMove>) => void;
   onChain: (on: boolean) => void;
+  onRestrict: (restrict: WaxRestrict) => void;
+  onMoveAll: (on: boolean) => void;
+  /** Build 103: the selected tooth confirmed (true) or taken up again (false). */
+  onConfirmTooth: (id: string, on: boolean) => void;
   onConfirm: () => void;
   onStage: (stage: "position" | "adapted") => void;
   /** Build 103: a change to a tooth (exact values, steps). */
@@ -418,8 +430,9 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
                     className={`waxup-tooth${view.selected === tooth.id ? " active" : ""}${low ? " warn" : ""}`}
                     title={t("waxup.toothInfo", { fdi: tooth.fdi, width: tooth.width.toFixed(1), length: tooth.length.toFixed(1), ratio: Math.round((tooth.width / Math.max(0.1, tooth.length)) * 100), wax: tooth.clearance === null ? "-" : tooth.clearance.toFixed(2) })}
                     onClick={() => actions.onSelect(tooth.id)}
+                    style={view.confirmed.includes(tooth.fdi) ? { background: WAX_CONFIRMED_COLOURS[tooth.fdi] ?? "#9aa0a6", color: "#fff" } : undefined}
                   >
-                    {low ? <AlertTriangle size={12} aria-hidden="true" /> : null}{tooth.fdi}
+                    {low ? <AlertTriangle size={12} aria-hidden="true" /> : null}{view.confirmed.includes(tooth.fdi) ? <Check size={12} aria-hidden="true" /> : null}{tooth.fdi}
                   </button>
                 );
               })}
@@ -432,9 +445,25 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
               ))}
             </div>
             <p className="blend-hint">{t(view.chain ? "waxup.chainHint" : "waxup.singleHint")}</p>
+            {/* Build 103 (exocad): the direction a dragged tooth is held to, and all teeth together. */}
+            <div className="dental-trim-mode waxup-restrict" role="radiogroup" aria-label={t("waxup.restrict")}>
+              {(["free", "mesial", "out", "up", "plane"] as const).map((r) => (
+                <button key={r} type="button" role="radio" aria-checked={view.restrict === r} className={view.restrict === r ? "active" : ""} disabled={working} title={t(`waxup.restrict.${r}Hint`)} onClick={() => actions.onRestrict(r)}>{t(`waxup.restrict.${r}`)}</button>
+              ))}
+            </div>
+            <label className="edge-modifier-check">
+              <input type="checkbox" checked={view.moveAll} disabled={working} onChange={(event) => actions.onMoveAll(event.currentTarget.checked)} />
+              <span>{t("waxup.moveAll")}</span>
+            </label>
+            <p className="blend-hint">{t("waxup.mouseHint")}</p>
             {selectedTooth ? (
               <div className="waxup-adjust" role="group" aria-label={t("waxup.adjustTooth", { fdi: selectedTooth.fdi })}>
                 <h5>{t("waxup.adjustTooth", { fdi: selectedTooth.fdi })}</h5>
+                <div className="dental-trim-buttons">
+                  {view.confirmed.includes(selectedTooth.fdi)
+                    ? <button type="button" className="secondary" disabled={working} onClick={() => actions.onConfirmTooth(selectedTooth.id, false)}>{t("waxup.unconfirmTooth", { fdi: selectedTooth.fdi })}</button>
+                    : <button type="button" className="active" disabled={working} title={t("waxup.confirmToothHint")} onClick={() => actions.onConfirmTooth(selectedTooth.id, true)}><Check size={15} /> {t("waxup.confirmTooth", { fdi: selectedTooth.fdi })}</button>}
+                </div>
                 {view.selectedAdjust ? <ToothValues tooth={selectedTooth} adjust={view.selectedAdjust} disabled={working} onAdjust={(change) => actions.onAdjust(selectedTooth.id, change)} /> : null}
                 {view.selectedAdjust ? null : ([["out", "waxup.in", "waxup.out", WAX_NUDGE], ["mesial", "waxup.distal", "waxup.mesial", WAX_NUDGE], ["longer", "waxup.shorter", "waxup.longer", WAX_NUDGE], ["wider", "waxup.narrower", "waxup.wider", WAX_NUDGE], ["thicker", "waxup.thinner", "waxup.thicker", WAX_SCALE_STEP], ["size", "waxup.smaller", "waxup.larger", WAX_SCALE_STEP], ["turn", "waxup.turnIn", "waxup.turnOut", WAX_TURN]] as const).map(([nudge, less, more, step]) => (
                   <div key={nudge} className="waxup-adjust-row">
