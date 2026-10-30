@@ -120,7 +120,7 @@ jobs:
           tag_name: pare-${{ needs.build.outputs.number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
-          name: Pare 3D build ${{ needs.build.outputs.number }} (layerling ${{ needs.build.outputs.version }})
+          name: Pare 3D build ${{ needs.build.outputs.number }}
           files: |
             dist/Pare-3D-Mac.zip
             dist/Pare-3D-Windows.zip

@@ -73,7 +73,7 @@ import { exocadSets } from "@/lib/exocadLibrary";
 import { composeAdjust, ToothGimbal } from "@/components/workplane/ToothGimbal";
 import { contactColors, type BiteContactStats } from "@/lib/biteContacts";
 import { alignToPlate, bridgeChoice, expandConnected, extrudeChoice, invertConnected, optimizeBoundary, shrinkChoice, smoothChoice } from "@/lib/meshEditTools";
-import { adjustMatrix, mirrorAdjust, ARC_DEPTH_DEFAULT, SMILE_LATERAL_STEP, CENTRAL_RATIO, contralateral, crownCutter, imtFirstInjection, moveFrame, nudgeMatrix, rigidMoveBetween, type ToothNudge, type ToothAdjust, fdiNumber, parseObj, splitShells, librarySet, type WaxLandmarks } from "@/lib/dentalWaxup";
+import { adjustMatrix, mirrorAdjust, waxedNeighbourSides, ARC_DEPTH_DEFAULT, SMILE_LATERAL_STEP, CENTRAL_RATIO, contralateral, crownCutter, imtFirstInjection, moveFrame, nudgeMatrix, rigidMoveBetween, type ToothNudge, type ToothAdjust, fdiNumber, parseObj, splitShells, librarySet, type WaxLandmarks } from "@/lib/dentalWaxup";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { WaxupPointOverlay, markerTriangles, rayHit } from "./workplane/WaxupPointOverlay";
 import { WAXUP_LANDMARKS, type WaxupView } from "./workplane/WaxupCard";
@@ -10135,6 +10135,7 @@ export function LayerlingEditor({
       const turn = new THREE.Matrix3().setFromMatrix4(move);
       const teeth = shapesRef.current.filter((candidate) => candidate.dental === "wax" && candidate.waxFor === shape.id && !candidate.hidden && candidate.waxTooth && (!waxTeeth || waxTeeth(candidate.waxTooth.fdi)));
       const cuts: NonNullable<DentalStudioInput["arches"][number]["cuts"]> = [];
+      const waxedHere = new Set(teeth.map((tooth) => tooth.waxTooth!.fdi));
       for (const tooth of teeth) {
         const n = tooth.waxTooth!.fdi;
         const toothWorld = localToWorld(tooth);
@@ -10147,7 +10148,9 @@ export function LayerlingEditor({
         if (!count) continue;
         const up = new THREE.Vector3(...frame.up).applyMatrix3(turn).normalize();
         const cover = transformSoup(Float32Array.from(worldTriangles(tooth)), move);
-        cuts.push({ positions: cutter, facing: [facing.x, facing.y, facing.z], through: [x / count, y / count, z / count], cover, up: [up.x, up.y, up.z] });
+        const mesial = new THREE.Vector3(...frame.mesial).applyMatrix3(turn).normalize();
+        const beside = waxedNeighbourSides(n, waxedHere, [mesial.x, mesial.y, mesial.z]);
+        cuts.push({ positions: cutter, facing: [facing.x, facing.y, facing.z], through: [x / count, y / count, z / count], cover, up: [up.x, up.y, up.z], ...(beside.length ? { beside } : {}) });
       }
       return cuts.length ? cuts : undefined;
     };
@@ -10851,7 +10854,7 @@ export function LayerlingEditor({
       // Build 101: the pair set up in the bite as scanned (its frames, its roles, the bite scan's check) and
       // only then the lower opened: set up already opened, the arches no longer touch, so the overjet took
       // the lower for the upper and the bite scan lined it up again - the models came out wrong.
-      input = { ...input, open: { id: lowerId, matrix: openedPose.toArray() }, arches: input.arches.map((arch) => (arch.id === lowerId ? { ...arch, ...(arch.wax ? { wax: transformSoup(Float32Array.from(arch.wax), openedPose) } : {}), ...(arch.cuts ? { cuts: arch.cuts.map((c) => ({ positions: transformSoup(Float32Array.from(c.positions), openedPose), facing: new THREE.Vector3(...c.facing).transformDirection(openedPose).toArray() as [number, number, number], through: new THREE.Vector3(...c.through).applyMatrix4(openedPose).toArray() as [number, number, number], ...(c.cover ? { cover: transformSoup(Float32Array.from(c.cover), openedPose) } : {}), ...(c.up ? { up: new THREE.Vector3(...c.up).transformDirection(openedPose).toArray() as [number, number, number] } : {}) })) } : {}) } : arch)) };
+      input = { ...input, open: { id: lowerId, matrix: openedPose.toArray() }, arches: input.arches.map((arch) => (arch.id === lowerId ? { ...arch, ...(arch.wax ? { wax: transformSoup(Float32Array.from(arch.wax), openedPose) } : {}), ...(arch.cuts ? { cuts: arch.cuts.map((c) => ({ positions: transformSoup(Float32Array.from(c.positions), openedPose), facing: new THREE.Vector3(...c.facing).transformDirection(openedPose).toArray() as [number, number, number], through: new THREE.Vector3(...c.through).applyMatrix4(openedPose).toArray() as [number, number, number], ...(c.cover ? { cover: transformSoup(Float32Array.from(c.cover), openedPose) } : {}), ...(c.up ? { up: new THREE.Vector3(...c.up).transformDirection(openedPose).toArray() as [number, number, number] } : {}), ...(c.beside ? { beside: c.beside.map((d) => new THREE.Vector3(...d).transformDirection(openedPose).toArray() as [number, number, number]) } : {}) })) } : {}) } : arch)) };
     }
     const fixedInput = input;
     const involved = [state.slots.upper, state.slots.lower, state.slots.bite, state.slots.bite2].filter((id): id is string => Boolean(id));

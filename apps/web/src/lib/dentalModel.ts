@@ -58,7 +58,8 @@ export type DentalArchInput = {
    * stands out beyond the ideal tooth facially or incisally it goes, and the palatal (lingual)
    * surfaces, where the opposing teeth meet them, are kept. The gum and every other tooth are kept.
    */
-  cuts?: Array<{ positions: ArrayLike<number>; facing: [number, number, number]; through: [number, number, number]; /** The wax tooth that replaces it (a soup) and its long axis towards the edge: only what stands in front of or beyond it is cut, so no hole is left where it does not reach. */ cover?: ArrayLike<number>; up?: [number, number, number] }> | null;
+  cuts?: Array<{ positions: ArrayLike<number>; facing: [number, number, number]; through: [number, number, number]; /** The wax tooth that replaces it (a soup) and its long axis towards the edge: only what stands in front of or beyond it is cut, so no hole is left where it does not reach. */ cover?: ArrayLike<number>; up?: [number, number, number];
+    /** Build 103: towards each waxed neighbour (unit directions along the arch): the cut reaches CUT_SIDE that way too, so a patient's tooth wider than the ideal one leaves no wall in the embrasure. */ beside?: Array<[number, number, number]> }> | null;
 };
 export type DentalStudioInput = {
   arches: DentalArchInput[];
@@ -264,6 +265,10 @@ export function withoutTags(runtime: ManifoldRuntime, solid: ManifoldSolid): { s
 // Build 102: how far in front of the wax tooth, and beyond its edge, the patient's tooth is cut back
 // (kept with the occlusion's cut, which works on the model as Make will cut it).
 export { CUT_FRONT, CUT_BEYOND } from "@/lib/dentalMesh";
+/** Build 103: how far a cut reaches sideways towards a waxed neighbour, mm. */
+export const CUT_SIDE = 2;
+/** Build 103: the band below the ideal tooth's edge from which the patient's tooth is cut whole (palatally too), mm. */
+export const CUT_EDGE_BAND = 1.5;
 import { CUT_FRONT, CUT_BEYOND } from "@/lib/dentalMesh";
 /** Gum kept below the teeth by a clean base when none is set, mm. */
 export const CLEAN_GUM = 3;
@@ -791,13 +796,31 @@ function buildArch(
         const cover = transformSoup(entry.cover, arch.frame);
         const up = new THREE.Vector3(...(entry.up ?? [0, 0, 1])).applyMatrix3(rotation).normalize();
         const points: [number, number, number][] = [];
-        const step = Math.max(1, Math.floor(cover.length / 3 / 4000));
+        const sides = (entry.beside ?? []).map((d) => new THREE.Vector3(...d).applyMatrix3(rotation).normalize());
+        const step = Math.max(1, Math.floor(cover.length / 3 / (sides.length ? 2000 : 4000)));
         for (let i = 0; i < cover.length / 3; i += step) {
           const x = cover[i * 3], y = cover[i * 3 + 1], z = cover[i * 3 + 2];
-          for (const [a, b] of [[0, 0], [CUT_FRONT, 0], [0, CUT_BEYOND], [CUT_FRONT, CUT_BEYOND]]) points.push([x + n.x * a + up.x * b, y + n.y * a + up.y * b, z + n.z * a + up.z * b]);
+          for (const [a, b] of [[0, 0], [CUT_FRONT, 0], [0, CUT_BEYOND], [CUT_FRONT, CUT_BEYOND]]) {
+            points.push([x + n.x * a + up.x * b, y + n.y * a + up.y * b, z + n.z * a + up.z * b]);
+            for (const side of sides) points.push([x + n.x * a + up.x * b + side.x * CUT_SIDE, y + n.y * a + up.y * b + side.y * CUT_SIDE, z + n.z * a + up.z * b + side.z * CUT_SIDE]);
+          }
         }
         const reach = keepSolid(runtime.Manifold.hull(points));
         facial = keepSolid(runtime.Manifold.intersection(facial, reach));
+        // Build 103: beyond the ideal tooth's incisal third the patient's tooth goes whole, palatal
+        // half too - where the design is shorter, its edge would otherwise stand behind the wax's.
+        let edge = -Infinity;
+        for (let i = 0; i < cover.length; i += 3) edge = Math.max(edge, cover[i] * up.x + cover[i + 1] * up.y + cover[i + 2] * up.z);
+        const beyond: [number, number, number][] = [];
+        for (let i = 0; i < cover.length / 3; i += step) {
+          const x = cover[i * 3], y = cover[i * 3 + 1], z = cover[i * 3 + 2];
+          if (x * up.x + y * up.y + z * up.z < edge - CUT_EDGE_BAND) continue;
+          for (const b of [0, CUT_BEYOND]) beyond.push([x + up.x * b, y + up.y * b, z + up.z * b]);
+        }
+        if (beyond.length >= 8) {
+          const edgeCut = keepSolid(runtime.Manifold.intersection(cutter, keepSolid(runtime.Manifold.hull(beyond))));
+          facial = keepSolid(runtime.Manifold.union(facial, edgeCut));
+        }
       }
       solid = keepSolid(runtime.Manifold.difference(solid, facial));
       cutShells.push(solidPositions(facial));

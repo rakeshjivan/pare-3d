@@ -109,6 +109,26 @@ function closestOnTriangle(px: number, py: number, pz: number, t: ArrayLike<numb
  * `to`'s nearest triangle: positive on the side its normal points to. If most nearby points come out
  * negative, `to` is wound inside out (some scanners save it so) and the signs are turned round.
  */
+/**
+ * Build 103: whether a soup is a closed surface (its faces' area vectors sum to nothing - true of any
+ * closed surface, never of an open scan) and then which way it faces: 1 outward, -1 inward; null if open.
+ */
+export function closedOrientation(soup: ArrayLike<number>): 1 | -1 | null {
+  let sx = 0, sy = 0, sz = 0, total = 0, volume = 0;
+  for (let o = 0; o + 8 < soup.length; o += 9) {
+    const ax = soup[o], ay = soup[o + 1], az = soup[o + 2];
+    const ux = soup[o + 3] - ax, uy = soup[o + 4] - ay, uz = soup[o + 5] - az;
+    const vx = soup[o + 6] - ax, vy = soup[o + 7] - ay, vz = soup[o + 8] - az;
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    sx += nx; sy += ny; sz += nz; total += Math.hypot(nx, ny, nz);
+    volume += ax * nx + ay * ny + az * nz;
+  }
+  if (!total || Math.hypot(sx, sy, sz) > CLOSED_TOLERANCE * total) return null;
+  return volume >= 0 ? 1 : -1;
+}
+/** A surface whose area vectors sum to less than this share of its area is closed. */
+const CLOSED_TOLERANCE = 1e-4;
+
 export function signedDistances(from: ArrayLike<number>, to: ArrayLike<number>, reachAll = CONTACT_REACH): Float32Array {
   // Build 96: near the other arch (where contacts are read) the nearest triangle, exactly; further out
   // (the scale's broad colours) the nearest corner of the other scan, below.
@@ -166,7 +186,11 @@ export function signedDistances(from: ArrayLike<number>, to: ArrayLike<number>, 
     out[c] = side < 0 ? -d : d;
     if (d > 0.05) { if (side < 0) negative += 1; else positive += 1; }
   }
-  const flip = negative > positive;
+  // Build 103: the vote reads a scan whose faces may run either way. A closed model (a made model:
+  // Manifold's, always outward) is never voted on - a large true overlap (wax into the other arch)
+  // outnumbered the rest and flipped every sign, overlap read as clearance. Its volume says which way it runs.
+  const closed = closedOrientation(to);
+  const flip = closed === null ? negative > positive : closed < 0;
   if (flip) for (let c = 0; c < corners; c += 1) if (!grazing[c]) out[c] = -out[c];
   if (reachAll > reach) farDistances(from, to, reachAll, out, flip);
   return out;

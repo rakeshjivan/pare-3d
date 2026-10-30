@@ -1289,7 +1289,7 @@ function mesialDirections(items: Array<{ key: number; side: -1 | 1; rank: number
  * The patient's arch form, widths and positions are kept - the wax restores shape and contour, as a
  * wax-up for worn or broken teeth (and IMT) wants. `all` gives the neighbours for the arch's line.
  */
-export type FitOptions = { minWax?: number; lengthen?: number; blend?: boolean; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number; /** Build 102: each tooth's own adjustment (by FDI number), applied before the contacts and the margin. */ adjust?: Record<number, ToothAdjust> };
+export type FitOptions = { minWax?: number; lengthen?: number; blend?: boolean; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number; /** Build 102: each tooth's own adjustment (by FDI number), applied before the contacts and the margin. */ adjust?: Record<number, ToothAdjust>; /** Build 103: tilt each tooth about its edge so its cervical third stands over the patient's (default on). */ alignCervical?: boolean };
 export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<number>, crowns: PatientCrown[], all: PatientCrown[], arch: "upper" | "lower", options: FitOptions = {}): PlacedTooth[] {
   const minWax = options.minWax ?? MIN_WAX;
   // Build 94: the smile designed on the anterior teeth, and how far towards it the teeth go (0 = the patient's teeth, 1 = the design).
@@ -1458,6 +1458,50 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
       })(),
     });
   }
+  // Build 103: each ideal tooth tilted about its incisal edge so its cervical third stands over the
+  // patient's crown (torque labio-lingually, tip mesio-distally, within CERVICAL_TORQUE_MAX and
+  // CERVICAL_TIP_MAX): the edge stays where the design put it, and the neck meets the patient's
+  // emergence without a ramp or a collar.
+  if (options.alignCervical !== false) placed.forEach((entry, i) => {
+    const crown = crowns.find((c) => c.fdi === placedFdi[i]);
+    if (!crown?.margin || crown.margin.length < MARGIN_MIN_POINTS * 3) return;
+    let mz = 0;
+    for (let k = 2; k < crown.margin.length; k += 3) mz += crown.margin[k];
+    mz /= crown.margin.length / 3;
+    const p = entry.positions;
+    let top = -Infinity;
+    for (let k = 2; k < p.length; k += 3) top = Math.max(top, p[k]);
+    const level = mz + Math.max(1.5, MARGIN_BLEND_SHARE * (top - mz));
+    const middle = (pts: Float32Array) => {
+      let x = 0, y = 0, n = 0;
+      for (let k = 0; k < pts.length; k += 3) if (Math.abs(pts[k + 2] - level) < 0.75) { x += pts[k]; y += pts[k + 1]; n += 1; }
+      return n >= 8 ? [x / n, y / n] : null;
+    };
+    const wax = middle(p), own = middle(crown.points);
+    if (!wax || !own) return;
+    const o = new THREE.Vector3(...entry.frame.origin), out = new THREE.Vector3(...entry.frame.out), mesial = new THREE.Vector3(...entry.frame.mesial);
+    const off = new THREE.Vector3(own[0] - wax[0], own[1] - wax[1], 0);
+    const reach = Math.max(2, o.z - level);
+    // Turned about the edge: the cervical moves towards the patient's by the offset, as nearly as the limits allow.
+    const torque = THREE.MathUtils.clamp(Math.atan2(off.dot(out), reach), -THREE.MathUtils.degToRad(CERVICAL_TORQUE_MAX), THREE.MathUtils.degToRad(CERVICAL_TORQUE_MAX));
+    const tip = THREE.MathUtils.clamp(Math.atan2(off.dot(mesial), reach), -THREE.MathUtils.degToRad(CERVICAL_TIP_MAX), THREE.MathUtils.degToRad(CERVICAL_TIP_MAX));
+    if (Math.abs(torque) < 1e-3 && Math.abs(tip) < 1e-3) return;
+    // A point below the edge moves along -up; turning about mesial by +a moves it towards +out (for a frame
+    // with up = mesial x out) - so the sign is taken from how the frame turns, not assumed.
+    const below = new THREE.Vector3(...entry.frame.up).multiplyScalar(-reach);
+    const turnAbout = (axis: THREE.Vector3, angle: number, want: THREE.Vector3) => {
+      const q = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+      const moved = below.clone().applyQuaternion(q).sub(below);
+      return moved.dot(want) >= 0 ? q : new THREE.Quaternion().setFromAxisAngle(axis, -angle);
+    };
+    const qT = turnAbout(mesial, Math.abs(torque), out.clone().multiplyScalar(Math.sign(torque) || 1));
+    const qP = turnAbout(out, Math.abs(tip), mesial.clone().multiplyScalar(Math.sign(tip) || 1));
+    const rot = new THREE.Matrix4().makeRotationFromQuaternion(qP.multiply(qT));
+    const m = new THREE.Matrix4().makeTranslation(o.x, o.y, o.z).multiply(rot).multiply(new THREE.Matrix4().makeTranslation(-o.x, -o.y, -o.z));
+    entry.positions = transformSoup(entry.positions, m);
+    entry.frame = moveFrame(entry.frame, m);
+    entry.matrix = m.clone().multiply(entry.matrix);
+  });
   // Build 102: each tooth's own adjustment (the gimbal, the buttons) - before the contacts and the
   // margin, so the tooth still meets its neighbours and the patient's gum wherever it is put.
   if (options.adjust) placed.forEach((entry, i) => {
@@ -1478,8 +1522,10 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
     // Build 95: each tooth's cervical end on the patient's gingival margin as found, all round;
     // where the margin was not found, sunk into the surface as before.
     placed.forEach((entry, i) => {
-      const margin = crowns.find((c) => c.fdi === placedFdi[i])?.margin;
-      if (margin && margin.length >= MARGIN_MIN_POINTS * 3) blendToMargin(entry, margin);
+      const crown = crowns.find((c) => c.fdi === placedFdi[i]);
+      const margin = crown?.margin;
+      // Build 103: the neck rebuilt on the margin with the patient's emergence; if it cannot be, blended as before.
+      if (margin && margin.length >= MARGIN_MIN_POINTS * 3) { if (!emergeFromMargin(entry, margin, crown!.points)) { emergenceFallbacks.push({ fdi: placedFdi[i], reason: emergenceFailure }); blendToMargin(entry, margin); } }
       else drapeCervical(entry, scan, normals);
     });
   }
@@ -2062,6 +2108,291 @@ export function blendToMargin(tooth: PlacedTooth, margin: Float32Array) {
     const r2 = r + Math.max(-1.5, Math.min(1.5, target - r)) * ease;
     p[i] = mx + (dx / r) * r2; p[i + 1] = my + (dy / r) * r2;
   }
+}
+
+/**
+ * Build 103: the directions along the arch from tooth `fdi` to its neighbours that are waxed too (the
+ * mesial one - across the midline for a central - and the distal one), for the cut-back to reach into
+ * the embrasures between waxed teeth and never into a tooth that is not waxed.
+ */
+export function waxedNeighbourSides(fdi: number, waxed: ReadonlySet<number>, mesial: Vec3): Vec3[] {
+  const q = Math.floor(fdi / 10), k = fdi % 10;
+  const across = ({ 1: 2, 2: 1, 3: 4, 4: 3 } as Record<number, number>)[q];
+  const towardsMidline = k === 1 ? across * 10 + 1 : q * 10 + k - 1;
+  const away = q * 10 + k + 1;
+  const out: Vec3[] = [];
+  if (waxed.has(towardsMidline)) out.push([...mesial] as Vec3);
+  if (waxed.has(away)) out.push([-mesial[0], -mesial[1], -mesial[2]]);
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Build 103: the neck rebuilt on the patient's margin
+
+/**
+ * The emergence is the patient's own. The library tooth is clipped along a scalloped line one band
+ * (MARGIN_BLEND_SHARE of its height) above the patient's gingival margin; below it a new neck is built
+ * as a regular surface - EMERGENCE_ANGLES directions round the tooth, a ring every EMERGENCE_RING mm -
+ * that starts exactly on the margin (MARGIN_INSET into the gum, MARGIN_FLARE out), follows the
+ * patient's own crown EMERGENCE_PROUD outside it over the band's lowest EMERGENCE_HOLD, then eases
+ * into the library tooth's cross-section at the clip; and the two are stitched into one closed tooth.
+ * So the wax ends on the margin all round with the patient's scallop, papillae and emergence profile,
+ * wherever the ideal tooth stands, with clean triangles (no library corners dragged into folds).
+ */
+export const EMERGENCE_PROUD = 0.08;
+/** Build 103: the most an ideal tooth is torqued and tipped about its edge to bring its cervical third over the patient's, degrees. */
+export const CERVICAL_TORQUE_MAX = 12;
+export const CERVICAL_TIP_MAX = 0;
+export const EMERGENCE_HOLD = 0.3;
+const EMERGENCE_ANGLES = 96;
+/** Margin corners further than this from its middle height are left out, mm - wider than the blend's, so the papillae's tips are kept. */
+const EMERGENCE_SPREAD = 5;
+const EMERGENCE_RING = 0.3;
+/** Steps of the patient's profile above the margin, mm. */
+const PROFILE_STEP = 0.25;
+
+/** The margin's middle and, in MARGIN_BINS directions round it, its height and distance (smoothed, gaps filled). */
+function marginRing(margin: Float32Array) {
+  let mx = 0, my = 0;
+  const m = margin.length / 3;
+  for (let i = 0; i < margin.length; i += 3) { mx += margin[i] / m; my += margin[i + 1] / m; }
+  const binOf = (x: number, y: number) => ((Math.atan2(y - my, x - mx) / (Math.PI * 2)) + 1) % 1 * MARGIN_BINS;
+  const radii = Array.from({ length: m }, (_, k) => Math.hypot(margin[k * 3] - mx, margin[k * 3 + 1] - my)).sort((a, b) => a - b);
+  const rMid = radii[Math.floor(m / 2)] || 1;
+  const zsAll = Array.from({ length: m }, (_, k) => margin[k * 3 + 2]).sort((a, b) => a - b);
+  const zMid = zsAll[Math.floor(m / 2)];
+  const binsZ: number[][] = Array.from({ length: MARGIN_BINS }, () => []), binsR: number[][] = Array.from({ length: MARGIN_BINS }, () => []);
+  for (let i = 0; i < margin.length; i += 3) {
+    const r = Math.hypot(margin[i] - mx, margin[i + 1] - my);
+    if (r < 0.5 * rMid || r > 1.6 * rMid || Math.abs(margin[i + 2] - zMid) > EMERGENCE_SPREAD) continue;
+    const b = Math.floor(binOf(margin[i], margin[i + 1])) % MARGIN_BINS;
+    binsZ[b].push(margin[i + 2]); binsR[b].push(r);
+  }
+  const median = (list: number[]) => { const l = [...list].sort((a, b) => a - b); return l[Math.floor(l.length / 2)]; };
+  const fill = (bins: number[][]) => {
+    const v = bins.map((list) => (list.length ? median(list) : NaN));
+    if (v.filter((x) => !Number.isNaN(x)).length < MARGIN_BINS / 3) return null;
+    const out = v.map((x, b) => {
+      if (!Number.isNaN(x)) return x;
+      let l = 1, r = 1;
+      while (Number.isNaN(v[(b - l + MARGIN_BINS) % MARGIN_BINS])) l += 1;
+      while (Number.isNaN(v[(b + r) % MARGIN_BINS])) r += 1;
+      return (v[(b - l + MARGIN_BINS) % MARGIN_BINS] * r + v[(b + r) % MARGIN_BINS] * l) / (l + r);
+    });
+    let smooth = out;
+    for (let pass = 0; pass < 4; pass += 1) smooth = smooth.map((x, b) => (smooth[(b - 1 + MARGIN_BINS) % MARGIN_BINS] + 2 * x + smooth[(b + 1) % MARGIN_BINS]) / 4);
+    return smooth;
+  };
+  const zm = fill(binsZ), rm = fill(binsR);
+  if (!zm || !rm) return null;
+  const at = (arr: number[], f: number) => { const g = ((f % MARGIN_BINS) + MARGIN_BINS) % MARGIN_BINS; const b0 = Math.floor(g), b1 = (b0 + 1) % MARGIN_BINS, u = g - b0; return arr[b0] * (1 - u) + arr[b1] * u; };
+  return { mx, my, rMid, zm, rm, at, binOf };
+}
+
+/** The patient's crown: its outermost distance from (mx, my) in each direction, at each height above that direction's margin. */
+function crownProfile(crown: Float32Array, ring: NonNullable<ReturnType<typeof marginRing>>, height: number) {
+  const { mx, my, rMid, zm, at, binOf } = ring;
+  const levels = Math.ceil(height / PROFILE_STEP) + 2;
+  const raw = new Float64Array(MARGIN_BINS * levels).fill(NaN);
+  for (let i = 0; i < crown.length; i += 3) {
+    const r = Math.hypot(crown[i] - mx, crown[i + 1] - my);
+    if (r < 0.3 * rMid || r > 2.2 * rMid) continue;
+    const f = binOf(crown[i], crown[i + 1]);
+    const k = Math.round((crown[i + 2] - at(zm, f)) / PROFILE_STEP);
+    if (k < 0 || k >= levels) continue;
+    const cell = (Math.floor(f) % MARGIN_BINS) * levels + k;
+    if (!(raw[cell] >= r)) raw[cell] = r;
+  }
+  // Each direction filled up and down from what it has; a direction with nothing, from its neighbours.
+  const has = new Array<boolean>(MARGIN_BINS).fill(false);
+  for (let b = 0; b < MARGIN_BINS; b += 1) {
+    const col = Array.from({ length: levels }, (_, k) => raw[b * levels + k]);
+    const known = col.map((v, k) => [k, v] as const).filter(([, v]) => !Number.isNaN(v));
+    if (known.length < 2) continue;
+    has[b] = true;
+    for (let k = 0; k < levels; k += 1) {
+      if (!Number.isNaN(col[k])) continue;
+      let below = -1, above = -1;
+      for (const [kk] of known) { if (kk < k) below = kk; else if (above < 0) above = kk; }
+      raw[b * levels + k] = below < 0 ? col[above] : above < 0 ? col[below] : col[below] + ((col[above] - col[below]) * (k - below)) / (above - below);
+    }
+  }
+  if (has.filter(Boolean).length < MARGIN_BINS / 2) return null;
+  let out = new Float64Array(MARGIN_BINS * levels);
+  for (let b = 0; b < MARGIN_BINS; b += 1) {
+    let src = b;
+    for (let d = 1; !has[src] && d < MARGIN_BINS; d += 1) src = has[(b + d) % MARGIN_BINS] ? (b + d) % MARGIN_BINS : has[(b - d + MARGIN_BINS) % MARGIN_BINS] ? (b - d + MARGIN_BINS) % MARGIN_BINS : src;
+    for (let k = 0; k < levels; k += 1) out[b * levels + k] = raw[src * levels + k];
+  }
+  // Smoothed round the tooth and up it (a scan's noise and the finder's ragged border are not the emergence).
+  for (let pass = 0; pass < 3; pass += 1) {
+    const next = new Float64Array(out.length);
+    for (let b = 0; b < MARGIN_BINS; b += 1) for (let k = 0; k < levels; k += 1) {
+      const l = (b - 1 + MARGIN_BINS) % MARGIN_BINS, r = (b + 1) % MARGIN_BINS, d = Math.max(0, k - 1), u = Math.min(levels - 1, k + 1);
+      next[b * levels + k] = (2 * out[b * levels + k] + out[l * levels + k] + out[r * levels + k] + out[b * levels + d] + out[b * levels + u]) / 6;
+    }
+    out = next;
+  }
+  return (f: number, h: number) => {
+    const g = ((f % MARGIN_BINS) + MARGIN_BINS) % MARGIN_BINS;
+    const b0 = Math.floor(g), b1 = (b0 + 1) % MARGIN_BINS, u = g - b0;
+    const kf = Math.max(0, Math.min(levels - 1, h / PROFILE_STEP)), k0 = Math.floor(kf), k1 = Math.min(levels - 1, k0 + 1), v = kf - k0;
+    const p0 = out[b0 * levels + k0] * (1 - v) + out[b0 * levels + k1] * v, p1 = out[b1 * levels + k0] * (1 - v) + out[b1 * levels + k1] * v;
+    return p0 * (1 - u) + p1 * u;
+  };
+}
+
+/** The tooth's neck rebuilt on the margin (in place). False when it cannot be (the tooth is left for blendToMargin). */
+/** Why the last neck could not be rebuilt, and the teeth blended instead (for tests). */
+export let emergenceFailure = "";
+export const emergenceFallbacks: Array<{ fdi: number; reason: string }> = [];
+export function emergeFromMargin(tooth: PlacedTooth, margin: Float32Array, crown: Float32Array): boolean {
+  const ring = marginRing(margin);
+  if (!ring) { emergenceFailure = "margin"; return false; }
+  const { mx, my, zm, rm, at } = ring;
+  const mesh = weld(tooth.positions, 1e-5);
+  const nv = mesh.v.length / 3;
+  let top = -Infinity;
+  for (let i = 2; i < mesh.v.length; i += 3) top = Math.max(top, mesh.v[i]);
+  const meanMargin = zm.reduce((a, b) => a + b, 0) / MARGIN_BINS;
+  const band = Math.max(1.5, MARGIN_BLEND_SHARE * (top - meanMargin));
+  // The library tooth's middle where it is clipped.
+  let wx = 0, wy = 0, wn = 0;
+  for (let i = 0; i < nv; i += 1) { const z = mesh.v[i * 3 + 2]; if (Math.abs(z - (meanMargin + band)) < 1.5) { wx += mesh.v[i * 3]; wy += mesh.v[i * 3 + 1]; wn += 1; } }
+  if (wn < 8) { emergenceFailure = "clip-centre"; return false; }
+  wx /= wn; wy /= wn;
+  const angleBin = (x: number, y: number) => ((Math.atan2(y - wy, x - wx) / (Math.PI * 2)) + 1) % 1 * MARGIN_BINS;
+  // The clip: above the margin's scallop by a band, in each direction round the library tooth.
+  const g = new Float64Array(nv);
+  for (let i = 0; i < nv; i += 1) g[i] = mesh.v[i * 3 + 2] - (at(zm, angleBin(mesh.v[i * 3], mesh.v[i * 3 + 1])) + band);
+  const v = mesh.v.slice();
+  const f: number[] = [];
+  const cutAt = new Map<string, number>();
+  const cut = (a: number, b: number) => {
+    const key = a < b ? `${a},${b}` : `${b},${a}`;
+    let id = cutAt.get(key);
+    if (id !== undefined) return id;
+    const t = g[a] / (g[a] - g[b]);
+    id = v.length / 3;
+    for (let k = 0; k < 3; k += 1) v.push(mesh.v[a * 3 + k] + (mesh.v[b * 3 + k] - mesh.v[a * 3 + k]) * t);
+    cutAt.set(key, id);
+    return id;
+  };
+  for (let t = 0; t < mesh.f.length; t += 3) {
+    const tri = [mesh.f[t], mesh.f[t + 1], mesh.f[t + 2]];
+    const above = tri.map((i) => g[i] >= 0);
+    const n = above.filter(Boolean).length;
+    if (n === 3) { f.push(...tri); continue; }
+    if (n === 0) continue;
+    // Rotated so the odd one out comes first; the kept part, in the triangle's own turn.
+    const odd = n === 1 ? above.indexOf(true) : above.indexOf(false);
+    const a = tri[odd], b = tri[(odd + 1) % 3], c = tri[(odd + 2) % 3];
+    const ab = cut(a, b), ac = cut(a, c);
+    if (n === 1) f.push(a, ab, ac);
+    else f.push(ab, b, c, ab, c, ac);
+  }
+  const clipped: Mesh = { v, f };
+  const loops = boundaryLoops(clipped);
+  if (!loops.length) { emergenceFailure = "loop-none"; return false; }
+  let loop = loops[0];
+  for (const l of loops) if (l.length > loop.length) loop = l;
+  // The loop must go round the tooth once.
+  const loopAngle = loop.map((i) => Math.atan2(v[i * 3 + 1] - wy, v[i * 3] - wx));
+  let turn = 0;
+  for (let i = 0; i < loop.length; i += 1) { let d = loopAngle[(i + 1) % loop.length] - loopAngle[i]; if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; turn += d; }
+  if (Math.abs(Math.abs(turn) - Math.PI * 2) > 0.5) { emergenceFailure = "loop-turn"; return false; }
+  const dir = turn > 0 ? 1 : -1;
+  // The loop by angle (unwrapped in its own direction, starting at its lowest angle).
+  const start = loopAngle.reduce((best, a, i) => (dir * a < dir * loopAngle[best] ? i : best), 0);
+  const U: number[] = [], Ua: number[] = [];
+  for (let k = 0; k < loop.length; k += 1) {
+    const i = loop[(start + k) % loop.length];
+    let a = loopAngle[(start + k) % loop.length] * dir;
+    while (Ua.length && a < Ua[Ua.length - 1] - 1e-9) a += Math.PI * 2;
+    U.push(i); Ua.push(a);
+  }
+  // The library's cross-section at the clip, by angle: distance and height.
+  const loopAt = (angle: number) => {
+    const a0 = Ua[0];
+    let a = angle * dir;
+    while (a < a0) a += Math.PI * 2;
+    while (a >= a0 + Math.PI * 2) a -= Math.PI * 2;
+    let j = 0;
+    while (j + 1 < Ua.length && Ua[j + 1] <= a) j += 1;
+    const i0 = U[j], i1 = U[(j + 1) % U.length];
+    const a1 = j + 1 < Ua.length ? Ua[j + 1] : Ua[0] + Math.PI * 2;
+    const t = a1 > Ua[j] ? (a - Ua[j]) / (a1 - Ua[j]) : 0;
+    return [v[i0 * 3] + (v[i1 * 3] - v[i0 * 3]) * t, v[i0 * 3 + 1] + (v[i1 * 3 + 1] - v[i0 * 3 + 1]) * t, v[i0 * 3 + 2] + (v[i1 * 3 + 2] - v[i0 * 3 + 2]) * t];
+  };
+  const profile = crownProfile(crown, ring, band);
+  // The rings of the new neck: ring 0 on the margin, the last just under the clip.
+  const rings = Math.max(5, Math.round(band / EMERGENCE_RING));
+  const N = EMERGENCE_ANGLES;
+  const ringStart = v.length / 3;
+  for (let k = 0; k < rings; k += 1) {
+    const h = (band * k) / rings;
+    const s0 = Math.max(0, Math.min(1, (h / band - EMERGENCE_HOLD) / (1 - EMERGENCE_HOLD)));
+    const s = s0 * s0 * (3 - 2 * s0);
+    for (let j = 0; j < N; j += 1) {
+      const angle = dir * (Ua[0] + (j / N) * Math.PI * 2);
+      const fb = ((angle / (Math.PI * 2)) + 1) % 1 * MARGIN_BINS;
+      const r = (k === 0 ? at(rm, fb) + MARGIN_FLARE : (profile ? profile(fb, h) : at(rm, fb)) + EMERGENCE_PROUD);
+      const px = mx + Math.cos(angle) * r, py = my + Math.sin(angle) * r, pz = at(zm, fb) + h + (k === 0 ? MARGIN_INSET : 0);
+      const q = loopAt(angle);
+      v.push(px + (q[0] - px) * s, py + (q[1] - py) * s, pz + (q[2] - pz) * s);
+    }
+  }
+  const R = (k: number, j: number) => ringStart + k * N + (((j % N) + N) % N);
+  const neckFaces = f.length;
+  // Two rings in the same direction (upper A, lower B): (A[j+1], A[j], B[j]) and (A[j+1], B[j], B[j+1]),
+  // wound as the clipped tooth's own faces run round its open edge.
+  for (let k = 0; k + 1 < rings; k += 1) for (let j = 0; j < N; j += 1) f.push(R(k + 1, j + 1), R(k + 1, j), R(k, j), R(k + 1, j + 1), R(k, j), R(k, j + 1));
+  // The last ring zipped to the clip's edge, by angle.
+  {
+    const ringA = Array.from({ length: N + 1 }, (_, j) => Ua[0] + (j / N) * Math.PI * 2);
+    const top: number[] = [...U, U[0]], topA = [...Ua, Ua[0] + Math.PI * 2];
+    let i = 0, j = 0;
+    const last = rings - 1;
+    while (i < top.length - 1 || j < N) {
+      const nextTop = i < top.length - 1 ? topA[i + 1] : Infinity, nextRing = j < N ? ringA[j + 1] : Infinity;
+      if (nextTop <= nextRing) { f.push(top[i + 1], top[i], R(last, j)); i += 1; }
+      else { f.push(top[i], R(last, j), R(last, j + 1)); j += 1; }
+    }
+  }
+  // Closed at the bottom, inside the tooth and the gum.
+  const centre = v.length / 3;
+  v.push(mx, my, meanMargin + MARGIN_INSET - 0.5);
+  for (let j = 0; j < N; j += 1) f.push(R(0, j + 1), R(0, j), centre);
+  // The clipped tooth's faces run one way round its edge; if the new neck came out the other way round, turn it.
+  const twice = (faces: number[]) => {
+    const seen = new Set<string>();
+    let bad = 0;
+    for (let t = 0; t < faces.length; t += 3) for (let k = 0; k < 3; k += 1) {
+      const key = `${faces[t + k]},${faces[t + (k + 1) % 3]}`;
+      if (seen.has(key)) bad += 1; else seen.add(key);
+    }
+    return bad;
+  };
+  if (twice(f)) {
+    for (let t = neckFaces; t < f.length; t += 3) { const x = f[t + 1]; f[t + 1] = f[t + 2]; f[t + 2] = x; }
+    if (twice(f)) { emergenceFailure = "winding"; return false; }
+  }
+  const out: Mesh = { v, f };
+  // Small openings the clip left besides the neck (where the library tooth dipped below the line for a
+  // moment) are closed; a large one means the tooth was not clipped cleanly.
+  for (const other of boundaryLoops(out)) {
+    if (other.length > Math.max(12, loop.length * 0.25)) { emergenceFailure = "open"; return false; }
+    fillLoop(out, other);
+  }
+  if (boundaryLoops(out).length) { emergenceFailure = "open"; return false; }
+  let volume = 0;
+  for (let t = 0; t < f.length; t += 3) {
+    const a = f[t] * 3, b = f[t + 1] * 3, c = f[t + 2] * 3;
+    volume += v[a] * (v[b + 1] * v[c + 2] - v[b + 2] * v[c + 1]) - v[a + 1] * (v[b] * v[c + 2] - v[b + 2] * v[c]) + v[a + 2] * (v[b] * v[c + 1] - v[b + 1] * v[c]);
+  }
+  if (!Number.isFinite(volume) || volume <= 0) { emergenceFailure = "volume"; return false; }
+  tooth.positions = meshSoup(out);
+  return true;
 }
 
 // ---------------------------------------------------------------------------------------------
