@@ -3759,6 +3759,43 @@ export function WorkplaneViewport({
   const sectionFineDraggingRef = useRef(false);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const threeRef = useRef<ThreeState | null>(null);
+  // Build 104: a tool's panel open over the right of the view shifts the picture left by half of what
+  // it covers (see applyViewShift); closing it brings the picture back.
+  useEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const canvas = threeRef.current?.renderer.domElement;
+      if (!canvas) return;
+      const view = canvas.getBoundingClientRect();
+      let covered = 0;
+      if (!canvas.closest(".studio-dental")) {
+        for (const panel of document.querySelectorAll<HTMLElement>(".edge-modifier-panel:not(.floating):not(.dental-studio-panel), .split-panel:not(.floating)")) {
+          const box = panel.getBoundingClientRect();
+          if (box.width < 40 || box.height < 40 || box.left <= view.left + view.width / 2) continue;
+          covered = Math.max(covered, view.right - box.left);
+        }
+      }
+      const next = Math.max(0, covered) / 2;
+      if (Math.abs(next - viewShiftPx) < 1) return;
+      viewShiftPx = next;
+      const state = threeRef.current;
+      if (state) state.needsRender = true;
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", schedule);
+    schedule();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", schedule);
+      if (frame) cancelAnimationFrame(frame);
+      viewShiftPx = 0;
+    };
+  }, []);
   const shapesRef = useRef(shapes);
   const alignReferenceShapesRef = useRef(alignReferenceShapes);
   const mirrorReferenceShapesRef = useRef(mirrorReferenceShapes);
@@ -12603,7 +12640,30 @@ function drawCutPreviews(state: ThreeState) {
   }
 }
 
+/**
+ * Build 104: how far the picture is shifted left while a tool's panel covers the right of the view, so
+ * the part being worked on stays in the open space beside the panel. Only the projection moves: the
+ * camera, its target and every measurement stay where they are.
+ */
+let viewShiftPx = 0;
+function applyViewShift(state: ThreeState) {
+  const camera = state.camera;
+  const canvas = state.renderer.domElement;
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (!width || !height) return;
+  const shift = Math.round(viewShiftPx);
+  const view = camera.view;
+  if (!shift) {
+    if (view?.enabled) camera.clearViewOffset();
+    return;
+  }
+  if (view?.enabled && view.offsetX === shift && view.fullWidth === width && view.fullHeight === height) return;
+  camera.setViewOffset(width, height, shift, 0, width, height);
+}
+
 function renderFrame(state: ThreeState) {
+  applyViewShift(state);
   placeHeadlight(state);
   applyGhost(state);
   state.renderer.render(state.scene, state.camera);

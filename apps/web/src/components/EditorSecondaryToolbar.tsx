@@ -688,6 +688,8 @@ export function SecondaryToolbar({
   // Fork (build 21): Ready-made parts is a window of its own, opened and closed from its toolbar
   // button. It shares the right-hand dock with Shapes - one at a time - so the two never stack.
   const [shapesTab, setShapesTab] = useState<"shapes" | "parts">("shapes");
+  const shapesTabRef = useRef(shapesTab);
+  shapesTabRef.current = shapesTab;
   const toggleShapesWindow = () => {
     setVisibilityOpen(false);
     if (shapesOpen && shapesTab === "shapes") {
@@ -759,7 +761,10 @@ export function SecondaryToolbar({
       if (!shapesPinnedRef.current && !shapesMenuRef.current?.contains(event.target as Node)) setShapesOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !shapesPinnedRef.current) setShapesOpen(false);
+      if (event.key !== "Escape") return;
+      // Build 104: Esc in Make (shown in the docked Shapes panel's place) goes back to the shapes.
+      if (shapesTabRef.current === "parts") { setShapesTab("shapes"); if (!shapesPinnedRef.current) setShapesOpen(false); return; }
+      if (!shapesPinnedRef.current) setShapesOpen(false);
     };
     window.addEventListener("pointerdown", closeOnPointerDown);
     window.addEventListener("keydown", closeOnEscape);
@@ -1447,11 +1452,12 @@ export function SecondaryToolbar({
           <div className="toolbar-section-label">{t("editor.group.make")}</div>
           <div className="toolbar-section-tools">{makeTools.map(renderToolButton)}</div>
         </div>
-        {/* Fork (build 47): Dental Studio has a place of its own. */}
-        <div className="toolbar-section" data-group="dental">
+        {/* Fork (build 47): Dental Studio has a place of its own. Build 104: in CAD Studio it is one button
+            beside Export instead. */}
+        {onSendToDental ? null : <div className="toolbar-section" data-group="dental">
           <div className="toolbar-section-label">{t("editor.group.dental")}</div>
           <div className="toolbar-section-tools">{dentalTools.map(renderToolButton)}</div>
-        </div>
+        </div>}
       </div>
           </>
         ) : (
@@ -1776,6 +1782,12 @@ export function SecondaryToolbar({
           {toolbarMode === "geometry" ? (
             <div className="title-row-tools">
               <ExportButton />
+              {onSendToDental ? (
+                <button type="button" className="send-to-dental-button" data-layerling-tool="sendToDental" title={t("home.sendToDental")} onClick={onSendToDental}>
+                  <ForkToothIcon width={18} height={18} aria-hidden="true" />
+                  <span>{t("home.sendToDental")}</span>
+                </button>
+              ) : null}
             <div className="toolbar-section toolbar-actions-section" data-group="manage">
               <div className="toolbar-section-label">{t("editor.group.manage")}</div>
               <div className="action-buttons">
