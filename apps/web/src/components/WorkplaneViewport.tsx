@@ -1,5 +1,6 @@
 "use client";
 
+import { EDITOR_WINDOW_EVENT } from "@/lib/editorShared";
 import { readViewLook, type ViewLook } from "@/lib/viewLook";
 import { markEscapeHandled } from "@/lib/escapeHandled";
 import { ArrowDownToLine, Check, ChevronLeft, ChevronRight, Crosshair, Cuboid, Download, Eye, EyeOff, FlipHorizontal, GripVertical, Home, Layers, Minus, MousePointer2, PanelsTopLeft, Plus, Rotate3d, RotateCcw, Ruler, RulerDimensionLine, Slice, Spline, Trash2, X } from "lucide-react";
@@ -3619,6 +3620,26 @@ export function WorkplaneViewport({
   const [selectionSnapDocked, setSelectionSnapDocked] = useState(false);
   const [snap, setSnap] = useState<GridSize>(() => normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Build 104: Esc closes the settings window, and another window opening closes it (one at a time).
+  useEffect(() => {
+    if (!settingsOpen) return;
+    window.dispatchEvent(new CustomEvent(EDITOR_WINDOW_EVENT, { detail: "settings" }));
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      setSettingsOpen(false);
+    };
+    const onOther = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== "settings") setSettingsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener(EDITOR_WINDOW_EVENT, onOther);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(EDITOR_WINDOW_EVENT, onOther);
+    };
+  }, [settingsOpen]);
   const [workspace, setWorkspace] = useState<WorkspaceSettings>(() => normalizeWorkspaceSettings(initialWorkspace));
   const [transformOverlay, setTransformOverlay] = useState<TransformOverlayState | null>(null);
   const [alignOverlay, setAlignOverlay] = useState<AlignOverlayState | null>(null);

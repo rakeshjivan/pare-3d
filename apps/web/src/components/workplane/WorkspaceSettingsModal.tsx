@@ -779,19 +779,7 @@ export function WorkspaceSettingsModal({
                     checked={workspace.fastMode}
                     onChange={(fastMode) => patchWorkspace({ fastMode })}
                   />
-                  <label className="workspace-select" data-help={t("workspace.theme")}>
-                    <span>{t("workspace.theme")}</span>
-                    <select
-                      value={themePreference}
-                      onChange={(event) => onThemePreferenceChange?.(event.currentTarget.value as AppThemePreference)}
-                    >
-                      {APP_THEME_CHOICES.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {t(THEME_LABEL_KEYS[option.value])}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {/* Build 104: CAD Studio is always light and Dental Studio is Meshmixer's colours - no theme here. */}
                   <label className="workspace-select" data-help={t("workspace.toolbarSize")}>
                     <span>{t("workspace.toolbarSize")}</span>
                     <select

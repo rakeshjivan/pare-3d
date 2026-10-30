@@ -18,3 +18,6 @@ export const libraryShapeIds: ReadonlySet<string> = new Set(libraryShapeAssets.m
 /** The commands of the search that stay awake in the history view: they change nothing in the design. */
 export const HISTORY_VIEW_COMMANDS = new Set(["history", "export", "guide", "shortcuts"]);
 export type ToolbarMode = "geometry" | "sketch";
+
+/** Build 104: a window of the editor opened (its name in detail); the others close - one at a time. */
+export const EDITOR_WINDOW_EVENT = "pare3d:editor-window";

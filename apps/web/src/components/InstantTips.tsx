@@ -64,6 +64,22 @@ export function InstantTips() {
       window.removeEventListener("blur", restore);
     };
   }, []);
+  // Build 104: a toolbar button's hover name goes the moment the button is clicked, and stays away until
+  // the pointer leaves it - it no longer sits over the panel or window the button just opened.
+  useEffect(() => {
+    const press = (event: PointerEvent) => {
+      const button = (event.target as Element | null)?.closest?.(".secondary-toolbar [data-tip]") as HTMLElement | null;
+      if (!button) return;
+      button.dataset.tipOff = "1";
+      const leave = () => {
+        delete button.dataset.tipOff;
+        button.removeEventListener("pointerleave", leave);
+      };
+      button.addEventListener("pointerleave", leave);
+    };
+    document.addEventListener("pointerdown", press, true);
+    return () => document.removeEventListener("pointerdown", press, true);
+  }, []);
   if (!tip) return null;
   return (
     <div className="instant-tip" role="tooltip" style={{ left: tip.x, top: tip.y }}>

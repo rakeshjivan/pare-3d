@@ -303,7 +303,7 @@ const SURFACE_TEXT_PREVIEW_ID = "surface-text-preview";
 const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
 
 import { TopActionPanel, type DirectExportFormat, type LylExportTarget, type LylHistoryLimit, type SvgExportView, type TopPanel, type ViewImageOptions } from "@/components/EditorTopActionPanel";
-import { DENTAL_MODEL_EVENT, WAXUP_STUDIO_EVENT, OPEN_DENTAL_STUDIO_KEY, FILL_HOLE_EVENT, MESH_CHECK_EVENT, OPEN_PARAMETERS_EVENT, type ToolbarMode } from "@/lib/editorShared";
+import { DENTAL_MODEL_EVENT, WAXUP_STUDIO_EVENT, OPEN_DENTAL_STUDIO_KEY, FILL_HOLE_EVENT, MESH_CHECK_EVENT, OPEN_PARAMETERS_EVENT, EDITOR_WINDOW_EVENT, type ToolbarMode } from "@/lib/editorShared";
 import { SecondaryToolbar, type SketchShapeOptions } from "@/components/EditorSecondaryToolbar";
 import { SHARED_CLIPBOARD_STORAGE_KEY, readSharedClipboard, readSystemClipboard, writeSharedClipboard } from "@/lib/editorClipboard";
 import { downloadBlobFile, downloadTextFile, footprintSvg, imagePlateDimensions, prepareImportedImage, toSvg } from "@/lib/editorFiles";
@@ -3864,6 +3864,48 @@ export function LayerlingEditor({
     window.addEventListener(OPEN_PARAMETERS_EVENT, open);
     return () => window.removeEventListener(OPEN_PARAMETERS_EVENT, open);
   }, []);
+  // Build 104: Import / Export and Parameters are windows too: Esc closes them, and one opening closes the others.
+  useEffect(() => {
+    if (!topPanel) return;
+    window.dispatchEvent(new CustomEvent(EDITOR_WINDOW_EVENT, { detail: "top" }));
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      setTopPanel(null);
+    };
+    const onOther = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== "top") setTopPanel(null);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener(EDITOR_WINDOW_EVENT, onOther);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(EDITOR_WINDOW_EVENT, onOther);
+    };
+  }, [topPanel]);
+  useEffect(() => {
+    if (!parametersOpen) return;
+    window.dispatchEvent(new CustomEvent(EDITOR_WINDOW_EVENT, { detail: "parameters" }));
+    const onOther = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== "parameters") setParametersOpen(false);
+    };
+    window.addEventListener(EDITOR_WINDOW_EVENT, onOther);
+    return () => window.removeEventListener(EDITOR_WINDOW_EVENT, onOther);
+  }, [parametersOpen]);
+  // Build 104: Esc closes the Parameters panel, as it closes the other tool panels (a field being typed
+  // in keeps it: there Esc puts the value back).
+  useEffect(() => {
+    if (!parametersOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      setParametersOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [parametersOpen]);
   const parameterUsage = useMemo(() => {
     const counts = new Map<string, number>();
     const visit = (shape: WorkplaneShape) => {

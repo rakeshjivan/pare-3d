@@ -2118,3 +2118,16 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .waxup-value-row input { height: 28px; width: 100%; text-align: right; font-variant-numeric: tabular-nums; padding: 0 6px; }
 .waxup-value-label { font-size: 13px; }
 .waxup-value-unit { font-size: 12px; opacity: 0.7; }
+
+/* Build 104: a clicked toolbar button shows no hover name over what it opened (see InstantTips). */
+.secondary-toolbar [data-tip][data-tip-off]:hover::after,
+.secondary-toolbar [data-tip][data-tip-off]:hover::before {
+  display: none !important;
+}
+
+/* Build 104: a tool's panel takes the place of the part's settings while it is open, instead of
+   lying half over them in the same corner (both came up at the top right). */
+.layerling-editor:has(.edge-modifier-panel:not(.dental-studio-panel):not(.floating)) .shape-inspector:not(.floating),
+.layerling-editor:has(.split-panel:not(.floating)) .shape-inspector:not(.floating) {
+  visibility: hidden;
+}
