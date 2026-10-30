@@ -138,7 +138,7 @@ jobs:
             **Installed a new download but it still shows an older build?** Restart your computer once (an older copy was still running in the background). From build 29 on, the app replaces an older copy by itself.
 
             Pare 3D is based on [layerling](https://github.com/henmedia/layerling) (AGPL-3.0-only); this release's source is this repository at this tag.
-      # Only the newest build is kept on the releases page, so there is one thing to download; older
+      # Only the newest build (and the newest test build) is kept on the releases page; older
       # builds and test builds are removed (the page also lists tags as text, pare-9 before pare-21).
       # Their tags stay, so every build's source is still in the repository.
       - name: Keep only the newest build on the releases page
@@ -149,6 +149,9 @@ jobs:
         run: |
           releases=$(gh api "repos/$REPO/releases?per_page=100" --paginate --jq '.[] | "\(.id) \(.tag_name)"')
           keep=$(echo "$releases" | awk '$2 ~ /^pare-[0-9]+$/ { sub("pare-", "", $2); print $2 }' | sort -n | tail -1 | sed 's/^/pare-/')
+          # The newest test build stays too: a release must not take the test build's page away.
+          preview=$(echo "$releases" | awk '$2 ~ /^pare-preview-[0-9]+$/ { sub("pare-preview-", "", $2); print $2 }' | sort -n | tail -1)
+          [ -n "$preview" ] && keep=$(printf '%s\npare-preview-%s' "$keep" "$preview")
           echo "Keeping: $keep"
           echo "$releases" | while read -r id tag; do
             [ -z "$id" ] && continue
