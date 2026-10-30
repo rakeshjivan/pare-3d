@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 103,
+    items: [
+      "Wax-up Studio (test builds): each wax tooth now ends exactly on the patient's gingival margin all round, with the patient's own emergence profile, scallop and papillae, blending into the ideal tooth above - and each ideal tooth is torqued about its edge (12° at most) so its cervical third stands over the patient's tooth, its edge where the design put it.",
+      "The wax-up model's cut-back reaches into the embrasures between waxed teeth, and where the design is shorter than the patient's tooth the tooth is cut back past the design's edge, palatally too - no walls or steps beside or behind the ideal teeth.",
+      "Bite contacts on made models are read correctly where the models overlap a lot.",
+    ],
+  },
+  {
     build: 102,
     items: [
       "Wax-up Studio (test builds): new tooth sets - Pare Square, Pare Oval and Pare Square-Oval (upper teeth and pontics, front or full arch), Pare Lower, and the anterior smile designs Pare Tapered and Pare Youthful. The earlier sets stay in the app for designs made with them.",
