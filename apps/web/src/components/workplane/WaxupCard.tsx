@@ -48,6 +48,8 @@ export type WaxupView = {
   stage: "position" | "adapted";
   setMove: WaxSetMove;
   chain: boolean;
+  /** Build 103: Wax-up Studio as Meshmixer - the teeth are parts, moved and sculpted where they are, never placed again by themselves. */
+  manual: boolean;
   /** Build 103 (exocad): which way a dragged tooth moves, and whether every tooth moves with it. */
   restrict: WaxRestrict;
   moveAll: boolean;
@@ -111,6 +113,8 @@ export type WaxupActions = {
   onChain: (on: boolean) => void;
   onRestrict: (restrict: WaxRestrict) => void;
   onMoveAll: (on: boolean) => void;
+  /** Build 103 (manual): Sculpt opened on the selected tooth with this brush (Meshmixer's). */
+  onSculpt: (brush: "bubbleSmooth" | "move" | "smooth" | "attract") => void;
   /** Build 103: the selected tooth confirmed (true) or taken up again (false). */
   onConfirmTooth: (id: string, on: boolean) => void;
   onConfirm: () => void;
@@ -155,7 +159,7 @@ export const archOrder = (fdi: number) => { const q = Math.floor(fdi / 10), n = 
 /** Build 101: Wax-up Studio's steps that live in this card (shown one at a time; all of them without a step). */
 /** Build 103: the whole set's move - intercanine width, forward/back, midline (to the patient's left), edges longer. */
 export type WaxSetMove = { width: number; depth: number; midline: number; height: number };
-export type WaxupPart = "find" | "choose" | "set" | "place" | "adjust" | "occlusion";
+export type WaxupPart = "find" | "choose" | "set" | "place" | "adjust" | "occlusion" | "sculpt";
 
 /** Build 102: reductions shown from this, mm (less is within a scan's own noise). */
 const WAX_REDUCE_SHOWN = 0.2;
@@ -555,6 +559,22 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
           </>
         ) : null}
       </div>
+      ) : null}
+      {/* Build 103: Sculpt as in Meshmixer - the tooth chosen, then its brushes. */}
+      {part === "sculpt" ? (
+        <div className="dental-substep">
+          <div className="waxup-teeth" role="group" aria-label={t("waxup.teeth")}>
+            {[...view.placed].sort((a, b) => a.fdi - b.fdi).map((tooth) => (
+              <button key={tooth.id} type="button" className={`waxup-tooth${view.selected === tooth.id ? " active" : ""}`} onClick={() => actions.onSelect(tooth.id)}>{tooth.fdi}</button>
+            ))}
+          </div>
+          <div className="dental-trim-buttons waxup-sculpt-brushes">
+            {(["bubbleSmooth", "move", "smooth", "attract"] as const).map((brush) => (
+              <button key={brush} type="button" className="secondary" disabled={working || !view.selected} title={t(`waxup.sculpt.${brush}Hint`)} onClick={() => actions.onSculpt(brush)}>{t(`waxup.sculpt.${brush}`)}</button>
+            ))}
+          </div>
+          <p className="blend-hint">{t("waxup.sculptHint")}</p>
+        </div>
       ) : null}
       {view.occlusion.ready && show("occlusion") ? (
         <div className="dental-substep">

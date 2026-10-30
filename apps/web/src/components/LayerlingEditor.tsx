@@ -74,7 +74,7 @@ import { composeAdjust } from "@/components/workplane/ToothGimbal";
 import { WaxToothDrag, type DragTooth, type WaxRestrict } from "@/components/workplane/WaxToothDrag";
 import { contactColors, type BiteContactStats } from "@/lib/biteContacts";
 import { alignToPlate, bridgeChoice, expandConnected, extrudeChoice, invertConnected, optimizeBoundary, shrinkChoice, smoothChoice } from "@/lib/meshEditTools";
-import { adjustMatrix, mirrorAdjust, setMoveAdjust, waxedNeighbourSides, ARC_DEPTH_DEFAULT, SMILE_LATERAL_STEP, CENTRAL_RATIO, contralateral, crownCutter, imtFirstInjection, moveFrame, nudgeMatrix, rigidMoveBetween, type ToothNudge, type ToothAdjust, fdiNumber, parseObj, splitShells, librarySet, type WaxLandmarks } from "@/lib/dentalWaxup";
+import { adjustMatrix, isIdentityAdjust, mirrorAdjust, setMoveAdjust, waxedNeighbourSides, ARC_DEPTH_DEFAULT, SMILE_LATERAL_STEP, CENTRAL_RATIO, contralateral, crownCutter, imtFirstInjection, moveFrame, nudgeMatrix, rigidMoveBetween, type ToothNudge, type ToothAdjust, fdiNumber, parseObj, splitShells, librarySet, type WaxLandmarks } from "@/lib/dentalWaxup";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { WaxupPointOverlay, markerTriangles, rayHit } from "./workplane/WaxupPointOverlay";
 import { WAXUP_LANDMARKS, WAX_CONFIRMED_COLOURS, type WaxupView } from "./workplane/WaxupCard";
@@ -9360,8 +9360,11 @@ export function LayerlingEditor({
   };
   /** Build 92: the surface of every other part that is not hidden (within 4 mm reach), made once per version of them. */
   const attractCache = useRef<{ key: string; target: NearestSurface | null } | null>(null);
+  /** Build 103: Meshmixer's magnet - when set, Attract pulls onto this part only (the opposing arch), shown or not. */
+  const attractOnly = useRef<string | null>(null);
   const attractTargetFor = (shape: WorkplaneShape) => {
-    const others = shapesRef.current.filter((other) => other.id !== shape.id && !other.hidden && !other.hole && !isNonSolidShapeKind(other.kind));
+    const only = attractOnly.current ? shapesRef.current.find((other) => other.id === attractOnly.current && other.id !== shape.id) : undefined;
+    const others = only ? [only] : shapesRef.current.filter((other) => other.id !== shape.id && !other.hidden && !other.hole && !isNonSolidShapeKind(other.kind));
     const key = `${shape.id}|${projectShapesFingerprint(others)}`;
     if (attractCache.current?.key === key) return attractCache.current.target;
     const soups = others.map((other) => worldTriangles(other));
@@ -11025,7 +11028,7 @@ export function LayerlingEditor({
   // Build 79: the digital wax-up - a tooth set over an arch's anterior teeth, from three landmarks.
   const WAX_COLOR = "#f1e7d0";
   type WaxupState = Omit<WaxupView, "marked" | "selected" | "mirror" | "found" | "chosen" | "confirmed"> & { /** Build 103: confirmed teeth (FDI), each held at its whole change as confirmed. */ locks: Record<number, ToothAdjust>; landmarks: WaxLandmarks | null; guessed: boolean; marks: Array<[number, number, number]>; /** Build 102: each tooth's own adjustment (by FDI number), kept through every placing. */ adjust: Record<number, ToothAdjust> };
-  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: BUILT_IN_FINDER.name, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 1, red: null, checks: null, adjust: {}, stage: "position", setMove: { width: 0, depth: 0, midline: 0, height: 0 }, chain: true, restrict: "free", moveAll: false, locks: {}, occlusion: { ready: false, busy: false, raise: 0, scheme: "canine", guidance: 30, bennett: 15, result: null } });
+  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: BUILT_IN_FINDER.name, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 1, red: null, checks: null, adjust: {}, stage: "position", setMove: { width: 0, depth: 0, midline: 0, height: 0 }, chain: true, restrict: "free", moveAll: false, locks: {}, manual: true, occlusion: { ready: false, busy: false, raise: 0, scheme: "canine", guidance: 30, bennett: 15, result: null } });
   // Build 94: the teeth found on each scan (by its part id): each scan triangle's FDI (as the studio
   // reads the scan), the teeth, the landmarks from them, and the teeth chosen for the wax-up.
   type FoundTeeth = { key: string; input: Float32Array; fdi: Uint8Array; teeth: ScanTeeth["teeth"]; landmarks: WaxLandmarks | null; chosen: number[] };
@@ -11277,7 +11280,7 @@ export function LayerlingEditor({
     const shells = (current.setId ? waxShellsById.current.get(current.setId) : undefined) ?? (current.setId ? null : waxShells.current);
     const found = arch ? waxFound[arch.shape.id] : undefined;
     // Build 94: on the patient's teeth when they were found (the scan as it was then), else from the landmarks.
-    const onTeeth = current.fit === "teeth" && found && found.chosen.length && arch && found.input.length === arch.scan.length ? { fdi: found.fdi, chosen: found.chosen, arch: arch.slot, ideal: current.ideal, ...(current.red !== null ? { red: current.red } : {}), centralRatio: current.centralRatio, ...(current.arcDepth !== null ? { arcDepth: current.arcDepth } : {}), adjust: waxAdjustWithSet(current, found.chosen), blend: current.stage === "adapted" } : undefined;
+    const onTeeth = current.fit === "teeth" && found && found.chosen.length && arch && found.input.length === arch.scan.length ? { fdi: found.fdi, chosen: found.chosen, arch: arch.slot, ideal: current.ideal, ...(current.red !== null ? { red: current.red } : {}), centralRatio: current.centralRatio, ...(current.arcDepth !== null ? { arcDepth: current.arcDepth } : {}), adjust: waxAdjustWithSet(current, found.chosen), blend: current.stage === "adapted" && !current.manual } : undefined;
     if (!arch || !shells || (!onTeeth && !current.landmarks)) return;
     setWaxup({ ...current, busy: true, error: null });
     try {
@@ -11330,7 +11333,7 @@ export function LayerlingEditor({
     if (!first?.waxTooth) return;
     // Build 102: on the patient's teeth, a nudge is kept as the tooth's adjustment and the teeth placed
     // again - so the tooth keeps its contacts and meets the gum at the margin wherever it goes.
-    if (waxupRef.current.fit === "teeth") {
+    if (waxupRef.current.fit === "teeth" && !waxupRef.current.manual) {
       const fdi = first.waxTooth.fdi;
       const numbers = [fdi, ...(waxMirror ? [contralateral(fdi)] : [])];
       setWaxup((current) => {
@@ -11426,7 +11429,8 @@ export function LayerlingEditor({
       for (const key of ["wider", "longer", "thicker"] as const) if (change[key] !== undefined) next[key] = Math.max(0.5, (next[key] ?? 1) * change[key]!);
       return next;
     };
-    if (waxupRef.current.fit === "teeth") {
+    // Build 103: Wax-up Studio as Meshmixer (manual) - the teeth are parts moved where they are, never placed again.
+    if (waxupRef.current.fit === "teeth" && !waxupRef.current.manual) {
       // Build 103: every tooth (Move all), or the tooth and its mirror - never a confirmed one.
       const locks = waxupRef.current.locks ?? {};
       const everyTooth = shapesRef.current.flatMap((shape) => (shape.dental === "wax" && !shape.hidden && shape.waxFor === first.waxFor && shape.waxTooth ? [shape.waxTooth.fdi] : []));
@@ -11449,16 +11453,24 @@ export function LayerlingEditor({
       });
       return;
     }
-    // Laid out by smile design: the tooth (and its mirror) moved where it is.
+    // Laid out by smile design, or as Meshmixer (manual): the teeth moved where they are - the tooth and
+    // its mirror, all of them (Move all), the teeth beyond it along the arch (chain), never a confirmed one.
     window.layerlingSculptPreview?.(id, null);
-    const partner = waxMirror ? shapesRef.current.find((shape) => shape.dental === "wax" && shape.waxFor === first.waxFor && !shape.hidden && shape.waxTooth?.fdi === contralateral(first.waxTooth!.fdi) && shape.id !== id) : undefined;
+    if (waxPreviewHeld.current === id) { waxPreviewHeld.current = null; waxHeldChange.current = {}; }
+    const heldBy = waxupRef.current.locks ?? {};
+    const archTeeth = shapesRef.current.filter((shape) => shape.dental === "wax" && shape.waxFor === first.waxFor && !shape.hidden && shape.waxTooth && !heldBy[shape.waxTooth.fdi]);
+    const partner = waxMirror ? archTeeth.find((shape) => shape.waxTooth?.fdi === contralateral(first.waxTooth!.fdi) && shape.id !== id) : undefined;
+    const movedTeeth = waxupRef.current.moveAll ? archTeeth : [first, ...(partner ? [partner] : [])].filter((shape) => archTeeth.includes(shape));
+    const chained = waxupRef.current.manual && waxupRef.current.chain && change.mesial && !waxupRef.current.moveAll
+      ? archTeeth.filter((shape) => !movedTeeth.includes(shape) && movedTeeth.some((m) => Math.floor(m.waxTooth!.fdi / 10) === Math.floor(shape.waxTooth!.fdi / 10) && shape.waxTooth!.fdi % 10 > m.waxTooth!.fdi % 10))
+      : [];
     const changed = new Map<string, WorkplaneShape>();
-    for (const shape of [first, ...(partner ? [partner] : [])]) {
+    for (const [shape, own] of [...movedTeeth.map((m) => [m, change] as const), ...chained.map((c) => [c, { mesial: change.mesial } as ToothAdjust] as const)]) {
       const tooth = shape.waxTooth!;
       const toWorld = localToWorld(shape);
       if (!toWorld) continue;
       const frame = moveFrame(tooth.frame, toWorld);
-      const move = adjustMatrix(frame, tooth.width, tooth.length, change);
+      const move = adjustMatrix(frame, tooth.width, tooth.length, own);
       const triangles = worldTriangles(shape);
       const v = new THREE.Vector3();
       for (let i = 0; i + 2 < triangles.length; i += 3) {
@@ -11468,18 +11480,45 @@ export function LayerlingEditor({
       const rebuilt = shapeWithWorldPositions(shape, triangles);
       const back = localToWorld(rebuilt);
       if (!back) continue;
-      changed.set(shape.id, canonicalizeShape({ ...rebuilt, waxTooth: { fdi: tooth.fdi, width: tooth.width * (change.wider ?? 1), length: tooth.length * (change.longer ?? 1), frame: moveFrame(moveFrame(frame, move), back.clone().invert()) } }));
+      changed.set(shape.id, canonicalizeShape({ ...rebuilt, waxTooth: { fdi: tooth.fdi, width: tooth.width * (own.wider ?? 1), length: tooth.length * (own.longer ?? 1), frame: moveFrame(moveFrame(frame, move), back.clone().invert()) } }));
     }
     if (!changed.size) return;
     commitShapes(shapesRef.current.map((shape) => changed.get(shape.id) ?? shape), [id], t("waxup.adjusted"));
+    // Manual: each tooth's change so far kept as numbers, for the exact values in the card (nothing is placed from them).
+    const recorded = [...changed.values()].map((shape) => [shape.waxTooth!.fdi, shape.id === id || movedTeeth.some((m) => m.id === shape.id) ? change : { mesial: change.mesial }] as const);
     setWaxup((current) => ({
       ...current,
+      ...(current.manual ? { adjust: { ...current.adjust, ...Object.fromEntries(recorded.map(([fdi, c]) => [fdi, composeAdjust(current.adjust[fdi] ?? {}, c)])) } } : {}),
       placed: current.placed.map((entry) => {
         const shape = changed.get(entry.id);
         return shape?.waxTooth ? { ...entry, width: shape.waxTooth.width, length: shape.waxTooth.length, clearance: change.out !== undefined && Object.keys(change).length === 1 && entry.clearance !== null ? entry.clearance + change.out : null } : entry;
       }),
     }));
   }, [commitShapes, waxMirror]);
+  /** Build 103 (manual): each tooth moved where it is by its own change (by shape id) - the whole set's sliders. */
+  const moveWaxTeethDirect = useCallback((changes: Map<string, ToothAdjust>) => {
+    const changed = new Map<string, WorkplaneShape>();
+    for (const [shapeId, own] of changes) {
+      const shape = shapesRef.current.find((candidate) => candidate.id === shapeId);
+      const tooth = shape?.waxTooth;
+      const toWorld = shape ? localToWorld(shape) : null;
+      if (!shape || !tooth || !toWorld || isIdentityAdjust(own)) continue;
+      const frame = moveFrame(tooth.frame, toWorld);
+      const move = adjustMatrix(frame, tooth.width, tooth.length, own);
+      const triangles = worldTriangles(shape);
+      const v = new THREE.Vector3();
+      for (let i = 0; i + 2 < triangles.length; i += 3) {
+        v.set(triangles[i], triangles[i + 1], triangles[i + 2]).applyMatrix4(move);
+        triangles[i] = v.x; triangles[i + 1] = v.y; triangles[i + 2] = v.z;
+      }
+      const rebuilt = shapeWithWorldPositions(shape, triangles);
+      const back = localToWorld(rebuilt);
+      if (!back) continue;
+      changed.set(shape.id, canonicalizeShape({ ...rebuilt, waxTooth: { fdi: tooth.fdi, width: tooth.width * (own.wider ?? 1), length: tooth.length * (own.longer ?? 1), frame: moveFrame(moveFrame(frame, move), back.clone().invert()) } }));
+    }
+    if (!changed.size) return;
+    commitShapes(shapesRef.current.map((shape) => changed.get(shape.id) ?? shape), [...changed.keys()], t("waxup.adjusted"));
+  }, [commitShapes]);
   /**
    * Build 102: the one-click helpers - most alignment without moving a tooth by hand. Each is one step
    * of the wax-up's Undo; on the patient's teeth each change is kept as the teeth's adjustments (and
@@ -11594,7 +11633,7 @@ export function LayerlingEditor({
     if (!teeth.length) return;
     const byFdi = new Map(teeth.map((tooth) => [tooth.fdi, tooth]));
     const selected = teeth.find((tooth) => tooth.shape.id === selectedIdsRef.current[0]) ?? null;
-    const onTeeth = waxupRef.current.fit === "teeth";
+    const onTeeth = waxupRef.current.fit === "teeth" && !waxupRef.current.manual;
     if (kind === "resetTooth" || kind === "resetAll") {
       if (!onTeeth) return;
       waxRecordRef.current();
@@ -11896,7 +11935,8 @@ export function LayerlingEditor({
   waxReplaceKeyRef.current = waxReplaceKey;
   useEffect(() => {
     if (waxReplaceSeen.current === waxReplaceKey) return;
-    if (!dentalStudio?.waxStudio || !waxupRef.current.placed.length) { waxReplaceSeen.current = waxReplaceKey; return; }
+    // Build 103: as Meshmixer (manual), the teeth are never placed again by themselves - only when asked.
+    if (!dentalStudio?.waxStudio || !waxupRef.current.placed.length || waxupRef.current.manual) { waxReplaceSeen.current = waxReplaceKey; return; }
     // Build 102: a change made while the teeth are being placed (a gimbal step) is placed straight after.
     if (waxup.busy) return;
     const timer = window.setTimeout(() => {
@@ -11961,10 +12001,11 @@ export function LayerlingEditor({
     marked: waxup.landmarks && !waxup.guessed ? 3 : waxup.marks.length,
     selected: selectedIds.length === 1 ? selectedIds[0] : null,
     confirmed: Object.keys(waxup.locks).map(Number),
+    manual: waxup.manual,
     // Build 103: the selected tooth's own change, for the exact values in the card.
     selectedAdjust: (() => {
       const shape = selectedIds.length === 1 ? shapes.find((candidate) => candidate.id === selectedIds[0]) : undefined;
-      return shape?.waxTooth && waxup.fit === "teeth" ? waxup.adjust[shape.waxTooth.fdi] ?? {} : null;
+      return shape?.waxTooth && (waxup.fit === "teeth" || waxup.manual) ? waxup.adjust[shape.waxTooth.fdi] ?? {} : null;
     })(),
     mirror: waxMirror,
     found: waxFoundHere ? waxFoundHere.teeth.map((tooth) => ({ fdi: tooth.fdi, agreed: tooth.agreed })) : null,
@@ -18287,11 +18328,36 @@ export function LayerlingEditor({
               onNudge: nudgeWaxTooth,
               onHelper: waxHelper,
               onRestrict: (restrict: WaxRestrict) => setWaxup((current) => ({ ...current, restrict })),
+              onSculpt: (brush: "bubbleSmooth" | "move" | "smooth" | "attract") => {
+                const id = selectedIdsRef.current.length === 1 ? selectedIdsRef.current[0] : null;
+                const shape = id ? shapesRef.current.find((candidate) => candidate.id === id && candidate.dental === "wax") : undefined;
+                if (!shape) { setNotice(t("sculpt.selectOne")); return; }
+                // Attract: onto the opposing arch's scan (Meshmixer's magnet on the lower jaw).
+                const studio = dentalStudioRef.current;
+                const other = waxupRef.current.slot === "upper" ? studio?.slots.lower : studio?.slots.upper;
+                attractOnly.current = brush === "attract" && other ? other : null;
+                if (sculptToolRef.current && sculptToolRef.current.shapeId !== shape.id) { flushSculpt(); setSculptTool(null); }
+                openSculpt(shape);
+                setSculptTool((current) => (current ? { ...current, tool: brush as SculptTool } : current));
+              },
               onMoveAll: (moveAll: boolean) => setWaxup((current) => ({ ...current, moveAll })),
               onConfirmTooth: (id: string, on: boolean) => confirmWaxTooth(id, on),
               onAdjust: (id: string, change: ToothAdjust) => adjustWaxToothBy(id, change),
               onEggshell: (wall: number) => { void makeEggshell(wall); },
-              onSetMove: (patch) => { waxRecord(true); setWaxup((current) => ({ ...current, setMove: { ...current.setMove, ...patch } })); },
+              onSetMove: (patch) => {
+                waxRecord(true);
+                // Build 103 (manual): the set's teeth moved where they are by the change (never placed again).
+                const current = waxupRef.current;
+                if (current.manual) {
+                  const before = current.setMove, after = { ...before, ...patch };
+                  const diff = { width: after.width - before.width, depth: after.depth - before.depth, midline: after.midline - before.midline, height: after.height - before.height };
+                  const arch = waxArch();
+                  const changes = new Map<string, ToothAdjust>();
+                  for (const shape of arch ? waxTeethOf(arch.shape.id) : []) if (shape.waxTooth && !current.locks[shape.waxTooth.fdi]) changes.set(shape.id, setMoveAdjust(diff, shape.waxTooth.fdi));
+                  moveWaxTeethDirect(changes);
+                }
+                setWaxup((now) => ({ ...now, setMove: { ...now.setMove, ...patch } }));
+              },
               onChain: (chain) => setWaxup((current) => ({ ...current, chain })),
               onConfirm: () => setWaxup((current) => ({ ...current, stage: "adapted" })),
               onStage: (stage) => setWaxup((current) => (current.stage === stage ? current : { ...current, stage })),
