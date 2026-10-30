@@ -1511,8 +1511,13 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
     entry.frame = moveFrame(entry.frame, m);
     entry.matrix = m.clone().multiply(entry.matrix);
   });
-  // Build 102: each tooth's own adjustment (the gimbal, the buttons) - before the contacts and the
-  // margin, so the tooth still meets its neighbours and the patient's gum wherever it is put.
+  // Build 103: the neighbours meet at their contacts here, before the dentist's own changes and the
+  // same in Position as in Adapt - so confirming the position moves no tooth (it did: the contacts
+  // were closed again at Adapt, widening and shifting the teeth beside one that had been moved).
+  // Smile-designed teeth have their widths by design: only gaps are closed, overlaps left (contacts).
+  widenToContacts(placed, ideal >= 0.5);
+  // Build 102: each tooth's own adjustment (the gimbal, the buttons), applied last - what the dentist
+  // set is what is kept.
   if (options.adjust) placed.forEach((entry, i) => {
     const a = options.adjust![placedFdi[i]];
     if (!a || isIdentityAdjust(a)) return;
@@ -1523,11 +1528,8 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
     entry.width *= a.wider ?? 1;
     entry.length *= a.longer ?? 1;
   });
-  // Neighbours meet at their contacts (the wax closes the gaps the patient's own teeth may have:
-  // each tooth widened, not moved, so it stays over its own), and the cervical part blends.
+  // Adapt: the teeth stay exactly as positioned; only the cervical part is seated on the gum.
   if (options.blend !== false) {
-    // Smile-designed teeth have their widths by design: only gaps are closed, overlaps left (they are contacts).
-    widenToContacts(placed, ideal >= 0.5);
     // Build 95: each tooth's cervical end on the patient's gingival margin as found, all round;
     // where the margin was not found, sunk into the surface as before.
     placed.forEach((entry, i) => {

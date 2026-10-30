@@ -11056,6 +11056,8 @@ export function LayerlingEditor({
   const waxOwnSets = useRef(new Map<string, { name: string; shells: Float32Array[] }>());
   /** Build 103: the set chosen for each arch, to come back to when that arch is chosen again. */
   const waxSetByArch = useRef<Partial<Record<"upper" | "lower", string>>>({});
+  /** Build 103: each set's teeth once loaded, by id - so placing always uses the set the wax-up names (after an Undo, or the other arch's visit), never a leftover. */
+  const waxShellsById = useRef(new Map<string, Float32Array[]>());
   const chooseBuiltInSet = useCallback(async (id: string) => {
     waxRecordRef.current();
     const arch = waxupRef.current.builtIn.find((set) => set.id === id)?.arch;
@@ -11063,6 +11065,7 @@ export function LayerlingEditor({
     const own = waxOwnSets.current.get(id);
     if (own) {
       waxShells.current = own.shells;
+      waxShellsById.current.set(id, own.shells);
       setWaxup((current) => ({ ...current, setId: id, setName: own.name, teeth: own.shells.length, builtInCredit: null, error: null }));
       return;
     }
@@ -11072,6 +11075,7 @@ export function LayerlingEditor({
     try {
       const shells = await loadToothSet(library.id, set);
       waxShells.current = shells;
+      waxShellsById.current.set(id, shells);
       setWaxup((current) => ({ ...current, setId: id, setName: set.name, teeth: shells.length, builtInCredit: null, error: null }));
     } catch {
       setWaxup((current) => ({ ...current, error: t("waxup.setFailed") }));
@@ -11264,7 +11268,11 @@ export function LayerlingEditor({
     if (options.record !== false) waxRecordRef.current();
     const current = waxupRef.current;
     const arch = waxArch();
-    const shells = waxShells.current;
+    // Build 103: the set this wax-up names (its teeth as loaded), and never a set made for the other arch
+    // - confirming the position placed an upper set on the lower teeth.
+    const setArch = current.builtIn.find((set) => set.id === current.setId)?.arch;
+    if (setArch && setArch !== current.slot) return;
+    const shells = (current.setId ? waxShellsById.current.get(current.setId) : undefined) ?? (current.setId ? null : waxShells.current);
     const found = arch ? waxFound[arch.shape.id] : undefined;
     // Build 94: on the patient's teeth when they were found (the scan as it was then), else from the landmarks.
     const onTeeth = current.fit === "teeth" && found && found.chosen.length && arch && found.input.length === arch.scan.length ? { fdi: found.fdi, chosen: found.chosen, arch: arch.slot, ideal: current.ideal, ...(current.red !== null ? { red: current.red } : {}), centralRatio: current.centralRatio, ...(current.arcDepth !== null ? { arcDepth: current.arcDepth } : {}), adjust: waxAdjustWithSet(current, found.chosen), blend: current.stage === "adapted" } : undefined;
