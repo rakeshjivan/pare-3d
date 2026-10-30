@@ -64,6 +64,7 @@ const DENTAL_VIEWS: readonly DentalView[] = ["occlusal", "front", "left", "right
 export type DentalAreaTool = "paint" | "erase" | "lassoAdd" | "lassoRemove";
 
 /** Fork (build 47): Dental Studio - raw intraoral scans to printable models, one arch or a pair with its bite. */
+type ModelStepId = "scans" | "prepare" | "model" | "base" | "articulator" | "label";
 type WaxStepId = "scans" | "trim" | "find" | "choose" | "set" | "place" | "adjust" | "occlusion" | "sculpt" | "make";
 
 export function DentalStudioPanel({
@@ -357,9 +358,48 @@ export function DentalStudioPanel({
     </div>
   ) : null;
   const inWaxStep = (id: WaxStepId) => !waxSteps || waxStep === id;
+  /**
+   * Build 104: Model Builder one step at a time too - Scans, Prepare, Model, Base, Articulator (a pair)
+   * and Label, with Back and Next, as Wax-up - instead of every card at once. Make models is on the last.
+   */
+  const mbSteps: ModelStepId[] | null = !waxStudio ? ["scans", "prepare", "model", "base", ...(pair ? ["articulator" as const] : []), "label"] : null;
+  const [mbStepId, setMbStepId] = useState<ModelStepId>("scans");
+  const mbStep = mbSteps ? (mbSteps.includes(mbStepId) ? mbStepId : "label") : null;
+  const mbIndex = mbSteps && mbStep ? mbSteps.indexOf(mbStep) : -1;
+  const mbStepDone = (id: ModelStepId) => (id === "scans" ? scansDone : true);
+  const inMb = (id: ModelStepId) => !mbSteps || mbStep === id;
+  const mbLast = !mbSteps || mbIndex === mbSteps.length - 1;
+  const mbStepper = mbSteps && mbStep ? (
+    <div className="wax-stepper mb-stepper">
+      <ol className="wax-steps" aria-label={t("modelBuilder.steps")}>
+        {mbSteps.map((id, i) => {
+          const reachable = i <= mbIndex || mbSteps.slice(0, i).every((prev) => mbStepDone(prev));
+          return (
+            <li key={id}>
+              <button type="button" aria-current={id === mbStep ? "step" : undefined} className={`${id === mbStep ? "current" : ""}${i < mbIndex ? " done" : ""}`} disabled={!reachable || stage === "making"} onClick={() => setMbStepId(id)}>
+                <span className="wax-step-number" aria-hidden="true">{i < mbIndex ? <Check size={11} strokeWidth={3} /> : i + 1}</span>
+                <span className="wax-step-label">{t(`modelBuilder.step.${id}` as "modelBuilder.step.scans")}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="wax-step-head">
+        <strong>{t("waxStudio.stepOf", { n: mbIndex + 1, count: mbSteps.length, name: t(`modelBuilder.step.${mbStep}` as "modelBuilder.step.scans") })}</strong>
+      </div>
+    </div>
+  ) : null;
+  const mbStepButtons = mbSteps && mbStep ? (
+    <div className="wax-step-nav">
+      <button type="button" className="secondary" disabled={mbIndex <= 0 || stage === "making"} onClick={() => setMbStepId(mbSteps[mbIndex - 1])}><ArrowLeft size={16} /> {t("waxStudio.back")}</button>
+      {!mbLast ? (
+        <button type="button" className="primary" disabled={!mbStepDone(mbStep) || busy} onClick={() => setMbStepId(mbSteps[mbIndex + 1])}>{t("waxStudio.next")} <ArrowRight size={16} /></button>
+      ) : null}
+    </div>
+  ) : null;
   const waxPart: WaxupPart | null = waxStep && ["find", "choose", "set", "place", "adjust", "occlusion", "sculpt"].includes(waxStep) ? waxStep as WaxupPart : null;
   const card = (number: number, label: string, done: boolean, hint: string | null, summary: string | null, body: ReactNode) => {
-    const isFolded = !waxSteps && Boolean(folded[number]);
+    const isFolded = !waxSteps && !mbSteps && Boolean(folded[number]);
     return (
       <section className={`dental-section dental-card${isFolded ? " folded" : ""}${activeCard === number ? " current" : ""}${nextCard === number ? " next" : ""}`} aria-label={label} onPointerDownCapture={() => { setActiveCard(number); if (!visited[number]) setVisited((state) => ({ ...state, [number]: true })); }}>
         <button type="button" className="dental-card-head" aria-expanded={!isFolded} onClick={() => setFolded((state) => ({ ...state, [number]: !isFolded }))}>
@@ -393,7 +433,7 @@ export function DentalStudioPanel({
     </div>
   );
   return (
-    <MovableToolPanel className="edge-modifier-panel dental-studio-panel" ariaLabel={title}>
+    <MovableToolPanel className={`edge-modifier-panel dental-studio-panel${mbSteps ? " mb-steps" : ""}${waxSteps ? " wax-steps-on" : ""}`} ariaLabel={title}>
       {(handleProps) => (<>
       <div className="edge-modifier-header movable" title={t("panel.moveHint")} {...handleProps}>
         <div>
@@ -422,6 +462,7 @@ export function DentalStudioPanel({
       ) : (<>
       {/* Build 94: Wax-up Studio's two choices, above the steps: the workflow and the arches. */}
       {waxStepper}
+      {mbStepper}
       {waxStudio && inWaxStep("scans") ? (
         <div className="wax-studio-choices">
           {choice(t("waxStudio.flow"), waxStudio.flow, [["waxup", t("waxStudio.flowWaxup")], ["imt", t("waxStudio.flowImt")]], waxStudio.onFlow, t("waxStudio.flowHint"))}
@@ -432,7 +473,7 @@ export function DentalStudioPanel({
       {/* Build 75: the Studio in step cards - scans, preparing them (trim, then the teeth), what the model
           is for, its base, the articulator (a pair), its name. A card folds to one line; the one last
           worked in is marked. */}
-      {inWaxStep("scans") ? card(1, t("dental.step1"), scansDone, t("dental.step1Hint"), scansSummary, (<>
+      {inWaxStep("scans") && inMb("scans") ? card(1, t("dental.step1"), scansDone, t("dental.step1Hint"), scansSummary, (<>
         <div className="dental-slots">
           {parts.length === 0 ? <p className="dental-status" role="status">{t("dental.noScans")}</p> : null}
           {parts.length === 0 ? <a className="dental-guide-link" href={DENTAL_GUIDE_PDF} download={DENTAL_GUIDE_FILE}><FileDown size={15} aria-hidden="true" /> {t("dental.guidePdfFirst")}</a> : null}
@@ -472,7 +513,7 @@ export function DentalStudioPanel({
         </div>
       </>)) : null}
 
-      {inWaxStep("trim") ? card(2, t("dental.step2Prepare"), scansDone, null, prepareSummary, (<>
+      {inWaxStep("trim") && inMb("prepare") ? card(2, t("dental.step2Prepare"), scansDone, null, prepareSummary, (<>
         <div className="dental-substep">
           <h4 className="dental-substep-title">{t("dental.trimStep")}</h4>
           <p className="blend-hint">{t("dental.trimHint")}</p>
@@ -549,12 +590,12 @@ export function DentalStudioPanel({
           <WaxupCard part={waxPart} view={waxup.view} actions={{ ...waxup.actions, onConfirm: () => { setWaxAuto(false); goWax(waxup.view.manual ? "sculpt" : "adjust"); } }} slots={{ upper: Boolean(slots.upper) && waxStudio?.arches !== "lower", lower: Boolean(slots.lower) && waxStudio?.arches !== "upper" }} imt={waxStudio?.flow === "imt"} busy={busy || !analysis} workspace={workspace} />
         </section>
       ) : null}
-      {waxup && !waxSteps ? card(3, t(waxStudio ? "waxup.stepStudio" : "waxup.step"), waxup.view.placed.length > 0, t(waxStudio ? "waxup.stepStudioHint" : "waxup.stepHint"), waxupSummary(waxup.view), (
+      {waxup && !waxSteps && !mbSteps ? card(3, t(waxStudio ? "waxup.stepStudio" : "waxup.step"), waxup.view.placed.length > 0, t(waxStudio ? "waxup.stepStudioHint" : "waxup.stepHint"), waxupSummary(waxup.view), (
         <WaxupCard view={waxup.view} actions={waxup.actions} slots={{ upper: Boolean(slots.upper) && waxStudio?.arches !== "lower", lower: Boolean(slots.lower) && waxStudio?.arches !== "upper" }} imt={waxStudio?.flow === "imt"} busy={busy || !analysis} workspace={workspace} />
       )) : null}
 
       {inWaxStep("make") ? (<>
-      {card(n(4), t("dental.step3"), scansDone, t("dental.step3Hint"), modelSummary, (<>
+      {inMb("model") ? card(n(4), t("dental.step3"), scansDone, t("dental.step3Hint"), modelSummary, (<>
         <div className="dental-presets" role="radiogroup" aria-label={t("dental.purpose")}>
           {([
             ["study", t("dental.study"), t("dental.studyHint")],
@@ -581,9 +622,9 @@ export function DentalStudioPanel({
           </>
         ) : null}
         <p className="blend-hint">{t(options.inside === "solid" ? (options.baseStyle === "ortho" ? "dental.orthoNote" : options.baseStyle === "plate" ? "dental.crownNote" : "dental.solidNote") : options.inside === "open" ? "dental.hollowNote" : "dental.closedNote")}</p>
-      </>))}
+      </>)) : null}
 
-      {card(n(5), t("dental.stepBase"), scansDone, t("dental.stepBaseHint"), baseSummary, (<>
+      {inMb("base") ? card(n(5), t("dental.stepBase"), scansDone, t("dental.stepBaseHint"), baseSummary, (<>
         {/* Build 66: each base as it looks from above. */}
         <div className="dental-picture-tiles" role="radiogroup" aria-label={t("dental.baseStyle")}>
           {([["clean", t("dental.cleanBase")], ["follow", t("dental.follow")], ["plate", t("dental.plate")], ["ortho", t("dental.orthoBase")], ["articulator", t("dental.articulatorBase")]] as Array<[DentalBaseStyle, string]>).map(([value, label]) => (
@@ -668,9 +709,9 @@ export function DentalStudioPanel({
 
           </div>
         ) : null}
-      </>))}
+      </>)) : null}
 
-      {pair ? card(n(6), t("dental.step4"), options.hinge, t("dental.step4Hint"), articSummary, (<>
+      {pair && inMb("articulator") ? card(n(6), t("dental.step4"), options.hinge, t("dental.step4Hint"), articSummary, (<>
             <label className="edge-modifier-check dental-hinge-check" title={t("dental.hingeHint")}>
               <input type="checkbox" checked={options.hinge} disabled={busy} onChange={(event) => onOptionsChange({ hinge: event.currentTarget.checked })} />
               <span>{t("dental.hinge")}</span>
@@ -701,7 +742,7 @@ export function DentalStudioPanel({
             {choice(t("dental.layout"), options.layout, [["print", t("dental.layoutPrint")], ["occlusion", t("dental.layoutOcclusion")]], (layout) => onOptionsChange({ layout }))}
       </>)) : null}
 
-      {card(n(pair ? 7 : 6), t("dental.stepName"), Boolean(options.label.trim()) || patientDetails === "remove", t("dental.stepNameHint"), nameSummary, (<>
+      {inMb("label") ? card(n(pair ? 7 : 6), t("dental.stepName"), Boolean(options.label.trim()) || patientDetails === "remove", t("dental.stepNameHint"), nameSummary, (<>
         {onPatientDetails ? choice(t("dental.patientDetails"), patientDetails, [["keep", t("dental.patientKeep")], ["remove", t("dental.patientRemove")]], onPatientDetails, t("dental.patientDetailsHint")) : null}
         {patientDetails === "remove" ? <p className="blend-hint">{t("dental.patientRemoveHint")}</p> : (<>
         <label className="dental-label-field">
@@ -710,23 +751,28 @@ export function DentalStudioPanel({
         </label>
         {options.label.trim() ? <p className="blend-hint">{t(options.baseStyle === "ortho" || options.baseStyle === "articulator" ? "dental.labelOrtho" : options.inside === "open" ? "dental.labelClosed" : "dental.labelPlate")}</p> : null}
         </>)}
-      </>))}
+      </>)) : null}
       </>) : null}
 
       {notes.map((note) => <p key={note} className="dental-status warn" role="status">{note}</p>)}
       {error ? <div className="edge-modifier-error" role="alert">{error}</div> : null}
       {/* Build 77: an error never leaves the person without a next move. */}
       {error ? <p className="dental-status dental-error-help" role="status">{t("dental.errorHelp")}</p> : null}
-      {nextStep && (!waxSteps || waxStep === "make") ? <p className="dental-next" role="status">{nextStep}</p> : null}
+      {nextStep && (!waxSteps || waxStep === "make") && mbLast ? <p className="dental-next" role="status">{nextStep}</p> : null}
       {waxStepButtons}
-      <div className="edge-modifier-footer">
-        {/* Build 79: while making, Cancel stops it. */}
-        <button type="button" className="secondary" onClick={onCancel}>{stage === "making" ? t("dental.stopMaking") : t("common.cancel")}</button>
-        {!waxSteps || waxStep === "make" ? <button type="button" className="primary" disabled={!ready} onClick={onApply}>
+      {mbLast ? null : mbStepButtons}
+      {mbLast ? <div className="edge-modifier-footer">
+        {/* Build 79: while making, Cancel stops it. Build 104: in Model Builder's steps, Back stands here on the last one (the panel's X closes it). */}
+        {mbSteps && stage !== "making" ? (
+          <button type="button" className="secondary" disabled={mbIndex <= 0} onClick={() => setMbStepId(mbSteps[mbIndex - 1])}><ArrowLeft size={16} /> {t("waxStudio.back")}</button>
+        ) : (
+          <button type="button" className="secondary" onClick={onCancel}>{stage === "making" ? t("dental.stopMaking") : t("common.cancel")}</button>
+        )}
+        {(!waxSteps || waxStep === "make") && mbLast ? <button type="button" className="primary" disabled={!ready} onClick={onApply}>
           {stage === "making" ? <LoaderCircle className="edge-modifier-spinner" size={17} /> : <Check size={17} />}
           {stage === "making" ? t("dental.working") : editing ? t("dental.updateModels") : t(pair ? "dental.applyPair" : "dental.apply")}
         </button> : null}
-      </div>
+      </div> : null}
       </>)}
       </>)}
     </MovableToolPanel>

@@ -1815,10 +1815,9 @@ export function SecondaryToolbar({
             </div>
             </div>
           ) : null}
-          <ViewLookSwitch />
+          {/* Build 104: CAD Studio is always light on the plate - no look or theme switches here. */}
           <SimpleModeSwitch />
           <InstantTips />
-          <ThemeSwitch />
         </div>
       </div>
     </div>

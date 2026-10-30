@@ -11708,7 +11708,7 @@ function applyGhost(state: ThreeState) {
 let beforeFrame: (() => void) | null = null;
 /** Build 87: set when only the sculpted surface changed this frame. */
 let sculptFrameOnly = false;
-const MESHMIXER_BACKGROUND = "#3e3d3b";
+const MESHMIXER_BACKGROUND = "#444240";
 const baseLight = new WeakMap<object, { ambient: number; key: number; fill: number; background: string }>();
 function applyViewLook(state: ThreeState | null) {
   if (!state) return;

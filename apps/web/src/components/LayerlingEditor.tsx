@@ -2023,16 +2023,20 @@ export function LayerlingEditor({
   const [snapGrid, setSnapGrid] = useState<GridSize>(() => normalizeSnapGrid(initialSnap));
   const [workplaneMode, setWorkplaneMode] = useState(false);
   const [topPanel, setTopPanel] = useState<TopPanel>(null);
-  // Build 104: a design of Dental Studio opens in its own Meshmixer-style frame, dark as Meshmixer is
-  // (the person's own theme comes back when they leave it).
+  // Build 104: both studios are light, whatever the app's theme (it comes back on leaving): CAD Studio in
+  // its Tinkercad colours on the plate, Dental Studio in Meshmixer's warm grey panels round its dark view.
   const dentalWorkspace = studio === "dental";
   const themePreferenceRef = useRef(themePreference);
   themePreferenceRef.current = themePreference;
+  // The editor stays mounted behind the start page, so this follows whether it is on screen.
   useEffect(() => {
-    if (!dentalWorkspace) return;
-    applyAppTheme("dark");
+    if (!editorOpen) return;
+    applyAppTheme("light");
     return () => applyAppTheme(themePreferenceRef.current);
-  }, [dentalWorkspace]);
+  }, [editorOpen]);
+  useEffect(() => {
+    if (editorOpen) setViewLook(dentalWorkspace ? "dark" : "plate");
+  }, [dentalWorkspace, editorOpen]);
   /** The icon tag window: an SVG file, its width and OK (the library's Icon tag). */
   const [iconTagPanelOpen, setIconTagPanelOpen] = useState(false);
   const [qrCodePanelOpen, setQrCodePanelOpen] = useState(false);
@@ -10495,7 +10499,7 @@ export function LayerlingEditor({
   // Build 86: Dental Studio opens on Meshmixer's dark background, so scans read as they do there from the
   // start (the switch at the top of the window changes it back).
   const dentalOpen = Boolean(dentalStudio);
-  useEffect(() => { if (dentalOpen) setViewLook("dark"); }, [dentalOpen]);
+  useEffect(() => { if (dentalOpen && dentalWorkspace) setViewLook("dark"); }, [dentalOpen, dentalWorkspace]);
   // A scan in a slot that changes (a trim, Undo, Redo) is looked at again.
   const dentalSlotKey = dentalStudio ? (Object.values(dentalStudio.slots).filter(Boolean) as string[]).map((id) => { const shape = shapes.find((candidate) => candidate.id === id); return shape ? `${id}:${shape.importedMesh?.positions.length ?? 0}:${scanFrameOf(shape.importedMesh) ? `f${shape.importedMesh?.biteLocked ? "L" : ""}` : `${shape.x}:${shape.z}`}` : `${id}:gone`; }).join("|") : "";
   const dentalSlotSeen = useRef("");
@@ -17853,7 +17857,7 @@ export function LayerlingEditor({
             const amount = Math.max(MIN_EDGE_MODIFIER_AMOUNT, Math.min(edgeModifierMaxAmount, value));
             return amount === current.amount ? current : { ...current, amount, preview: null, busy: current.selectedEdgeIds.length > 0, error: null };
           }) : undefined}
-          themePreference={themePreference}
+          themePreference="light"
           resolvedTheme={resolvedTheme}
           onThemePreferenceChange={onThemePreferenceChange}
           onExportSectionSvg={(axis, offset, frame) => void exportSectionSvg(axis, offset, frame)}

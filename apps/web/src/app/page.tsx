@@ -3041,7 +3041,7 @@ export default function Home() {
               editorOpen={view === "editor"}
               sharedProjectsEnabled={sharedProjectsEnabled}
               themePreference={themePreference}
-              resolvedTheme={resolvedTheme}
+              resolvedTheme="light"
               onThemePreferenceChange={setAppTheme}
             />
           </div>

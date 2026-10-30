@@ -67,6 +67,7 @@ export function DentalStart({ onScans, onPick, waxupShown }: { onScans: (files: 
     { title: t("home.slotUpper"), hint: t("home.slotUpperHint") },
     { title: t("home.slotLower"), hint: t("home.slotLowerHint") },
     { title: t("home.slotBite"), hint: t("home.slotBiteHint") },
+    { title: t("home.slotBite2"), hint: t("home.slotBite2Hint") },
   ];
   return (
     <div className="dental-start">

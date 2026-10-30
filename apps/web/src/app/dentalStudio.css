@@ -1,39 +1,51 @@
 /*
- * Build 104: Dental Studio's workspace, framed as Meshmixer is. The editor underneath is the same as
- * CAD Studio's; only its frame changes: the ribbon, the shape library and the footer give way to a slim
- * bar, a column of tools on the left and the open tool's settings docked beside it.
+ * Build 104: Dental Studio's workspace, framed as Meshmixer is: its warm light-grey column and panels
+ * around a flat dark-grey view, white fields, mauve-grey action buttons, dark text. The editor
+ * underneath is CAD Studio's; only its frame changes - the ribbon, the shape library, the camera
+ * column and the footer give way to a slim bar, a column of tools and the open tool's settings.
  */
 .layerling-editor.studio-dental {
-  --editor-toolbar-height: 48px;
+  --editor-toolbar-height: 44px;
   --editor-footer-height: 0px;
-  --dental-column: 76px;
+  --dental-column: 80px;
   --dental-dock: 0px;
   /* CAD Studio's docked Shapes panel is not in this frame. */
   --shape-dock-width: 0px;
-  --dc-bar: #1c1f23;
-  --dc-column: #23262b;
-  --dc-line: #33383f;
-  --dc-text: #e7e9ec;
-  --dc-muted: #a3a9b2;
-  --dc-hover: #2e3238;
-  --dc-accent: #35c2ae;
-  --dc-accent-soft: rgba(53, 194, 174, 0.16);
-  --dc-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Meshmixer's colours. */
+  --mm-chrome: #ede8e4;
+  --mm-chrome-2: #e4dfdb;
+  --mm-active: #ded9d5;
+  --mm-line: #cdc7c2;
+  --mm-line-soft: #ddd8d4;
+  --mm-panel: #f6f4f2;
+  --mm-field: #ffffff;
+  --mm-text: #2c2a28;
+  --mm-muted: #6b6864;
+  --mm-button: #afa19d;
+  --mm-button-hover: #a19490;
+  --mm-on-button: #ffffff;
+  --mm-view: #444240;
+  --mm-accent: #2f6bd3;
+  --mm-accent-soft: #dfe8f7;
+  --mm-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  background: var(--mm-view);
 }
 
 .layerling-editor.studio-dental.dental-docked {
-  --dental-dock: 400px;
+  --dental-dock: 384px;
 }
 
 /* What CAD Studio has and Dental Studio does without. */
 .studio-dental .secondary-toolbar,
 .studio-dental .dashboard-legal.editor-legal,
-.studio-dental .printer-picker {
+.studio-dental .printer-picker,
+.studio-dental .camera-controls {
   display: none !important;
 }
 
 .studio-dental .editor-body {
   inset: var(--editor-toolbar-height) 0 0 calc(var(--dental-column) + var(--dental-dock));
+  background: var(--mm-view);
 }
 
 /* ---------------------------------------------------------------- the bar */
@@ -46,12 +58,12 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 48px;
-  padding: 0 10px 0 14px;
-  color: var(--dc-text);
-  background: var(--dc-bar);
-  border-bottom: 1px solid var(--dc-line);
-  font-family: var(--dc-font);
+  height: 44px;
+  padding: 0 10px 0 12px;
+  color: var(--mm-text);
+  background: var(--mm-chrome);
+  border-bottom: 1px solid var(--mm-line);
+  font-family: var(--mm-font);
   font-size: 13.5px;
 }
 
@@ -68,7 +80,7 @@
   height: 10px;
   flex: none;
   border-radius: 3px;
-  background: var(--dc-accent);
+  background: #0a786c;
 }
 
 .dental-chrome-studio {
@@ -77,12 +89,12 @@
 }
 
 .dental-chrome-sep {
-  color: var(--dc-muted);
+  color: var(--mm-muted);
 }
 
 .dental-chrome-case {
   overflow: hidden;
-  color: var(--dc-muted);
+  color: var(--mm-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -94,17 +106,17 @@
 .dental-chrome-icon {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  color: var(--dc-text);
+  width: 32px;
+  height: 32px;
+  color: var(--mm-text);
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
 }
 
 .dental-chrome-icon:hover:not(:disabled) {
-  background: var(--dc-hover);
+  background: var(--mm-active);
 }
 
 .dental-chrome-icon:disabled {
@@ -116,36 +128,36 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 32px;
+  height: 30px;
   margin-left: 6px;
   padding: 0 12px;
-  color: var(--dc-text);
-  background: transparent;
-  border: 1px solid var(--dc-line);
-  border-radius: 8px;
-  font: 600 13px var(--dc-font);
+  color: var(--mm-text);
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  border-radius: 6px;
+  font: 600 13px var(--mm-font);
   white-space: nowrap;
   cursor: pointer;
 }
 
 .dental-chrome-button:hover {
-  background: var(--dc-hover);
+  background: #ffffff;
 }
 
 .dental-chrome-button.primary {
-  color: #08201c;
-  background: var(--dc-accent);
+  color: var(--mm-on-button);
+  background: var(--mm-button);
   border-color: transparent;
 }
 
 .dental-chrome-button.primary:hover {
-  background: #52d0be;
+  background: var(--mm-button-hover);
 }
 
 /* ---------------------------------------------------------------- the tool column */
 .dental-chrome-column {
   position: fixed;
-  top: 48px;
+  top: 44px;
   bottom: 0;
   left: 0;
   z-index: 58;
@@ -154,15 +166,26 @@
   gap: 2px;
   width: var(--dental-column);
   box-sizing: border-box;
-  padding: 8px 6px;
-  color: var(--dc-text);
-  background: var(--dc-column);
-  border-right: 1px solid var(--dc-line);
-  font-family: var(--dc-font);
+  padding: 8px 4px;
+  color: var(--mm-text);
+  background: var(--mm-chrome);
+  border-right: 1px solid var(--mm-line);
+  font-family: var(--mm-font);
 }
 
 .dental-chrome-tool-wrap {
   position: relative;
+}
+
+/* Meshmixer's dividers between groups of tools: after Import, and before Export. */
+.dental-chrome-tool-wrap:nth-child(1)::after,
+.dental-chrome-tool-wrap:nth-last-child(3)::after {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 1px;
+  margin: 4px auto;
+  background: #928c89;
 }
 
 .dental-chrome-tool {
@@ -172,48 +195,56 @@
   align-items: center;
   gap: 5px;
   width: 100%;
-  padding: 10px 2px 8px;
-  color: var(--dc-muted);
+  padding: 9px 2px 7px;
+  color: var(--mm-text);
   background: transparent;
   border: 0;
-  border-radius: 9px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
 }
 
 .dental-chrome-tool:hover:not(:disabled),
-.dental-chrome-tool.open {
-  color: var(--dc-text);
-  background: var(--dc-hover);
+.dental-chrome-tool.open,
+.dental-chrome-tool.active {
+  background: var(--mm-active);
 }
 
 .dental-chrome-tool.active {
-  color: var(--dc-accent);
-  background: var(--dc-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--mm-line);
 }
 
 .dental-chrome-tool:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: default;
 }
 
+/* Meshmixer's icons sit on soft grey spheres. */
 .dental-chrome-tool-icon {
   display: grid;
   place-items: center;
-  height: 24px;
+  width: 42px;
+  height: 42px;
+  color: #4a4644;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #d8d3cf 60%, #b9b3ae);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.dental-chrome-tool.active .dental-chrome-tool-icon {
+  color: #0a786c;
 }
 
 .dental-chrome-tool-label {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   line-height: 1.15;
   text-align: center;
 }
 
 .dental-chrome-test {
   padding: 0 5px;
-  color: #ffb27a;
-  border: 1px solid rgba(255, 178, 122, 0.45);
+  color: #a1430a;
+  background: #fff1e6;
   border-radius: 99px;
   font-size: 9px;
   font-weight: 600;
@@ -224,86 +255,76 @@
 .dental-chrome-more {
   position: absolute;
   top: 8px;
-  right: 4px;
-  opacity: 0.6;
+  right: 3px;
+  opacity: 0.5;
 }
 
 .dental-chrome-column-foot {
-  margin-top: auto;
-  display: grid;
-  place-items: center;
-  height: 24px;
-  color: var(--dc-line);
+  display: none;
 }
 
 .dental-chrome-flyout {
   position: absolute;
   top: 0;
-  left: calc(100% + 10px);
+  left: calc(100% + 8px);
   z-index: 70;
   display: flex;
   flex-direction: column;
   width: 280px;
-  padding: 6px;
-  color: var(--dc-text);
-  background: #2a2e34;
-  border: 1px solid var(--dc-line);
-  border-radius: 12px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
-  animation: dental-fly 0.12s ease-out;
-}
-
-@keyframes dental-fly {
-  from { opacity: 0; transform: translateX(-4px); }
-  to { opacity: 1; transform: none; }
+  padding: 4px;
+  color: var(--mm-text);
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  border-radius: 4px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
 }
 
 .dental-chrome-flyout-title {
-  padding: 8px 10px 6px;
-  color: var(--dc-muted);
-  font-size: 11px;
+  margin: -4px -4px 4px;
+  padding: 8px 12px;
+  background: var(--mm-chrome);
+  border-bottom: 1px solid var(--mm-line);
+  font-size: 13.5px;
   font-weight: 650;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
 }
 
 .dental-chrome-flyout button {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 9px 10px;
-  color: var(--dc-text);
+  padding: 8px 10px;
+  color: var(--mm-text);
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: 4px;
   text-align: left;
-  font-family: var(--dc-font);
+  font-family: var(--mm-font);
   cursor: pointer;
 }
 
 .dental-chrome-flyout button svg {
   flex: none;
   margin-top: 2px;
-  color: var(--dc-accent);
+  color: var(--mm-muted);
 }
 
 .dental-chrome-flyout button:hover:not(:disabled) {
-  background: var(--dc-hover);
+  background: var(--mm-active);
 }
 
 .dental-chrome-flyout button.active {
-  background: var(--dc-accent-soft);
+  background: var(--mm-accent-soft);
 }
 
 .dental-chrome-flyout button:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: default;
 }
 
 .dental-chrome-flyout button span {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .dental-chrome-flyout strong {
@@ -312,14 +333,14 @@
 }
 
 .dental-chrome-flyout small {
-  color: var(--dc-muted);
+  color: var(--mm-muted);
   font-size: 12px;
 }
 
-/* ---------------------------------------------------------------- the docked panel */
+/* ---------------------------------------------------------------- the docked panel, as Meshmixer's */
 .studio-dental .dental-studio-panel {
   position: fixed !important;
-  top: 48px !important;
+  top: 44px !important;
   right: auto !important;
   bottom: 0 !important;
   left: var(--dental-column) !important;
@@ -328,21 +349,319 @@
   max-width: none !important;
   max-height: none !important;
   box-sizing: border-box;
+  padding: 0 16px 16px !important;
   transform: none !important;
+  color: var(--mm-text) !important;
+  background: var(--mm-chrome) !important;
   border: 0 !important;
-  border-right: 1px solid var(--dc-line) !important;
+  border-right: 1px solid var(--mm-line) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
-  background: #1f2227 !important;
-  font-family: var(--dc-font);
+  font-family: var(--mm-font);
+  font-size: 13.5px;
+  line-height: 1.45;
 }
 
-/* The panel's title bar is no handle while it is docked. */
 .studio-dental .dental-studio-panel .edge-modifier-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 -16px 0;
+  padding: 12px 16px 10px;
+  background: var(--mm-chrome-2);
+  border-bottom: 1px solid var(--mm-line);
   cursor: default;
 }
 
+.studio-dental .dental-studio-panel .edge-modifier-header strong {
+  color: var(--mm-text);
+  font: 650 15px/1.25 var(--mm-font);
+}
+
+.studio-dental .dental-studio-panel .edge-modifier-header span {
+  color: var(--mm-muted);
+  font-size: 12px;
+}
+
+.studio-dental .dental-studio-panel .panel-header-actions button,
+.studio-dental .dental-studio-panel .panel-header-actions a {
+  color: var(--mm-muted);
+}
+
+/* Steps: small tabs in a row. */
+.studio-dental .dental-studio-panel .wax-stepper {
+  margin: 12px 0 4px;
+}
+
+.studio-dental .dental-studio-panel .wax-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.studio-dental .dental-studio-panel .wax-steps button {
+  height: 26px;
+  padding: 0 9px 0 4px;
+  color: var(--mm-muted);
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.studio-dental .dental-studio-panel .wax-steps button.current {
+  color: var(--mm-text);
+  background: #ffffff;
+  border-color: #8f8884;
+  font-weight: 650;
+}
+
+.studio-dental .dental-studio-panel .wax-steps button.done {
+  color: var(--mm-text);
+}
+
+.studio-dental .dental-studio-panel .wax-steps .wax-step-number {
+  width: 18px;
+  height: 18px;
+  color: var(--mm-text);
+  background: var(--mm-active);
+}
+
+.studio-dental .dental-studio-panel .wax-steps button.current .wax-step-number {
+  color: #ffffff;
+  background: var(--mm-button);
+}
+
+.studio-dental .dental-studio-panel .wax-steps button.done .wax-step-number {
+  color: #ffffff;
+  background: #7f9c8d;
+}
+
+.studio-dental .dental-studio-panel.mb-steps .wax-step-head {
+  display: none;
+}
+
+/* The open step: one Meshmixer section - a light block with its title bar. */
+.studio-dental .dental-studio-panel .dental-card {
+  margin: 12px 0 0;
+  padding: 0 12px 12px;
+  background: var(--mm-panel) !important;
+  border: 1px solid var(--mm-line) !important;
+  border-radius: 3px;
+  box-shadow: none !important;
+}
+
+.studio-dental .dental-studio-panel .dental-card-head {
+  margin: 0 -12px 10px;
+  padding: 9px 12px;
+  background: var(--mm-chrome-2);
+  border-bottom: 1px solid var(--mm-line);
+}
+
+.studio-dental .dental-studio-panel.mb-steps .dental-card-head {
+  pointer-events: none;
+}
+
+.studio-dental .dental-studio-panel.mb-steps .dental-card-chevron,
+.studio-dental .dental-studio-panel.mb-steps .dental-step-number {
+  display: none;
+}
+
+.studio-dental .dental-studio-panel .dental-step-head .dental-step {
+  margin: 0;
+  color: var(--mm-text);
+  font: 650 14px/1.3 var(--mm-font);
+}
+
+.studio-dental .dental-studio-panel .dental-step-hint {
+  margin: 3px 0 0;
+  color: var(--mm-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.studio-dental .dental-studio-panel .dental-step-number {
+  color: var(--mm-text);
+  background: var(--mm-active);
+}
+
+.studio-dental .dental-studio-panel .dental-step-number.done {
+  color: #ffffff;
+  background: #7f9c8d;
+}
+
+.studio-dental .dental-studio-panel .blend-hint,
+.studio-dental .dental-studio-panel .dental-status {
+  color: var(--mm-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.studio-dental .dental-studio-panel .dental-status.warn {
+  color: #9a5b00;
+}
+
+.studio-dental .dental-studio-panel .dental-guide-link {
+  display: none;
+}
+
+.studio-dental .dental-studio-panel .dental-substep {
+  padding: 4px 0 6px;
+}
+
+.studio-dental .dental-studio-panel .dental-substep + .dental-substep {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--mm-line-soft);
+}
+
+.studio-dental .dental-studio-panel .dental-substep-title,
+.studio-dental .dental-studio-panel .dental-group,
+.studio-dental .dental-studio-panel .edge-modifier-label {
+  margin: 0 0 6px;
+  color: var(--mm-text);
+  font: 600 13px/1.3 var(--mm-font);
+}
+
+/* Fields: white, as Meshmixer's. */
+.studio-dental .dental-studio-panel .dental-slot label {
+  grid-template-columns: 84px 1fr;
+  color: var(--mm-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.studio-dental .dental-studio-panel select,
+.studio-dental .dental-studio-panel .dental-label-field input,
+.studio-dental .dental-studio-panel input[type="text"],
+.studio-dental .dental-studio-panel input[type="number"] {
+  height: 30px;
+  padding: 0 8px;
+  color: var(--mm-text);
+  background: var(--mm-field) !important;
+  border: 1px solid #b9b3ae;
+  border-radius: 3px;
+  font: 500 13px var(--mm-font);
+}
+
+.studio-dental .dental-studio-panel .dental-slot-info {
+  color: var(--mm-muted);
+  font-size: 12px;
+}
+
+/* Choices: white tiles; the chosen one in Meshmixer's selection blue. */
+.studio-dental .dental-studio-panel .dental-import,
+.studio-dental .dental-studio-panel .dental-trim-mode button,
+.studio-dental .dental-studio-panel .dental-trim-buttons button,
+.studio-dental .dental-studio-panel .shell-opening-options button,
+.studio-dental .dental-studio-panel .dental-presets button,
+.studio-dental .dental-studio-panel .dental-picture-tiles button,
+.studio-dental .dental-studio-panel .dental-swap,
+.studio-dental .dental-studio-panel .dental-views button,
+.studio-dental .dental-studio-panel .dental-more {
+  min-height: 30px;
+  color: var(--mm-text);
+  background: var(--mm-field) !important;
+  border: 1px solid #c3bdb8 !important;
+  border-radius: 3px;
+  box-shadow: none !important;
+  font: 500 13px/1.3 var(--mm-font);
+}
+
+.studio-dental .dental-studio-panel .dental-import:hover:not(:disabled),
+.studio-dental .dental-studio-panel .dental-trim-mode button:hover:not(:disabled),
+.studio-dental .dental-studio-panel .dental-trim-buttons button:hover:not(:disabled),
+.studio-dental .dental-studio-panel .shell-opening-options button:hover:not(:disabled),
+.studio-dental .dental-studio-panel .dental-presets button:hover:not(:disabled),
+.studio-dental .dental-studio-panel .dental-picture-tiles button:hover:not(:disabled) {
+  border-color: #8f8884 !important;
+}
+
+.studio-dental .dental-studio-panel .dental-trim-mode button.active,
+.studio-dental .dental-studio-panel .dental-trim-buttons button.active,
+.studio-dental .dental-studio-panel .shell-opening-options button.active,
+.studio-dental .dental-studio-panel .dental-presets button.active,
+.studio-dental .dental-studio-panel .dental-picture-tiles button.active {
+  color: var(--mm-text);
+  background: var(--mm-accent-soft) !important;
+  border-color: var(--mm-accent) !important;
+  font-weight: 600;
+}
+
+.studio-dental .dental-studio-panel .dental-presets button span {
+  color: var(--mm-muted);
+}
+
+.studio-dental .dental-studio-panel .edge-modifier-check {
+  color: var(--mm-text);
+  font-size: 13px;
+}
+
+.studio-dental .dental-studio-panel input[type="checkbox"],
+.studio-dental .dental-studio-panel input[type="range"] {
+  accent-color: #8f8884;
+}
+
+.studio-dental .dental-studio-panel .dental-next {
+  color: var(--mm-text);
+  border-left-color: var(--mm-button) !important;
+}
+
+/* Back / Next and the footer: Meshmixer's mauve-grey buttons. */
+.studio-dental .dental-studio-panel .wax-step-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.studio-dental .dental-studio-panel .wax-step-nav button,
+.studio-dental .dental-studio-panel .edge-modifier-footer button {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 3px;
+  font: 600 13px var(--mm-font);
+}
+
+.studio-dental .dental-studio-panel .wax-step-nav button.secondary,
+.studio-dental .dental-studio-panel .edge-modifier-footer button.secondary {
+  color: var(--mm-text);
+  background: var(--mm-field);
+  border: 1px solid #c3bdb8;
+}
+
+.studio-dental .dental-studio-panel .wax-step-nav button.primary,
+.studio-dental .dental-studio-panel .edge-modifier-footer button.primary {
+  color: var(--mm-on-button);
+  background: var(--mm-button);
+  border: 1px solid transparent;
+}
+
+.studio-dental .dental-studio-panel .wax-step-nav button.primary:hover:not(:disabled),
+.studio-dental .dental-studio-panel .edge-modifier-footer button.primary:hover:not(:disabled) {
+  background: var(--mm-button-hover);
+}
+
+.studio-dental .dental-studio-panel .wax-step-nav button.primary {
+  margin-left: auto;
+}
+
+.studio-dental .dental-studio-panel .wax-step-nav button:disabled,
+.studio-dental .dental-studio-panel .edge-modifier-footer button:disabled {
+  opacity: 0.45;
+}
+
+.studio-dental .dental-studio-panel > .edge-modifier-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+/* ---------------------------------------------------------------- around the view */
 /* The object list, top right as Meshmixer's Object Browser. */
 .studio-dental .outliner-panel:not(.floating) {
   top: 14px;
@@ -350,54 +669,50 @@
   left: auto;
 }
 
+.studio-dental .outliner-panel {
+  color: var(--mm-text);
+  background: var(--mm-chrome);
+  border-color: var(--mm-line);
+  border-radius: 3px;
+}
+
 /* Tool panels other than the docked one keep floating, clear of the bar. */
 .studio-dental .edge-modifier-panel:not(.dental-studio-panel):not(.floating) {
-  top: calc(48px + 14px);
+  top: calc(44px + 14px);
 }
 
-/* The bite contacts card sits in the 3D view, beside the docked panel. */
-.studio-dental .bite-contacts-card {
-  left: calc(var(--dental-column) + var(--dental-dock) + 76px);
-  bottom: 18px;
-}
-
-/* Messages stand beside the view cube, as in CAD Studio - right of the column and the docked panel. */
+/* Messages: bottom centre of the view, in a white box, as Meshmixer's hints. */
 .studio-dental .editor-status {
-  left: calc(var(--dental-column) + var(--dental-dock) + 104px);
+  top: auto;
+  bottom: 22px;
+  left: calc(var(--dental-column) + var(--dental-dock) + (100vw - var(--dental-column) - var(--dental-dock)) / 2);
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100vw - var(--dental-column) - var(--dental-dock) - 40px));
+  color: var(--mm-text);
+  background: #ffffff;
+  border: 1px solid var(--mm-line);
+  border-radius: 2px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
-/* The bite contacts card, in the frame's dark colours. */
+/* The bite contacts card, in the frame's colours. */
 .studio-dental .bite-contacts-card {
-  color: var(--dc-text);
-  background: #2a2e34;
-  border: 1px solid var(--dc-line);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
-}
-
-.studio-dental .bite-contacts-card button {
-  color: var(--dc-text);
+  left: calc(var(--dental-column) + var(--dental-dock) + 16px);
+  bottom: 18px;
+  color: var(--mm-text);
+  background: var(--mm-chrome);
+  border: 1px solid var(--mm-line);
+  border-radius: 3px;
 }
 
 .studio-dental .bite-contacts-card .bite-contacts-open {
-  color: var(--dc-text);
-  background: transparent;
-  border-color: var(--dc-line);
+  color: var(--mm-text);
+  background: var(--mm-field);
+  border-color: #c3bdb8;
+  border-radius: 3px;
 }
 
-/* Wax-up's step chips, in the frame's dark colours. */
-.studio-dental .wax-steps button {
-  color: var(--dc-text);
-  background: #2a2e34;
-  border-color: var(--dc-line);
-}
-
-.studio-dental .wax-steps button.current {
-  color: #8fb8ff;
-  background: rgba(110, 155, 255, 0.14);
-  border-color: #6e9bff;
-}
-
-.studio-dental .wax-steps .wax-step-number {
-  color: var(--dc-text);
-  background: #3a3f46;
+.studio-dental .dental-studio-panel .dental-card-head {
+  box-sizing: border-box;
+  width: calc(100% + 24px);
 }

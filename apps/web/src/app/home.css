@@ -909,9 +909,10 @@ html[data-theme="dark"] .pare-home {
   color: var(--h-muted);
 }
 
+/* Upper and lower on the top row, the two bite scans below them. */
 .dental-drop-slots {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
