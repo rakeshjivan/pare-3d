@@ -9,6 +9,9 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Wax-up Studio (test builds): each wax tooth now ends exactly on the patient's gingival margin all round, with the patient's own emergence profile, scallop and papillae, blending into the ideal tooth above - and each ideal tooth is torqued about its edge (12° at most) so its cervical third stands over the patient's tooth, its edge where the design put it.",
       "The wax-up model's cut-back reaches into the embrasures between waxed teeth, and where the design is shorter than the patient's tooth the tooth is cut back past the design's edge, palatally too - no walls or steps beside or behind the ideal teeth.",
       "Bite contacts on made models are read correctly where the models overlap a lot.",
+      "Wax-up in two stages: Position shows the whole library teeth, see-through over the patient's, seen straight on; take hold of a tooth and drag it where you want it (Alt for fine), scroll over it to turn it (Shift: torque, Alt: tip), move the whole set (arch width, forward or back, midline, length), in chain or one tooth at a time. Confirm position, and Adapt fits the teeth to the patient's margins and surfaces.",
+      "Each tooth can now be made thicker or thinner (bucco-lingually) and larger or smaller as a whole, from its neck.",
+      "Eggshell provisional: once adapted, the wax-up teeth can be made into one thin shell (wall 0.3 to 1.5 mm), open at the necks, to print and reline over the preparations. It is added as its own part, ready to export.",
     ],
   },
   {

@@ -969,7 +969,7 @@ export function moveFrame(f: ToothFrame, m: THREE.Matrix4): ToothFrame {
 }
 
 /** Ways to adjust a placed wax tooth: along its frame, mm (or degrees for `turn`). */
-export type ToothNudge = "out" | "mesial" | "longer" | "wider" | "turn";
+export type ToothNudge = "out" | "mesial" | "longer" | "wider" | "turn" | "thicker" | "size";
 
 /**
  * Build 102: a wax tooth's own adjustment, in its frame (mesial towards the midline, out, up towards
@@ -978,8 +978,8 @@ export type ToothNudge = "out" | "mesial" | "longer" | "wider" | "turn";
  * the cervical end, both as factors). The same numbers on the other side's tooth mirror it (each
  * side's frame is the other's mirror image), which is how symmetry works.
  */
-export type ToothAdjust = { mesial?: number; out?: number; up?: number; turn?: number; tip?: number; torque?: number; wider?: number; longer?: number };
-export const isIdentityAdjust = (a: ToothAdjust) => !a.mesial && !a.out && !a.up && !a.turn && !a.tip && !a.torque && (a.wider ?? 1) === 1 && (a.longer ?? 1) === 1;
+export type ToothAdjust = { mesial?: number; out?: number; up?: number; turn?: number; tip?: number; torque?: number; wider?: number; longer?: number; thicker?: number };
+export const isIdentityAdjust = (a: ToothAdjust) => !a.mesial && !a.out && !a.up && !a.turn && !a.tip && !a.torque && (a.wider ?? 1) === 1 && (a.longer ?? 1) === 1 && (a.thicker ?? 1) === 1;
 /** The move an adjustment makes, for a tooth with this frame, width and length. */
 export function adjustMatrix(frame: ToothFrame, width: number, length: number, a: ToothAdjust): THREE.Matrix4 {
   void width;
@@ -994,7 +994,7 @@ export function adjustMatrix(frame: ToothFrame, width: number, length: number, a
     .multiply(new THREE.Matrix4().makeRotationZ(rad(a.turn ?? 0)))
     .multiply(new THREE.Matrix4().makeRotationY(rad(a.tip ?? 0)))
     .multiply(new THREE.Matrix4().makeRotationX(rad(a.torque ?? 0)))
-    .multiply(new THREE.Matrix4().makeScale(a.wider ?? 1, 1, 1))
+    .multiply(new THREE.Matrix4().makeScale(a.wider ?? 1, a.thicker ?? 1, 1))
     .multiply(new THREE.Matrix4().makeTranslation(0, 0, -centre))
     // Longer from the cervical end (length below the edge).
     .multiply(new THREE.Matrix4().makeTranslation(0, 0, -length))
@@ -1034,7 +1034,8 @@ export function mirrorAdjust(source: { frame: ToothFrame; width: number; length:
  * `frame`, given its `width` along the arch and `length` from edge to cervical end:
  * - out: straight out from the arch (negative: in); mesial: along the arch towards the midline;
  * - longer: the incisal edge further out of the gum, the cervical end staying where it is;
- * - wider: wider along the arch about its middle; turn: about its long axis, mesial side outward.
+ * - wider: wider along the arch about its middle; turn: about its long axis, mesial side outward;
+ * - thicker: bucco-lingually, and size: the whole tooth, both by a share (0.05 is 5%).
  */
 export function nudgeMatrix(frame: ToothFrame, width: number, length: number, nudge: ToothNudge, amount: number): THREE.Matrix4 {
   const o = new THREE.Vector3(...frame.origin), out = new THREE.Vector3(...frame.out), mesial = new THREE.Vector3(...frame.mesial), up = new THREE.Vector3(...frame.up);
@@ -1052,6 +1053,14 @@ export function nudgeMatrix(frame: ToothFrame, width: number, length: number, nu
   if (nudge === "wider") {
     const k = Math.max(0.3, (width + amount) / Math.max(0.5, width));
     return basis.clone().multiply(new THREE.Matrix4().makeScale(k, 1, 1)).multiply(inverse);
+  }
+  // Build 103 (Meshmixer's non-uniform and uniform scale): `amount` a share (0.05 is 5%).
+  if (nudge === "thicker") return basis.clone().multiply(new THREE.Matrix4().makeScale(1, Math.max(0.5, 1 + amount), 1)).multiply(inverse);
+  if (nudge === "size") {
+    const k = Math.max(0.5, 1 + amount);
+    // Larger about the cervical end, so the tooth stays seated on the gum.
+    const about = new THREE.Matrix4().makeTranslation(0, 0, -length).multiply(new THREE.Matrix4().makeScale(k, k, k)).multiply(new THREE.Matrix4().makeTranslation(0, 0, length));
+    return basis.clone().multiply(about).multiply(inverse);
   }
   return basis.clone().multiply(new THREE.Matrix4().makeRotationZ(THREE.MathUtils.degToRad(amount))).multiply(inverse);
 }

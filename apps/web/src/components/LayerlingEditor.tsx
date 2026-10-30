@@ -67,7 +67,7 @@ import { AVERAGE_ARTICULATOR } from "@/lib/waxOcclusion";
 import { BUILT_IN_FINDER, finderBytes, loadStoredFinder, storeFinder } from "@/lib/toothFinderStore";
 import { toothColour, transferLabels, type ScanTeeth } from "@/lib/toothSegment";
 import { smoothOpenEdges } from "@/lib/edgeSmooth";
-import { transformSoup } from "@/lib/dentalMesh";
+import { solidPositions, toManifold, transformSoup, weld, type ManifoldSolid } from "@/lib/dentalMesh";
 import { BUILT_IN_LIBRARIES, loadToothLibrary, loadToothSet, type ToothLibraryManifest } from "@/lib/toothLibrary";
 import { exocadSets } from "@/lib/exocadLibrary";
 import { composeAdjust, ToothGimbal } from "@/components/workplane/ToothGimbal";
@@ -137,6 +137,7 @@ import { checkBeforeSending, CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, PrintCheckP
 import { belowBedCutter } from "@/lib/cutBelowBed";
 import { fillHoleAt, isManifoldSolid, makeSolidPositions, meshHealth, pendingMeshChecks, shapeWithWorldPositions, tidyOpenSurface } from "@/lib/meshRepair";
 import { worldTriangles } from "@/lib/blend";
+import { eggshellTooth } from "@/lib/dentalEggshell";
 import { NearestSurface, DeviationProbe } from "@/lib/nearestSurface";
 import { repairStlPositions } from "@/lib/stlRepair";
 import { checkForPrinting, type PrintIssue } from "@/lib/printCheck";
@@ -11331,6 +11332,8 @@ export function LayerlingEditor({
           else if (nudge === "turn") a.turn = (a.turn ?? 0) + amount;
           else if (nudge === "wider") a.wider = Math.max(0.5, (a.wider ?? 1) * (first.waxTooth!.width + amount) / Math.max(0.5, first.waxTooth!.width));
           else if (nudge === "longer") a.longer = Math.max(0.5, (a.longer ?? 1) * (first.waxTooth!.length + amount) / Math.max(0.5, first.waxTooth!.length));
+          else if (nudge === "thicker") a.thicker = Math.max(0.5, (a.thicker ?? 1) * (1 + amount));
+          else if (nudge === "size") { const k = 1 + amount; a.wider = Math.max(0.5, (a.wider ?? 1) * k); a.longer = Math.max(0.5, (a.longer ?? 1) * k); a.thicker = Math.max(0.5, (a.thicker ?? 1) * k); }
           adjust[n] = a;
         }
         return { ...current, adjust };
@@ -11354,7 +11357,8 @@ export function LayerlingEditor({
       const rebuilt = shapeWithWorldPositions(shape, triangles);
       const back = localToWorld(rebuilt);
       if (!back) continue;
-      const width = tooth.width + (nudge === "wider" ? amount : 0), length = tooth.length + (nudge === "longer" ? amount : 0);
+      const grow = nudge === "size" ? 1 + amount : 1;
+      const width = (tooth.width + (nudge === "wider" ? amount : 0)) * grow, length = (tooth.length + (nudge === "longer" ? amount : 0)) * grow;
       changed.set(shape.id, canonicalizeShape({ ...rebuilt, waxTooth: { fdi: tooth.fdi, width, length, frame: moveFrame(moveFrame(frame, move), back.clone().invert()) } }));
     }
     if (!changed.size) return;
@@ -11409,7 +11413,7 @@ export function LayerlingEditor({
     const merge = (a: ToothAdjust): ToothAdjust => {
       const next: ToothAdjust = { ...a };
       for (const key of ["mesial", "out", "up", "turn", "tip", "torque"] as const) if (change[key]) next[key] = (next[key] ?? 0) + change[key]!;
-      for (const key of ["wider", "longer"] as const) if (change[key] !== undefined) next[key] = Math.max(0.5, (next[key] ?? 1) * change[key]!);
+      for (const key of ["wider", "longer", "thicker"] as const) if (change[key] !== undefined) next[key] = Math.max(0.5, (next[key] ?? 1) * change[key]!);
       return next;
     };
     if (waxupRef.current.fit === "teeth") {
@@ -11474,6 +11478,53 @@ export function LayerlingEditor({
    * - mirrorSide: every tooth on the selected tooth's side mirrored onto the other side;
    * - resetTooth / resetAll: the adjustment taken away (on the patient's teeth).
    */
+  /**
+   * Build 103: an eggshell provisional from the adapted wax teeth (exocad's anatomy extraction for an
+   * eggshell): each tooth's outer surface with an even wall inward, open at the neck, joined into one
+   * splinted shell and added beside the wax-up as a part of its own, ready to export.
+   */
+  const makeEggshell = useCallback(async (wall: number) => {
+    const arch = waxArch();
+    if (!arch) return;
+    const teeth = waxTeethOf(arch.shape.id).flatMap((shape) => {
+      const toWorld = shape.waxTooth ? localToWorld(shape) : null;
+      return shape.waxTooth && toWorld ? [{ shape, fdi: shape.waxTooth.fdi, up: moveFrame(shape.waxTooth.frame, toWorld).up }] : [];
+    });
+    if (!teeth.length) return;
+    setWaxup((current) => ({ ...current, busy: true }));
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 30));
+      const shells = teeth.flatMap((tooth) => {
+        const shell = eggshellTooth(worldTriangles(tooth.shape), tooth.up, wall);
+        return shell ? [shell] : [];
+      });
+      if (!shells.length) { setNotice(t("waxup.eggshellNone")); return; }
+      // Joined into one piece where the teeth touch; laid side by side if the join cannot be made.
+      let positions: number[] = shells.flatMap((shell) => Array.from(shell));
+      try {
+        const runtime = await getManifoldRuntime();
+        let joined: ManifoldSolid | null = null;
+        for (const shell of shells) {
+          const solid = toManifold(runtime, weld(shell, 1e-6));
+          joined = joined ? runtime.Manifold.union(joined, solid) : solid;
+        }
+        if (joined && !joined.isEmpty()) positions = Array.from(solidPositions(joined));
+      } catch {
+        // The shells as they are.
+      }
+      // Named along the arch, right to left (13-23, 43-33).
+      const along = (fdi: number) => (Math.floor(fdi / 10) === 1 || Math.floor(fdi / 10) === 4 ? -1 : 1) * (fdi % 10);
+      const fdis = teeth.map((tooth) => tooth.fdi).sort((a, b) => along(a) - along(b));
+      const name = t("waxup.eggshellName", { from: fdis[0], to: fdis[fdis.length - 1] });
+      const template = teeth[0].shape;
+      const made = canonicalizeShape({ ...shapeWithWorldPositions({ ...template, dental: undefined, waxTooth: undefined, waxFor: undefined }, positions), id: createLocalId("mesh"), name, color: "#f2efe6", hidden: false });
+      commitShapes([...shapesRef.current, made], [made.id], t("waxup.eggshellMade", { name }));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setWaxup((current) => ({ ...current, busy: false }));
+    }
+  }, [commitShapes, t]); // eslint-disable-line react-hooks/exhaustive-deps
   const waxHelper = useCallback((kind: "level" | "arc" | "mirrorTooth" | "mirrorSide" | "resetTooth" | "resetAll") => {
     const arch = waxArch();
     if (!arch) return;
@@ -11810,6 +11861,27 @@ export function LayerlingEditor({
     const totals = [`${shape.waxTooth.fdi}`, mm("mesial"), mm("out"), mm("up"), deg("turn"), deg("tip"), deg("torque"), `${w.toFixed(1)} × ${l.toFixed(1)} mm (${Math.round((w / Math.max(0.1, l)) * 100)}%)`].filter(Boolean).join(" · ");
     return { id: shape.id, totals, tooth: { frame: moveFrame(shape.waxTooth.frame, toWorld), width: w, length: l } };
   })();
+  // Build 103: entering Position with the teeth placed, the view frames the front teeth from the front
+  // (their average labial direction) - close enough to place a tooth precisely.
+  const waxFramed = useRef("");
+  const waxFrameKey = dentalStudio?.waxStudio && waxup.stage === "position" && waxup.placed.length && !waxup.busy ? `${waxup.slot}:${waxup.placed.map((tooth) => tooth.id).join(",")}` : "";
+  useEffect(() => {
+    if (!waxFrameKey || waxFramed.current === waxFrameKey.split(":")[0] + waxup.placed.length) return;
+    waxFramed.current = waxFrameKey.split(":")[0] + waxup.placed.length;
+    const teeth = shapesRef.current.filter((shape) => shape.dental === "wax" && !shape.hidden && shape.waxTooth && waxup.placed.some((tooth) => tooth.id === shape.id));
+    const out = new THREE.Vector3(), up = new THREE.Vector3();
+    for (const shape of teeth) {
+      const toWorld = localToWorld(shape);
+      if (!toWorld) continue;
+      const frame = moveFrame(shape.waxTooth!.frame, toWorld);
+      out.add(new THREE.Vector3(...frame.out)); up.add(new THREE.Vector3(...frame.up));
+    }
+    if (out.lengthSq() < 1e-9) return;
+    // Straight from the front, as the dentist judges the front teeth.
+    void up;
+    const from = out.normalize();
+    window.layerlingShowParts?.(teeth.map((shape) => shape.id), [from.x, from.y, from.z]);
+  }, [waxFrameKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // Build 103: the teeth taken hold of in Position (their triangles in the scene, read when first needed).
   const waxDragCache = useRef(new Map<string, { shape: WorkplaneShape; tris: Float32Array }>());
   const waxDragTeeth: DragTooth[] = !dentalStudio?.waxStudio || waxup.stage !== "position" ? [] : shapes.flatMap((shape) => {
@@ -18149,6 +18221,7 @@ export function LayerlingEditor({
               onSelect: (id) => setSelectedIds([id]),
               onNudge: nudgeWaxTooth,
               onHelper: waxHelper,
+              onEggshell: (wall: number) => { void makeEggshell(wall); },
               onSetMove: (patch) => { waxRecord(true); setWaxup((current) => ({ ...current, setMove: { ...current.setMove, ...patch } })); },
               onChain: (chain) => setWaxup((current) => ({ ...current, chain })),
               onConfirm: () => setWaxup((current) => ({ ...current, stage: "adapted" })),

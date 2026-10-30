@@ -6,7 +6,8 @@
  * only ever adds; Make joins it to the model.
  */
 import { AlertTriangle, Check, LoaderCircle, Upload } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { EGGSHELL_MAX_WALL, EGGSHELL_MIN_WALL, EGGSHELL_WALL } from "@/lib/dentalEggshell";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { t } from "@/lib/i18n";
 import type { MessageKey } from "@/lib/messages.en";
@@ -100,6 +101,8 @@ export type WaxupActions = {
   onChain: (on: boolean) => void;
   onConfirm: () => void;
   onStage: (stage: "position" | "adapted") => void;
+  /** Build 103: an eggshell provisional from the adapted teeth, with this wall (mm). */
+  onEggshell: (wall: number) => void;
   onMirror: (on: boolean) => void;
   onAlternate: (on: boolean) => void;
   onLoadFinder: (file: File) => void;
@@ -118,6 +121,8 @@ export type WaxupActions = {
 /** One click of an adjusting button: mm, or degrees for a turn. */
 export const WAX_NUDGE = 0.25;
 export const WAX_TURN = 2;
+/** Build 103: thicker and the whole tooth larger, a share a click (5%). */
+export const WAX_SCALE_STEP = 0.05;
 
 /** The landmark clicked at each step, in order. */
 export const WAXUP_LANDMARKS = ["waxup.pickMidline", "waxup.pickCanine1", "waxup.pickCanine2"] as const;
@@ -143,6 +148,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
   const show = (which: WaxupPart) => !part || part === which;
   const file = useRef<HTMLInputElement>(null);
   const finderFile = useRef<HTMLInputElement>(null);
+  const [eggshellWall, setEggshellWall] = useState(EGGSHELL_WALL);
   const working = busy || view.busy;
   // Build 94: the sets for the arch being waxed (and any whose arch is not known).
   const sets = view.builtIn.filter((set) => !set.arch || set.arch === view.slot);
@@ -353,7 +359,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
             {selectedTooth ? (
               <div className="waxup-adjust" role="group" aria-label={t("waxup.adjustTooth", { fdi: selectedTooth.fdi })}>
                 <h5>{t("waxup.adjustTooth", { fdi: selectedTooth.fdi })}</h5>
-                {([["out", "waxup.in", "waxup.out", WAX_NUDGE], ["mesial", "waxup.distal", "waxup.mesial", WAX_NUDGE], ["longer", "waxup.shorter", "waxup.longer", WAX_NUDGE], ["wider", "waxup.narrower", "waxup.wider", WAX_NUDGE], ["turn", "waxup.turnIn", "waxup.turnOut", WAX_TURN]] as const).map(([nudge, less, more, step]) => (
+                {([["out", "waxup.in", "waxup.out", WAX_NUDGE], ["mesial", "waxup.distal", "waxup.mesial", WAX_NUDGE], ["longer", "waxup.shorter", "waxup.longer", WAX_NUDGE], ["wider", "waxup.narrower", "waxup.wider", WAX_NUDGE], ["thicker", "waxup.thinner", "waxup.thicker", WAX_SCALE_STEP], ["size", "waxup.smaller", "waxup.larger", WAX_SCALE_STEP], ["turn", "waxup.turnIn", "waxup.turnOut", WAX_TURN]] as const).map(([nudge, less, more, step]) => (
                   <div key={nudge} className="waxup-adjust-row">
                     <button type="button" disabled={working} onClick={() => actions.onNudge(selectedTooth.id, nudge, -step)}>{t(less)}</button>
                     <button type="button" disabled={working} onClick={() => actions.onNudge(selectedTooth.id, nudge, step)}>{t(more)}</button>
@@ -418,6 +424,17 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
             {cutBack.length ? <p className="dental-status" role="status">{t("waxup.cutBack", { teeth: cutBack.map((tooth) => `${tooth.fdi} (${tooth.reduce!.toFixed(1)} mm)`).join(", ") })}</p> : null}
             {lengthening.length ? <p className="dental-status warn" role="status">{t("waxup.lengthening", { teeth: lengthening.map((tooth) => `${tooth.fdi} (${tooth.lengthening.toFixed(1)} mm)`).join(", ") })}</p> : null}
             <p className="blend-hint">{t("waxup.adaptHint")}</p>
+            {/* Build 103: the eggshell provisional - the adapted teeth as a thin shell, open at the necks. */}
+            {view.stage === "adapted" ? (
+              <div className="waxup-helpers" role="group" aria-label={t("waxup.eggshell")}>
+                <h5>{t("waxup.eggshell")}</h5>
+                <EdgeModifierSlider label={t("waxup.eggshellWall")} value={eggshellWall} min={EGGSHELL_MIN_WALL} max={EGGSHELL_MAX_WALL} step={0.1} unit="mm" workspace={workspace} onChange={(value) => setEggshellWall(Math.max(EGGSHELL_MIN_WALL, Math.min(EGGSHELL_MAX_WALL, value)))} />
+                <div className="dental-trim-buttons">
+                  <button type="button" className="secondary" disabled={working} title={t("waxup.eggshellHint")} onClick={() => actions.onEggshell(eggshellWall)}>{t("waxup.eggshellMake")}</button>
+                </div>
+                <p className="blend-hint">{t("waxup.eggshellHint")}</p>
+              </div>
+            ) : null}
             {thin.length ? <p className="dental-status warn" role="status">{t("waxup.thin", { teeth: thin.map((tooth) => tooth.fdi).sort().join(", "), mm: WAX_THIN })}</p> : null}
             {imt ? <p className="dental-status" role="note">{t("waxup.imtModels", { first: first.map((tooth) => tooth.fdi).join(", ") || "-" })}</p> : null}
             {!imt && first.length && first.length < sorted.length ? (

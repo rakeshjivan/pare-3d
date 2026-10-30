@@ -61,14 +61,14 @@ const SIZES: GimbalHandle[] = ["wider", "longer"];
 export function composeAdjust(a: ToothAdjust, b: ToothAdjust): ToothAdjust {
   const out: ToothAdjust = { ...a };
   for (const key of ["mesial", "out", "up", "turn", "tip", "torque"] as const) if (b[key]) out[key] = (out[key] ?? 0) + b[key]!;
-  for (const key of ["wider", "longer"] as const) if (b[key] !== undefined) out[key] = (out[key] ?? 1) * b[key]!;
+  for (const key of ["wider", "longer", "thicker"] as const) if (b[key] !== undefined) out[key] = (out[key] ?? 1) * b[key]!;
   return out;
 }
 export function clampAdjustChange(c: ToothAdjust): ToothAdjust {
   const out: ToothAdjust = {};
   for (const key of ["mesial", "out", "up"] as const) if (c[key] !== undefined) out[key] = Math.max(-MOVE_MAX, Math.min(MOVE_MAX, c[key]!));
   for (const key of ["turn", "tip", "torque"] as const) if (c[key] !== undefined) out[key] = Math.max(-TURN_MAX, Math.min(TURN_MAX, c[key]!));
-  for (const key of ["wider", "longer"] as const) if (c[key] !== undefined) out[key] = Math.max(SIZE_MIN, Math.min(SIZE_MAX, c[key]!));
+  for (const key of ["wider", "longer", "thicker"] as const) if (c[key] !== undefined) out[key] = Math.max(SIZE_MIN, Math.min(SIZE_MAX, c[key]!));
   return out;
 }
 const isEmpty = (c: ToothAdjust) => !Object.entries(c).some(([key, v]) => typeof v === "number" && (SIZES.includes(key as GimbalHandle) ? Math.abs(v - 1) > 1e-5 : Math.abs(v) > 1e-6));

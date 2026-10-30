@@ -4,7 +4,7 @@
  * Build 103: in Position, the library teeth are moved by taking hold of them. Press on a tooth: it is
  * selected and follows the pointer in the plane of the screen - seen from the front, along the arch
  * and up or down; from above, along and out - so it goes where the hand goes, from any view. Shift
- * holds it to up and down. The wheel over a tooth turns it about its long axis (Shift: torque, Alt:
+ * holds it to up and down, Alt moves it a fifth as far as the pointer (fine). The wheel over a tooth turns it about its long axis (Shift: torque, Alt:
  * tip), a degree a notch. The tooth follows at once (`onPreview`); the change is kept when it is let
  * go, or a moment after the last notch (`onCommit`). A press that misses every tooth is left to the
  * view (orbit, pan), so the camera works as always.
@@ -18,6 +18,8 @@ export type DragTooth = { id: string; frame: ToothFrame; triangles: () => Float3
 /** Degrees per wheel notch, and with Shift (coarse) the same: torque and tip are by the notch too. */
 const WHEEL_DEGREES = 1;
 const SETTLE_MS = 600;
+/** Alt held while dragging: the tooth moves this share of the pointer's way. */
+const FINE = 0.2;
 
 /** Where a ray first meets a soup of triangles (distance along it), or null. */
 function hitDistance(o: V, d: V, tris: Float32Array): number | null {
@@ -95,7 +97,9 @@ export function WaxToothDrag({ teeth, onSelect, onPreview, onCommit }: {
       const delta: V = [p[0] - drag.point[0], p[1] - drag.point[1], p[2] - drag.point[2]];
       const f = drag.tooth.frame;
       const along = (axis: readonly number[]) => delta[0] * axis[0] + delta[1] * axis[1] + delta[2] * axis[2];
-      drag.change = drag.vertical || event.shiftKey ? { up: along(f.up) } : { mesial: along(f.mesial), out: along(f.out), up: along(f.up) };
+      // Alt: five times finer than the pointer (a fine adjustment at any zoom).
+      const k = event.altKey ? FINE : 1;
+      drag.change = drag.vertical || event.shiftKey ? { up: along(f.up) * k } : { mesial: along(f.mesial) * k, out: along(f.out) * k, up: along(f.up) * k };
       live.current.onPreview(drag.tooth.id, drag.change);
     };
     const onUp = (event: PointerEvent) => {
