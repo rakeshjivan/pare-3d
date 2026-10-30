@@ -29,6 +29,8 @@ copy_app() { # destination
   cp -R "$EXPORT" "$1"
   rm -f "$1/store.php" "$1/sitemap.xml" "$1/robots.txt"
   echo "$BUILD" > "$1/pare-build.txt"
+  # Build 103: a test build says so (and which one), so it updates to newer test builds only.
+  if [ -n "${PARE_PREVIEW:-}" ]; then echo "$PARE_PREVIEW" > "$1/pare-preview.txt"; fi
 }
 
 rm -rf "$OUT" && mkdir -p "$OUT"
@@ -104,7 +106,7 @@ tar -czf "$OUT/Pare-3D-Linux.tar.gz" -C "$WORK/linux" "Pare 3D"
 copy_app "$WORK/update"
 COPYFILE_DISABLE=1 tar -czf "$OUT/Pare-3D-app.tar.gz" -C "$WORK/update" .
 if command -v sha256sum >/dev/null 2>&1; then SHA=$(sha256sum "$OUT/Pare-3D-app.tar.gz" | cut -d' ' -f1); else SHA=$(shasum -a 256 "$OUT/Pare-3D-app.tar.gz" | cut -d' ' -f1); fi
-printf '{"build":%s,"version":"%s","minRuntime":%s,"sha256":"%s"}\n' "$BUILD" "$VERSION" "$MIN_RUNTIME" "$SHA" > "$OUT/pare3d-update.json"
+printf '{"build":%s,"preview":%s,"version":"%s","minRuntime":%s,"sha256":"%s"}\n' "$BUILD" "${PARE_PREVIEW:-0}" "$VERSION" "$MIN_RUNTIME" "$SHA" > "$OUT/pare3d-update.json"
 cat "$OUT/pare3d-update.json"
 
 ls -lh "$OUT"

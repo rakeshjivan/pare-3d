@@ -4,6 +4,12 @@
  * Asks GitHub at most every six hours; a build of 0 (a local build) never asks.
  */
 export const PARE_BUILD = Number(process.env.NEXT_PUBLIC_PARE_BUILD || 0) || 0;
+/** Build 103: a test build's number (0 for a public build); test builds update to newer test builds only. */
+export const PARE_PREVIEW = Number(process.env.NEXT_PUBLIC_PARE_PREVIEW || 0) || 0;
+/** Which app files are newer: the build, then (test builds) the test number - as the app's server ranks them. */
+export const pareRank = (build: number, preview = 0) => build * 100000 + (preview || 0);
+/** "103", or "103 (test build 118)". */
+export const pareBuildLabel = (build: number, preview = 0) => (preview ? `${build} (test build ${preview})` : String(build));
 const RELEASES_API = "https://api.github.com/repos/rakeshjivan/pare-3d/releases/latest";
 export const RELEASES_PAGE = "https://github.com/rakeshjivan/pare-3d/releases/latest";
 const CACHE_KEY = "pare3d.updateCheck";
@@ -46,6 +52,8 @@ export async function checkPareUpdate(fetchFn: typeof fetch = fetch): Promise<Pa
     }
     return fromServer;
   }
+  // A test build is not pointed at the public release (it would lose what is in testing).
+  if (PARE_PREVIEW) return null;
   let latest: { build: number; url: string; at: number } | null = null;
   try {
     const cached = JSON.parse(window.localStorage.getItem(CACHE_KEY) || "null");

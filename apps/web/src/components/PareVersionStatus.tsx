@@ -4,18 +4,18 @@ import { CheckCircle2, Download, LoaderCircle, RefreshCw, WifiOff } from "lucide
 import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
-import { PARE_BUILD, RELEASES_PAGE, parseBuildTag } from "@/lib/pareUpdate";
+import { PARE_BUILD, PARE_PREVIEW, RELEASES_PAGE, pareBuildLabel, pareRank, parseBuildTag } from "@/lib/pareUpdate";
 
 /** Fork: the build number, for next to the tagline ("Build 12"; "dev" for a local build). */
 export function PareBuildBadge({ className = "" }: { className?: string }) {
   useLanguage();
-  return <span className={`pare-build-badge ${className}`} title={t("version.badgeTitle")}>{PARE_BUILD > 0 ? t("version.build", { build: PARE_BUILD }) : t("version.dev")}</span>;
+  return <span className={`pare-build-badge ${className}`} title={t("version.badgeTitle")}>{PARE_BUILD > 0 ? t("version.build", { build: pareBuildLabel(PARE_BUILD, PARE_PREVIEW) }) : t("version.dev")}</span>;
 }
 
 type Status =
   | { kind: "checking" }
   | { kind: "current" }
-  | { kind: "ready"; build: number }
+  | { kind: "ready"; build: string }
   | { kind: "download"; build: number }
   | { kind: "offline" }
   | { kind: "dev" };
@@ -39,10 +39,13 @@ export function PareVersionStatus() {
       try {
         const response = await fetch("/__pare3d/update", { cache: "no-store", signal: AbortSignal.timeout(4000) });
         if (response.ok && response.headers.get("x-pare3d") === "1") {
-          const state = (await response.json()) as { serving?: number; ready?: number; needsReinstall?: number; checking?: boolean; error?: string };
-          const newest = Math.max(Number(state.serving) || 0, Number(state.ready) || 0);
+          const state = (await response.json()) as { serving?: number; ready?: number; servingPreview?: number; readyPreview?: number; needsReinstall?: number; checking?: boolean; error?: string };
+          // Build 103: ranked as the server ranks them, so a newer test build of the same build counts.
+          const serving = { build: Number(state.serving) || 0, preview: Number(state.servingPreview) || 0 };
+          const ready = { build: Number(state.ready) || 0, preview: Number(state.readyPreview) || 0 };
+          const newest = pareRank(ready.build, ready.preview) > pareRank(serving.build, serving.preview) ? ready : serving;
           if ((Number(state.needsReinstall) || 0) > PARE_BUILD) next = { kind: "download", build: Number(state.needsReinstall) };
-          else if (newest > PARE_BUILD) next = { kind: "ready", build: newest };
+          else if (pareRank(newest.build, newest.preview) > pareRank(PARE_BUILD, PARE_PREVIEW)) next = { kind: "ready", build: pareBuildLabel(newest.build, newest.preview) };
           else if (state.checking || (!state.error && polls < 4)) {
             // The app checks a few seconds after it starts: keep asking until it has.
             next = { kind: "checking" };
@@ -52,6 +55,11 @@ export function PareVersionStatus() {
         }
       } catch {
         next = null;
+      }
+      if (!next && PARE_PREVIEW) {
+        // A test build in a plain browser: not compared with the public release.
+        next = { kind: "current" };
+        again = 0;
       }
       if (!next) {
         // Not the app (a plain browser): ask GitHub directly.
@@ -79,8 +87,8 @@ export function PareVersionStatus() {
   return (
     <div className={`pare-version-status ${status.kind}`} role="status">
       {status.kind === "checking" ? <><LoaderCircle size={15} className="spin" aria-hidden="true" />{t("version.checking")}</> : null}
-      {status.kind === "current" ? <><CheckCircle2 size={15} aria-hidden="true" />{t("version.current", { build: PARE_BUILD })}</> : null}
-      {status.kind === "offline" ? <><WifiOff size={15} aria-hidden="true" />{t("version.offline", { build: PARE_BUILD })}</> : null}
+      {status.kind === "current" ? <><CheckCircle2 size={15} aria-hidden="true" />{t("version.current", { build: pareBuildLabel(PARE_BUILD, PARE_PREVIEW) })}</> : null}
+      {status.kind === "offline" ? <><WifiOff size={15} aria-hidden="true" />{t("version.offline", { build: pareBuildLabel(PARE_BUILD, PARE_PREVIEW) })}</> : null}
       {status.kind === "ready" ? (
         <>
           <RefreshCw size={15} aria-hidden="true" />

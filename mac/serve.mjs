@@ -30,6 +30,9 @@ const port = Number(process.env.PORT || 47177);
 // download) on an older server, so minRuntime stays 4.
 const RUNTIME_VERSION = 6;
 const RELEASES_API = process.env.PARE3D_RELEASES_API || "https://api.github.com/repos/rakeshjivan/pare-3d/releases/latest";
+// Build 103: a test build (its app files carry pare-preview.txt) follows the test builds, never the
+// public release - which would take features in testing away - and the newest of them wins.
+const PREVIEWS_API = process.env.PARE3D_RELEASES_API || "https://api.github.com/repos/rakeshjivan/pare-3d/releases?per_page=30";
 // Only for the automated tests: lets a local test server stand in for GitHub.
 const TEST_ORIGIN = process.env.PARE3D_TEST_ORIGIN || "";
 const UPDATE_EVERY_MS = 6 * 60 * 60 * 1000;
@@ -42,7 +45,8 @@ const UPDATES_DIR = join(DATA_DIR, "updates");
 const DESIGNS_DIR = join(DATA_DIR, "designs");
 /** Files are looked up here in order: the newest app files first, the ones before as a fallback. */
 let roots = [bundledRoot];
-const updateState = { serving: 0, bundled: 0, ready: 0, needsReinstall: 0, checking: false, error: "" };
+// serving, bundled and ready are build numbers; a test build's rank adds its test number (servingRank, readyRank).
+const updateState = { serving: 0, bundled: 0, ready: 0, needsReinstall: 0, checking: false, error: "", preview: 0, servingPreview: 0, readyPreview: 0 };
 const EXPORT_DIR = join(homedir(), "Documents", "Pare 3D Exports");
 const BACKUP_DIR = join(homedir(), "Documents", "Pare 3D Backups");
 const BACKUP_KEEP_DAYS = 14;
@@ -427,24 +431,51 @@ async function buildOf(root) {
     return 0;
   }
 }
+/** A test build's number (pare-preview.txt), 0 for a public build. */
+async function previewOf(root) {
+  try {
+    const value = Number((await readFile(join(root, "pare-preview.txt"), "utf8")).trim());
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+/** Which app files are newer: the build, then (test builds) the test number. */
+const rankOf = (build, preview) => build * 100000 + (preview || 0);
+/** The folder an update is unpacked into: app-<build>, or app-<build>-<test> for a test build. */
+const folderOf = (build, preview) => (preview ? `app-${build}-${preview}` : `app-${build}`);
 
 /** At start: the newest complete app folder, the bundled one if nothing newer was installed. */
 async function chooseRoots() {
   updateState.bundled = await buildOf(bundledRoot);
-  let best = { root: bundledRoot, build: updateState.bundled };
+  updateState.preview = await previewOf(bundledRoot);
+  let best = { root: bundledRoot, build: updateState.bundled, preview: updateState.preview };
   try {
     for (const name of await readdir(UPDATES_DIR)) {
-      const match = /^app-(\d+)$/.exec(name);
+      const match = /^app-(\d+)(?:-(\d+))?$/.exec(name);
       if (!match) continue;
+      // A test build takes test builds only; a public build, public ones only.
+      if (Boolean(match[2]) !== Boolean(updateState.preview)) continue;
       const root = join(UPDATES_DIR, name);
-      const build = await buildOf(root);
-      if (build === Number(match[1]) && build > best.build && (await resolveIn(root, "/"))) best = { root, build };
+      const build = await buildOf(root), preview = await previewOf(root);
+      if (build === Number(match[1]) && preview === Number(match[2] || 0) && rankOf(build, preview) > rankOf(best.build, best.preview) && (await resolveIn(root, "/"))) best = { root, build, preview };
     }
   } catch {
     // No updates folder yet.
   }
   roots = best.root === bundledRoot ? [bundledRoot] : [best.root, bundledRoot];
   updateState.serving = best.build;
+  updateState.servingPreview = best.preview;
+}
+
+/** The release to update from: the public one, or for a test build the newest test build. */
+async function releaseToFollow() {
+  const response = await fetch(updateState.preview ? PREVIEWS_API : RELEASES_API, { headers: { accept: "application/vnd.github+json" } });
+  if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
+  const data = await response.json();
+  if (!Array.isArray(data)) return data;
+  const number = (release) => Number(/^pare-preview-(\d+)$/.exec(release.tag_name || "")?.[1] || 0);
+  return data.filter((release) => number(release) > 0 && !release.draft).sort((a, b) => number(b) - number(a))[0] || null;
 }
 
 /** Only files from GitHub's own release storage, over HTTPS. */
@@ -469,16 +500,19 @@ async function checkForUpdate() {
   if (updateState.checking || updateState.serving <= 0) return;
   updateState.checking = true;
   try {
-    const response = await fetch(RELEASES_API, { headers: { accept: "application/vnd.github+json" } });
-    if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
-    const release = await response.json();
+    const release = await releaseToFollow();
+    if (!release) return;
     const asset = (name) => (release.assets || []).find((entry) => entry.name === name)?.browser_download_url;
     const manifestUrl = asset("pare3d-update.json");
     const packageUrl = asset("Pare-3D-app.tar.gz");
     if (!manifestUrl || !packageUrl) return;
     const manifest = JSON.parse((await download(manifestUrl)).toString("utf8"));
     const build = Number(manifest.build);
-    if (!Number.isFinite(build) || build <= Math.max(updateState.serving, updateState.ready)) return;
+    const preview = updateState.preview ? Number(manifest.preview) || 0 : 0;
+    // A test build updates to a test build only (one without a test number would be a public one).
+    if (updateState.preview && !preview) return;
+    const current = Math.max(rankOf(updateState.serving, updateState.servingPreview), rankOf(updateState.ready, updateState.readyPreview));
+    if (!Number.isFinite(build) || rankOf(build, preview) <= current) return;
     if (Number(manifest.minRuntime || 1) > RUNTIME_VERSION) {
       // These app files need a newer launcher: the page offers the full download instead.
       updateState.needsReinstall = build;
@@ -488,8 +522,8 @@ async function checkForUpdate() {
     const digest = createHash("sha256").update(bytes).digest("hex");
     if (digest !== String(manifest.sha256).toLowerCase()) throw new Error("checksum does not match");
     await mkdir(UPDATES_DIR, { recursive: true });
-    const temp = join(UPDATES_DIR, `app-${build}.partial`);
-    const archive = join(UPDATES_DIR, `app-${build}.tar.gz`);
+    const temp = join(UPDATES_DIR, `${folderOf(build, preview)}.partial`);
+    const archive = join(UPDATES_DIR, `${folderOf(build, preview)}.tar.gz`);
     await rm(temp, { recursive: true, force: true });
     await mkdir(temp, { recursive: true });
     await writeFile(archive, bytes);
@@ -497,19 +531,21 @@ async function checkForUpdate() {
     const tar = platform() === "win32" ? join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe") : "tar";
     if (!(await run(tar, ["-xzf", archive, "-C", temp]))) throw new Error("could not unpack the update");
     await rm(archive, { force: true });
-    if ((await buildOf(temp)) !== build || !(await resolveIn(temp, "/"))) throw new Error("the update is incomplete");
-    const finalRoot = join(UPDATES_DIR, `app-${build}`);
+    if ((await buildOf(temp)) !== build || (await previewOf(temp)) !== preview || !(await resolveIn(temp, "/"))) throw new Error("the update is incomplete");
+    const finalRoot = join(UPDATES_DIR, folderOf(build, preview));
     await rm(finalRoot, { recursive: true, force: true });
     await rename(temp, finalRoot);
     // Served at once; the open page notices the new version and offers to reload.
     roots = [finalRoot, ...roots.filter((root) => root !== finalRoot)].slice(0, 2);
     updateState.ready = build;
     updateState.serving = build;
+    updateState.readyPreview = preview;
+    updateState.servingPreview = preview;
     updateState.error = "";
     // Older downloaded folders are no longer needed.
     for (const name of await readdir(UPDATES_DIR)) {
-      const match = /^app-(\d+)$/.exec(name);
-      if (match && Number(match[1]) < build && !roots.includes(join(UPDATES_DIR, name))) {
+      const match = /^app-(\d+)(?:-(\d+))?$/.exec(name);
+      if (match && rankOf(Number(match[1]), Number(match[2] || 0)) < rankOf(build, preview) && !roots.includes(join(UPDATES_DIR, name))) {
         await rm(join(UPDATES_DIR, name), { recursive: true, force: true }).catch(() => {});
       }
     }

@@ -40,6 +40,8 @@ jobs:
           NEXT_PUBLIC_PARE_BUILD: ${{ steps.build.outputs.number }}
           # Build 80: features in development are on in test builds (native-preview) only.
           NEXT_PUBLIC_PARE_WAXUP: ${{ github.ref_name == 'native-preview' && 'on' || 'off' }}
+          # Build 103: a test build knows its test number (it follows newer test builds only).
+          NEXT_PUBLIC_PARE_PREVIEW: ${{ github.ref_name == 'native-preview' && github.run_number || '' }}
           NEXT_PUBLIC_SUPPORT_HINT: "off"
           NEXT_PUBLIC_SOURCE_CODE_URL: https://github.com/${{ github.repository }}
         run: node scripts/build-static-export.mjs
@@ -47,6 +49,8 @@ jobs:
         with:
           dotnet-version: "8.0.x"
       - name: Package for Mac and Windows
+        env:
+          PARE_PREVIEW: ${{ github.ref_name == 'native-preview' && github.run_number || '' }}
         run: bash scripts/package-desktop.sh
       - name: Send to a slicer finds Mac apps
         run: bash scripts/mac-check-slicers.sh
