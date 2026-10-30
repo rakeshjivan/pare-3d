@@ -383,3 +383,21 @@
   background: transparent;
   border-color: var(--dc-line);
 }
+
+/* Wax-up's step chips, in the frame's dark colours. */
+.studio-dental .wax-steps button {
+  color: var(--dc-text);
+  background: #2a2e34;
+  border-color: var(--dc-line);
+}
+
+.studio-dental .wax-steps button.current {
+  color: #8fb8ff;
+  background: rgba(110, 155, 255, 0.14);
+  border-color: #6e9bff;
+}
+
+.studio-dental .wax-steps .wax-step-number {
+  color: var(--dc-text);
+  background: #3a3f46;
+}

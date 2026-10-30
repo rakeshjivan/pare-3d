@@ -5,17 +5,19 @@ summary: From a blank sheet to your first part for the 3D printer, in five minut
 
 Pare 3D is a free design program for 3D printing, for Mac and Windows. You build a part from simple shapes, cut holes into it, round the edges and send it to your slicer. If you have used Tinkercad you will feel at home; if you have used Fusion you will find its push/pull, fillet, shell, pattern and loft moves. There is nothing to sign up for, and what you build stays on your computer. How to install it is in [Installing, updates and where things are saved](chapter:offline-and-install).
 
-![The start page of Pare 3D: "Create new 3D design" at the top, your designs and the quick guide below.](shot:start-page)
+![The Home page of Pare 3D: CAD Studio and Dental Studio side by side, your most recent work below.](shot:start-page)
 
 ## Creating a design
 
-Open Pare 3D. The start page has three big buttons: {{ui:dashboard.createDesign}}, **Continue last design** and {{ui:dashboard.importGeometry}}. Click {{ui:dashboard.createDesign}}: the editor opens with an empty workplane - the grid on which everything takes shape - and the Shapes panel open on the right.
+Open Pare 3D. The Home page shows the two studios side by side: **{{ui:home.cadStudio}}**, for parts, enclosures and prints, and **{{ui:home.dentalStudio}}**, for printable models from intraoral scans (see [Dental Studio](chapter:dental-studio)). Below them, **{{ui:home.recent}}** lists your most recent work from both. Click {{ui:home.newDesign}} on the CAD Studio card: the editor opens with an empty workplane - the grid on which everything takes shape - and the Shapes panel open on the right.
 
-The first time, the start page asks **New to 3D design?**. {{ui:firstRun.beginner}} starts in Simple mode: fewer tools, each with its name under it. {{ui:firstRun.tinkercad}} opens a page that shows where everything you know from Tinkercad is. {{ui:firstRun.experienced}} shows every tool. You can switch at any time with **Simple mode** at the top right.
+The bar across the top takes you between {{ui:home.tabHome}}, {{ui:home.cadStudio}} and {{ui:home.dentalStudio}}, and holds the search field ([[Ctrl]]+[[K]], or [[⌘]]+[[K]] on a Mac), the guides (the book), notifications - updates and backups - (the bell) and the settings (the cog). Each studio's page lists its own designs; a design's menu (⋮) can send it to the other studio.
 
-If you already have a file to continue with, use {{ui:dashboard.importGeometry}}. That works for Pare 3D designs (`.lyl`) as well as STL, OBJ, 3MF, STEP or SVG files.
+The first time, CAD Studio's page asks **New to 3D design?**. {{ui:firstRun.beginner}} starts in Simple mode: fewer tools, each with its name under it. {{ui:firstRun.tinkercad}} opens a page that shows where everything you know from Tinkercad is. {{ui:firstRun.experienced}} shows every tool. You can switch at any time with **Simple mode** at the top right.
 
-All your designs appear on the start page with a preview picture. They are saved automatically after every change, so there is no save button; **Saved** next to the design's name shows it happened. Pare 3D also backs them all up by itself every few minutes while they change: the line above **Designs** says where and when (Documents › Pare 3D Backups at first). {{ui:backupStrip.backUpNow}} makes a backup on the spot, {{ui:backupStrip.restore}} brings one back. More in [Files and saving](chapter:files-and-saving).
+If you already have a file to continue with, use {{ui:home.importCad}} on CAD Studio's page. That works for Pare 3D designs (`.lyl`) as well as STL, OBJ, 3MF, STEP or SVG files.
+
+All your designs appear on their studio's page with a preview picture. They are saved automatically after every change, so there is no save button; **Saved** next to the design's name shows it happened. Pare 3D also backs them all up by itself every few minutes while they change: the bell at the top of the Home page says where and when (Documents › Pare 3D Backups at first). {{ui:backupStrip.backUpNow}} makes a backup on the spot, {{ui:backupStrip.restore}} brings one back. More in [Files and saving](chapter:files-and-saving).
 
 ## The editor at a glance
 

@@ -9,7 +9,7 @@ An intraoral scan comes out of the scanner as an open surface: the teeth and gum
 
 For most cases you only need three clicks:
 
-1. Click **{{ui:dental.title}}** in the {{ui:editor.group.dental}} group of the toolbar, and **{{ui:dental.import}}** your upper and lower scans (and the bite scan, if you have one).
+1. On the Home page, click {{ui:home.newCase}} on the Dental Studio card (or drop the scans on Dental Studio's page), and **{{ui:dental.import}}** your upper and lower scans (and the bite scan, if you have one).
 2. Under **{{ui:dental.step3}}**, pick what the models are for: **{{ui:dental.study}}**, **{{ui:dental.ortho}}**, **{{ui:dental.aligner}}** or **{{ui:dental.crown}}**.
 3. Click **{{ui:dental.applyPair}}**.
 
@@ -21,7 +21,7 @@ The panel leads you through six numbered steps, top to bottom, each on a card of
 
 ## Step 1 · {{ui:dental.step1}}
 
-Click **{{ui:dental.title}}** in the {{ui:editor.group.dental}} group of the toolbar, or search for it with [[Ctrl]]+[[K]]. With no scans in the design yet, click **{{ui:dental.import}}** in the panel and pick the upper, lower and bite scans (STL, OBJ, PLY or 3MF) together; they go straight into the slots. Scans already in the design are picked up when the panel opens: file names with upper, lower or bite in them say which is which; otherwise Pare 3D works it out (scanners put the upper above the lower, and a palate or the width across the canines says upper). **{{ui:dental.swap}}** swaps them if it guessed wrong.
+Dental Studio has a workspace of its own, laid out like Meshmixer: a slim bar on top (Home, Undo, Redo, {{ui:home.sendToCad}} and Export), a column of tools down the left - {{ui:dentalChrome.import}}, {{ui:dentalChrome.modelBuilder}}, {{ui:dentalChrome.sculpt}}, {{ui:dentalChrome.edit}} (plane cut, make solid, fill holes, smooth, hollow, reduce, mirror), {{ui:dentalChrome.analysis}} (bite contacts, print check), {{ui:dentalChrome.objects}} and {{ui:dentalChrome.export}} - and the open tool's settings beside the column. A new case opens with **{{ui:dentalChrome.modelBuilder}}** ready; in a case you come back to, click it in the column. {{ui:home.sendToCad}} opens the same case in CAD Studio, with every modelling tool (to add a label or a stand, say); CAD Studio's **{{ui:home.sendToDental}}** brings it back. With no scans in the design yet, click **{{ui:dental.import}}** in the panel and pick the upper, lower and bite scans (STL, OBJ, PLY or 3MF) together; they go straight into the slots. Scans already in the design are picked up when the panel opens: file names with upper, lower or bite in them say which is which; otherwise Pare 3D works it out (scanners put the upper above the lower, and a palate or the width across the canines says upper). **{{ui:dental.swap}}** swaps them if it guessed wrong.
 
 **As the panel opens** Pare 3D welds each scan, removes broken triangles and loose pieces, fills the small holes and sets each arch up teeth up, with the occlusal plane level and the midline straight. A quadrant is recognised as one and set up along its own length. The arches stay exactly where the scanner put them, which is in occlusion when they came from the same scan. The panel says what it found for each scan and whether the arches are in occlusion.
 
@@ -153,7 +153,7 @@ The scans are kept with the models, hidden. Later, select a model and open **{{u
 
 ## {{ui:waxStudio.title}}
 
-**{{ui:waxStudio.command}}**, beside **{{ui:dental.title}}** on the toolbar, opens the same steps with a diagnostic wax-up in them. It is in test builds only for now, while its steps are made clearer. For now it waxes the anterior teeth - canine to canine, or premolar to premolar, the range IMT is used for; a posterior studio, for occlusal wax-ups, is to follow. Two choices sit above the steps: **{{ui:waxStudio.flow}}** - **{{ui:waxStudio.flowWaxup}}** or **{{ui:waxStudio.flowImt}}** - and **{{ui:waxStudio.arches}}**.
+**{{ui:waxStudio.command}}**, below **{{ui:dentalChrome.modelBuilder}}** in Dental Studio's column, opens the same steps with a diagnostic wax-up in them. It is in test builds only for now, while its steps are made clearer. For now it waxes the anterior teeth - canine to canine, or premolar to premolar, the range IMT is used for; a posterior studio, for occlusal wax-ups, is to follow. Two choices sit above the steps: **{{ui:waxStudio.flow}}** - **{{ui:waxStudio.flowWaxup}}** or **{{ui:waxStudio.flowImt}}** - and **{{ui:waxStudio.arches}}**.
 
 1. Load and trim the scans as for any model.
 2. **{{ui:waxup.findStep}}**: **{{ui:waxup.find}}** marks and numbers every tooth on the scan, in colour, in about ten seconds. The canine-to-canine teeth are chosen at first; click a tooth to add or leave it out. A number shown dashed was put right by the tooth's place in the arch - the network called it something else - so check it. The midline and canine tips are set from the teeth found; **{{ui:waxup.markAgain}}** sets them by hand instead.
