@@ -3026,6 +3026,13 @@ export default function Home() {
               }}
               onCreateProjectFromState={createProjectFromHistoryState}
               onNewDentalDesign={() => createAndOpenProject(undefined, [], "dental")}
+              studio={activeProject?.studio ?? "cad"}
+              onStudioChange={(studio) => {
+                if (!activeProjectId) return;
+                setProjects((current) => current.map((project) => (project.id === activeProjectId ? { ...project, studio, studioPinned: true } : project)));
+                // Back on the start page, the design is found on its new studio's page.
+                setDashboardSection(studio);
+              }}
               projectId={activeProjectId}
               projectName={activeProject?.name}
               projectCreatedAt={activeProject?.createdAt}

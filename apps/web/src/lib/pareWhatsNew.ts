@@ -9,6 +9,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "A new Home: CAD Studio and Dental Studio side by side, and your most recent work from both below. One bar across the top holds search (Ctrl or ⌘ + K), the guides, notifications (updates, backups) and settings.",
       "Each studio has its own page. CAD Studio lists your designs and folders. Dental Studio lists your cases and has a place to drop the scans - Pare 3D sorts upper, lower and bite and opens the case with Model Builder ready.",
       "Send a design to the other studio from its menu (⋮). Designs from earlier builds are sorted for you: the ones with dental work go to Dental Studio, the rest to CAD Studio.",
+      "Dental Studio has its own workspace, laid out like Meshmixer: a slim bar on top (Home, Undo, Redo, Send to CAD Studio, Export), a column of tools down the left - Import, Model Builder, Sculpt, Edit (plane cut, make solid, fill holes, smooth, hollow, reduce, mirror), Analysis (bite contacts, print check), Objects and Export - and the open tool's settings docked beside it. It is dark, as Meshmixer is; CAD Studio keeps your own theme.",
+      "CAD Studio no longer shows the dental tools; its Dental button sends the design to Dental Studio, and Dental Studio's Send to CAD Studio brings it back with all its parts and undo history.",
     ],
   },
   {

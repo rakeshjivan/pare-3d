@@ -91,6 +91,10 @@ import { RADIAL_TOOLS, SculptRadialMenu, radialIndex } from "./workplane/SculptR
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
 import { looksLikeDentalScan, type DentalAnalysis, type DentalRole, type DentalStudioInput, type DentalStudioOptions } from "@/lib/dentalModel";
+import { DentalChrome } from "./workplane/DentalChrome";
+import { WAXUP_ENABLED } from "@/lib/pareFeatures";
+import type { PareStudio } from "@/lib/pareStudio";
+import { applyAppTheme } from "@/lib/appTheme";
 import { DentalStudioPanel, dentalPreset, type DentalAreaTool, type DentalPreset, type DentalSlot, type DentalView } from "./workplane/DentalStudioPanel";
 import { ShellPanel } from "./workplane/ShellPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
@@ -1870,6 +1874,8 @@ export function LayerlingEditor({
   themePreference = "system",
   resolvedTheme = "light",
   onThemePreferenceChange,
+  studio = "cad",
+  onStudioChange,
 }: {
   initialAssets?: ProjectAsset[];
   initialShapes?: WorkplaneShape[];
@@ -1927,6 +1933,10 @@ export function LayerlingEditor({
   themePreference?: AppThemePreference;
   resolvedTheme?: ResolvedAppTheme;
   onThemePreferenceChange?: (preference: AppThemePreference) => void;
+  /** Build 104: the studio the design belongs to - Dental Studio has its own Meshmixer-style frame. */
+  studio?: PareStudio;
+  /** Build 104: send the open design to the other studio. */
+  onStudioChange?: (studio: PareStudio) => void;
 } = {}) {
   const initialSceneRef = useRef<WorkplaneShape[] | null>(null);
   if (initialSceneRef.current === null) {
@@ -2013,6 +2023,16 @@ export function LayerlingEditor({
   const [snapGrid, setSnapGrid] = useState<GridSize>(() => normalizeSnapGrid(initialSnap));
   const [workplaneMode, setWorkplaneMode] = useState(false);
   const [topPanel, setTopPanel] = useState<TopPanel>(null);
+  // Build 104: a design of Dental Studio opens in its own Meshmixer-style frame, dark as Meshmixer is
+  // (the person's own theme comes back when they leave it).
+  const dentalWorkspace = studio === "dental";
+  const themePreferenceRef = useRef(themePreference);
+  themePreferenceRef.current = themePreference;
+  useEffect(() => {
+    if (!dentalWorkspace) return;
+    applyAppTheme("dark");
+    return () => applyAppTheme(themePreferenceRef.current);
+  }, [dentalWorkspace]);
   /** The icon tag window: an SVG file, its width and OK (the library's Icon tag). */
   const [iconTagPanelOpen, setIconTagPanelOpen] = useState(false);
   const [qrCodePanelOpen, setQrCodePanelOpen] = useState(false);
@@ -17274,8 +17294,40 @@ export function LayerlingEditor({
   };
 
   return (
-    <div className={`layerling-editor ${historyViewState ? "history-view-active" : ""}`}>
+    <div className={`layerling-editor ${historyViewState ? "history-view-active" : ""}${dentalWorkspace ? " studio-dental" : ""}${dentalWorkspace && dentalStudio ? " dental-docked" : ""}`}>
+      {dentalWorkspace ? (
+        <DentalChrome
+          caseName={projectName}
+          canUndo={!splitSession && !projectInteractionActive && historyViewIndex === null && (historyIndex > 0 || Boolean(edgeModifier))}
+          canRedo={!splitSession && !projectInteractionActive && historyViewIndex === null && historyIndex < history.length - 1}
+          onUndo={undo}
+          onRedo={redo}
+          onHome={onHome ? leaveToDashboard : undefined}
+          onSendToCad={onStudioChange ? () => onStudioChange("cad") : undefined}
+          onImport={() => setTopPanel((current) => (current === "import" ? null : "import"))}
+          onExport={() => setTopPanel((current) => (current === "export" ? null : "export"))}
+          modelBuilder={{ active: Boolean(dentalStudio) && !dentalStudio?.waxStudio, onClick: () => openDentalModel(false) }}
+          waxup={WAXUP_ENABLED ? { active: Boolean(dentalStudio?.waxStudio), onClick: () => openDentalModel(true) } : null}
+          sculpt={{ active: Boolean(sculptTool), enabled: Boolean(sculptTool) || (!selectionLocked && selectedShapes.length === 1 && !selectedShapes[0].hole && !isNonSolidShapeKind(selectedShapes[0].kind)), onClick: toggleSculpt }}
+          editActions={[
+            { id: "planeCut", label: t("dentalChrome.planeCut"), hint: t("dentalChrome.planeCutHint"), onClick: toggleSplitMode, enabled: canSplitSelection || Boolean(splitSession), active: Boolean(splitSession) },
+            { id: "makeSolid", label: t("dentalChrome.makeSolid"), hint: t("dentalChrome.makeSolidHint"), onClick: () => window.dispatchEvent(new Event(MESH_CHECK_EVENT)), enabled: selectedShapes.length === 1 && offersMeshSimplify(selectedShape) },
+            { id: "fillHoles", label: t("dentalChrome.fillHoles"), hint: t("dentalChrome.fillHolesHint"), onClick: () => window.dispatchEvent(new Event(FILL_HOLE_EVENT)), enabled: selectedShapes.length === 1 && offersMeshSimplify(selectedShape) },
+            { id: "smooth", label: t("dentalChrome.smooth"), hint: t("dentalChrome.smoothHint"), onClick: toggleMeshRound, enabled: Boolean(meshRoundTool) || (!selectionLocked && selectedShapes.length === 1 && !selectedShapes[0].hole && !isNonSolidShapeKind(selectedShapes[0].kind)), active: Boolean(meshRoundTool) },
+            { id: "hollow", label: t("dentalChrome.hollow"), hint: t("dentalChrome.hollowHint"), onClick: startShellTool, enabled: hasSelection && !selectionLocked, active: Boolean(shellTool) },
+            { id: "reduce", label: t("dentalChrome.reduce"), hint: t("dentalChrome.reduceHint"), onClick: startSimplifyTool, enabled: selectedShapes.length === 1 && offersMeshSimplify(selectedShape) && !selectedShape?.locked, active: Boolean(simplifyToolShape) },
+            { id: "mirror", label: t("dentalChrome.mirror"), hint: t("dentalChrome.mirrorHint"), onClick: toggleMirrorMode, enabled: hasSelection && !selectionLocked, active: Boolean(mirrorMode) },
+          ]}
+          analysisActions={[
+            { id: "bite", label: t("dentalChrome.biteContacts"), hint: t("dentalChrome.biteContactsHint"), onClick: () => toggleBiteMap(!biteMap?.on), enabled: Boolean(biteMap?.on || biteCandidate), active: Boolean(biteMap?.on) },
+            { id: "printCheck", label: t("dentalChrome.printCheck"), hint: t("dentalChrome.printCheckHint"), onClick: () => setPrintCheck({ issues: runPrintCheck(), sending: null }), enabled: shapes.length > 0 },
+          ]}
+          objectsOpen={outlinerOpen}
+          onObjects={toggleOutliner}
+        />
+      ) : null}
       <SecondaryToolbar
+        onSendToDental={onStudioChange ? () => onStudioChange("dental") : undefined}
         toolbarMode={toolbarMode}
         projectId={projectId ?? null}
         projectName={projectName}

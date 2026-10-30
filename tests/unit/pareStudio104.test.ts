@@ -55,3 +55,31 @@ describe("build 104: the two studios", () => {
     expect(page).not.toMatch(/waxupShown=\{true\}/);
   });
 });
+
+describe("build 104: Dental Studio's workspace", () => {
+  const editor = readFileSync("apps/web/src/components/LayerlingEditor.tsx", "utf8");
+  const toolbar = readFileSync("apps/web/src/components/EditorSecondaryToolbar.tsx", "utf8");
+  const css = readFileSync("apps/web/src/app/dentalStudio.css", "utf8");
+
+  it("frames only a Dental Studio design, with Wax-up only in test builds", () => {
+    expect(editor).toContain('const dentalWorkspace = studio === "dental";');
+    expect(editor).toMatch(/\{dentalWorkspace \? \(\s*<DentalChrome/);
+    expect(editor).toContain("waxup={WAXUP_ENABLED ?");
+  });
+
+  it("keeps CAD Studio's toolbar, with the dental tools replaced by Send to Dental Studio", () => {
+    expect(toolbar).toMatch(/const dentalTools = onSendToDental \? \[/);
+    expect(editor).toContain('onSendToDental={onStudioChange ? () => onStudioChange("dental") : undefined}');
+  });
+
+  it("hides CAD Studio's ribbon, shape library and footer only inside the Dental Studio frame", () => {
+    expect(css).toMatch(/\.studio-dental \.secondary-toolbar,/);
+    expect(css).toContain("--shape-dock-width: 0px;");
+    // Every rule is scoped to the frame, so CAD Studio is untouched.
+    const selectors = css.replace(/\/\*[\s\S]*?\*\//g, "").match(/^[^@{}\n][^{}]*\{/gm) ?? [];
+    for (const selector of selectors) {
+      if (/^\s*(from|to)\s*\{/.test(selector)) continue;
+      expect(selector, selector).toMatch(/studio-dental|dental-chrome/);
+    }
+  });
+});

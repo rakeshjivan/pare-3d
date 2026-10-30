@@ -88,9 +88,9 @@ export function DentalStart({ onScans, onPick, waxupShown }: { onScans: (files: 
           <h2 id="dental-drop-title">{t("home.startCase")}</h2>
           <p>{t("home.startCaseHint")}</p>
         </div>
-        <div className="dental-slots">
+        <div className="dental-drop-slots">
           {slots.map((slot) => (
-            <button key={slot.title} type="button" className="dental-slot" onClick={onPick}>
+            <button key={slot.title} type="button" className="dental-drop-slot" onClick={onPick}>
               <Upload size={26} strokeWidth={1.6} aria-hidden="true" />
               <strong>{slot.title}</strong>
               <span>{slot.hint}</span>

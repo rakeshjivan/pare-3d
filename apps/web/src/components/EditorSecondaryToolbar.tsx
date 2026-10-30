@@ -364,6 +364,7 @@ export function SecondaryToolbar({
   addMoreShape,
   renderReadyParts,
   onLithophane,
+  onSendToDental,
   onTrace,
   traceOpen,
   onVoronoi,
@@ -512,6 +513,8 @@ export function SecondaryToolbar({
   renderReadyParts?: (close: () => void) => ReactNode;
   /** Fork: the lithophane and Voronoi makers. */
   onLithophane?: () => void;
+  /** Build 104: the dental tools live in Dental Studio; CAD Studio offers to send the design there. */
+  onSendToDental?: () => void;
   onTrace?: () => void;
   traceOpen?: boolean;
   onVoronoi?: () => void;
@@ -883,7 +886,9 @@ export function SecondaryToolbar({
     { id: "sculpt", label: t("sculpt.title"), icon: Brush, action: build33.onSculpt, enabled: build33.canRound || build33.sculptActive, active: build33.sculptActive },
   ];
   // Fork (build 47): Dental Studio, in a toolbar section of its own.
-  const dentalTools = [
+  const dentalTools = onSendToDental ? [
+    { id: "sendToDental", label: t("home.sendToDental"), icon: ForkToothIcon, action: onSendToDental, enabled: true, active: false },
+  ] : [
     { id: "dentalModel", label: t("dental.title"), icon: ForkToothIcon, action: () => window.dispatchEvent(new Event(DENTAL_MODEL_EVENT)), enabled: true, active: Boolean(dentalOpen) && !waxStudioOpen },
     // Build 94: Wax-up Studio, beside it - the same steps, with the wax-up. Build 95: in test builds
     // only, until its steps are clear and it does the work by itself.

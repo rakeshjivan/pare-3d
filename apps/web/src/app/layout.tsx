@@ -6,6 +6,7 @@ import "./viewCube.css";
 import "./fork.css";
 import "./shortcuts.css";
 import "./home.css";
+import "./dentalStudio.css";
 import { DiagnoseStrip } from "@/components/DiagnoseStrip";
 import { NewVersionNotice } from "@/components/NewVersionNotice";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";

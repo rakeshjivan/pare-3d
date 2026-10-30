@@ -1,0 +1,385 @@
+/*
+ * Build 104: Dental Studio's workspace, framed as Meshmixer is. The editor underneath is the same as
+ * CAD Studio's; only its frame changes: the ribbon, the shape library and the footer give way to a slim
+ * bar, a column of tools on the left and the open tool's settings docked beside it.
+ */
+.layerling-editor.studio-dental {
+  --editor-toolbar-height: 48px;
+  --editor-footer-height: 0px;
+  --dental-column: 76px;
+  --dental-dock: 0px;
+  /* CAD Studio's docked Shapes panel is not in this frame. */
+  --shape-dock-width: 0px;
+  --dc-bar: #1c1f23;
+  --dc-column: #23262b;
+  --dc-line: #33383f;
+  --dc-text: #e7e9ec;
+  --dc-muted: #a3a9b2;
+  --dc-hover: #2e3238;
+  --dc-accent: #35c2ae;
+  --dc-accent-soft: rgba(53, 194, 174, 0.16);
+  --dc-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.layerling-editor.studio-dental.dental-docked {
+  --dental-dock: 400px;
+}
+
+/* What CAD Studio has and Dental Studio does without. */
+.studio-dental .secondary-toolbar,
+.studio-dental .dashboard-legal.editor-legal,
+.studio-dental .printer-picker {
+  display: none !important;
+}
+
+.studio-dental .editor-body {
+  inset: var(--editor-toolbar-height) 0 0 calc(var(--dental-column) + var(--dental-dock));
+}
+
+/* ---------------------------------------------------------------- the bar */
+.dental-chrome-bar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 48px;
+  padding: 0 10px 0 14px;
+  color: var(--dc-text);
+  background: var(--dc-bar);
+  border-bottom: 1px solid var(--dc-line);
+  font-family: var(--dc-font);
+  font-size: 13.5px;
+}
+
+.dental-chrome-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  margin-left: 6px;
+}
+
+.dental-chrome-mark {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 3px;
+  background: var(--dc-accent);
+}
+
+.dental-chrome-studio {
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.dental-chrome-sep {
+  color: var(--dc-muted);
+}
+
+.dental-chrome-case {
+  overflow: hidden;
+  color: var(--dc-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dental-chrome-spacer {
+  flex: 1 1 12px;
+}
+
+.dental-chrome-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--dc-text);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.dental-chrome-icon:hover:not(:disabled) {
+  background: var(--dc-hover);
+}
+
+.dental-chrome-icon:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dental-chrome-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  margin-left: 6px;
+  padding: 0 12px;
+  color: var(--dc-text);
+  background: transparent;
+  border: 1px solid var(--dc-line);
+  border-radius: 8px;
+  font: 600 13px var(--dc-font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dental-chrome-button:hover {
+  background: var(--dc-hover);
+}
+
+.dental-chrome-button.primary {
+  color: #08201c;
+  background: var(--dc-accent);
+  border-color: transparent;
+}
+
+.dental-chrome-button.primary:hover {
+  background: #52d0be;
+}
+
+/* ---------------------------------------------------------------- the tool column */
+.dental-chrome-column {
+  position: fixed;
+  top: 48px;
+  bottom: 0;
+  left: 0;
+  z-index: 58;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: var(--dental-column);
+  box-sizing: border-box;
+  padding: 8px 6px;
+  color: var(--dc-text);
+  background: var(--dc-column);
+  border-right: 1px solid var(--dc-line);
+  font-family: var(--dc-font);
+}
+
+.dental-chrome-tool-wrap {
+  position: relative;
+}
+
+.dental-chrome-tool {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 10px 2px 8px;
+  color: var(--dc-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.dental-chrome-tool:hover:not(:disabled),
+.dental-chrome-tool.open {
+  color: var(--dc-text);
+  background: var(--dc-hover);
+}
+
+.dental-chrome-tool.active {
+  color: var(--dc-accent);
+  background: var(--dc-accent-soft);
+}
+
+.dental-chrome-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dental-chrome-tool-icon {
+  display: grid;
+  place-items: center;
+  height: 24px;
+}
+
+.dental-chrome-tool-label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.dental-chrome-test {
+  padding: 0 5px;
+  color: #ffb27a;
+  border: 1px solid rgba(255, 178, 122, 0.45);
+  border-radius: 99px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.dental-chrome-more {
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  opacity: 0.6;
+}
+
+.dental-chrome-column-foot {
+  margin-top: auto;
+  display: grid;
+  place-items: center;
+  height: 24px;
+  color: var(--dc-line);
+}
+
+.dental-chrome-flyout {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 10px);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  padding: 6px;
+  color: var(--dc-text);
+  background: #2a2e34;
+  border: 1px solid var(--dc-line);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  animation: dental-fly 0.12s ease-out;
+}
+
+@keyframes dental-fly {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.dental-chrome-flyout-title {
+  padding: 8px 10px 6px;
+  color: var(--dc-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.dental-chrome-flyout button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  color: var(--dc-text);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  text-align: left;
+  font-family: var(--dc-font);
+  cursor: pointer;
+}
+
+.dental-chrome-flyout button svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--dc-accent);
+}
+
+.dental-chrome-flyout button:hover:not(:disabled) {
+  background: var(--dc-hover);
+}
+
+.dental-chrome-flyout button.active {
+  background: var(--dc-accent-soft);
+}
+
+.dental-chrome-flyout button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.dental-chrome-flyout button span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dental-chrome-flyout strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.dental-chrome-flyout small {
+  color: var(--dc-muted);
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------- the docked panel */
+.studio-dental .dental-studio-panel {
+  position: fixed !important;
+  top: 48px !important;
+  right: auto !important;
+  bottom: 0 !important;
+  left: var(--dental-column) !important;
+  z-index: 50 !important;
+  width: var(--dental-dock) !important;
+  max-width: none !important;
+  max-height: none !important;
+  box-sizing: border-box;
+  transform: none !important;
+  border: 0 !important;
+  border-right: 1px solid var(--dc-line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  background: #1f2227 !important;
+  font-family: var(--dc-font);
+}
+
+/* The panel's title bar is no handle while it is docked. */
+.studio-dental .dental-studio-panel .edge-modifier-header {
+  cursor: default;
+}
+
+/* The object list, top right as Meshmixer's Object Browser. */
+.studio-dental .outliner-panel:not(.floating) {
+  top: 14px;
+  right: 14px;
+  left: auto;
+}
+
+/* Tool panels other than the docked one keep floating, clear of the bar. */
+.studio-dental .edge-modifier-panel:not(.dental-studio-panel):not(.floating) {
+  top: calc(48px + 14px);
+}
+
+/* The bite contacts card sits in the 3D view, beside the docked panel. */
+.studio-dental .bite-contacts-card {
+  left: calc(var(--dental-column) + var(--dental-dock) + 76px);
+  bottom: 18px;
+}
+
+/* Messages stand beside the view cube, as in CAD Studio - right of the column and the docked panel. */
+.studio-dental .editor-status {
+  left: calc(var(--dental-column) + var(--dental-dock) + 104px);
+}
+
+/* The bite contacts card, in the frame's dark colours. */
+.studio-dental .bite-contacts-card {
+  color: var(--dc-text);
+  background: #2a2e34;
+  border: 1px solid var(--dc-line);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+.studio-dental .bite-contacts-card button {
+  color: var(--dc-text);
+}
+
+.studio-dental .bite-contacts-card .bite-contacts-open {
+  color: var(--dc-text);
+  background: transparent;
+  border-color: var(--dc-line);
+}

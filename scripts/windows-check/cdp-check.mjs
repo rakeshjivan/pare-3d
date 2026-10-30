@@ -21,12 +21,15 @@ if (!page) throw new Error("the app window never loaded the app: " + context.pag
 const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
 console.log("app page:", page.url());
-await page.waitForSelector(".dashboard-actions-band", { timeout: 120000 });
+// Build 104: Home shows the two studios under one bar; the build is under Settings.
+await page.waitForSelector(".home-bar", { timeout: 120000 });
 await page.screenshot({ path: `${out}/windows-home.png` });
-const build = await page.locator(".pare-build-badge, [class*=build-badge]").first().textContent().catch(() => "");
+await page.locator(".home-bar-icon[aria-label='Settings']").click().catch(() => {});
+const build = await page.locator(".pare-build-badge, [class*=build-badge]").first().textContent({ timeout: 5000 }).catch(() => "");
+await page.keyboard.press("Escape").catch(() => {});
 console.log(`::notice::Windows app shows \"${(build || "").trim()}\"`);
 // Build 22: the examples panel is gone from the home screen; a new design opens the editor.
-await page.locator(".dashboard-action-tile.create").click();
+await page.locator(".home-studio-card.cad .home-primary").click();
 await page.waitForSelector(".toolbar-section", { timeout: 120000 });
 await page.waitForTimeout(6000);
 await page.screenshot({ path: `${out}/windows-editor.png` });
