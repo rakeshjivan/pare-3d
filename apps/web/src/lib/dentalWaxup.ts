@@ -1534,7 +1534,10 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
       const crown = crowns.find((c) => c.fdi === placedFdi[i]);
       const margin = crown?.margin;
       // Build 103: the neck rebuilt on the margin with the patient's emergence; if it cannot be, blended as before.
-      if (margin && margin.length >= MARGIN_MIN_POINTS * 3) { if (!emergeFromMargin(entry, margin, crown!.points)) { emergenceFallbacks.push({ fdi: placedFdi[i], reason: emergenceFailure }); blendToMargin(entry, margin); } }
+      // Build 103 (simpler): the tooth as positioned, its cervical end drawn down onto the gum (SEAT_SIMPLE);
+      // otherwise the neck rebuilt with the patient's emergence.
+      if (margin && margin.length >= MARGIN_MIN_POINTS * 3 && SEAT_SIMPLE) { if (!seatOnMargin(entry, margin)) drapeCervical(entry, scan, normals); }
+      else if (margin && margin.length >= MARGIN_MIN_POINTS * 3) { if (!emergeFromMargin(entry, margin, crown!.points)) { emergenceFallbacks.push({ fdi: placedFdi[i], reason: emergenceFailure }); blendToMargin(entry, margin); } }
       else drapeCervical(entry, scan, normals);
     });
   }
@@ -1787,7 +1790,63 @@ export type SmileTarget = {
  * zeniths: canines level with the centrals, laterals SMILE_LATERAL_ZENITH coronal. Upper arch only
  * (the lower anterior teeth are set by their own sizes, level). Null when the centrals or canines are missing.
  */
-export function smileTargets(crowns: PatientCrown[], arch: "upper" | "lower", options: { /** Set: widths by the RED proportion; left out: natural steps. */ red?: number; centralRatio?: number; arcDepth?: number; lengthen?: number; minWax?: number } = {}): Map<number, SmileTarget> | null {
+type SmileOptions = { /** Set: widths by the RED proportion; left out: natural steps. */ red?: number; centralRatio?: number; arcDepth?: number; lengthen?: number; minWax?: number };
+/**
+ * Build 103: the smile is designed square to the patient's anterior teeth, not to the scan's arch
+ * frame. Where the front teeth stand turned in the frame (an asymmetric arch, a shifted midline), a
+ * curve symmetric about the frame's axis sat well in front on one side and behind on the other. The
+ * turn is read from the pairs of teeth either side (canines and laterals: the line between each pair
+ * should run across the face), the design made with the teeth turned square, and turned back.
+ */
+export function smileTargets(crowns: PatientCrown[], arch: "upper" | "lower", options: SmileOptions = {}): Map<number, SmileTarget> | null {
+  const q = arch === "upper" ? [1, 2] : [4, 3];
+  const centroid = (fdi: number) => {
+    const c = crowns.find((crown) => crown.fdi === fdi);
+    if (!c || !c.points.length) return null;
+    let x = 0, y = 0; const n = c.points.length / 3;
+    for (let i = 0; i < c.points.length; i += 3) { x += c.points[i]; y += c.points[i + 1]; }
+    return [x / n, y / n];
+  };
+  const { angle, px, py } = frontTurn(centroid, q);
+  if (Math.abs(angle) < 1e-3) return smileTargetsSquare(crowns, arch, options);
+  const rot = (x: number, y: number, a: number): [number, number] => {
+    const c = Math.cos(a), sn = Math.sin(a), dx = x - px, dy = y - py;
+    return [px + dx * c - dy * sn, py + dx * sn + dy * c];
+  };
+  const dir = (v: [number, number], a: number): [number, number] => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)];
+  const turned = crowns.map((c) => ({ ...c, points: turnSoup(c.points, -angle, px, py), ...(c.margin ? { margin: turnSoup(c.margin, -angle, px, py) } : {}) }));
+  const square = smileTargetsSquare(turned, arch, options);
+  if (!square) return null;
+  const out = new Map<number, SmileTarget>();
+  for (const [fdi, t] of square) out.set(fdi, { ...t, at: rot(t.at[0], t.at[1], angle), mesial: dir(t.mesial, angle), out: dir(t.out, angle) });
+  return out;
+}
+/** The most the smile is turned to square it to the front teeth, radians (15°). */
+const SMILE_TURN_MAX = (15 * Math.PI) / 180;
+
+/** Build 103: how far the front teeth stand turned about the vertical (radians) and about which point, from the pairs either side. */
+function frontTurn(centroid: (fdi: number) => number[] | null, q: number[]): { angle: number; px: number; py: number } {
+  let sx = 0, sy = 0, cx = 0, cy = 0, pairs = 0;
+  for (const [n, weight] of [[3, 2], [2, 1]] as const) {
+    const a = centroid(q[0] * 10 + n), b = centroid(q[1] * 10 + n);
+    if (!a || !b) continue;
+    let dx = b[0] - a[0], dy = b[1] - a[1];
+    if (dx < 0) { dx = -dx; dy = -dy; }
+    const l = Math.hypot(dx, dy) || 1;
+    sx += (weight * dx) / l; sy += (weight * dy) / l;
+    cx += weight * (a[0] + b[0]) / 2; cy += weight * (a[1] + b[1]) / 2; pairs += weight;
+  }
+  if (!pairs) return { angle: 0, px: 0, py: 0 };
+  return { angle: Math.max(-SMILE_TURN_MAX, Math.min(SMILE_TURN_MAX, Math.atan2(sy, sx))), px: cx / pairs, py: cy / pairs };
+}
+/** A soup turned about the vertical through (px, py). */
+function turnSoup(src: Float32Array, angle: number, px: number, py: number) {
+  const out = src.slice(), c = Math.cos(angle), sn = Math.sin(angle);
+  for (let i = 0; i < out.length; i += 3) { const dx = out[i] - px, dy = out[i + 1] - py; out[i] = px + dx * c - dy * sn; out[i + 1] = py + dx * sn + dy * c; }
+  return out;
+}
+
+function smileTargetsSquare(crowns: PatientCrown[], arch: "upper" | "lower", options: SmileOptions = {}): Map<number, SmileTarget> | null {
   const q = arch === "upper" ? [1, 2] : [4, 3];
   const get = (fdi: number) => crowns.find((c) => c.fdi === fdi);
   const c1 = get(q[0] * 10 + 1), c2 = get(q[1] * 10 + 1), k1 = get(q[0] * 10 + 3), k2 = get(q[1] * 10 + 3);
@@ -1905,6 +1964,10 @@ function solve3(A: number[][], B: number[]): number[] | null {
 export type SmileCheck = { key: string; level: "ok" | "warn"; values: Record<string, string> };
 /** Left-right differences warned at, mm (stricter than lay detection: the viewer is a dentist). */
 export const SYMMETRY_WARN = 0.5;
+/** The strips a frontal view of the teeth is read in, mm. */
+const APPARENT_STRIP = 0.1;
+/** A face is seen from the front when its normal turns this far towards the viewer (cosine; about 70° off). */
+const FRONT_FACING = 0.34;
 /** Left-right axial inclination difference warned at, degrees. */
 export const TILT_WARN = 2;
 
@@ -1927,9 +1990,52 @@ export function smileChecks(teeth: Array<{ fdi: number; positions: Float32Array 
       else if (p[i + 2] < bottom + 0.2 * h) { ca += p[i]; cb += 1; }
     }
     const tilt = ib && cb ? Math.atan2(ia / ib - ca / cb, 0.6 * h) * 180 / Math.PI : 0;
-    return { apparent: x1 - x0, length: h, top, zenith: bottom, cx, tilt };
+    // Build 103: the apparent width is what is seen from the front - the facial surface, the faces
+    // turned towards the viewer - not the whole tooth's shadow, which on a canine turning round the
+    // arch adds its labio-lingual thickness and made it look wider than the lateral.
+    let f0 = Infinity, f1 = -Infinity;
+    for (let t = 0; t + 8 < p.length; t += 9) {
+      const ux = p[t + 3] - p[t], uy = p[t + 4] - p[t + 1], uz = p[t + 5] - p[t + 2];
+      const vx = p[t + 6] - p[t], vy = p[t + 7] - p[t + 1], vz = p[t + 8] - p[t + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const l = Math.hypot(nx, ny, nz);
+      if (!l || -ny / l < FRONT_FACING) continue;
+      for (let k = 0; k < 9; k += 3) { f0 = Math.min(f0, p[t + k]); f1 = Math.max(f1, p[t + k]); }
+    }
+    const apparent = Number.isFinite(f0) && f1 > f0 ? f1 - f0 : x1 - x0;
+    return { apparent, length: h, top, zenith: bottom, cx, tilt };
   };
-  const m = new Map(teeth.map((t) => [t.fdi, measure(t.positions)]));
+  // Build 103: measured square to the front teeth, as they were designed.
+  const centroidOf = (fdi: number) => {
+    const t = teeth.find((tooth) => tooth.fdi === fdi);
+    if (!t) return null;
+    let x = 0, y = 0; const n = t.positions.length / 3;
+    for (let i = 0; i < t.positions.length; i += 3) { x += t.positions[i]; y += t.positions[i + 1]; }
+    return [x / n, y / n];
+  };
+  const turn = frontTurn(centroidOf, q);
+  const square = teeth.map((t) => ({ fdi: t.fdi, positions: Math.abs(turn.angle) > 1e-3 ? turnSoup(t.positions, -turn.angle, turn.px, turn.py) : t.positions }));
+  const m = new Map(square.map((t) => [t.fdi, measure(t.positions)]));
+  // The apparent widths as a frontal photograph shows them: across the front, in narrow strips, the
+  // tooth in front in each strip (over the middle of the crowns' height) - so a tooth turning round
+  // the arch, or one behind its neighbour, shows only what is seen of it.
+  {
+    const strips = new Map<number, { y: number; fdi: number }>();
+    for (const t of square) {
+      const me = m.get(t.fdi)!;
+      const lo = me.zenith + 0.25 * (me.top - me.zenith), hi = me.top - 0.25 * (me.top - me.zenith);
+      for (let i = 0; i < t.positions.length; i += 3) {
+        const z = t.positions[i + 2];
+        if (z < lo || z > hi) continue;
+        const k = Math.round(t.positions[i] / APPARENT_STRIP);
+        const was = strips.get(k);
+        if (!was || t.positions[i + 1] < was.y) strips.set(k, { y: t.positions[i + 1], fdi: t.fdi });
+      }
+    }
+    const seen = new Map<number, number>();
+    for (const { fdi } of strips.values()) seen.set(fdi, (seen.get(fdi) ?? 0) + APPARENT_STRIP);
+    for (const [fdi, width] of seen) { const me = m.get(fdi); if (me && width > 0) me.apparent = width; }
+  }
   const out: SmileCheck[] = [];
   const f = (v: number, d = 1) => v.toFixed(d);
   const c1 = m.get(q[0] * 10 + 1), c2 = m.get(q[1] * 10 + 1);
@@ -2209,6 +2315,48 @@ function marginRing(margin: Float32Array) {
   if (!zm || !rm) return null;
   const at = (arr: number[], f: number) => { const g = ((f % MARGIN_BINS) + MARGIN_BINS) % MARGIN_BINS; const b0 = Math.floor(g), b1 = (b0 + 1) % MARGIN_BINS, u = g - b0; return arr[b0] * (1 - u) + arr[b1] * u; };
   return { mx, my, rMid, zm, rm, at, binOf };
+}
+
+/**
+ * Build 103 (simpler): the library tooth seated on the gum as a technician does it - the whole tooth
+ * kept as it was positioned, only its cervical end drawn straight down (along the tooth's height, not
+ * in or out) until it reaches SEAT_SINK past the patient's gingival margin in every direction, so the
+ * model and the tooth join in one piece where the gum meets it. Nothing is rebuilt: no ledge, no
+ * folds, wherever the tooth was moved. False when the margin cannot be read.
+ */
+export const SEAT_SINK = 0.5;
+/** Build 103: the simple seat (true) or the rebuilt neck (false). */
+export const SEAT_SIMPLE = true;
+/** The cervical part drawn down, mm from the tooth's lowest point, faded out above it. */
+export const SEAT_BAND = 2.5;
+/** The most the cervical end is drawn down, mm. */
+export const SEAT_REACH = 5;
+export function seatOnMargin(tooth: PlacedTooth, margin: Float32Array): boolean {
+  const ring = marginRing(margin);
+  if (!ring) return false;
+  const { zm, at, binOf } = ring;
+  const p = tooth.positions;
+  // The tooth's lowest point round the margin, by direction.
+  const low = new Array<number>(MARGIN_BINS).fill(Infinity);
+  for (let i = 0; i < p.length; i += 3) { const b = Math.floor(binOf(p[i], p[i + 1])) % MARGIN_BINS; low[b] = Math.min(low[b], p[i + 2]); }
+  let lowest = Infinity;
+  for (let i = 2; i < p.length; i += 3) lowest = Math.min(lowest, p[i]);
+  // How far each direction is drawn down: to SEAT_SINK past the margin there (never up), smoothed round.
+  let drop = low.map((z, b) => (Number.isFinite(z) ? Math.max(0, Math.min(SEAT_REACH, z - (at(zm, b + 0.5) - SEAT_SINK))) : NaN));
+  const known = drop.filter((d) => !Number.isNaN(d));
+  if (!known.length) return false;
+  const fallback = Math.max(...known);
+  drop = drop.map((d) => (Number.isNaN(d) ? fallback : d));
+  for (let pass = 0; pass < 6; pass += 1) drop = drop.map((d, b) => Math.max(d, (drop[(b - 1 + MARGIN_BINS) % MARGIN_BINS] + 2 * d + drop[(b + 1) % MARGIN_BINS]) / 4));
+  const dropAt = (f: number) => at(drop, f);
+  for (let i = 0; i < p.length; i += 3) {
+    const u = (p[i + 2] - lowest) / SEAT_BAND;
+    if (u >= 1) continue;
+    // Full at the bottom, fading smoothly to nothing SEAT_BAND above it.
+    const w = 1 - Math.max(0, u) * Math.max(0, u) * (3 - 2 * Math.max(0, u));
+    p[i + 2] -= w * dropAt(binOf(p[i], p[i + 1]));
+  }
+  return true;
 }
 
 /** The patient's crown: its outermost distance from (mx, my) in each direction, at each height above that direction's margin. */

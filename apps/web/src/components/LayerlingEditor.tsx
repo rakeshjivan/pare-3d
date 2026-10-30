@@ -11901,6 +11901,11 @@ export function LayerlingEditor({
     placed: waxPlacedNow,
     marked: waxup.landmarks && !waxup.guessed ? 3 : waxup.marks.length,
     selected: selectedIds.length === 1 ? selectedIds[0] : null,
+    // Build 103: the selected tooth's own change, for the exact values in the card.
+    selectedAdjust: (() => {
+      const shape = selectedIds.length === 1 ? shapes.find((candidate) => candidate.id === selectedIds[0]) : undefined;
+      return shape?.waxTooth && waxup.fit === "teeth" ? waxup.adjust[shape.waxTooth.fdi] ?? {} : null;
+    })(),
     mirror: waxMirror,
     found: waxFoundHere ? waxFoundHere.teeth.map((tooth) => ({ fdi: tooth.fdi, agreed: tooth.agreed })) : null,
     occlusion: { ...waxup.occlusion, ready: Boolean(dentalStudio?.slots.upper && dentalStudio?.slots.lower && shapes.some((shape) => shape.dental === "wax" && !shape.hidden)) },
@@ -18101,7 +18106,7 @@ export function LayerlingEditor({
         <WaxupPointOverlay hint={t(WAXUP_LANDMARKS[waxup.picking])} onPick={pickWaxPoint} onCancel={stopWaxPicking} />
       ) : null}
       {waxGimbal && waxup.stage === "position" ? (
-        <ToothGimbal tooth={waxGimbal.tooth} totals={waxGimbal.totals} handles={false} onPreview={(change) => previewWaxTooth(waxGimbal.id, change)} onCommit={(change) => adjustWaxToothBy(waxGimbal.id, change)} />
+        <ToothGimbal tooth={waxGimbal.tooth} totals={waxGimbal.totals} onPreview={(change) => previewWaxTooth(waxGimbal.id, change)} onCommit={(change) => adjustWaxToothBy(waxGimbal.id, change)} />
       ) : null}
       {dentalStudio?.waxStudio && waxup.stage === "position" && waxup.placed.length && waxup.picking === null ? (
         <WaxToothDrag teeth={waxDragTeeth} onSelect={(id) => selectShape(id, "replace")} onPreview={previewWaxTooth} onCommit={adjustWaxToothBy} />
@@ -18221,6 +18226,7 @@ export function LayerlingEditor({
               onSelect: (id) => setSelectedIds([id]),
               onNudge: nudgeWaxTooth,
               onHelper: waxHelper,
+              onAdjust: (id: string, change: ToothAdjust) => adjustWaxToothBy(id, change),
               onEggshell: (wall: number) => { void makeEggshell(wall); },
               onSetMove: (patch) => { waxRecord(true); setWaxup((current) => ({ ...current, setMove: { ...current.setMove, ...patch } })); },
               onChain: (chain) => setWaxup((current) => ({ ...current, chain })),

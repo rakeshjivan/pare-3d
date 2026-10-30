@@ -25,7 +25,7 @@ import type { ToothAdjust, ToothFrame } from "@/lib/dentalWaxup";
 import { t } from "@/lib/i18n";
 
 type V = [number, number, number];
-export type GimbalHandle = "mesial" | "out" | "up" | "turn" | "tip" | "torque" | "wider" | "longer";
+export type GimbalHandle = "mesial" | "out" | "up" | "turn" | "tip" | "torque" | "wider" | "longer" | "thicker" | "size";
 const add = (a: V, b: V, k = 1): V => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
 const dot = (a: V, b: V) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a: V, b: V): V => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -35,7 +35,7 @@ const ARROW = 7;
 const RING = 5;
 const RING_STEPS = 48;
 /** The arrows are never shorter than this on the screen, px. */
-export const GIMBAL_MIN_PX = 70;
+export const GIMBAL_MIN_PX = 100;
 /** A drag: mm per pixel, and degrees per pixel - the same at every zoom. */
 export const GIMBAL_MM_PER_PX = 0.01;
 export const GIMBAL_DEG_PER_PX = 0.1;
@@ -52,10 +52,12 @@ const MOVE_MAX = 5, TURN_MAX = 30, SIZE_MIN = 0.6, SIZE_MAX = 1.5;
 const COLOURS: Record<GimbalHandle, string> = {
   mesial: "#e5484d", out: "#30a46c", up: "#3e63dd",
   turn: "#3e63dd", tip: "#30a46c", torque: "#e5484d",
-  wider: "#f5f5f5", longer: "#f5f5f5",
+  wider: "#f5f5f5", longer: "#f5f5f5", thicker: "#f5f5f5", size: "#f2c94c",
 };
 const ANGLES: GimbalHandle[] = ["turn", "tip", "torque"];
-const SIZES: GimbalHandle[] = ["wider", "longer"];
+const SIZES: GimbalHandle[] = ["wider", "longer", "thicker", "size"];
+/** Build 103: a crown's labio-lingual thickness taken as this much, mm, to turn a thicker handle's mm into a share. */
+const THICKNESS_MM = 7;
 
 /** Two changes one after the other: moves and turns add, sizes multiply. */
 export function composeAdjust(a: ToothAdjust, b: ToothAdjust): ToothAdjust {
@@ -129,13 +131,17 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
     if (ANGLES.includes(handle)) return { [handle]: deg };
     if (handle === "wider") return { wider: (width + mm) / Math.max(0.5, width) };
     if (handle === "longer") return { longer: (length + mm) / Math.max(0.5, length) };
+    if (handle === "thicker") return { thicker: (THICKNESS_MM + mm) / THICKNESS_MM };
+    // Build 103: the whole tooth larger or smaller (width, length and thickness alike), mm on its width.
+    if (handle === "size") { const k = (width + mm) / Math.max(0.5, width); return { wider: k, longer: k, thicker: k }; }
     return { [handle]: mm };
   };
   const describe = (handle: GimbalHandle, change: ToothAdjust) => {
     const { width, length } = live.current.tooth;
-    const v = change[handle as keyof ToothAdjust] ?? (SIZES.includes(handle) ? 1 : 0);
+    const v = handle === "size" ? change.wider ?? 1 : change[handle as keyof ToothAdjust] ?? (SIZES.includes(handle) ? 1 : 0);
+    if (handle === "size") return `${t("toothGimbal.short.size")} ${v >= 1 ? "+" : ""}${((v - 1) * 100).toFixed(1)}%`;
     if (ANGLES.includes(handle)) return `${t(`toothGimbal.short.${handle}`)} ${v >= 0 ? "+" : ""}${v.toFixed(1)}°`;
-    const mm = handle === "wider" ? (v - 1) * width : handle === "longer" ? (v - 1) * length : v;
+    const mm = handle === "wider" ? (v - 1) * width : handle === "longer" ? (v - 1) * length : handle === "thicker" ? (v - 1) * THICKNESS_MM : v;
     return `${t(`toothGimbal.short.${handle}`)} ${mm >= 0 ? "+" : ""}${mm.toFixed(2)} mm`;
   };
   const flush = () => {
@@ -195,11 +201,15 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
   const arrowMm = ARROW * grow, ringMm = RING * grow;
   const widerAt = add(centre, mesial, -Math.max(width / 2 + 1.5, arrowMm * 0.55));
   const longerAt = add(centre, up, -Math.max(length / 2 + 1.5, arrowMm * 0.55));
+  // Build 103: thicker - a square behind the tooth (lingual), dragged away from it.
+  const thickerAt = add(centre, out, -Math.max(3, arrowMm * 0.55));
+  // Build 103: the whole tooth's size - a gold square at the corner (distal and up).
+  const sizeAt = add(add(centre, mesial, -Math.max(width / 2 + 1.5, arrowMm * 0.5)), up, Math.max(length / 2, arrowMm * 0.5));
   const ringPoints = (a: V, b: V) => Array.from({ length: RING_STEPS + 1 }, (_, i) => {
     const angle = (i / RING_STEPS) * Math.PI * 2;
     return add(add(centre, a, Math.cos(angle) * ringMm), b, Math.sin(angle) * ringMm);
   });
-  const all: V[] = [centre, add(centre, mesial, arrowMm), add(centre, out, arrowMm), add(centre, up, arrowMm), widerAt, longerAt, ...ringPoints(mesial, out), ...ringPoints(mesial, up), ...ringPoints(out, up)];
+  const all: V[] = [centre, add(centre, mesial, arrowMm), add(centre, out, arrowMm), add(centre, up, arrowMm), widerAt, longerAt, thickerAt, sizeAt, ...ringPoints(mesial, out), ...ringPoints(mesial, up), ...ringPoints(out, up)];
   const flat = new Float32Array(all.length * 3);
   all.forEach((p, i) => flat.set(p, i * 3));
   const screen = project(flat);
@@ -217,7 +227,7 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
   const toCamera: V = [camera[0] - centre[0], camera[1] - centre[1], camera[2] - centre[2]];
   // The frame's handedness: each side's frame is the other's mirror image.
   const handed = Math.sign(dot(cross(mesial, out), up)) || 1;
-  const RING_AT = 6;
+  const RING_AT = 8;
   const ringPath = (index: number) => {
     let d = "";
     for (let i = 0; i <= RING_STEPS; i += 1) { const p = at(RING_AT + index * (RING_STEPS + 1) + i); d += `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`; }
@@ -247,7 +257,7 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
       along = [ry / l, -rx / l];
     } else {
       // Along its arrow as it shows (the squares: away from the crown); up the screen if it points at the eye.
-      const index = handle === "mesial" ? 1 : handle === "out" ? 2 : handle === "up" ? 3 : handle === "wider" ? 4 : 5;
+      const index = handle === "mesial" ? 1 : handle === "out" ? 2 : handle === "up" ? 3 : handle === "wider" ? 4 : handle === "longer" ? 5 : handle === "thicker" ? 6 : 7;
       along = towards(index) ?? [0, -1];
     }
     drag.current = { handle, start: [event.clientX, event.clientY], along, sign: ANGLES.includes(handle) ? ringSign(handle) : 1, gain: gainOf(event), base: {} };
@@ -318,7 +328,7 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
       </g>
     );
   };
-  const square = (handle: "wider" | "longer", index: number) => {
+  const square = (handle: "wider" | "longer" | "thicker" | "size", index: number) => {
     const p = at(index);
     const dim = active && active !== handle;
     return (
@@ -350,13 +360,15 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
         {arrow("up", 3)}
         {square("wider", 4)}
         {square("longer", 5)}
+        {square("thicker", 6)}
+        {square("size", 7)}
         <circle cx={c[0]} cy={c[1]} r={3} fill="#1f2328" stroke="#fff" strokeWidth={1} />
       </svg>
       <div className="tooth-gimbal-panel" style={{ left: c[0] + 22, top: c[1] - 48 }}>
         {typing ? (
           <form onSubmit={(event) => { event.preventDefault(); typed(); }}>
             <select value={typing.handle} onChange={(event) => { const handle = event.currentTarget.value as GimbalHandle; setTyping((now) => (now ? { ...now, handle } : now)); }} aria-label={t("toothGimbal.what")}>
-              {(["mesial", "out", "up", "turn", "tip", "torque", "wider", "longer"] as const).map((h) => <option key={h} value={h}>{t(`toothGimbal.short.${h}`)}</option>)}
+              {(["mesial", "out", "up", "turn", "tip", "torque", "wider", "longer", "thicker", "size"] as const).map((h) => <option key={h} value={h}>{t(`toothGimbal.short.${h}`)}</option>)}
             </select>
             <input autoFocus value={typing.value} inputMode="decimal" placeholder="+0.3" aria-label={t("toothGimbal.value")} onChange={(event) => { const value = event.currentTarget.value; setTyping((now) => (now ? { ...now, value } : now)); }} onKeyDown={(event) => { if (event.key === "Escape") setTyping(null); }} />
             <span>{ANGLES.includes(typing.handle) ? "°" : "mm"}</span>

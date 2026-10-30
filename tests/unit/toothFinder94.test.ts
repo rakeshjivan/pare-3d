@@ -186,9 +186,12 @@ describe("smile design on the teeth found", () => {
     expect(w(11) - w(13)).toBeCloseTo(1, 1);
     expect(t.get(11)!.edge).toBeCloseTo(t.get(21)!.edge, 6);
     expect(t.get(11)!.edge - t.get(12)!.edge).toBeCloseTo(1, 6);
-    // Symmetric about the midline (x of 11 and 21 mirrored about it).
-    const mid = (t.get(11)!.at[0] + t.get(21)!.at[0]) / 2;
-    expect(t.get(13)!.at[0] - mid).toBeCloseTo(mid - t.get(23)!.at[0], 6);
+    // Symmetric about the midline: each pair as far from the centrals' middle (build 103: the design is
+    // squared to the front teeth, so the midline need not run along the frame's axis).
+    const mx = (t.get(11)!.at[0] + t.get(21)!.at[0]) / 2, my = (t.get(11)!.at[1] + t.get(21)!.at[1]) / 2;
+    const from = (fdi: number) => Math.hypot(t.get(fdi)!.at[0] - mx, t.get(fdi)!.at[1] - my);
+    expect(from(13)).toBeCloseTo(from(23), 6);
+    expect(from(12)).toBeCloseTo(from(22), 6);
     // In front of every crown point (the wax only adds).
     for (const v of t.values()) expect(v.at[1]).toBeLessThan(-25 + 0.04 * v.at[0] * v.at[0]);
     // RED: apparent widths in proportion.

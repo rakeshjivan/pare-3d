@@ -11,7 +11,7 @@ import { EGGSHELL_MAX_WALL, EGGSHELL_MIN_WALL, EGGSHELL_WALL } from "@/lib/denta
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { t } from "@/lib/i18n";
 import type { MessageKey } from "@/lib/messages.en";
-import { IMT_REDUCE, IMT_UNSUPPORTED, imtFirstInjection, type SmileCheck, type ToothNudge } from "@/lib/dentalWaxup";
+import { IMT_REDUCE, IMT_UNSUPPORTED, imtFirstInjection, type SmileCheck, type ToothAdjust, type ToothNudge } from "@/lib/dentalWaxup";
 import type { WorkplaneWorkspaceSettings } from "@/types/layerling";
 
 /** How long the wax can make the teeth, mm (negative shortens). */
@@ -48,6 +48,8 @@ export type WaxupView = {
   /** Build 79: also make a model with wax on alternate teeth only (injection moulding, first injection). */
   alternate: boolean;
   selected: string | null;
+  /** Build 103: the selected tooth's change from where it was placed (null: not on the patient's teeth). */
+  selectedAdjust?: ToothAdjust | null;
   /** Adjusting a tooth adjusts the same tooth on the other side too. */
   mirror: boolean;
   error: string | null;
@@ -101,6 +103,8 @@ export type WaxupActions = {
   onChain: (on: boolean) => void;
   onConfirm: () => void;
   onStage: (stage: "position" | "adapted") => void;
+  /** Build 103: a change to a tooth (exact values, steps). */
+  onAdjust: (id: string, change: ToothAdjust) => void;
   /** Build 103: an eggshell provisional from the adapted teeth, with this wall (mm). */
   onEggshell: (wall: number) => void;
   onMirror: (on: boolean) => void;
@@ -143,6 +147,78 @@ export type WaxupPart = "find" | "choose" | "set" | "place" | "adjust" | "occlus
 
 /** Build 102: reductions shown from this, mm (less is within a scan's own noise). */
 const WAX_REDUCE_SHOWN = 0.2;
+
+/**
+ * Build 103: the selected tooth's exact values - each move, turn and size as a number to read and to
+ * type, with fine steps either side (Shift: five times, Alt: a fifth). Moves and turns are from where
+ * the tooth was placed; width and length are the tooth's own, mm.
+ */
+const VALUE_ROWS = [
+  { key: "mesial", unit: "mm", step: 0.1 }, { key: "out", unit: "mm", step: 0.1 }, { key: "up", unit: "mm", step: 0.1 },
+  { key: "turn", unit: "°", step: 1 }, { key: "tip", unit: "°", step: 1 }, { key: "torque", unit: "°", step: 1 },
+  { key: "wider", unit: "mm", step: 0.1 }, { key: "longer", unit: "mm", step: 0.1 }, { key: "thicker", unit: "%", step: 2 }, { key: "size", unit: "%", step: 2 },
+] as const;
+function ToothValues({ tooth, adjust, disabled, onAdjust }: { tooth: { width: number; length: number }; adjust: ToothAdjust; disabled: boolean; onAdjust: (change: ToothAdjust) => void }) {
+  const [editing, setEditing] = useState<{ key: string; value: string } | null>(null);
+  const shown = (key: (typeof VALUE_ROWS)[number]["key"]) => {
+    if (key === "wider") return tooth.width;
+    if (key === "longer") return tooth.length;
+    if (key === "thicker") return (adjust.thicker ?? 1) * 100;
+    // The whole tooth's size: the three factors' geometric mean.
+    if (key === "size") return Math.cbrt((adjust.wider ?? 1) * (adjust.longer ?? 1) * (adjust.thicker ?? 1)) * 100;
+    return adjust[key] ?? 0;
+  };
+  /** The change that takes a value from what it is to `to`. */
+  const changeTo = (key: (typeof VALUE_ROWS)[number]["key"], to: number): ToothAdjust | null => {
+    const now = shown(key);
+    if (!Number.isFinite(to) || Math.abs(to - now) < 1e-6) return null;
+    if (key === "wider" || key === "longer") return to > 0.5 ? { [key]: to / Math.max(0.5, now) } : null;
+    if (key === "thicker") return to > 30 ? { thicker: to / Math.max(1, now) } : null;
+    if (key === "size") { if (to <= 30) return null; const k = to / Math.max(1, now); return { wider: k, longer: k, thicker: k }; }
+    return { [key]: to - now };
+  };
+  const commit = () => {
+    if (!editing) return;
+    const row = VALUE_ROWS.find((r) => r.key === editing.key)!;
+    const value = Number(editing.value.replace(",", ".").replace(/[^0-9.+-]/g, ""));
+    setEditing(null);
+    const change = changeTo(row.key, value);
+    if (change) onAdjust(change);
+  };
+  return (
+    <div className="waxup-values" role="group">
+      {VALUE_ROWS.map((row) => {
+        const value = shown(row.key);
+        const text = row.key === "wider" || row.key === "longer" ? value.toFixed(2) : row.unit === "%" ? value.toFixed(0) : `${value >= 0 ? "+" : ""}${value.toFixed(row.unit === "°" ? 1 : 2)}`;
+        const stepBy = (sign: number, event: React.MouseEvent) => {
+          const k = event.shiftKey ? 5 : event.altKey ? 0.2 : 1;
+          const change = changeTo(row.key, value + sign * row.step * k);
+          if (change) onAdjust(change);
+        };
+        return (
+          <div key={row.key} className="waxup-value-row">
+            <span className="waxup-value-label">{t(`toothGimbal.short.${row.key}`)}</span>
+            <button type="button" disabled={disabled} aria-label={t("waxup.valueLess", { what: t(`toothGimbal.short.${row.key}`) })} onClick={(event) => stepBy(-1, event)}>−</button>
+            <input
+              type="text"
+              inputMode="decimal"
+              disabled={disabled}
+              value={editing?.key === row.key ? editing.value : text}
+              onFocus={(event) => { setEditing({ key: row.key, value: text }); event.currentTarget.select(); }}
+              onChange={(event) => { const v = event.currentTarget.value; setEditing({ key: row.key, value: v }); }}
+              onBlur={commit}
+              onKeyDown={(event) => { if (event.key === "Enter") (event.currentTarget as HTMLInputElement).blur(); else if (event.key === "Escape") { setEditing(null); (event.currentTarget as HTMLInputElement).blur(); } }}
+              aria-label={t(`toothGimbal.short.${row.key}`)}
+            />
+            <span className="waxup-value-unit">{row.unit}</span>
+            <button type="button" disabled={disabled} aria-label={t("waxup.valueMore", { what: t(`toothGimbal.short.${row.key}`) })} onClick={(event) => stepBy(1, event)}>+</button>
+          </div>
+        );
+      })}
+      <p className="blend-hint">{t("waxup.valuesHint")}</p>
+    </div>
+  );
+}
 
 export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, part }: { view: WaxupView; actions: WaxupActions; slots: { upper: boolean; lower: boolean }; busy: boolean; workspace: WorkplaneWorkspaceSettings; imt?: boolean; part?: WaxupPart }) {
   const show = (which: WaxupPart) => !part || part === which;
@@ -359,7 +435,8 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
             {selectedTooth ? (
               <div className="waxup-adjust" role="group" aria-label={t("waxup.adjustTooth", { fdi: selectedTooth.fdi })}>
                 <h5>{t("waxup.adjustTooth", { fdi: selectedTooth.fdi })}</h5>
-                {([["out", "waxup.in", "waxup.out", WAX_NUDGE], ["mesial", "waxup.distal", "waxup.mesial", WAX_NUDGE], ["longer", "waxup.shorter", "waxup.longer", WAX_NUDGE], ["wider", "waxup.narrower", "waxup.wider", WAX_NUDGE], ["thicker", "waxup.thinner", "waxup.thicker", WAX_SCALE_STEP], ["size", "waxup.smaller", "waxup.larger", WAX_SCALE_STEP], ["turn", "waxup.turnIn", "waxup.turnOut", WAX_TURN]] as const).map(([nudge, less, more, step]) => (
+                {view.selectedAdjust ? <ToothValues tooth={selectedTooth} adjust={view.selectedAdjust} disabled={working} onAdjust={(change) => actions.onAdjust(selectedTooth.id, change)} /> : null}
+                {view.selectedAdjust ? null : ([["out", "waxup.in", "waxup.out", WAX_NUDGE], ["mesial", "waxup.distal", "waxup.mesial", WAX_NUDGE], ["longer", "waxup.shorter", "waxup.longer", WAX_NUDGE], ["wider", "waxup.narrower", "waxup.wider", WAX_NUDGE], ["thicker", "waxup.thinner", "waxup.thicker", WAX_SCALE_STEP], ["size", "waxup.smaller", "waxup.larger", WAX_SCALE_STEP], ["turn", "waxup.turnIn", "waxup.turnOut", WAX_TURN]] as const).map(([nudge, less, more, step]) => (
                   <div key={nudge} className="waxup-adjust-row">
                     <button type="button" disabled={working} onClick={() => actions.onNudge(selectedTooth.id, nudge, -step)}>{t(less)}</button>
                     <button type="button" disabled={working} onClick={() => actions.onNudge(selectedTooth.id, nudge, step)}>{t(more)}</button>

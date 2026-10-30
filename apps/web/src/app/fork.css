@@ -2110,3 +2110,11 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .tooth-gimbal-panel form { display: flex; gap: 4px; align-items: center; background: rgba(31, 35, 40, 0.92); color: #fff; border-radius: 6px; padding: 4px 6px; }
 .tooth-gimbal-panel input { width: 56px; font: inherit; padding: 2px 4px; }
 .tooth-gimbal-panel select, .tooth-gimbal-panel button[type="submit"] { font: inherit; padding: 2px 4px; }
+
+/* Build 103: the selected wax tooth's exact values. */
+.waxup-values { display: grid; gap: 4px; margin: 4px 0 6px; }
+.waxup-value-row { display: grid; grid-template-columns: minmax(70px, 1fr) 30px 72px 22px 30px; align-items: center; gap: 4px; }
+.waxup-value-row button { height: 28px; padding: 0; font-size: 16px; line-height: 1; border-radius: 6px; }
+.waxup-value-row input { height: 28px; width: 100%; text-align: right; font-variant-numeric: tabular-nums; padding: 0 6px; }
+.waxup-value-label { font-size: 13px; }
+.waxup-value-unit { font-size: 12px; opacity: 0.7; }

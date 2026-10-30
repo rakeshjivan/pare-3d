@@ -11,6 +11,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Bite contacts on made models are read correctly where the models overlap a lot.",
       "Wax-up in two stages: Position shows the whole library teeth, see-through over the patient's, seen straight on; take hold of a tooth and drag it where you want it (Alt for fine), scroll over it to turn it (Shift: torque, Alt: tip), move the whole set (arch width, forward or back, midline, length), in chain or one tooth at a time. Confirm position, and Adapt fits the teeth to the patient's margins and surfaces.",
       "Each tooth can now be made thicker or thinner (bucco-lingually) and larger or smaller as a whole, from its neck.",
+      "Full control of each tooth in Position: the gimbal over the selected tooth moves it (mesial, labial, incisal), turns it (rotation, mesio-distal tilt, labio-lingual tilt) and sizes it (width, length, thickness, or the whole tooth), and the card shows each value exactly - type a number, or step it with - and +.",
+      "Adapt is simpler: each tooth stays as you positioned it and its cervical end is drawn straight down just past the gingival margin, so it joins the model cleanly - no ledge at the gum, however far it was moved.",
       "Eggshell provisional: once adapted, the wax-up teeth can be made into one thin shell (wall 0.3 to 1.5 mm), open at the necks, to print and reline over the preparations. It is added as its own part, ready to export.",
     ],
   },
