@@ -4,6 +4,18 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 102,
+    items: [
+      "Wax-up Studio (test builds): new tooth sets - Pare Square, Pare Oval and Pare Square-Oval (upper teeth and pontics, front or full arch), Pare Lower, and the anterior smile designs Pare Tapered and Pare Youthful. The earlier sets stay in the app for designs made with them.",
+      "Load an exocad tooth library as your own set: its folder as a .zip (or its .eoff teeth with the jaw's set-up file) - every form in it is offered, front and full arch.",
+      "A gimbal over the wax tooth you select: arrows move it along the arch, out and up, rings turn, tip and torque it, squares make it wider or longer. Fine from the first pixel at any zoom (0.1 mm or 1° per 10 px; Shift faster, Alt finer); scroll over a handle for 0.05 mm or 0.5° steps; arrow keys, Page Up/Down and [ ] step the tooth; click the readout to type an exact value. The tooth follows at once and is placed again on the patient's teeth to keep its contacts and the margin.",
+      "One-click helpers: level the centrals, edges on the smile arc, copy a tooth to the other side (mirrored across the midline - place, angles and size), make the other side match, reset a tooth or all.",
+      "The library teeth meet the gum at the margin and follow its scallop, without fins at the neck. Where the patient's tooth stands in front of the design, the wax-up model is cut back to it (the pre-op model is left as it is), and the card shows how much for each tooth.",
+      "The occlusion is worked out on the model as Make cuts it, so the bite on the made models matches the scans'.",
+      "A cut in Trim or Wax-up leaves a smooth edge, not a jagged one, so the model's base is smooth too.",
+    ],
+  },
+  {
     build: 101,
     items: [
       "Bite contacts on the finished models: after Make, the map is measured on the models in the bite they were made in (however they are laid out to print), and a hidden scan is no longer drawn over them.",
@@ -204,7 +216,7 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Dental Studio has a digital diagnostic wax-up (step 3, optional): library teeth set over the front teeth, canine to canine, and joined to the model when you make it. Wax only adds, so a mock-up from the printed model seats over the teeth without preparing any.",
       "The wax-up follows the order smile design does: you click the midline and the two canine tips; the incisal edges come first (the laterals 0.5 mm shorter, the canine tips following the patient's own smile arc); widths from the space between the midline and the canines; lengths from the central's width-to-length ratio (80%, adjustable). Each tooth stands at least 0.3 mm proud of the patient's.",
       "A table gives every wax tooth's width, length and ratio, and where the design reaches above the gum: the crown lengthening it asks for. Select a tooth to move it in or out, along the arch, longer or shorter, wider or narrower, or turn it, in 0.25 mm and 2 degree steps - the same tooth on the other side follows unless you turn that off.",
-      "Nine anterior tooth sets from teethy.org come with Pare 3D, with their owner's permission; you can load your own sets too (OBJ or STL, a Meshmixer part, or one file per tooth).",
+      "Nine anterior tooth sets come with Pare 3D (credited on the Licences & credits page); you can load your own sets too (OBJ or STL, a Meshmixer part, or one file per tooth).",
       "Every crown point of the scan outside the wax is still checked to the micrometre when the model is made; the points under the wax are counted apart.",
       "The wax-up blends rather than sitting on the teeth: the contacts are closed without changing any tooth's width, and each tooth's cervical third is feathered into the patient's tooth and gum, with no step, as a technician finishes wax.",
       "For injection moulding (GC IMT): the table shows how far each design edge stands past the patient's own; the panel warns where unsupported composite would exceed 0.5 mm, and where the patient's edge would show through (reduction needed). An alternate-tooth model (12, 21, 23 first, as GC's sequence) can be made beside the full model for the two-index technique.",

@@ -18,7 +18,7 @@
  */
 import * as THREE from "three";
 import { cleanScan, pairFrame } from "@/lib/dentalArch";
-import { PointGrid, transformSoup } from "@/lib/dentalMesh";
+import { CUT_BEYOND, CUT_FRONT, PointGrid, transformSoup } from "@/lib/dentalMesh";
 
 export type Articulator = { intercondylar: number; bonwill: number; balkwill: number; condylarGuidance: number; bennett: number };
 export const AVERAGE_ARTICULATOR: Articulator = { intercondylar: 105, bonwill: 105, balkwill: 25, condylarGuidance: 30, bennett: 15 };
@@ -53,7 +53,7 @@ export type Guidance = "canine" | "group";
 export type Surface = { p: Float32Array; n: Float32Array; fdi: Uint8Array; wax: Uint8Array };
 
 /** One arch's soups as a surface: the scan (its triangles' FDI, if found) and each wax tooth (its FDI). */
-export function surfaceOf(scan: Float32Array, scanFdi: Uint8Array | null, wax: Array<{ fdi: number; positions: Float32Array }>, keep: (z: number) => boolean): Surface {
+export function surfaceOf(scan: Float32Array, scanFdi: Uint8Array | null, wax: Array<{ fdi: number; positions: Float32Array }>, keep: (z: number) => boolean, cuts?: ToothCut[]): Surface {
   const p: number[] = [], n: number[] = [], f: number[] = [], w: number[] = [];
   const add = (soup: Float32Array, fdiOf: (t: number) => number, isWax: number) => {
     for (let t = 0; t < soup.length / 9; t += 1) {
@@ -68,7 +68,26 @@ export function surfaceOf(scan: Float32Array, scanFdi: Uint8Array | null, wax: A
       p.push(cx, cy, cz); n.push(nx / l, ny / l, nz / l); f.push(fdiOf(t)); w.push(isWax);
     }
   };
-  add(scan, (t) => (scanFdi ? scanFdi[t] : 0), 0);
+  // Build 102: the patient's crowns as the wax-up model has them - cut back on their facial side.
+  const cutOf = new Map((cuts ?? []).map((c) => [c.fdi, c]));
+  const scanKept = scanFdi && cutOf.size ? (() => {
+    const out: number[] = [];
+    for (let t = 0; t < scan.length / 9; t += 1) {
+      const c = cutOf.get(scanFdi[t]);
+      if (c) {
+        const o = t * 9;
+        const cx = (scan[o] + scan[o + 3] + scan[o + 6]) / 3 - c.through[0], cy = (scan[o + 1] + scan[o + 4] + scan[o + 7]) / 3 - c.through[1], cz = (scan[o + 2] + scan[o + 5] + scan[o + 8]) / 3 - c.through[2];
+        if (cx * c.facing[0] + cy * c.facing[1] + cz * c.facing[2] > 0) continue;
+      }
+      out.push(t);
+    }
+    return out;
+  })() : null;
+  if (scanKept) {
+    const sub = new Float32Array(scanKept.length * 9), subFdi = new Uint8Array(scanKept.length);
+    scanKept.forEach((t, i) => { sub.set(scan.subarray(t * 9, t * 9 + 9), i * 9); subFdi[i] = scanFdi![t]; });
+    add(sub, (t) => subFdi[t], 0);
+  } else add(scan, (t) => (scanFdi ? scanFdi[t] : 0), 0);
   for (const tooth of wax) add(tooth.positions, () => tooth.fdi, 1);
   return { p: Float32Array.from(p), n: Float32Array.from(n), fdi: Uint8Array.from(f), wax: Uint8Array.from(w) };
 }
@@ -253,9 +272,17 @@ export class VerticalCaster {
 }
 
 export type WaxTooth = { fdi: number; positions: Float32Array };
+/** Build 102: a patient's crown cut back under its wax tooth - on the side of `through` that `facing` points to. */
+export type ToothCut = {
+  fdi: number; facing: [number, number, number]; through: [number, number, number];
+  /** The wax tooth over it and the tooth's up (incisal) direction: Make cuts only in front of and beyond the wax (no lower than its end), and so is the crown here. */
+  cover?: Float32Array; up?: [number, number, number];
+};
 export type OcclusionInput = {
   upperScan: Float32Array; upperFdi: Uint8Array | null; lowerScan: Float32Array; lowerFdi: Uint8Array | null;
   upperWax: WaxTooth[]; lowerWax: WaxTooth[];
+  /** Build 102: the crowns cut back for the wax-up model, so the occlusion is worked out on the model as it will be. */
+  upperCuts?: ToothCut[]; lowerCuts?: ToothCut[];
   /** The opening at the incisors, mm (the pin raised). */
   raise: number;
   articulator?: Articulator;
@@ -301,6 +328,48 @@ export function occlusionWork(input: OcclusionInput): OcclusionResult {
   const a = input.articulator ?? AVERAGE_ARTICULATOR;
   const scheme = input.scheme ?? "canine";
   const incisal = incisalPoint(input.lowerScan);
+  // Build 102: the patient's crowns as the wax-up model will have them - cut back on their facial side.
+  {
+    const cut = (scan: Float32Array, fdi: Uint8Array | null, cuts?: ToothCut[]) => {
+      if (!fdi || !cuts?.length || fdi.length * 9 !== scan.length) return { scan, fdi };
+      // Each cut's reach, as Make's (dentalModel buildArch): the wax swept CUT_FRONT forward and CUT_BEYOND
+      // up - in the tooth's own axes, its box: across the wax's width, from its end upward, from its back forward.
+      type Box = { f: THREE.Vector3; u: THREE.Vector3; side: THREE.Vector3; lo: number[]; hi: number[] };
+      const reach = new Map<number, { c: ToothCut; box: Box | null }>(cuts.map((c): [number, { c: ToothCut; box: Box | null }] => {
+        if (!c.cover || !c.up) return [c.fdi, { c, box: null }];
+        const f = new THREE.Vector3(...c.facing).normalize(), u = new THREE.Vector3(...c.up).normalize();
+        const side = new THREE.Vector3().crossVectors(u, f).normalize();
+        const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+        for (let i = 0; i < c.cover.length; i += 3) {
+          const v = [c.cover[i], c.cover[i + 1], c.cover[i + 2]];
+          const q = [v[0] * f.x + v[1] * f.y + v[2] * f.z, v[0] * u.x + v[1] * u.y + v[2] * u.z, v[0] * side.x + v[1] * side.y + v[2] * side.z];
+          for (let k = 0; k < 3; k += 1) { lo[k] = Math.min(lo[k], q[k]); hi[k] = Math.max(hi[k], q[k]); }
+        }
+        return [c.fdi, { c, box: { f, u, side, lo, hi } }];
+      }));
+      const kept: number[] = [];
+      for (let t = 0; t < fdi.length; t += 1) {
+        const r = reach.get(fdi[t]);
+        if (r) {
+          const { c, box } = r;
+          const o = t * 9;
+          const mx = (scan[o] + scan[o + 3] + scan[o + 6]) / 3, my = (scan[o + 1] + scan[o + 4] + scan[o + 7]) / 3, mz = (scan[o + 2] + scan[o + 5] + scan[o + 8]) / 3;
+          const facial = (mx - c.through[0]) * c.facing[0] + (my - c.through[1]) * c.facing[1] + (mz - c.through[2]) * c.facing[2] > 0;
+          const within = !box || (() => {
+            const qf = mx * box.f.x + my * box.f.y + mz * box.f.z, qu = mx * box.u.x + my * box.u.y + mz * box.u.z, qs = mx * box.side.x + my * box.side.y + mz * box.side.z;
+            return qf >= box.lo[0] && qf <= box.hi[0] + CUT_FRONT && qu >= box.lo[1] && qu <= box.hi[1] + CUT_BEYOND && qs >= box.lo[2] && qs <= box.hi[2];
+          })();
+          if (facial && within) continue;
+        }
+        kept.push(t);
+      }
+      const out = new Float32Array(kept.length * 9), outFdi = new Uint8Array(kept.length);
+      kept.forEach((t, i) => { out.set(scan.subarray(t * 9, t * 9 + 9), i * 9); outFdi[i] = fdi[t]; });
+      return { scan: out, fdi: outFdi };
+    };
+    const u = cut(input.upperScan, input.upperFdi, input.upperCuts), l = cut(input.lowerScan, input.lowerFdi, input.lowerCuts);
+    input = { ...input, upperScan: u.scan, upperFdi: u.fdi, lowerScan: l.scan, lowerFdi: l.fdi, upperCuts: undefined, lowerCuts: undefined };
+  }
   const rest = openingFor(Math.max(0, Math.min(OVD_MAX * 2, input.raise)), incisal, a);
   const restPose = mandiblePose({ kind: "rest" }, rest, incisal, a);
   let upperWax: WaxTooth[] = input.upperWax.map((t) => ({ fdi: t.fdi, positions: Float32Array.from(t.positions) }));
@@ -558,7 +627,8 @@ export function occlusionInScanFrame(input: OcclusionInput): OcclusionResult {
   const { frame } = pairFrame(cleanScan(input.upperScan), cleanScan(input.lowerScan));
   const back = frame.clone().invert();
   const move = (list: WaxTooth[], m: THREE.Matrix4) => list.map((t) => ({ fdi: t.fdi, positions: transformSoup(t.positions, m) }));
-  const result = occlusionWork({ ...input, upperScan: transformSoup(input.upperScan, frame), lowerScan: transformSoup(input.lowerScan, frame), upperWax: move(input.upperWax, frame), lowerWax: move(input.lowerWax, frame) });
+  const moveCuts = (cuts?: ToothCut[]) => cuts?.map((c) => ({ fdi: c.fdi, facing: new THREE.Vector3(...c.facing).transformDirection(frame).toArray() as [number, number, number], through: new THREE.Vector3(...c.through).applyMatrix4(frame).toArray() as [number, number, number], ...(c.cover && c.up ? { cover: transformSoup(c.cover, frame), up: new THREE.Vector3(...c.up).transformDirection(frame).toArray() as [number, number, number] } : {}) }));
+  const result = occlusionWork({ ...input, upperScan: transformSoup(input.upperScan, frame), lowerScan: transformSoup(input.lowerScan, frame), upperWax: move(input.upperWax, frame), lowerWax: move(input.lowerWax, frame), upperCuts: moveCuts(input.upperCuts), lowerCuts: moveCuts(input.lowerCuts) });
   const incisal = incisalPoint(transformSoup(input.lowerScan, frame));
   const a = input.articulator ?? AVERAGE_ARTICULATOR;
   const pose = mandiblePose({ kind: "rest" }, openingFor(Math.max(0, Math.min(OVD_MAX * 2, input.raise)), incisal, a), incisal, a);

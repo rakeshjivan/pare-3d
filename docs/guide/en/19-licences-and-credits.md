@@ -15,7 +15,7 @@ Pare 3D began as a modified version of **layerling** (copyright 2026 layerling c
 
 ## Dental data and models
 
-- **Tooth libraries:** by Dr Adam Nulty, used with his permission (CC BY-NC-ND 4.0); and by [teethy.org](https://teethy.org), redistributed with written permission.
+- **Tooth libraries:** the sets in Wax-up (Pare Square, Pare Oval, Pare Square-Oval, Pare Lower, Pare Tapered and Pare Youthful) are made from Christian Brenes's Elchi library and 3D Smile Overlay, used with his permission. Earlier sets, kept so older designs still open: by Dr Adam Nulty, used with his permission (CC BY-NC-ND 4.0); and by [teethy.org](https://teethy.org), redistributed with written permission.
 - **Tooth finder:** the trained network is CrossTooth - Xi et al., *3D Dental Model Segmentation with Geometrical Boundary Preserving*, CVPR 2025 - used with the authors' permission.
 
 ## Open-source libraries

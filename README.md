@@ -81,7 +81,7 @@ Pare 3D is free software, licensed under the **GNU Affero General Public License
 **Where the code comes from.** Pare 3D began as a modified version of [layerling](https://github.com/henmedia/layerling) (copyright (C) 2026 layerling contributors). layerling is itself a modified version of [SketchForge-3D](https://github.com/Formsmith746/SketchForge-3D) (copyright (C) 2026 SketchForge contributors). Both are licensed under the AGPL-3.0, and their copyright notices are kept in the source. Pare 3D has been changed substantially since, and the full history is in this repository.
 
 **Dental data and models.**
-- **Tooth libraries:** by Dr Adam Nulty, used with his permission (CC BY-NC-ND 4.0), and by [teethy.org](https://teethy.org), redistributed with written permission.
+- **Tooth libraries:** Christian Brenes's Elchi library and 3D Smile Overlay (the Pare sets), used with his permission; and, kept for older designs, by Dr Adam Nulty, used with his permission (CC BY-NC-ND 4.0), and by [teethy.org](https://teethy.org), redistributed with written permission.
 - **Tooth finder:** CrossTooth (Xi et al., *3D Dental Model Segmentation with Geometrical Boundary Preserving*, CVPR 2025), used with the authors' permission.
 
 **Libraries.** three.js, Manifold, OpenCascade (through occt-wasm and brepjs), meshoptimizer, three-mesh-bvh, three-bvh-csg, opentype.js, fflate, qrcode-generator, React, Next.js and Lucide. Each keeps its own licence; see `package.json`.

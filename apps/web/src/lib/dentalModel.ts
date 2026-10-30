@@ -51,6 +51,14 @@ export type DentalArchInput = {
    * under the wax (counted apart in the trueness check).
    */
   wax?: ArrayLike<number> | null;
+  /**
+   * Build 102: the patient's crowns the wax-up replaces, each a closed solid (a soup, in the same
+   * coordinates), cut out of the model before the wax is joined - on the facial side of `through`
+   * (towards `facing`) only, as a technician reduces a model for a mock-up: where the patient's tooth
+   * stands out beyond the ideal tooth facially or incisally it goes, and the palatal (lingual)
+   * surfaces, where the opposing teeth meet them, are kept. The gum and every other tooth are kept.
+   */
+  cuts?: Array<{ positions: ArrayLike<number>; facing: [number, number, number]; through: [number, number, number]; /** The wax tooth that replaces it (a soup) and its long axis towards the edge: only what stands in front of or beyond it is cut, so no hole is left where it does not reach. */ cover?: ArrayLike<number>; up?: [number, number, number] }> | null;
 };
 export type DentalStudioInput = {
   arches: DentalArchInput[];
@@ -253,6 +261,10 @@ export function withoutTags(runtime: ManifoldRuntime, solid: ManifoldSolid): { s
   return { solid: kept, dropped };
 }
 
+// Build 102: how far in front of the wax tooth, and beyond its edge, the patient's tooth is cut back
+// (kept with the occlusion's cut, which works on the model as Make will cut it).
+export { CUT_FRONT, CUT_BEYOND } from "@/lib/dentalMesh";
+import { CUT_FRONT, CUT_BEYOND } from "@/lib/dentalMesh";
 /** Gum kept below the teeth by a clean base when none is set, mm. */
 export const CLEAN_GUM = 3;
 /** Rounds of smoothing the margin's line gets along the surface before the cut (build 52). */
@@ -509,6 +521,7 @@ function buildArch(
   area?: Uint8Array,
   opponent?: { mesh: Mesh; teeth: Uint8Array; normals: Float64Array } | null,
   wax?: ArrayLike<number> | null,
+  cutAway?: DentalArchInput["cuts"],
 ): Built {
   const warnings: string[] = [];
   const m = cloneMesh(arch.clean.mesh);
@@ -761,6 +774,37 @@ function buildArch(
     const cutter = bevelCutter(runtime, footprint, floor);
     if (cutter) solid = keepSolid(runtime.Manifold.difference(solid, keepSolid(cutter)));
   }
+  // Build 102: the crowns the wax-up replaces, cut back to the margin first - their facial side.
+  const cutShells: Float32Array[] = [];
+  const rotation = new THREE.Matrix3().setFromMatrix4(arch.frame);
+  for (const entry of cutAway ?? []) {
+    const shell = transformSoup(entry.positions, arch.frame);
+    try {
+      const n = new THREE.Vector3(...entry.facing).applyMatrix3(rotation).normalize();
+      const through = new THREE.Vector3(...entry.through).applyMatrix4(arch.frame);
+      const cutter = keepSolid(toManifold(runtime, weld(shell, 1e-6)));
+      let facial = keepSolid(cutter.trimByPlane([n.x, n.y, n.z], n.dot(through)));
+      // What the ideal tooth replaces: the space it fills and what lies in front of it and beyond its
+      // edge (the hull of the wax tooth swept out and up) - the patient's tooth below the wax's cervical
+      // end, or beside it, stays.
+      if (entry.cover && entry.cover.length >= 9 * 4) {
+        const cover = transformSoup(entry.cover, arch.frame);
+        const up = new THREE.Vector3(...(entry.up ?? [0, 0, 1])).applyMatrix3(rotation).normalize();
+        const points: [number, number, number][] = [];
+        const step = Math.max(1, Math.floor(cover.length / 3 / 4000));
+        for (let i = 0; i < cover.length / 3; i += step) {
+          const x = cover[i * 3], y = cover[i * 3 + 1], z = cover[i * 3 + 2];
+          for (const [a, b] of [[0, 0], [CUT_FRONT, 0], [0, CUT_BEYOND], [CUT_FRONT, CUT_BEYOND]]) points.push([x + n.x * a + up.x * b, y + n.y * a + up.y * b, z + n.z * a + up.z * b]);
+        }
+        const reach = keepSolid(runtime.Manifold.hull(points));
+        facial = keepSolid(runtime.Manifold.intersection(facial, reach));
+      }
+      solid = keepSolid(runtime.Manifold.difference(solid, facial));
+      cutShells.push(solidPositions(facial));
+    } catch {
+      warnings.push("cut");
+    }
+  }
   // Build 79: the wax-up, tooth by tooth (library teeth may overlap their neighbours).
   const waxShells = wax && wax.length ? splitShells(transformSoup(wax, arch.frame), 4) : [];
   for (const shell of waxShells) {
@@ -817,7 +861,10 @@ function buildArch(
   // Build 79: the scan's corners under the wax-up are covered on purpose, not lost.
   const underWax = waxShells.map(insideOf);
   const waxedCorner = new Uint8Array(m.v.length / 3);
-  if (underWax.length) for (let i = 0; i < waxedCorner.length; i += 1) if (scanTeeth[i] && underWax.some((inside) => inside(m.v[i * 3], m.v[i * 3 + 1], m.v[i * 3 + 2]))) waxedCorner[i] = 1;
+  // Build 102: and those of a crown cut back for the wax-up are changed on purpose too.
+  const underCut = cutShells.map(insideOf);
+  const replaced = [...underWax, ...underCut];
+  if (replaced.length) for (let i = 0; i < waxedCorner.length; i += 1) if (scanTeeth[i] && replaced.some((inside) => inside(m.v[i * 3], m.v[i * 3 + 1], m.v[i * 3 + 2]))) waxedCorner[i] = 1;
   const promised = scanTeeth.map((inZone, i) => (inZone && !waxedCorner[i] && fromEdge[i] > EDGE_FRINGE ? 1 : 0));
   for (const depth of [2, 4, 6, 8, 10, 12]) kept[depth] = surfaceKept(m, out, -depth, scanTeeth);
   kept[-3] = surfaceKept(m, out, -Infinity, scanTeeth);
@@ -961,7 +1008,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
       for (let i = 0; i < normals.length; i += 3) { normals[i] = -normals[i]; normals[i + 2] = -normals[i + 2]; }
       opponent = { mesh, teeth: otherTeeth, normals };
     }
-    const made = buildArch(runtime, arch, { ...options, base }, -depth, ortho, line, areaOn(arch.id, arch.clean.mesh), opponent, input.arches.find((entry) => entry.id === arch.id)?.wax);
+    const made = buildArch(runtime, arch, { ...options, base }, -depth, ortho, line, areaOn(arch.id, arch.clean.mesh), opponent, input.arches.find((entry) => entry.id === arch.id)?.wax, input.arches.find((entry) => entry.id === arch.id)?.cuts);
     if (mode.only !== undefined) {
       mode.take?.(archPartOf(made));
       made.solid.delete();

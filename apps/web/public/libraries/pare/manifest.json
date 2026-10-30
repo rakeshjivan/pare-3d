@@ -1,0 +1,360 @@
+{
+  "id": "pare",
+  "name": "Pare",
+  "credit": "Tooth libraries by Christian Brenes (the Elchi library and the 3D Smile Overlay), used with his permission.",
+  "url": "",
+  "sets": [
+    {
+      "id": "pare-square-upper-front",
+      "name": "Pare Square",
+      "file": "square-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "square-upper-front.png"
+    },
+    {
+      "id": "pare-square-upper-arch",
+      "name": "Pare Square full arch",
+      "file": "square-upper-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "preview": "square-upper-arch.png"
+    },
+    {
+      "id": "pare-square-pontic-upper-front",
+      "name": "Pare Square pontics",
+      "file": "square-pontic-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "square-pontic-upper-front.png"
+    },
+    {
+      "id": "pare-square-pontic-upper-arch",
+      "name": "Pare Square pontics full arch",
+      "file": "square-pontic-upper-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "preview": "square-pontic-upper-arch.png"
+    },
+    {
+      "id": "pare-lower-front",
+      "name": "Pare Lower",
+      "file": "lower-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        33,
+        32,
+        31,
+        41,
+        42,
+        43
+      ],
+      "preview": "lower-front.png"
+    },
+    {
+      "id": "pare-lower-arch",
+      "name": "Pare Lower full arch",
+      "file": "lower-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47
+      ],
+      "preview": "lower-arch.png"
+    },
+    {
+      "id": "pare-pontic-lower-front",
+      "name": "Pare Lower pontics",
+      "file": "pontic-lower-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        33,
+        32,
+        31,
+        41,
+        42,
+        43
+      ],
+      "preview": "pontic-lower-front.png"
+    },
+    {
+      "id": "pare-pontic-lower-arch",
+      "name": "Pare Lower pontics full arch",
+      "file": "pontic-lower-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47
+      ],
+      "preview": "pontic-lower-arch.png"
+    },
+    {
+      "id": "pare-oval-upper-front",
+      "name": "Pare Oval",
+      "file": "oval-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "oval-upper-front.png"
+    },
+    {
+      "id": "pare-oval-upper-arch",
+      "name": "Pare Oval full arch",
+      "file": "oval-upper-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "preview": "oval-upper-arch.png"
+    },
+    {
+      "id": "pare-oval-pontic-upper-front",
+      "name": "Pare Oval pontics",
+      "file": "oval-pontic-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "oval-pontic-upper-front.png"
+    },
+    {
+      "id": "pare-oval-pontic-upper-arch",
+      "name": "Pare Oval pontics full arch",
+      "file": "oval-pontic-upper-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "preview": "oval-pontic-upper-arch.png"
+    },
+    {
+      "id": "pare-square-oval-upper-front",
+      "name": "Pare Square-Oval",
+      "file": "square-oval-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "square-oval-upper-front.png"
+    },
+    {
+      "id": "pare-square-oval-upper-arch",
+      "name": "Pare Square-Oval full arch",
+      "file": "square-oval-upper-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "preview": "square-oval-upper-arch.png"
+    },
+    {
+      "id": "pare-square-oval-pontic-upper-front",
+      "name": "Pare Square-Oval pontics",
+      "file": "square-oval-pontic-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "square-oval-pontic-upper-front.png"
+    },
+    {
+      "id": "pare-square-oval-pontic-upper-arch",
+      "name": "Pare Square-Oval pontics full arch",
+      "file": "square-oval-pontic-upper-arch.ptl",
+      "teeth": 14,
+      "kind": "arch",
+      "fdi": [
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "preview": "square-oval-pontic-upper-arch.png"
+    },
+    {
+      "id": "pare-tapered-upper-front",
+      "name": "Pare Tapered",
+      "file": "tapered-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "tapered-upper-front.png"
+    },
+    {
+      "id": "pare-youthful-upper-front",
+      "name": "Pare Youthful",
+      "file": "youthful-upper-front.ptl",
+      "teeth": 6,
+      "kind": "anterior",
+      "fdi": [
+        13,
+        12,
+        11,
+        21,
+        22,
+        23
+      ],
+      "preview": "youthful-upper-front.png"
+    }
+  ]
+}

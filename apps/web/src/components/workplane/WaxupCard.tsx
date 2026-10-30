@@ -39,7 +39,7 @@ export type WaxupView = {
   arcUsed: number | null;
   proportions: "natural" | "library";
   busy: boolean;
-  placed: Array<{ id: string; fdi: number; clearance: number | null; width: number; length: number; lengthening: number; extension: number }>;
+  placed: Array<{ id: string; fdi: number; clearance: number | null; width: number; length: number; lengthening: number; extension: number; /** Build 102: the reduction it asks of the patient's tooth, mm. */ reduce?: number }>;
   /** Build 79: also make a model with wax on alternate teeth only (injection moulding, first injection). */
   alternate: boolean;
   selected: string | null;
@@ -89,6 +89,8 @@ export type WaxupActions = {
   onRemove: () => void;
   onSelect: (id: string) => void;
   onNudge: (id: string, nudge: ToothNudge, amount: number) => void;
+  /** Build 102: the one-click helpers. */
+  onHelper: (kind: "level" | "arc" | "mirrorTooth" | "mirrorSide" | "resetTooth" | "resetAll") => void;
   onMirror: (on: boolean) => void;
   onAlternate: (on: boolean) => void;
   onLoadFinder: (file: File) => void;
@@ -123,6 +125,9 @@ export const archOrder = (fdi: number) => { const q = Math.floor(fdi / 10), n = 
 /** Build 101: Wax-up Studio's steps that live in this card (shown one at a time; all of them without a step). */
 export type WaxupPart = "find" | "choose" | "set" | "place" | "adjust" | "occlusion";
 
+/** Build 102: reductions shown from this, mm (less is within a scan's own noise). */
+const WAX_REDUCE_SHOWN = 0.2;
+
 export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, part }: { view: WaxupView; actions: WaxupActions; slots: { upper: boolean; lower: boolean }; busy: boolean; workspace: WorkplaneWorkspaceSettings; imt?: boolean; part?: WaxupPart }) {
   const show = (which: WaxupPart) => !part || part === which;
   const file = useRef<HTMLInputElement>(null);
@@ -139,6 +144,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
   const sorted = [...view.placed].sort((a, b) => a.fdi - b.fdi);
   const unsupported = sorted.filter((tooth) => tooth.extension > IMT_UNSUPPORTED + 1e-6);
   const reduce = sorted.filter((tooth) => tooth.extension < -IMT_REDUCE);
+  const cutBack = sorted.filter((tooth) => (tooth.reduce ?? 0) >= WAX_REDUCE_SHOWN);
   const first = sorted.filter((tooth) => imtFirstInjection(tooth.fdi));
   return (
     <div className="waxup-card">
@@ -208,7 +214,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
         <input
           ref={file}
           type="file"
-          accept=".obj,.stl"
+          accept=".obj,.stl,.zip,.eoff,.xml"
           multiple
           hidden
           onChange={(event) => {
@@ -218,11 +224,12 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
           }}
         />
         {view.builtIn.length ? (
-          // Build 91: the sets as pictures, by library (Teethy, Dr Adam Nulty's).
+          // Build 91: the sets as pictures. Build 102: Pare's own sets by their Pare names (no heading); an
+          // exocad library the user loads, under "Your library".
           <div className="waxup-sets" role="radiogroup" aria-label={t("waxup.builtIn")}>
             {[...new Set(sets.map((set) => set.library ?? ""))].map((library) => (
               <div key={library} className="waxup-set-library">
-                {library ? <span className="waxup-set-library-name">{library}</span> : null}
+                {library ? <span className="waxup-set-library-name">{library === "own" ? t("waxup.ownLibrary") : library}</span> : null}
                 <div className="waxup-set-grid">
                   {sets.filter((set) => (set.library ?? "") === library).map((set) => (
                     <button key={set.id} type="button" role="radio" aria-checked={view.setId === set.id} className={`waxup-set${view.setId === set.id ? " active" : ""}`} disabled={working} title={set.name} onClick={() => actions.onBuiltIn(set.id)}>
@@ -237,7 +244,6 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
         ) : null}
         <button type="button" className="dental-import" disabled={working} onClick={() => file.current?.click()}><Upload size={15} /> {t("waxup.loadSet")}</button>
         <p className="blend-hint">{view.setName ? t("waxup.setLoaded", { name: view.setName, count: view.teeth }) : t("waxup.setHint")}</p>
-        {view.setId && view.builtInCredit ? <p className="blend-hint">{view.builtInCredit}</p> : null}
       </div>
       ) : null}
 
@@ -334,17 +340,19 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
               </details>
             ) : null}
             <table className="waxup-table">
-              <thead><tr><th>{t("waxup.colTooth")}</th><th>{t("waxup.colWidth")}</th><th>{t("waxup.colLength")}</th><th>{t("waxup.colRatio")}</th><th>{t("waxup.colEdge")}</th><th>{t("waxup.colLengthening")}</th></tr></thead>
+              <thead><tr><th>{t("waxup.colTooth")}</th><th>{t("waxup.colWidth")}</th><th>{t("waxup.colLength")}</th><th>{t("waxup.colRatio")}</th><th>{t("waxup.colEdge")}</th><th>{t("waxup.colLengthening")}</th><th>{t("waxup.colReduce")}</th></tr></thead>
               <tbody>
                 {[...view.placed].sort((a, b) => a.fdi - b.fdi).map((tooth) => (
                   <tr key={tooth.id}>
-                    <td>{tooth.fdi}</td><td>{tooth.width.toFixed(1)}</td><td>{tooth.length.toFixed(1)}</td><td>{Math.round((tooth.width / Math.max(0.1, tooth.length)) * 100)}%</td><td className={tooth.extension > IMT_UNSUPPORTED + 1e-6 || tooth.extension < -IMT_REDUCE ? "warn" : ""}>{tooth.extension >= 0 ? "+" : ""}{tooth.extension.toFixed(1)}</td><td>{tooth.lengthening > 0 ? tooth.lengthening.toFixed(1) : "-"}</td>
+                    <td>{tooth.fdi}</td><td>{tooth.width.toFixed(1)}</td><td>{tooth.length.toFixed(1)}</td><td>{Math.round((tooth.width / Math.max(0.1, tooth.length)) * 100)}%</td><td className={tooth.extension > IMT_UNSUPPORTED + 1e-6 || tooth.extension < -IMT_REDUCE ? "warn" : ""}>{tooth.extension >= 0 ? "+" : ""}{tooth.extension.toFixed(1)}</td><td>{tooth.lengthening > 0 ? tooth.lengthening.toFixed(1) : "-"}</td><td>{(tooth.reduce ?? 0) >= WAX_REDUCE_SHOWN ? tooth.reduce!.toFixed(1) : "-"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {unsupported.length ? <p className="dental-status warn" role="status">{t("waxup.unsupported", { teeth: unsupported.map((tooth) => `${tooth.fdi} (${tooth.extension.toFixed(1)} mm)`).join(", "), mm: IMT_UNSUPPORTED })}</p> : null}
             {reduce.length ? <p className="dental-status warn" role="status">{t("waxup.reduce", { teeth: reduce.map((tooth) => `${tooth.fdi} (${(-tooth.extension).toFixed(1)} mm)`).join(", ") })}</p> : null}
+            {/* Build 102: where the wax-up model is cut back - the patient's tooth in front of the design. */}
+            {cutBack.length ? <p className="dental-status" role="status">{t("waxup.cutBack", { teeth: cutBack.map((tooth) => `${tooth.fdi} (${tooth.reduce!.toFixed(1)} mm)`).join(", ") })}</p> : null}
             {lengthening.length ? <p className="dental-status warn" role="status">{t("waxup.lengthening", { teeth: lengthening.map((tooth) => `${tooth.fdi} (${tooth.lengthening.toFixed(1)} mm)`).join(", ") })}</p> : null}
             {selectedTooth ? (
               <div className="waxup-adjust" role="group" aria-label={t("waxup.adjustTooth", { fdi: selectedTooth.fdi })}>
@@ -361,6 +369,21 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
                 </label>
               </div>
             ) : null}
+            {/* Build 102: most alignment in a click - the edges levelled or on the smile arc, a side mirrored. */}
+            <div className="waxup-helpers" role="group" aria-label={t("waxup.helpers")}>
+              <h5>{t("waxup.helpers")}</h5>
+              <div className="dental-trim-buttons">
+                {(["level", "arc"] as const).map((kind) => (
+                  <button key={kind} type="button" className="secondary" disabled={working} title={t(`waxup.helper.${kind}Hint`)} onClick={() => actions.onHelper(kind)}>{t(`waxup.helper.${kind}`)}</button>
+                ))}
+                {(["mirrorTooth", "mirrorSide"] as const).map((kind) => (
+                  <button key={kind} type="button" className="secondary" disabled={working || !selectedTooth} title={t(`waxup.helper.${kind}Hint`)} onClick={() => actions.onHelper(kind)}>{t(`waxup.helper.${kind}`)}</button>
+                ))}
+                {view.fit === "teeth" ? (["resetTooth", "resetAll"] as const).map((kind) => (
+                  <button key={kind} type="button" className="secondary" disabled={working || (kind === "resetTooth" && !selectedTooth)} title={t(`waxup.helper.${kind}Hint`)} onClick={() => actions.onHelper(kind)}>{t(`waxup.helper.${kind}`)}</button>
+                )) : null}
+              </div>
+            </div>
             <p className="blend-hint">{t("waxup.adjustHint")}</p>
             {thin.length ? <p className="dental-status warn" role="status">{t("waxup.thin", { teeth: thin.map((tooth) => tooth.fdi).sort().join(", "), mm: WAX_THIN })}</p> : null}
             {imt ? <p className="dental-status" role="note">{t("waxup.imtModels", { first: first.map((tooth) => tooth.fdi).join(", ") || "-" })}</p> : null}

@@ -11,7 +11,7 @@ import type { WaxLandmarks, WaxupOptions, WaxupPlan } from "@/lib/dentalWaxup";
 import type { ScanTeeth } from "@/lib/toothSegment";
 import type { OcclusionInput, OcclusionResult } from "@/lib/waxOcclusion";
 /** Build 94: fit the set tooth by tooth to the teeth found: each scan triangle's FDI, the teeth chosen. */
-export type WaxTeethFit = { fdi: Uint8Array; chosen: number[]; arch: "upper" | "lower"; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number };
+export type WaxTeethFit = { fdi: Uint8Array; chosen: number[]; arch: "upper" | "lower"; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number; adjust?: Record<number, import("@/lib/dentalWaxup").ToothAdjust> };
 import type { WorkplaneShape } from "@/types/layerling";
 import type { SurfaceTextureOptions, SurfaceTextureResult } from "@/lib/surfaceTexture";
 import type { RemeshOptions, RemeshResult } from "@/lib/meshRemesh";
@@ -185,7 +185,7 @@ function copiedInput(input: DentalStudioInput): DentalStudioInput {
     // Build 68: the tooth area fixed by hand goes along too - it was left behind, so in the worker a
     // corrected area was not used.
     // Build 79: and the arch's wax-up teeth.
-    arches: input.arches.map((arch) => ({ id: arch.id, positions: Float32Array.from(arch.positions as ArrayLike<number>), ...(arch.area ? { area: Uint8Array.from(arch.area) } : {}), ...(arch.wax?.length ? { wax: Float32Array.from(arch.wax) } : {}) })),
+    arches: input.arches.map((arch) => ({ id: arch.id, positions: Float32Array.from(arch.positions as ArrayLike<number>), ...(arch.area ? { area: Uint8Array.from(arch.area) } : {}), ...(arch.wax?.length ? { wax: Float32Array.from(arch.wax) } : {}), ...(arch.cuts?.length ? { cuts: arch.cuts.map((c) => ({ positions: Float32Array.from(c.positions), facing: [...c.facing] as [number, number, number], through: [...c.through] as [number, number, number], ...(c.cover ? { cover: Float32Array.from(c.cover) } : {}), ...(c.up ? { up: [...c.up] as [number, number, number] } : {}) })) } : {}) })),
     bite: input.bite ? Float32Array.from(input.bite as ArrayLike<number>) : null,
     ...(input.bite2 ? { bite2: Float32Array.from(input.bite2 as ArrayLike<number>) } : {}),
     roles: input.roles,
@@ -397,7 +397,7 @@ export function waxupInBackground(scan: Float32Array, shells: null): Promise<Wax
 export async function waxupInBackground(scan: Float32Array, shells: Float32Array[] | null, landmarks: WaxLandmarks | null = null, options: Omit<WaxupOptions, "landmarks"> = {}, teeth?: WaxTeethFit): Promise<WaxupPlan | WaxLandmarks | null> {
   const here = async () => {
     const { guessLandmarks, planWaxup, planWaxupOnTeeth } = await import("@/lib/dentalWaxup");
-    if (shells && teeth) return planWaxupOnTeeth(scan, shells, teeth.fdi, teeth.chosen, teeth.arch, { lengthen: options.lengthen, ideal: teeth.ideal, red: teeth.red, centralRatio: teeth.centralRatio, arcDepth: teeth.arcDepth });
+    if (shells && teeth) return planWaxupOnTeeth(scan, shells, teeth.fdi, teeth.chosen, teeth.arch, { lengthen: options.lengthen, ideal: teeth.ideal, red: teeth.red, centralRatio: teeth.centralRatio, arcDepth: teeth.arcDepth, adjust: teeth.adjust });
     return shells ? planWaxup(scan, shells, landmarks, options) : guessLandmarks(scan);
   };
   const target = meshWorker();

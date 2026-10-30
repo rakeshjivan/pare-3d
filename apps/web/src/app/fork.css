@@ -2099,3 +2099,14 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 /* Build 101: handles hidden from the right-click menu - said on screen, with the way back. */
 .handles-hidden-chip { position: fixed; z-index: 55; left: 50%; top: 150px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.97); box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18); font-size: 12px; }
 .handles-hidden-chip button { border: 0; border-radius: 999px; padding: 4px 10px; background: var(--accent, #2f5fb3); color: #fff; font: inherit; cursor: pointer; }
+
+/* Build 102: the wax tooth's gimbal, drawn over the view. */
+.tooth-gimbal { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 30; overflow: visible; }
+.tooth-gimbal-handle { pointer-events: auto; cursor: grab; }
+.tooth-gimbal-handle.active { cursor: grabbing; }
+.tooth-gimbal.disabled .tooth-gimbal-handle { pointer-events: none; opacity: 0.3; }
+.tooth-gimbal-panel { position: fixed; z-index: 31; pointer-events: auto; font: 500 12px/1.2 var(--font-sans, system-ui, sans-serif); }
+.tooth-gimbal-panel .tooth-gimbal-readout { background: rgba(31, 35, 40, 0.88); color: #fff; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 6px; padding: 4px 8px; cursor: text; white-space: nowrap; font: inherit; }
+.tooth-gimbal-panel form { display: flex; gap: 4px; align-items: center; background: rgba(31, 35, 40, 0.92); color: #fff; border-radius: 6px; padding: 4px 6px; }
+.tooth-gimbal-panel input { width: 56px; font: inherit; padding: 2px 4px; }
+.tooth-gimbal-panel select, .tooth-gimbal-panel button[type="submit"] { font: inherit; padding: 2px 4px; }

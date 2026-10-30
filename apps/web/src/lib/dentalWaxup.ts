@@ -11,7 +11,7 @@
  */
 import * as THREE from "three";
 import { archFrame, cleanScan, marginUp, vertexNormals } from "@/lib/dentalArch";
-import { PointGrid, upwardness, weld, type Mesh } from "@/lib/dentalMesh";
+import { boundaryLoops, dropFragments, dropNonManifold, fillLoop, PointGrid, soup as meshSoup, upwardness, weld, type Mesh } from "@/lib/dentalMesh";
 
 /** One library tooth: its closed shell (triangle soup) in the set's frame, and where it sits. */
 export type LibraryTooth = {
@@ -911,7 +911,7 @@ export type WaxupPlan = {
   /** The smile arc used: canine tips above the centrals' edges, mm. */
   arcDepth: number;
   centralWidth: number;
-  teeth: Array<{ kind: ToothKind; side: -1 | 1; positions: Float32Array; clearance: number | null; width: number; length: number; lengthening: number; extension: number; frame: ToothFrame }>;
+  teeth: Array<{ kind: ToothKind; side: -1 | 1; positions: Float32Array; clearance: number | null; width: number; length: number; lengthening: number; extension: number; frame: ToothFrame; /** Build 102: how far the patient's tooth stands outside it, mm (the reduction it asks for). */ reduce?: number }>;
   /** Build 94: the smile checked (when the arch is known). */
   checks?: SmileCheck[];
 };
@@ -970,6 +970,64 @@ export function moveFrame(f: ToothFrame, m: THREE.Matrix4): ToothFrame {
 
 /** Ways to adjust a placed wax tooth: along its frame, mm (or degrees for `turn`). */
 export type ToothNudge = "out" | "mesial" | "longer" | "wider" | "turn";
+
+/**
+ * Build 102: a wax tooth's own adjustment, in its frame (mesial towards the midline, out, up towards
+ * the edge): moved (mm), turned about its long axis, tipped mesio-distally and torqued labio-
+ * lingually (degrees, about the middle of the crown), and scaled (wider along the arch, longer from
+ * the cervical end, both as factors). The same numbers on the other side's tooth mirror it (each
+ * side's frame is the other's mirror image), which is how symmetry works.
+ */
+export type ToothAdjust = { mesial?: number; out?: number; up?: number; turn?: number; tip?: number; torque?: number; wider?: number; longer?: number };
+export const isIdentityAdjust = (a: ToothAdjust) => !a.mesial && !a.out && !a.up && !a.turn && !a.tip && !a.torque && (a.wider ?? 1) === 1 && (a.longer ?? 1) === 1;
+/** The move an adjustment makes, for a tooth with this frame, width and length. */
+export function adjustMatrix(frame: ToothFrame, width: number, length: number, a: ToothAdjust): THREE.Matrix4 {
+  void width;
+  const o = new THREE.Vector3(...frame.origin), out = new THREE.Vector3(...frame.out), mesial = new THREE.Vector3(...frame.mesial), up = new THREE.Vector3(...frame.up);
+  const basis = new THREE.Matrix4().makeBasis(mesial, out, up).setPosition(o);
+  const inverse = basis.clone().invert();
+  const rad = THREE.MathUtils.degToRad;
+  const centre = -Math.max(1, length) / 2;
+  const local = new THREE.Matrix4().makeTranslation(a.mesial ?? 0, a.out ?? 0, a.up ?? 0)
+    // Turned about the middle of the crown.
+    .multiply(new THREE.Matrix4().makeTranslation(0, 0, centre))
+    .multiply(new THREE.Matrix4().makeRotationZ(rad(a.turn ?? 0)))
+    .multiply(new THREE.Matrix4().makeRotationY(rad(a.tip ?? 0)))
+    .multiply(new THREE.Matrix4().makeRotationX(rad(a.torque ?? 0)))
+    .multiply(new THREE.Matrix4().makeScale(a.wider ?? 1, 1, 1))
+    .multiply(new THREE.Matrix4().makeTranslation(0, 0, -centre))
+    // Longer from the cervical end (length below the edge).
+    .multiply(new THREE.Matrix4().makeTranslation(0, 0, -length))
+    .multiply(new THREE.Matrix4().makeScale(1, 1, a.longer ?? 1))
+    .multiply(new THREE.Matrix4().makeTranslation(0, 0, length));
+  return basis.clone().multiply(local).multiply(inverse);
+}
+
+/**
+ * Build 102: the adjustment that makes `partner` the mirror image of `source` across the plane through
+ * `mid` square to `normal` (the midline): its axes onto the source's reflected, its edge onto the
+ * source's reflected edge, its width and length the source's. In the partner's own frame, as
+ * adjustMatrix takes it (moved after turning about the crown's middle and lengthening from its neck).
+ */
+export function mirrorAdjust(source: { frame: ToothFrame; width: number; length: number }, partner: { frame: ToothFrame; width: number; length: number }, mid: Vec3, normal: Vec3): ToothAdjust {
+  const v3 = (v: readonly number[]) => new THREE.Vector3(v[0], v[1], v[2]);
+  const n = v3(normal).normalize(), m = v3(mid);
+  const reflect = (p: THREE.Vector3) => p.clone().sub(n.clone().multiplyScalar(2 * p.clone().sub(m).dot(n)));
+  const reflectDir = (d: THREE.Vector3) => d.clone().sub(n.clone().multiplyScalar(2 * d.dot(n)));
+  const basis = new THREE.Matrix4().makeBasis(v3(partner.frame.mesial), v3(partner.frame.out), v3(partner.frame.up));
+  const want = new THREE.Matrix4().makeBasis(reflectDir(v3(source.frame.mesial)), reflectDir(v3(source.frame.out)), reflectDir(v3(source.frame.up)));
+  const inverse = basis.clone().invert();
+  const euler = new THREE.Euler().setFromRotationMatrix(inverse.clone().multiply(want), "ZYX");
+  const longer = source.length / Math.max(0.5, partner.length), wider = source.width / Math.max(0.5, partner.width);
+  const target = reflect(v3(source.frame.origin)).sub(v3(partner.frame.origin)).applyMatrix4(inverse);
+  const L = Math.max(1, partner.length);
+  const centre = -L / 2;
+  // Where the edge would be after the turn and the lengthening, before the move.
+  const edge = new THREE.Vector3(0, 0, (longer - 1) * partner.length - centre).applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(euler)).add(new THREE.Vector3(0, 0, centre));
+  const move = target.sub(edge);
+  const deg = THREE.MathUtils.radToDeg;
+  return { mesial: move.x, out: move.y, up: move.z, turn: deg(euler.z), tip: deg(euler.y), torque: deg(euler.x), wider, longer };
+}
 
 /**
  * The move that adjusts a wax tooth by `amount` (mm; degrees for "turn"), in the coordinates of its
@@ -1231,7 +1289,7 @@ function mesialDirections(items: Array<{ key: number; side: -1 | 1; rank: number
  * The patient's arch form, widths and positions are kept - the wax restores shape and contour, as a
  * wax-up for worn or broken teeth (and IMT) wants. `all` gives the neighbours for the arch's line.
  */
-export type FitOptions = { minWax?: number; lengthen?: number; blend?: boolean; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number };
+export type FitOptions = { minWax?: number; lengthen?: number; blend?: boolean; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number; /** Build 102: each tooth's own adjustment (by FDI number), applied before the contacts and the margin. */ adjust?: Record<number, ToothAdjust> };
 export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<number>, crowns: PatientCrown[], all: PatientCrown[], arch: "upper" | "lower", options: FitOptions = {}): PlacedTooth[] {
   const minWax = options.minWax ?? MIN_WAX;
   // Build 94: the smile designed on the anterior teeth, and how far towards it the teeth go (0 = the patient's teeth, 1 = the design).
@@ -1376,6 +1434,9 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
       if (Math.abs(move) < 0.01) break;
       shift = Math.max(-PLACE_REACH, Math.min(PLACE_REACH, shift + move));
     }
+    // Build 102: at the smile design the tooth stands where the design puts it - the patient's tooth
+    // standing outside it is cut back (and reported), not covered by moving the design out.
+    shift *= 1 - ideal;
     const moveOut = new THREE.Matrix4().makeTranslation(dir.x * shift, dir.y * shift, dir.z * shift);
     positions = transformSoup(positions, moveOut);
     const matrix = moveOut.clone().multiply(base);
@@ -1397,6 +1458,18 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
       })(),
     });
   }
+  // Build 102: each tooth's own adjustment (the gimbal, the buttons) - before the contacts and the
+  // margin, so the tooth still meets its neighbours and the patient's gum wherever it is put.
+  if (options.adjust) placed.forEach((entry, i) => {
+    const a = options.adjust![placedFdi[i]];
+    if (!a || isIdentityAdjust(a)) return;
+    const m = adjustMatrix(entry.frame, entry.width, entry.length, a);
+    entry.positions = transformSoup(entry.positions, m);
+    entry.frame = moveFrame(entry.frame, m);
+    entry.matrix = m.clone().multiply(entry.matrix);
+    entry.width *= a.wider ?? 1;
+    entry.length *= a.longer ?? 1;
+  });
   // Neighbours meet at their contacts (the wax closes the gaps the patient's own teeth may have:
   // each tooth widened, not moved, so it stays over its own), and the cervical part blends.
   if (options.blend !== false) {
@@ -1414,10 +1487,22 @@ export function placeOnTeeth(set: LibrarySet, scan: Mesh, normals: ArrayLike<num
 }
 
 /** Build 94: the wax-up fitted tooth by tooth (scan in its own coordinates; `fdi` per scan triangle, as found). */
-export function planWaxupOnTeeth(scan: ArrayLike<number>, shells: Float32Array[], fdi: Uint8Array, chosen: number[], arch: "upper" | "lower", options: FitOptions = {}): WaxupPlan {
-  const set = librarySet("set", shells);
+/**
+ * Build 102: the scan in its arch frame and its crowns with their gum margins - the same for every
+ * placing on one scan (a nudge, a gimbal drag, a slider), so kept for the last few scans: two and a
+ * half seconds of a placing's five. Keyed by the scan's and the numbering's contents (a quick hash).
+ */
+const crownCache: Array<{ key: string; value: ReturnType<typeof scanCrownsNow> }> = [];
+function contentKey(scan: ArrayLike<number>, fdi: Uint8Array) {
+  let h = 2166136261;
+  const step = Math.max(1, Math.floor(scan.length / 4096));
+  for (let i = 0; i < scan.length; i += step) h = Math.imul(h ^ Math.round(scan[i] * 1000), 16777619);
+  const fstep = Math.max(1, Math.floor(fdi.length / 4096));
+  for (let i = 0; i < fdi.length; i += fstep) h = Math.imul(h ^ fdi[i], 16777619);
+  return `${scan.length}:${fdi.length}:${h >>> 0}`;
+}
+function scanCrownsNow(scan: ArrayLike<number>, fdi: Uint8Array) {
   const { mesh, normals, frame } = scanInArchFrame(scan);
-  const back = frame.clone().invert();
   // The crowns, in the arch frame: the scan's own triangles by their number.
   const local = transformSoup(scan, frame);
   const byFdi = new Map<number, number[]>();
@@ -1428,6 +1513,22 @@ export function planWaxupOnTeeth(scan: ArrayLike<number>, shells: Float32Array[]
     for (let k = 0; k < 9; k += 1) list.push(local[t * 9 + k]);
   }
   const all: PatientCrown[] = [...byFdi].map(([n, list]) => ({ fdi: n, points: Float32Array.from(list), margin: gingivalMarginOf(local, fdi, n) }));
+  return { mesh, normals, frame, all };
+}
+function scanCrowns(scan: ArrayLike<number>, fdi: Uint8Array) {
+  const key = contentKey(scan, fdi);
+  const hit = crownCache.find((entry) => entry.key === key);
+  if (hit) return hit.value;
+  const value = scanCrownsNow(scan, fdi);
+  crownCache.unshift({ key, value });
+  if (crownCache.length > 2) crownCache.pop();
+  return value;
+}
+
+export function planWaxupOnTeeth(scan: ArrayLike<number>, shells: Float32Array[], fdi: Uint8Array, chosen: number[], arch: "upper" | "lower", options: FitOptions = {}): WaxupPlan {
+  const set = librarySet("set", shells);
+  const { mesh, normals, frame, all } = scanCrowns(scan, fdi);
+  const back = frame.clone().invert();
   const placed = placeOnTeeth(set, mesh, normals, all.filter((c) => chosen.includes(c.fdi)), all, arch, options);
   const checks = smileChecks(placed.map((p) => ({ fdi: fdiNumber(p.tooth.kind, p.tooth.side, arch), positions: p.positions })), arch);
   return {
@@ -1436,7 +1537,10 @@ export function planWaxupOnTeeth(scan: ArrayLike<number>, shells: Float32Array[]
     scale: 1,
     arcDepth: 0,
     centralWidth: placed.find((p) => p.tooth.kind === "central")?.width ?? 0,
-    teeth: placed.map(({ tooth, positions, clearance, width, length, lengthening, extension, frame: f }) => ({ kind: tooth.kind, side: tooth.side, positions: transformSoup(positions, back), clearance, width, length, lengthening, extension, frame: moveFrame(f, back) })),
+    teeth: placed.map(({ tooth, positions, clearance, width, length, lengthening, extension, frame: f }) => {
+      const crown = all.find((c) => c.fdi === fdiNumber(tooth.kind, tooth.side, arch));
+      return { kind: tooth.kind, side: tooth.side, positions: transformSoup(positions, back), clearance, width, length, lengthening, extension, frame: moveFrame(f, back), reduce: crown ? Math.round(reductionFor(crown.points, positions, f.out) * 100) / 100 : 0 };
+    }),
   };
 }
 
@@ -1810,8 +1914,14 @@ export function smileChecks(teeth: Array<{ fdi: number; positions: Float32Array 
 
 /** A margin found from fewer corners than this is not used. */
 export const MARGIN_MIN_POINTS = 40;
-/** The wax's cervical end stands this far coronal to the margin, mm (on the tooth, off the gum). */
-export const MARGIN_INSET = 0.1;
+/**
+ * Where the wax's cervical end stands against the margin, mm along the tooth (+ coronal, - apical).
+ * Build 102: just into the gum - with the crown cut back to the margin under it, the wax is joined to
+ * the model there, so the join (the new emergence) runs exactly along the patient's gingival margin.
+ */
+export const MARGIN_INSET = -0.3;
+/** Build 102: and this far out from the margin, mm, so it covers the margin all round. */
+export const MARGIN_FLARE = 0.15;
 /** How much of the tooth's height above the margin the cervical blend reaches. */
 export const MARGIN_BLEND_SHARE = 0.35;
 /** The margin's height and distance from the tooth's axis, in this many directions round it. */
@@ -1866,9 +1976,9 @@ export function gingivalMarginOf(soup: Float32Array, fdi: Uint8Array, n: number)
  * Build 95: a wax tooth's cervical end brought onto the patient's gingival margin all round (arch
  * frame, teeth up). Round the tooth's axis in MARGIN_BINS directions, the margin's height and distance
  * from the axis (smoothed); the wax's cervical part in each direction is stretched or squeezed along
- * the axis so its end stands MARGIN_INSET coronal to the margin there, easing to nothing at
- * MARGIN_BLEND_SHARE of the tooth's height, and drawn in towards the tooth's surface at the margin -
- * a feather edge onto the tooth, the gum untouched.
+ * the axis so its end stands at the margin there (build 102: MARGIN_INSET into the gum, MARGIN_FLARE
+ * outside it), easing to nothing at MARGIN_BLEND_SHARE of the tooth's height, and drawn to the
+ * margin's line all round - following the gum's scallop, papillae and all.
  */
 export function blendToMargin(tooth: PlacedTooth, margin: Float32Array) {
   const p = tooth.positions;
@@ -1924,14 +2034,22 @@ export function blendToMargin(tooth: PlacedTooth, margin: Float32Array) {
   let lowFilled = low.map((x) => (Number.isFinite(x) ? x : Math.min(...low.filter(Number.isFinite))));
   for (let pass = 0; pass < 2; pass += 1) lowFilled = lowFilled.map((x, b) => (lowFilled[(b - 1 + MARGIN_BINS) % MARGIN_BINS] + 2 * x + lowFilled[(b + 1) % MARGIN_BINS]) / 4);
   const meanMargin = zm.reduce((a, b) => a + b, 0) / MARGIN_BINS;
+  const meanLow = lowFilled.reduce((a, b) => a + b, 0) / MARGIN_BINS;
   const band = Math.max(1, MARGIN_BLEND_SHARE * (top - meanMargin));
   for (let i = 0; i < p.length; i += 3) {
     const f = binOf(p[i], p[i + 1]);
-    const zt = at(zm, f) + MARGIN_INSET, lo = at(lowFilled, f), up = zt + band;
+    // Build 102: the band reaches a full band above the wax's end too - where the wax stops short of
+    // the margin, a thin band stretched a corner many times over, and a corner just under the smoothed
+    // end was thrown past it: fins at the neck.
+    // And near the axis (the cap closing the neck) a corner has no direction of its own - it took
+    // whichever bin it fell in, a papilla's height as easily as the mid-facial margin's, and the cap
+    // tented into a sheet. There, the means of the margin and of the wax's end, blended out to the ring.
+    const axial = Math.max(0, Math.min(1, (Math.hypot(p[i] - mx, p[i + 1] - my) / rMid - 0.2) / 0.4));
+    const zt = at(zm, f) * axial + meanMargin * (1 - axial) + MARGIN_INSET, lo = at(lowFilled, f) * axial + meanLow * (1 - axial), up = Math.max(zt, lo) + band;
     const z = p[i + 2];
-    if (z >= up || lo >= up - 0.05) continue;
-    // [lo, up] onto [zt, up]: the end on the margin, the rest of the band eased.
-    let z2 = zt + ((z - lo) * (up - zt)) / (up - lo);
+    if (z >= up) continue;
+    // [lo, up] onto [zt, up]: the end on the margin, the rest of the band eased (nothing below the end).
+    let z2 = zt + ((Math.max(z, lo) - lo) * (up - zt)) / (up - lo);
     // Never pulled far: a margin read wrongly cannot drag the wax up the gum.
     z2 = Math.max(z - MARGIN_MOVE_MAX, Math.min(z + MARGIN_MOVE_MAX, z2));
     p[i + 2] = z2;
@@ -1940,8 +2058,97 @@ export function blendToMargin(tooth: PlacedTooth, margin: Float32Array) {
     const ease = w * w * (3 - 2 * w);
     const dx = p[i] - mx, dy = p[i + 1] - my, r = Math.hypot(dx, dy);
     if (r < 0.4 * rMid) continue;
-    const target = at(rm, f);
-    const r2 = r + Math.max(-1, Math.min(1, target - r)) * ease;
+    const target = at(rm, f) + MARGIN_FLARE;
+    const r2 = r + Math.max(-1.5, Math.min(1.5, target - r)) * ease;
     p[i] = mx + (dx / r) * r2; p[i + 1] = my + (dy / r) * r2;
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Build 102: the patient's crowns cut back to the ideal outline
+
+/** The cut-out stands this far outside the patient's crown, mm, so the cut is clean (no surfaces lying on each other). */
+export const CUT_MARGIN = 0.06;
+
+/**
+ * Tooth `n`'s crown on a scan (soup, its triangles' FDI numbers) as a closed solid: its own triangles,
+ * each opening (at the gingival margin, at a contact) closed over, and the whole stood CUT_MARGIN
+ * out along its normals. Cut out of the model, the crown goes down to the margin - the wax-up then
+ * fills it with the ideal tooth. Null when there is too little of it.
+ */
+export function crownCutter(soupIn: Float32Array, fdi: Uint8Array, n: number): Float32Array | null {
+  const own: number[] = [];
+  for (let t = 0; t < fdi.length; t += 1) if (fdi[t] === n) for (let k = 0; k < 9; k += 1) own.push(soupIn[t * 9 + k]);
+  if (own.length < 9 * 200) return null;
+  const m = weld(own, 1e-5);
+  dropNonManifold(m);
+  // Specks the finder gave the tooth away from it go.
+  dropFragments(m, 0.2);
+  if (m.f.length < 3 * 200) return null;
+  for (const loop of boundaryLoops(m)) fillLoop(m, loop);
+  // Out along the corners' normals.
+  const count = m.v.length / 3;
+  const nrm = new Float64Array(count * 3);
+  for (let t = 0; t < m.f.length / 3; t += 1) {
+    const a = m.f[t * 3], b = m.f[t * 3 + 1], c = m.f[t * 3 + 2];
+    const ux = m.v[b * 3] - m.v[a * 3], uy = m.v[b * 3 + 1] - m.v[a * 3 + 1], uz = m.v[b * 3 + 2] - m.v[a * 3 + 2];
+    const vx = m.v[c * 3] - m.v[a * 3], vy = m.v[c * 3 + 1] - m.v[a * 3 + 1], vz = m.v[c * 3 + 2] - m.v[a * 3 + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    for (const i of [a, b, c]) { nrm[i * 3] += nx; nrm[i * 3 + 1] += ny; nrm[i * 3 + 2] += nz; }
+  }
+  for (let i = 0; i < count; i += 1) {
+    const l = Math.hypot(nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]) || 1;
+    for (let k = 0; k < 3; k += 1) m.v[i * 3 + k] += (nrm[i * 3 + k] / l) * CUT_MARGIN;
+  }
+  return meshSoup(m);
+}
+
+/**
+ * Build 102: how far the patient's tooth stands outside the wax tooth that replaces it, mm (the
+ * 98th percentile of its crown corners outside the wax, so a speck does not decide; on the facial
+ * side of its middle when `facing` is given) - the reduction the wax-up asks for there. Corners within `nearMargin` mm of its lowest point (at the
+ * gum) are left out. 0 when it lies within the wax.
+ */
+/** How far the reduction is looked for, mm: further out, a crown is counted at this. */
+export const REDUCE_REACH = 4;
+
+export function reductionFor(crown: Float32Array, wax: Float32Array, facing?: [number, number, number], nearMargin = 0.5): number {
+  const inside = insideOf(wax);
+  const grid = new PointGrid(wax, REDUCE_REACH);
+  let low = Infinity, cx = 0, cy = 0, cz = 0, waxLow = Infinity;
+  for (let i = 0; i < crown.length; i += 3) { low = Math.min(low, crown[i + 2]); cx += crown[i]; cy += crown[i + 1]; cz += crown[i + 2]; }
+  let waxFront = -Infinity;
+  for (let i = 0; i < wax.length; i += 3) {
+    waxLow = Math.min(waxLow, wax[i + 2]);
+    if (facing) waxFront = Math.max(waxFront, wax[i] * facing[0] + wax[i + 1] * facing[1] + wax[i + 2] * facing[2]);
+  }
+  const count = Math.max(1, crown.length / 3);
+  cx /= count; cy /= count; cz /= count;
+  const outside: number[] = [];
+  for (let i = 0; i < crown.length; i += 3) {
+    // Build 102: only the crown the ideal tooth covers - below the wax's end the patient's tooth is
+    // kept (the cut goes no lower), so there is nothing to reduce.
+    if (crown[i + 2] < Math.max(low + nearMargin, waxLow)) continue;
+    // Build 102: the facial side only - the side the model is cut back on.
+    if (facing && (crown[i] - cx) * facing[0] + (crown[i + 1] - cy) * facing[1] + (crown[i + 2] - cz) * facing[2] <= 0) continue;
+    if (inside(crown[i], crown[i + 1], crown[i + 2])) continue;
+    const hit = grid.nearest(crown[i], crown[i + 1], crown[i + 2]);
+    if (!facing) { outside.push(hit ? hit[1] : REDUCE_REACH); continue; }
+    // Build 102: a reduction is where the patient's tooth stands in front of the ideal tooth's facial
+    // surface. Outside the wax but behind it (the ideal tooth set further forward, the wax-up adding)
+    // there is nothing to cut: that is not counted. How far in front, along the facial direction.
+    // Further than the grid reaches (the ideal tooth well away from the patient's): how far it stands past
+    // the ideal tooth's most facial point.
+    if (!hit) {
+      const past = crown[i] * facing[0] + crown[i + 1] * facing[1] + crown[i + 2] * facing[2] - waxFront;
+      if (past > 0) outside.push(past);
+      continue;
+    }
+    const w = hit[0] * 3;
+    const ahead = (crown[i] - wax[w]) * facing[0] + (crown[i + 1] - wax[w + 1]) * facing[1] + (crown[i + 2] - wax[w + 2]) * facing[2];
+    if (ahead > 0) outside.push(Math.min(hit[1], ahead + 0.1 * hit[1]));
+  }
+  if (!outside.length) return 0;
+  outside.sort((a, b) => a - b);
+  return outside[Math.floor(outside.length * 0.98)];
 }

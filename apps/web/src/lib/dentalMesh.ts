@@ -7,6 +7,10 @@ import type { ManifoldToplevel } from "manifold-3d";
 import { weldedVertexIds } from "@/lib/meshComponents";
 
 export type Mesh = { v: number[]; f: number[] };
+
+/** Build 102: how far in front of a wax tooth, and beyond its edge, the patient's tooth is cut back for the wax-up model, mm. */
+export const CUT_FRONT = 6;
+export const CUT_BEYOND = 4;
 export type Ring = Array<[number, number]>;
 export type ManifoldRuntime = ManifoldToplevel;
 export type ManifoldSolid = InstanceType<ManifoldToplevel["Manifold"]>;

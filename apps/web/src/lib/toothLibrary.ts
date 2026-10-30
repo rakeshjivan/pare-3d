@@ -19,10 +19,18 @@ export type ToothSetEntry = {
   /** Build 91: each tooth's FDI number, in the file's order. */
   fdi?: number[];
 };
-export type ToothLibraryManifest = { id: string; name: string; credit: string; url: string; sets: ToothSetEntry[] };
+/**
+ * `credit` is for the Licences & credits page; the tool itself shows only the sets' Pare names.
+ * Build 102: `hidden` - shipped (so a design made with it still opens) but no longer offered in the picker.
+ */
+export type ToothLibraryManifest = { id: string; name: string; credit: string; url: string; sets: ToothSetEntry[]; hidden?: boolean };
 
-/** The libraries that ship with Pare 3D (folders under public/libraries). */
-export const BUILT_IN_LIBRARIES = ["teethy", "nulty"] as const;
+/**
+ * The libraries that ship with Pare 3D (folders under public/libraries). Build 102: the Pare library
+ * (Christian Brenes's Elchi forms and Smile Overlay designs) is the one offered; Teethy's and Dr Adam
+ * Nulty's sets stay in the app, hidden, so designs made with them still open.
+ */
+export const BUILT_IN_LIBRARIES = ["pare", "nulty", "teethy"] as const;
 
 const MAGIC = 0x314c5450; // "PTL1"
 
