@@ -4,6 +4,14 @@
  */
 export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] }> = [
   {
+    build: 104,
+    items: [
+      "A new Home: CAD Studio and Dental Studio side by side, and your most recent work from both below. One bar across the top holds search (Ctrl or ⌘ + K), the guides, notifications (updates, backups) and settings.",
+      "Each studio has its own page. CAD Studio lists your designs and folders. Dental Studio lists your cases and has a place to drop the scans - Pare 3D sorts upper, lower and bite and opens the case with Model Builder ready.",
+      "Send a design to the other studio from its menu (⋮). Designs from earlier builds are sorted for you: the ones with dental work go to Dental Studio, the rest to CAD Studio.",
+    ],
+  },
+  {
     build: 103,
     items: [
       "Wax-up Studio (test builds): each wax tooth now ends exactly on the patient's gingival margin all round, with the patient's own emergence profile, scallop and papillae, blending into the ideal tooth above - and each ideal tooth is torqued about its edge (12° at most) so its cervical third stands over the patient's tooth, its edge where the design put it.",

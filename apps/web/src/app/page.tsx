@@ -4,10 +4,10 @@ import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { requestPersistentStorage } from "@/lib/persistentStorage";
 import { designDiskAvailable, designDiskDelete, designDiskGet, designDiskId, designDiskList, designDiskPut } from "@/lib/designDiskStore";
 import { PareBuildBadge, PareVersionStatus } from "@/components/PareVersionStatus";
-import { ArrowLeft, Clock3, Copy, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { ArrowLeft, ArrowLeftRight, Clock3, Copy, Download, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 import { AppFooter } from "@/components/AppFooter";
-import { PareUpdateBanner } from "@/components/PareUpdateBanner";
+import { checkPareUpdate, dismissPareUpdate, PARE_BUILD, type PareUpdate } from "@/lib/pareUpdate";
 import { FirstRunCard, useFirstRunAnswered } from "@/components/FirstRunCard";
 import { SAVE_STATE_EVENT } from "@/components/SaveStatus";
 import { OPEN_WHATS_NEW_EVENT, WhatsNew } from "@/components/WhatsNew";
@@ -91,10 +91,16 @@ import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings
 import { saveUserFile } from "@/lib/pareFiles";
 import { BackupStrip } from "@/components/BackupStrip";
 import { SavedFileToast } from "@/components/SavedFileToast";
+import { dentalStudioAvailable, dentalWorkIn, isPareStudio, studioOfShapes, type PareStudio } from "@/lib/pareStudio";
+import { HomeTopBar, type HomePlace } from "@/components/home/HomeTopBar";
+import { HomeLauncher } from "@/components/home/HomeLauncher";
+import { DentalStart, StudioHeader } from "@/components/home/StudioPage";
+import { WAXUP_ENABLED } from "@/lib/pareFeatures";
 
 type AppView = "dashboard" | "editor";
 type ViewMode = "grid" | "list";
-type DashboardSection = "home" | "shared";
+/** Build 104: Home (both studios), a studio's own page, or the shared folder. */
+type DashboardSection = HomePlace;
 
 type DashboardProject = {
   id: string;
@@ -114,6 +120,10 @@ type DashboardProject = {
   sharedProject?: { fileName: string; revision: string; path?: string };
   /** The folder of this browser the design is in (#496); none at the top level. */
   folderId?: string | null;
+  /** Build 104: the studio the design belongs to. Designs from before have none until they are sorted. */
+  studio?: PareStudio;
+  /** Build 104: sent to its studio by hand, so the parts in it no longer move it by themselves. */
+  studioPinned?: boolean;
 };
 
 type SharedProject = {
@@ -955,6 +965,8 @@ function readStoredProjects() {
             }
             : undefined,
           folderId: typeof project.folderId === "string" && project.folderId ? project.folderId : null,
+          studio: isPareStudio(project.studio) ? project.studio : undefined,
+          studioPinned: project.studioPinned === true ? true : undefined,
         };
       });
     return { projects, legacyShapes };
@@ -989,6 +1001,8 @@ function mergeProjectForStorage(project: DashboardProject, storedProject?: Dashb
     placementWorkplane: storedProject.placementWorkplane ?? project.placementWorkplane,
     sketchPlacementWorkplane: storedProject.sketchPlacementWorkplane ?? project.sketchPlacementWorkplane,
     sharedProject: project.sharedProject ?? storedProject.sharedProject,
+    studio: project.studio ?? storedProject.studio,
+    studioPinned: project.studioPinned ?? storedProject.studioPinned,
   };
 }
 
@@ -1010,6 +1024,8 @@ function projectForStorage(project: DashboardProject): DashboardProject {
     sketchPlacementWorkplane: normalizePlacementWorkplane(project.sketchPlacementWorkplane),
     sharedProject: project.sharedProject,
     ...(project.folderId ? { folderId: project.folderId } : {}),
+    ...(project.studio ? { studio: project.studio } : {}),
+    ...(project.studioPinned ? { studioPinned: true } : {}),
   };
 }
 
@@ -1028,7 +1044,7 @@ function readDesignFolders(): DesignFolder[] {
   }
 }
 
-function newProject(name: string, index: number, shapeCount = 0, folderId: string | null = null): DashboardProject {
+function newProject(name: string, index: number, shapeCount = 0, folderId: string | null = null, studio: PareStudio = "cad"): DashboardProject {
   const now = Date.now();
   const savedDefault = readWorkspaceDefault();
   return {
@@ -1045,6 +1061,7 @@ function newProject(name: string, index: number, shapeCount = 0, folderId: strin
     placementWorkplane: horizontalPlacementWorkplane(),
     sketchPlacementWorkplane: horizontalPlacementWorkplane(),
     ...(folderId ? { folderId } : {}),
+    studio,
   };
 }
 
@@ -1065,6 +1082,10 @@ export default function Home() {
   const [openFolderId, setOpenFolderId] = useState<string | null>(null);
   const designFoldersJsonRef = useRef<string | null>(null);
   const [dashboardSection, setDashboardSection] = useState<DashboardSection>("home");
+  // Build 104: the studio whose page is open; new designs and imports made there belong to it.
+  const sectionStudio: PareStudio | null = dashboardSection === "cad" || dashboardSection === "dental" ? dashboardSection : null;
+  const importStudioRef = useRef<PareStudio | null>(null);
+  importStudioRef.current = sectionStudio;
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sortMode, setSortMode] = useState("recent");
@@ -1502,18 +1523,46 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [activeProjectId, editorLoading, projectShapesById, projects, view]);
 
+  // Build 104: designs from before the studios are sorted once, quietly, while the start page is open:
+  // one with dental work (or scans) in it goes to Dental Studio, the rest to CAD Studio.
+  const unsortedKey = mounted ? projects.filter((project) => project.studio === undefined && !project.sharedProject).map((project) => project.id).join(",") : "";
+  useEffect(() => {
+    if (!unsortedKey || view !== "dashboard") return;
+    let stopped = false;
+    void (async () => {
+      for (const id of unsortedKey.split(",")) {
+        await waitForInputPause();
+        if (stopped) return;
+        let studio: PareStudio = "cad";
+        try {
+          const record = await loadProjectShapes(id);
+          studio = studioOfShapes(record?.shapes ?? []);
+        } catch {
+          // A design that cannot be read stays in CAD Studio, where it can still be opened.
+        }
+        if (stopped) return;
+        setProjects((current) => current.map((project) => (project.id === id && project.studio === undefined ? { ...project, studio } : project)));
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
+  }, [unsortedKey, view]);
+
   const visibleProjects = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     // A project that lives on the server belongs in the folder, not twice in
     // one view. If the server is out of reach the local copy is all there is,
     // so then it does appear here rather than vanishing with the folder.
-    const byLocation = sharedProjectsEnabled ? projects.filter((project) => !project.sharedProject) : projects;
+    const byPlace = sharedProjectsEnabled ? projects.filter((project) => !project.sharedProject) : projects;
+    // Build 104: a studio's page shows that studio's designs; one not sorted yet counts as CAD.
+    const byLocation = sectionStudio ? byPlace.filter((project) => (project.studio ?? "cad") === sectionStudio) : byPlace;
     // A search looks through every folder; otherwise the open folder shows what is in it.
     const filtered = normalizedQuery
       ? byLocation.filter((project) => project.name.toLowerCase().includes(normalizedQuery))
       : byLocation.filter((project) => folderOfDesign(designFolders, project.folderId) === openFolderId);
     return sortMode === "name" ? [...filtered].sort((a, b) => a.name.localeCompare(b.name)) : [...filtered].sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [designFolders, openFolderId, projects, query, sharedProjectsEnabled, sortMode]);
+  }, [designFolders, openFolderId, projects, query, sectionStudio, sharedProjectsEnabled, sortMode]);
 
   const visibleFolders = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -1702,7 +1751,17 @@ export default function Home() {
         setProjects((current) =>
           current.map((project) =>
             project.id === snapshot.projectId && (project.revision ?? 0) <= revision
-              ? { ...project, shapes: snapshot.shapes.length, updatedAt: revision, revision }
+              ? {
+                ...project,
+                shapes: snapshot.shapes.length,
+                updatedAt: revision,
+                revision,
+                // Build 104: a design not sorted yet is sorted by its parts; one where dental work has
+                // begun moves to Dental Studio, unless someone sent it to CAD Studio on purpose.
+                ...(project.studio === undefined || (project.studio === "cad" && !project.studioPinned && dentalWorkIn(snapshot.shapes))
+                  ? { studio: studioOfShapes(snapshot.shapes) }
+                  : {}),
+              }
               : project,
           ),
         );
@@ -1780,8 +1839,16 @@ export default function Home() {
     });
   }, []);
 
-  const createAndOpenProject = (name?: string, shapes: WorkplaneShape[] = []) => {
-    const project = newProject(name ?? t("dashboard.untitledDesign", { number: projects.length + 1 }), projects.length, shapes.length, openFolderId);
+  const createAndOpenProject = (name?: string, shapes: WorkplaneShape[] = [], studio: PareStudio = sectionStudio ?? "cad") => {
+    const project = newProject(name ?? (studio === "dental" ? t("home.untitledCase", { number: projects.filter((entry) => entry.studio === "dental").length + 1 }) : t("dashboard.untitledDesign", { number: projects.length + 1 })), projects.length, shapes.length, openFolderId, studio);
+    if (studio === "dental") {
+      // A new case opens with Dental Studio open, asking for the scans.
+      try {
+        window.sessionStorage.setItem(OPEN_DENTAL_STUDIO_KEY, "1");
+      } catch {
+        // The case then opens without it.
+      }
+    }
     setProjectShapesById((current) => ({
       ...current,
       [project.id]: projectShapeCacheEntry(project.revision ?? project.updatedAt, shapes),
@@ -1813,7 +1880,7 @@ export default function Home() {
       } catch {
         // Opens with the usual view.
       }
-      createAndOpenProject(t(`starter.${id}`), shapes);
+      createAndOpenProject(t(`starter.${id}`), shapes, "cad");
     } catch (error) {
       setDashboardNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -2497,7 +2564,16 @@ export default function Home() {
         const projectName = importedFileNames.length === 1
           ? projectNameFromFileName(importedFileNames[0])
           : t("notice.importedDesignName", { count: importedFileNames.length });
-        const project = newProject(projectName, projects.length, importedShapes.length, openFolderId);
+        // Build 104: scans dropped on Dental Studio's page start a case there; elsewhere the parts decide.
+        const studio: PareStudio = importStudioRef.current === "dental" ? "dental" : studioOfShapes(importedShapes);
+        const project = newProject(projectName, projects.length, importedShapes.length, openFolderId, studio);
+        if (studio === "dental") {
+          try {
+            window.sessionStorage.setItem(OPEN_DENTAL_STUDIO_KEY, "1");
+          } catch {
+            // The case then opens without Dental Studio.
+          }
+        }
         const revision = project.revision ?? project.updatedAt;
         const entry = projectShapeCacheEntry(revision, importedShapes, undefined, undefined, dedupeProjectAssets(importedAssets));
         await saveProjectShapes(project.id, entry, projectShapeSaveContext(project));
@@ -2549,8 +2625,9 @@ export default function Home() {
     if (activeProjectId) {
       setProjects((current) => current.map((project) => (project.id === activeProjectId ? { ...project, updatedAt: Date.now() } : project)));
     }
-    // Back where you came from: a project opened from the folder returns to it.
-    setDashboardSection(leavingProject?.sharedProject ? "shared" : "home");
+    // Back where you came from: a project opened from the folder returns to it, one opened from a
+    // studio's page or Home to that page (build 104).
+    if (leavingProject?.sharedProject) setDashboardSection("shared");
     setEditorLoading(false);
     setView("dashboard");
     if (typeof window !== "undefined") {
@@ -2796,6 +2873,28 @@ export default function Home() {
       {view === "dashboard" ? (
         <Dashboard
           dashboardSection={dashboardSection}
+          allProjects={localDesigns}
+          onPlace={(place) => {
+            setDashboardSection(place);
+            setDashboardNotice("");
+            setOpenFolderId(null);
+          }}
+          onCreateIn={(studio) => {
+            if (studio === "cad" && sharedProjectsEnabled && newDesignsOnServer) {
+              void createProjectInStoreFolder();
+              return;
+            }
+            createAndOpenProject(undefined, [], studio);
+          }}
+          onSendToStudio={(projectId, studio) => {
+            const moved = projects.find((project) => project.id === projectId);
+            setProjects((current) => current.map((project) => (project.id === projectId ? { ...project, studio, studioPinned: true } : project)));
+            if (moved) setDashboardNotice(t(studio === "dental" ? "home.sentToDental" : "home.sentToCad", { name: moved.name }));
+          }}
+          onImportScans={(files) => {
+            importStudioRef.current = "dental";
+            void importFilesFromDashboard(files);
+          }}
           dashboardNotice={dashboardNotice}
           hasProjects={projects.length > 0}
           projects={visibleProjects}
@@ -2926,14 +3025,7 @@ export default function Home() {
                 if (activeProjectId) renameProject(activeProjectId, name);
               }}
               onCreateProjectFromState={createProjectFromHistoryState}
-              onNewDentalDesign={() => {
-                try {
-                  window.sessionStorage.setItem(OPEN_DENTAL_STUDIO_KEY, "1");
-                } catch {
-                  // The new design then opens without Dental Studio.
-                }
-                createAndOpenProject();
-              }}
+              onNewDentalDesign={() => createAndOpenProject(undefined, [], "dental")}
               projectId={activeProjectId}
               projectName={activeProject?.name}
               projectCreatedAt={activeProject?.createdAt}
@@ -3025,6 +3117,11 @@ function EditorLoadingSkeleton() {
 
 function Dashboard({
   dashboardSection,
+  allProjects,
+  onPlace,
+  onCreateIn,
+  onSendToStudio,
+  onImportScans,
   dashboardNotice,
   hasProjects,
   projects,
@@ -3080,6 +3177,13 @@ function Dashboard({
   onWorkspace,
 }: {
   dashboardSection: DashboardSection;
+  /** Build 104: every design of this browser, for Home's Recent list (both studios). */
+  allProjects: DashboardProject[];
+  onPlace: (place: HomePlace) => void;
+  onCreateIn: (studio: PareStudio) => void;
+  onSendToStudio: (projectId: string, studio: PareStudio) => void;
+  /** Scans dropped on Dental Studio's page: a new case from them. */
+  onImportScans: (files: File[]) => void;
   dashboardNotice: string;
   hasProjects: boolean;
   projects: DashboardProject[];
@@ -3143,6 +3247,21 @@ function Dashboard({
   const offlineOk = useOfflineAvailable();
   const { update, isDismissed, dismiss: dismissUpdate } = useAppUpdate(LYL_CREATED_WITH_VERSION);
   const whatsNew = useWhatsNew(LYL_CREATED_WITH_VERSION);
+  void whatsNew;
+  // Build 104: what the bell in the top bar holds.
+  const [pareUpdate, setPareUpdate] = useState<PareUpdate | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void checkPareUpdate().then((result) => {
+      if (!cancelled) setPareUpdate(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const backupStatus = useSyncExternalStore(subscribeAutoBackup, getAutoBackupStatus, () => ({ state: "off" }) as ReturnType<typeof getAutoBackupStatus>);
+  const backupNeedsAttention = hasProjects && (backupStatus.state === "paused" || (backupStatus.state === "on" && Boolean(backupStatus.error)) || backupStatus.state === "off");
+  const pageStudio: PareStudio = dashboardSection === "dental" ? "dental" : "cad";
   const [openProjectMenuId, setOpenProjectMenuId] = useState<string | null>(null);
   const [openSharedProjectMenuKey, setOpenSharedProjectMenuKey] = useState<string | null>(null);
   const [projectPendingDeleteId, setProjectPendingDeleteId] = useState<string | null>(null);
@@ -3278,6 +3397,21 @@ function Dashboard({
   };
 
   const localSearch = query.trim().length > 0;
+  // Build 104: Home's Recent list - both studios, newest first; while searching, every match.
+  const launcherProjects = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return allProjects
+      .filter((project) => !needle || project.name.toLowerCase().includes(needle))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((project) => ({
+        id: project.id,
+        name: project.name,
+        updatedAt: project.updatedAt,
+        studio: project.studio ?? ("cad" as PareStudio),
+        thumbnail: <ProjectPreview accent={project.accent} thumbnailUrl={project.thumbnailUrl} />,
+        meta: formatUpdated(project.updatedAt, language),
+      }));
+  }, [allProjects, language, query]);
   const openTrail = folderTrail(designFolders, openFolderId);
   const openParentId = openTrail.length ? openTrail[openTrail.length - 1].parentId : null;
   const folderName = (folderId: string | null) => designFolders.find((folder) => folder.id === folderId)?.name ?? "";
@@ -3368,59 +3502,82 @@ function Dashboard({
   };
 
   return (
-    <main className="dashboard-shell">
-      <header className="dashboard-topbar">
-        <a className="dashboard-brand" href="./" aria-label={t("brand.home")}>
-          <img src="/assets/pare3d/pare3d-icon.svg" alt="" />
-          <span className="dashboard-brand-text">
-            <span className="dashboard-brand-name">Pare 3D</span>
-            <span className="dashboard-tagline">{t("brand.tagline")} <PareBuildBadge /></span>
-          </span>
-        </a>
-        <div className="dashboard-search">
-          <Search size={18} strokeWidth={2.4} />
-          <input value={query} onChange={(event) => onQueryChange(event.currentTarget.value)} placeholder={t("dashboard.searchPlaceholder")} aria-label={t("dashboard.searchLabel")} />
-        </div>
-        <div className="dashboard-topbar-actions">
-          {/* Build 75: what this build brought, and every build before it, a click from the start page. */}
-          <button type="button" className="dashboard-whats-new" onClick={() => window.dispatchEvent(new Event(OPEN_WHATS_NEW_EVENT))}>
-            <Sparkles size={16} aria-hidden="true" />
-            <span>{t("helpMenu.whatsNew")}</span>
-          </button>
-          <PareVersionStatus />
-          <ThemeSwitch />
-        </div>
-      </header>
+    <main className="dashboard-shell pare-home">
+      {/* Build 104: one bar across the top - Home, the two studios, search, and small menus for
+          what used to stand in big boxes on the start page. */}
+      <HomeTopBar
+        place={dashboardSection}
+        onPlace={(place) => {
+          if (place === "shared") onSharedProjects();
+          else onPlace(place);
+        }}
+        query={query}
+        onQueryChange={onQueryChange}
+        sharedEnabled={sharedProjectsEnabled}
+        dentalAvailable={dentalStudioAvailable()}
+        notificationCount={(pareUpdate ? 1 : 0) + (update && !isDismissed ? 1 : 0) + (backupNeedsAttention ? 1 : 0)}
+        notifications={(close) => (
+          <div className="home-notes">
+            <div className="home-menu-title">{t("home.notifications")}</div>
+            {pareUpdate ? (
+              <div className="home-note">
+                <Download size={17} aria-hidden="true" />
+                <div>
+                  <strong>{t("home.updateTitle", { build: String(pareUpdate.build) })}</strong>
+                  <span>{t("home.updateText", { current: String(PARE_BUILD) })}</span>
+                  <span className="home-note-actions">
+                    <a href={pareUpdate.url} target="_blank" rel="noreferrer">{t("home.download")}</a>
+                    <button type="button" onClick={() => { dismissPareUpdate(pareUpdate.build); setPareUpdate(null); }}>{t("home.dismiss")}</button>
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            {update && !isDismissed ? (
+              <div className="home-note">
+                <Sparkles size={17} aria-hidden="true" />
+                <div>
+                  <strong>{t("dashboard.updateBannerText", { current: LYL_CREATED_WITH_VERSION, latest: update.latestVersion })}</strong>
+                  <span className="home-note-actions">
+                    <a href={update.releaseUrl} target="_blank" rel="noreferrer">{t("dashboard.updateBannerLink")}</a>
+                    <button type="button" onClick={dismissUpdate}>{t("dashboard.updateDismiss")}</button>
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            <div className="home-note backup">
+              <BackupStrip hasDesigns={hasProjects} onBackupAll={() => { close(); onBackupAll(); }} onRestore={() => { close(); onRestoreBackup(); }} />
+            </div>
+            <button type="button" className="home-note-link" onClick={() => { close(); window.dispatchEvent(new Event(OPEN_WHATS_NEW_EVENT)); }}>
+              <Sparkles size={16} aria-hidden="true" />
+              {t("home.whatsNewIn", { build: PARE_BUILD > 0 ? String(PARE_BUILD) : "dev" })}
+            </button>
+          </div>
+        )}
+        learn={(close) => (
+          <div className="home-menu-list">
+            <div className="home-menu-title">{t("home.learn")}</div>
+            <a href="/guide/index.html" target="_blank" rel="noreferrer" onClick={close}>{t("home.userGuide")}</a>
+            <a href="/guide/dental-studio.html" target="_blank" rel="noreferrer" onClick={close}>{t("home.dentalGuide")}</a>
+            <a href="/guide/shortcuts.html" target="_blank" rel="noreferrer" onClick={close}>{t("home.shortcutsGuide")}</a>
+            <button type="button" onClick={() => { close(); window.dispatchEvent(new Event(OPEN_TINKERCAD_GUIDE_EVENT)); }}>{t("home.fromTinkercad")}</button>
+            <button type="button" onClick={() => { close(); window.dispatchEvent(new Event(OPEN_WHATS_NEW_EVENT)); }}>{t("helpMenu.whatsNew")}</button>
+          </div>
+        )}
+        settings={() => (
+          <div className="home-menu-list home-settings">
+            <div className="home-menu-title">{t("home.settings")}</div>
+            <div className="home-settings-row"><span>{t("home.appearance")}</span><ThemeSwitch /></div>
+            <div className="home-settings-row"><span>{t("home.version")}</span><PareBuildBadge /></div>
+            <div className="home-settings-status"><PareVersionStatus /></div>
+          </div>
+        )}
+      />
       {/* Build 75: beside the top bar, so its button opens it whichever part of the start page is shown. */}
       <WhatsNew />
+      <FeedbackDialog />
 
       <div className="dashboard-layout">
         <section className={`dashboard-main${hasProjects ? " has-projects" : ""}`} aria-label={dashboardSection === "shared" ? t("shared.title") : t("dashboard.projects")}>
-          {update && !isDismissed ? (
-            <aside
-              className="dashboard-update-notice"
-              role="status"
-              aria-label={t("dashboard.updateAvailable", { version: update.latestVersion })}
-            >
-              <div className="dashboard-update-notice-content">
-                <Sparkles size={18} className="dashboard-update-icon" aria-hidden="true" />
-                <span>{t("dashboard.updateBannerText", { current: LYL_CREATED_WITH_VERSION, latest: update.latestVersion })}</span>
-                <a href={update.releaseUrl} target="_blank" rel="noreferrer" className="dashboard-update-link">
-                  {t("dashboard.updateBannerLink")}
-                </a>
-              </div>
-              <button
-                type="button"
-                className="dashboard-update-dismiss"
-                onClick={dismissUpdate}
-                aria-label={t("dashboard.updateDismiss")}
-                title={t("dashboard.updateDismiss")}
-              >
-                <X size={16} />
-              </button>
-              <UpdatePreview update={update} currentVersion={LYL_CREATED_WITH_VERSION} />
-            </aside>
-          ) : null}
           {dashboardSection === "shared" ? (
             <>
               {dashboardNotice ? <div className="dashboard-import-notice" role="status">{dashboardNotice}</div> : null}
@@ -3715,80 +3872,48 @@ function Dashboard({
                 </div>
               ) : null}
             </>
+          ) : dashboardSection === "home" ? (
+            <>
+              <HomeLauncher
+                projects={launcherProjects}
+                searching={localSearch}
+                waxupShown={WAXUP_ENABLED}
+                dentalAvailable={dentalStudioAvailable()}
+                onOpenProject={onOpenProject}
+                onNew={onCreateIn}
+                onOpenStudio={(studio) => onPlace(studio)}
+                notice={dashboardNotice ? <div className="dashboard-import-notice" role="status">{dashboardNotice}</div> : null}
+              />
+              <SavedFileToast />
+            </>
           ) : (
             <>
-              {/* Order follows what someone actually does: start something new,
-                  pick up where they left off, open something that exists, then
-                  the shared folder beside it. Settings close the row. */}
-              <div className="dashboard-actions-band">
-                <button className="dashboard-action-tile create" type="button" onClick={onCreate}>
-                  <span className="dashboard-action-icon">
-                    <Plus size={25} strokeWidth={2.8} />
-                  </span>
-                  <span>{t("dashboard.createDesign")}</span>
-                </button>
-                {/* Fork: nothing to continue on a first visit - the tile says so instead of opening an empty plate. */}
-                <button
-                  className="dashboard-action-tile"
-                  type="button"
-                  onClick={onWorkspace}
-                  disabled={projects.length === 0}
-                  title={projects.length === 0 ? t("dashboard.noDesignYet") : undefined}
-                >
-                  <span className="dashboard-action-icon">
-                    <Clock3 size={24} strokeWidth={2.4} />
-                  </span>
-                  <span>{t("dashboard.continueWorkplane")}</span>
-                </button>
-                <button className="dashboard-action-tile" type="button" onClick={onImportFile}>
-                  <span className="dashboard-action-icon">
-                    {/* The same picture as the import button in the editor. */}
-                    <ToolbarImportIcon width={30} height={30} />
-                  </span>
-                  <span>{t("dashboard.importGeometry")}</span>
-                </button>
-                {/* Build 70: the dental way in - a new design with Dental Studio already open. */}
-                <button
-                  className="dashboard-action-tile"
-                  type="button"
-                  onClick={() => {
-                    try {
-                      window.sessionStorage.setItem(OPEN_DENTAL_STUDIO_KEY, "1");
-                    } catch {
-                      // Then the editor simply opens without it.
-                    }
-                    onCreate();
-                  }}
-                >
-                  <span className="dashboard-action-icon">
-                    <ForkToothIcon width={28} height={28} />
-                  </span>
-                  <span>{t("dashboard.dentalModels")}</span>
-                </button>
-              </div>
+              {/* Build 104: a studio's own page - its head, then (Dental Studio) the place to drop scans,
+                  then its designs or cases. Home is drawn above, by HomeLauncher. */}
+              <StudioHeader
+                studio={pageStudio}
+                onHome={() => onPlace("home")}
+                onNew={() => onCreateIn(pageStudio)}
+                onImport={onImportFile}
+                extra={pageStudio === "cad" ? (
+                  <button type="button" className="studio-head-link" onClick={() => window.dispatchEvent(new Event(OPEN_TINKERCAD_GUIDE_EVENT))}>
+                    <GraduationCap size={16} aria-hidden="true" />
+                    {t("home.fromTinkercadLong")}
+                  </button>
+                ) : null}
+              />
               {dashboardNotice ? (
                 <div className="dashboard-import-notice" role="status">
                   {dashboardNotice}
                 </div>
               ) : null}
-              <PareUpdateBanner />
-              <FirstRunCard />
-      <FeedbackDialog />
-              {/* Fork: on a first visit the "New to 3D design?" question already offers the Tinkercad guide. */}
-              {firstRunAnswered ? (
-              <button type="button" className="tc-guide-card" onClick={() => window.dispatchEvent(new Event(OPEN_TINKERCAD_GUIDE_EVENT))}>
-                <GraduationCap size={22} aria-hidden="true" />
-                <span><strong>Coming from Tinkercad?</strong> See where everything is, what&apos;s new and which shortcuts are the same.</span>
-              </button>
-              ) : null}
-              {/* The designs live in the browser, and a browser can fail or break with an update: said always,
-                  but (build 22) as one quiet line rather than a big box. */}
-              <BackupStrip hasDesigns={projects.length > 0} onBackupAll={onBackupAll} onRestore={onRestoreBackup} />
+              {pageStudio === "cad" ? <FirstRunCard /> : null}
+              {pageStudio === "dental" ? <DentalStart onScans={onImportScans} onPick={onImportFile} waxupShown={WAXUP_ENABLED} /> : null}
               <SavedFileToast />
 
               <div className="dashboard-section-header">
                 <div>
-                  <h1>{t("dashboard.projects")}</h1>
+                  <h2 className="studio-list-title">{pageStudio === "dental" ? t("home.cases") : t("home.designs")}</h2>
                   {/* Inside a folder the line under the heading is the way back: every step a
                       button, and a place to drop a design or a folder on (#496). */}
                   {openFolderId && !localSearch ? (
@@ -3799,7 +3924,7 @@ function Dashboard({
                         className={localDropTarget === "" ? "drop-target" : undefined}
                         {...localDropTargetProps(null)}
                       >
-                        {t("dashboard.projects")}
+                        {pageStudio === "dental" ? t("home.cases") : t("home.designs")}
                       </button>
                       {openTrail.map((folder, index) => {
                         const here = index === openTrail.length - 1;
@@ -4092,6 +4217,19 @@ function Dashboard({
                             <FolderInput size={16} />
                             <span>{t("shared.moveTo")}</span>
                           </button>
+                          {dentalStudioAvailable() ? (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setOpenProjectMenuId(null);
+                                onSendToStudio(project.id, (project.studio ?? "cad") === "dental" ? "cad" : "dental");
+                              }}
+                            >
+                              <ArrowLeftRight size={16} />
+                              <span>{(project.studio ?? "cad") === "dental" ? t("home.sendToCad") : t("home.sendToDental")}</span>
+                            </button>
+                          ) : null}
                           {sharedProjectsEnabled ? (
                             <button
                               type="button"
