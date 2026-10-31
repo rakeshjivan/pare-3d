@@ -4678,6 +4678,8 @@ export const MESSAGES_EN = {
   "dental.area.paint": "Paint teeth",
   "dental.areaTools": "Tooth area tools",
   "dental.marginManual": "Fix by hand",
+  "dental.fixByHandLink": "Teeth cut wrong? Fix by hand",
+  "dental.backToAuto": "Back to automatic",
   "dental.marginAutoHint": "Pare 3D finds the margin below the teeth and cuts the scan along it. Teeth are never cut.",
   "dental.marginManualHint": "Pare 3D marks the teeth in orange. Paint on or off, then make the model; what you approve is kept.",
   "dental.step3": "Choose the model",

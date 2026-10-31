@@ -144,6 +144,13 @@ export function articulatorOpening(raise: number) {
   return { degrees: (a * 180) / Math.PI, front: part(44, PLANE), back: part(186, PLANE) };
 }
 
+/** Build 104: moved by a CSS transform, so a change glides (see .glide in fork.css). */
+const shift = (dx: number) => ({ transform: `translate(${f(dx)}px, 0px)` });
+/** Build 104: a bar from x0 to x1 that glides as its ends move: a unit bar stretched by a transform. */
+function GlideBar({ className, x0, x1, y, h }: { className: string; x0: number; x1: number; y: number; h: number }) {
+  return <rect className={`${className} glide`} x="0" y="0" width="1" height={h} vectorEffect="non-scaling-stroke" style={{ transform: `translate(${f(x0)}px, ${f(y)}px) scale(${f(Math.max(0.01, x1 - x0))}, 1)` }} />;
+}
+
 /** Build 104: the picture's units per mm of the pin's distance from the teeth (beyond the least, 2 mm). */
 const GAP_UNIT = 1.8;
 
@@ -152,7 +159,7 @@ export function ArticulatorPicture({ pinRaise, pin = true, pinGap = 2 }: { pinRa
   const gap = raise * 2.6;
   const { degrees } = articulatorOpening(raise);
   const out = Math.max(0, Math.min(8, pinGap - 2)) * GAP_UNIT;
-  const jx = JX, jy = JY, pinX = PIN_X - out;
+  const jx = JX, jy = JY, pinX = PIN_X;
   return (
     <svg className="dental-picture articulator" viewBox="-16 -20 260 146" aria-hidden="true">
       {/* Build 78: the lower model, its ball condyle and its half of the pin: these stay put. */}
@@ -165,8 +172,8 @@ export function ArticulatorPicture({ pinRaise, pin = true, pinGap = 2 }: { pinRa
         <circle className="lower" cx={jx} cy={jy} r={6.2} />
         {/* Build 84: the lower half of the split pin on an arm along the bottom of the lower base, a dish in its top. */}
         {pin ? (<>
-          <rect className="lower" x={pinX - 8} y={PLANE + 45} width={42 + out} height="3" />
-          <path className="lower" d={`M${pinX - 3} ${PLANE + 46} V${TABLE_TOP} H${pinX - 2} Q${pinX} ${TABLE_TOP + 1.4} ${pinX + 2} ${TABLE_TOP} H${pinX + 3} V${PLANE + 46} Z`} />
+          <GlideBar className="lower" x0={pinX - 8 - out} x1={pinX + 34} y={PLANE + 45} h={3} />
+          <path className="lower glide" style={shift(-out)} d={`M${pinX - 3} ${PLANE + 46} V${TABLE_TOP} H${pinX - 2} Q${pinX} ${TABLE_TOP + 1.4} ${pinX + 2} ${TABLE_TOP} H${pinX + 3} V${PLANE + 46} Z`} />
         </>) : null}
       </g>
       {/* The upper model, turned about the condyles by the pin's raise: its cups round the balls, its half of the pin on the lower's. */}
@@ -180,21 +187,23 @@ export function ArticulatorPicture({ pinRaise, pin = true, pinGap = 2 }: { pinRa
         <path className="upper" d={`M${jx - 10} ${PLANE - 42} H${jx + 10} V${jy + 3.1} L${jx + 5.25} ${jy - 3.67} A6.4 6.4 0 0 0 ${jx - 5.25} ${jy + 3.67} L${jx - 2.2} ${jy + 8} H${jx - 10} Z`} />
         {/* Build 84: the upper half of the split pin, longer by the opening, its rounded end in the dish. */}
         {pin ? (<>
-          <rect className="upper" x={pinX - 8} y={PIN_TOP - 2} width={42 + out} height="3" />
-          <path className="upper" d={`M${pinX - 3} ${PIN_TOP} V${TABLE_TOP - 3 - gap} A3 3 0 0 0 ${pinX + 3} ${TABLE_TOP - 3 - gap} V${PIN_TOP} Z`} />
+          <GlideBar className="upper" x0={pinX - 8 - out} x1={pinX + 34} y={PIN_TOP - 2} h={3} />
+          <path className="upper glide" style={shift(-out)} d={`M${pinX - 3} ${PIN_TOP} V${TABLE_TOP - 3 - gap} A3 3 0 0 0 ${pinX + 3} ${TABLE_TOP - 3 - gap} V${PIN_TOP} Z`} />
         </>) : null}
       </g>
       {/* Build 104: the pin's distance from the front teeth, measured at the occlusal plane. */}
       {pin ? (
         <g className="pin-gap">
-          <path className="measure" d={`M${f(pinX + 3.5)} ${PLANE + 4} H${FRONT - 1} M${f(pinX + 3.5)} ${PLANE + 1} V${PLANE + 7} M${FRONT - 1} ${PLANE + 1} V${PLANE + 7}`} />
+          <GlideBar className="measure-bar" x0={pinX + 3.5 - out} x1={FRONT - 1} y={PLANE + 3.55} h={0.9} />
+          <path className="measure glide" style={shift(-out)} d={`M${f(pinX + 3.5)} ${PLANE + 1} V${PLANE + 7}`} />
+          <path className="measure" d={`M${FRONT - 1} ${PLANE + 1} V${PLANE + 7}`} />
         </g>
       ) : null}
       {raise > 0 ? (
         <g className="opening">
           <path className="turn" d={`M${jx - 13} ${jy - 18} A22 22 0 0 0 ${jx - 21} ${jy - 5}`} />
           <path className="turn" d={`M${jx - 13} ${jy - 18} l-4.4 0.4 M${jx - 13} ${jy - 18} l-0.2 4.4`} />
-          <text className="raise" x={pinX - 8} y={PLANE + 58}>{`+${raise} mm`}</text>
+          <text className="raise" x={pinX - 8 - out} y={PLANE + 58}>{`+${raise} mm`}</text>
         </g>
       ) : null}
     </svg>
@@ -212,15 +221,22 @@ export function ArticulatorSidesPicture({ pinGap = 2 }: { pinGap?: number }) {
   const upperTeeth = [-3.5, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5, 3.5].map((i) => cx + i * toothW);
   const post = (side: -1 | 1) => {
     const edge = cx + side * half; // the side of the bases at the premolars
-    const x = edge + side * (7 + out);
+    // Drawn at the least distance and moved out by a transform, so it glides.
+    const x = edge + side * 7, dx = side * out;
     const near = side < 0 ? x + 3 : x - 3;
+    const [a0, a1] = side < 0 ? [x - 3 - out, edge] : [edge, x + 3 + out];
+    const [m0, m1] = side < 0 ? [near - out, edge] : [edge, near + out];
     return (
       <g key={side}>
-        <rect className="upper" x={f(Math.min(cx + side * half, x) - (side < 0 ? 3 : 0))} y="8" width={f(Math.abs(cx + side * half - x) + 3)} height="4" />
-        <rect className="lower" x={f(Math.min(cx + side * half, x) - (side < 0 ? 3 : 0))} y="108" width={f(Math.abs(cx + side * half - x) + 3)} height="4" />
-        <path className="upper" d={`M${f(x - 3)} 10 V58 A3 3 0 0 0 ${f(x + 3)} 58 V10 Z`} />
-        <path className="lower" d={`M${f(x - 3)} 110 V62 H${f(x - 2)} Q${f(x)} 63.4 ${f(x + 2)} 62 H${f(x + 3)} V110 Z`} />
-        <path className="measure" d={`M${f(near)} 74 H${f(edge)} M${f(near)} 71 V77 M${f(edge)} 71 V77`} />
+        <GlideBar className="upper" x0={a0} x1={a1} y={8} h={4} />
+        <GlideBar className="lower" x0={a0} x1={a1} y={108} h={4} />
+        <g className="glide" style={shift(dx)}>
+          <path className="upper" d={`M${f(x - 3)} 10 V58 A3 3 0 0 0 ${f(x + 3)} 58 V10 Z`} />
+          <path className="lower" d={`M${f(x - 3)} 110 V62 H${f(x - 2)} Q${f(x)} 63.4 ${f(x + 2)} 62 H${f(x + 3)} V110 Z`} />
+          <path className="measure" d={`M${f(near)} 71 V77`} />
+        </g>
+        <GlideBar className="measure-bar" x0={m0} x1={m1} y={73.55} h={0.9} />
+        <path className="measure" d={`M${f(edge)} 71 V77`} />
       </g>
     );
   };

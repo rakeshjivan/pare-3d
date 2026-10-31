@@ -532,16 +532,12 @@ export function DentalStudioPanel({
           ) : null}
         </div>
         <div className="dental-substep">
-          <h4 className="dental-substep-title">{t("dental.step2")}</h4>
-        <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.step2")}>
-          {(["auto", "manual"] as const).map((value) => (
-            <button key={value} type="button" role="radio" aria-checked={(options.margin ?? "auto") === value} className={(options.margin ?? "auto") === value ? "active" : ""} disabled={busy || Boolean(trimming)} onClick={() => onOptionsChange({ margin: value })}>
-              {t(value === "auto" ? "dental.marginAuto" : "dental.marginManual")}
-            </button>
-          ))}
-        </div>
-        <p className="blend-hint">{t((options.margin ?? "auto") === "auto" ? "dental.marginAutoHint" : "dental.marginManualHint")}</p>
-        {(options.margin ?? "auto") === "manual" ? (<>
+          {/* Build 104: the teeth are found automatically; fixing them by hand is a link, not a choice up front. */}
+        {(options.margin ?? "auto") === "auto" ? (
+          <button type="button" className="link-button dental-fix-link" disabled={busy || Boolean(trimming)} onClick={() => onOptionsChange({ margin: "manual" })}>{t("dental.fixByHandLink")}</button>
+        ) : (<>
+        <h4 className="dental-substep-title">{t("dental.marginManual")}</h4>
+        <p className="blend-hint">{t("dental.marginManualHint")} <button type="button" className="link-button" disabled={busy || Boolean(trimming)} onClick={() => onOptionsChange({ margin: "auto" })}>{t("dental.backToAuto")}</button></p>
         <div className="dental-trim-mode" role="radiogroup" aria-label={t("dental.trimArch")}>
           {(["upper", "lower"] as const).map((slot) => (
             <button key={slot} type="button" role="radio" aria-checked={arch === slot} className={arch === slot ? "active" : ""} disabled={!slots[slot] || Boolean(trimming)} onClick={() => setArch(slot)}>
@@ -576,7 +572,7 @@ export function DentalStudioPanel({
           {onSculpt ? <button type="button" disabled={busy || !slots[arch] || areaBusy} onClick={() => onSculpt(arch)}>{t("dental.sculpt")}</button> : null}
         </div>
         {areaBusy ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.areaFinding")}</p> : <p className="blend-hint">{t("dental.areaInfo")}</p>}
-        </>) : null}
+        </>)}
         </div>
       </>)) : null}
 

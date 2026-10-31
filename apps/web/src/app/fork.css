@@ -2232,3 +2232,9 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .dental-picture.articulator .pin-gap .measure { fill: none; stroke: #1662b3; stroke-width: 0.9; }
 .dental-picture.articulator .pin-gap text { font-size: 7.5px; }
 .dental-picture.articulator.sides .measure { fill: none; stroke: #1662b3; stroke-width: 0.9; }
+/* Build 104: Prepare's "Teeth cut wrong? Fix by hand" link. */
+.dental-studio-panel .dental-fix-link { display: block; margin: 2px 0 4px; font-size: 13px; font-weight: 600; }
+/* Build 104: the articulator pictures' pin glides to its new distance. */
+.dental-picture .glide { transform-box: view-box; transform-origin: 0 0; transition: transform 0.35s ease; }
+.dental-picture.articulator .measure-bar { fill: #1662b3; stroke: none; }
+@media (prefers-reduced-motion: reduce) { .dental-picture .glide { transition: none; } }
