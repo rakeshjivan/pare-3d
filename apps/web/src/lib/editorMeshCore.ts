@@ -718,6 +718,10 @@ export function meshForShape(shape: WorkplaneShape): MeshData {
     return transformMesh({ name: sanitizeName(shape.name), vertices: scaled, faces }, shape);
   }
 
+  const cached = cachedUnplacedMesh(shape);
+  if (cached) {
+    return transformMesh({ name: sanitizeName(shape.name), vertices: cached.vertices, faces: cached.faces.map(([a, b, c]) => [a, b, c]) }, shape);
+  }
   const raw =
     geometryMeshForShape(shape) ??
     (shape.kind === "cylinder" || shape.kind === "ellipse" || shape.kind === "tube" || shape.kind === "ring" || shape.kind === "torus"
@@ -729,7 +733,53 @@ export function meshForShape(shape: WorkplaneShape): MeshData {
           : shape.kind === "pyramid"
             ? cylinderMesh(shape, shape.sides ?? 4, 0)
             : boxMesh(shape));
+  rememberUnplacedMesh(shape, raw);
   return transformMesh(raw, shape);
+}
+
+// Moving or turning a spring built it again from scratch, about 300 ms each time it was aligned,
+// exported or split. The mesh before transformMesh does not depend on where the shape stands, so
+// the last ones are kept and found by the other fields. Text is left out: it builds a stand-in
+// until its font has loaded.
+const PLACEMENT_FIELDS = new Set(["id", "name", "color", "x", "z", "elevation", "rotation", "rotationX", "rotationZ"]);
+const MAX_UNPLACED_MESHES = 24;
+const MAX_UNPLACED_MESH_VERTICES = 1_500_000;
+const unplacedMeshCache: Array<{ shape: WorkplaneShape; mesh: MeshData }> = [];
+
+function sameShapeApartFromPlacement(a: WorkplaneShape, b: WorkplaneShape) {
+  if (a === b) return true;
+  const left = a as unknown as Record<string, unknown>;
+  const right = b as unknown as Record<string, unknown>;
+  for (const key in left) {
+    if (!PLACEMENT_FIELDS.has(key) && left[key] !== right[key]) return false;
+  }
+  for (const key in right) {
+    if (!PLACEMENT_FIELDS.has(key) && !(key in left) && right[key] !== undefined) return false;
+  }
+  return true;
+}
+
+function cachedUnplacedMesh(shape: WorkplaneShape) {
+  if (shape.kind === "text") return null;
+  const index = unplacedMeshCache.findIndex((entry) => sameShapeApartFromPlacement(entry.shape, shape));
+  if (index < 0) return null;
+  const [entry] = unplacedMeshCache.splice(index, 1);
+  unplacedMeshCache.push(entry);
+  return entry.mesh;
+}
+
+function rememberUnplacedMesh(shape: WorkplaneShape, mesh: MeshData) {
+  if (shape.kind === "text" || mesh.vertices.length > MAX_UNPLACED_MESH_VERTICES) return;
+  unplacedMeshCache.push({ shape: { ...shape }, mesh: { name: mesh.name, vertices: mesh.vertices, faces: mesh.faces.map(([a, b, c]) => [a, b, c]) } });
+  let vertexCount = unplacedMeshCache.reduce((sum, entry) => sum + entry.mesh.vertices.length, 0);
+  while (unplacedMeshCache.length > MAX_UNPLACED_MESHES || vertexCount > MAX_UNPLACED_MESH_VERTICES) {
+    vertexCount -= unplacedMeshCache.shift()!.mesh.vertices.length;
+  }
+}
+
+/** For tests: forget the kept meshes. */
+export function clearUnplacedMeshCache() {
+  unplacedMeshCache.length = 0;
 }
 
 export function appendMeshData(vertices: Vec3[], faces: [number, number, number][], mesh: MeshData) {
