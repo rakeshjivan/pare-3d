@@ -56,7 +56,7 @@ const SHAPE_KINDS = new Set([
 ]);
 
 const FEATURE_TYPES = new Set([
-  "group", "boolean-subtraction", "boolean-intersection", "mirror", "sketch-extrusion", "sketch-revolve", "sketch-sweep", "fillet", "chamfer", "chamfillet", "shell", "delete-face", "draft",
+  "group", "boolean-subtraction", "boolean-intersection", "mirror", "sketch-extrusion", "sketch-revolve", "sketch-sweep", "fillet", "chamfer", "chamfillet", "shell", "delete-face", "draft", "offset",
 ]);
 
 type LylAssetKind = "source" | "derived-mesh" | "brep" | "image" | "display-edges";
@@ -936,7 +936,7 @@ function activeProjectIndexes(state: LylStateV1) {
     }
     const treatments = Array.isArray(node.definition.edgeTreatments) ? node.definition.edgeTreatments as Array<Record<string, unknown>> : [];
     treatments.forEach((treatment, index) => {
-      const type = treatment.kind === "fillet" || treatment.kind === "chamfillet" || treatment.kind === "shell" || treatment.kind === "draft" ? treatment.kind : treatment.kind === "deleteFace" ? "delete-face" : "chamfer";
+      const type = treatment.kind === "fillet" || treatment.kind === "chamfillet" || treatment.kind === "shell" || treatment.kind === "draft" || treatment.kind === "offset" ? treatment.kind : treatment.kind === "deleteFace" ? "delete-face" : "chamfer";
       const featureId = `feature/${safeNodeToken(node.nodeId)}/${type}/${index}`;
       features.push({
         id: featureId,

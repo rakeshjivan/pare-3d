@@ -623,8 +623,8 @@ export type ShellOpenings = "none" | "top" | "bottom" | "top-bottom" | ShellSide
 export type ShellEdges = "round" | "sharp";
 
 export type EdgeTreatmentFeature = {
-  /** "shell" hollows the body: `amount` is then the wall thickness. "deleteFace" deletes faces and closes the gap (#451). */
-  kind: "fillet" | "chamfer" | "chamfillet" | "shell" | "deleteFace" | "draft";
+  /** "shell" hollows the body: `amount` is then the wall thickness. "deleteFace" deletes faces and closes the gap (#451). "offset" moves every face by `amount` (#919). */
+  kind: "fillet" | "chamfer" | "chamfillet" | "shell" | "deleteFace" | "draft" | "offset";
   /** For "draft" (build 37): the angle in degrees the picked faces lean in. */
   amount: number;
   edgeCount: number;
@@ -636,8 +636,10 @@ export type EdgeTreatmentFeature = {
   /** Fork (build 32): a fillet's radius at the edge's end, when it changed along it; `amount` is its start. */
   endAmount?: number;
   openings?: ShellOpenings;
-  /** Only for "shell"; missing means "round". */
+  /** Only for "shell" and "offset"; missing means "round". */
   shellEdges?: ShellEdges;
+  /** Only for "offset": the faces moved inward, the body shrunk; missing means grown. */
+  offsetShrink?: boolean;
   /** Only for "deleteFace": the faces deleted, as the tool numbered them on the body before. */
   faceIds?: number[];
   faceCount?: number;

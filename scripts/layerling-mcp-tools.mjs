@@ -866,6 +866,22 @@ export const tools = [
     },
   },
   {
+    name: "layerling_offset_object",
+    description: "Move every face of one exact solid by the same distance, outward (grow, the default) or inward (shrink) - like the editor's Offset tool. This is the clearance for a press fit or a snap joint: with asHole true the original stays as it is and a copy, grown by the distance, is added as a hole to cut the mating part with (group them with layerling_group_objects, or use layerling_boolean_cut). `distance` is in millimetres (0.01 to 10, default 0.2). `edges` round (default) keeps the offset surface round at the outer corners, sharp lets the faces run on until they meet. A body that is only a triangle mesh often cannot be offset, and neither can a bundle or a hole; the error then says so. The result is a fixed exact body: its offset can be taken back like a chamfer.",
+    inputSchema: {
+      ...editorTargetSchema,
+      required: ["id"],
+      properties: {
+        ...editorTargetSchema.properties,
+        id: { type: "string" },
+        distance: { type: "number", description: "Distance in millimetres, 0.01 to 10; 0.2 when omitted." },
+        shrink: { type: "boolean", description: "True moves the faces inward (the body gets smaller); false or omitted outward." },
+        asHole: { type: "boolean", description: "True keeps the original and adds the offset body as a copy that is a hole; the result is that copy." },
+        edges: { type: "string", enum: ["round", "sharp"] },
+      },
+    },
+  },
+  {
     name: "layerling_array_objects",
     description: "Repeat objects n times in a row or around a circle - hole rows, hole grids, bolt circles, the teeth of a ring - like the editor's Pattern tool. `count` includes the originals. Coordinates are as in a slicer: X to the right, Y to the back, Z up. A row steps `spacing` millimetres along `direction` (negative runs the other way), or along several axes at once with `spacingX`, `spacingY` and `spacingZ` (a diagonal row, a staircase; give any of them and the others count as 0). A circle turns about the vertical axis through (`centerX`, `centerY`) over `angle` degrees: 360 (default) spreads the pieces evenly, a smaller angle puts the first and last piece on its ends; positive runs counter-clockwise seen from above. `rise` lifts every copy that many millimetres more than the one before (a screw, an ascending spiral) and `radiusChange` moves it that far further from the centre (negative: closer) for a flat or conical spiral. `rotateCopies` (default true) turns each copy with the circle. The copies are added as one undo step and returned with their ids; the originals stay where they are.",
     inputSchema: {

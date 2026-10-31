@@ -97,6 +97,7 @@ import type { PareStudio } from "@/lib/pareStudio";
 import { applyAppTheme } from "@/lib/appTheme";
 import { DentalStudioPanel, dentalPreset, type DentalAreaTool, type DentalPreset, type DentalSlot, type DentalView } from "./workplane/DentalStudioPanel";
 import { ShellPanel } from "./workplane/ShellPanel";
+import { OffsetPanel } from "./workplane/OffsetPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
 import { MateFacesPanel } from "./workplane/MateFacesPanel";
 import { concentricMotion, mateMotion, type FacePick, type MateMode } from "@/lib/mateFaces";
@@ -731,6 +732,7 @@ function bedOverhangMessage(overhangs: BedOverhang[], printer: string) {
 function edgeTreatmentLabel(feature: NonNullable<WorkplaneShape["edgeTreatments"]>[number]) {
   const size = `${Number(feature.amount.toFixed(2))} mm`;
   if (feature.kind === "shell") return `hollow (${size} walls, open ${shellOpenSides(feature.openings).join(" + ") || "none"})`;
+  if (feature.kind === "offset") return `offset (${feature.offsetShrink ? "-" : "+"}${size})`;
   if (feature.kind === "deleteFace") return `face deletion (${feature.faceCount ?? 0} face${feature.faceCount === 1 ? "" : "s"})`;
   if (feature.kind === "draft") return `draft (${Number(feature.amount.toFixed(1))}°, ${feature.faceCount ?? 0} face${feature.faceCount === 1 ? "" : "s"})`;
   return `${feature.kind === "fillet" ? "fillet" : feature.kind === "chamfillet" ? "chamfillet" : "chamfer"} (${size}, ${feature.edgeCount} edge${feature.edgeCount === 1 ? "" : "s"})`;
@@ -991,7 +993,7 @@ function edgeTreatmentHistoryOptions(shape: WorkplaneShape, path: number[] = [],
     targetName,
     createdAt: entry.createdAt,
     removesNewerCount: Math.max(0, ownHistory.length - index - 1),
-    editable: path.length === 0 && (entry.feature.kind === "shell" || Boolean(entry.feature.edgeIds?.length)),
+    editable: path.length === 0 && (entry.feature.kind === "shell" || entry.feature.kind === "offset" || Boolean(entry.feature.edgeIds?.length)),
   }));
   const childOptions = (shape.groupedShapes ?? []).flatMap((child, index) =>
     edgeTreatmentHistoryOptions(child, [...path, index], `${targetName} / ${child.name}`),
@@ -2386,7 +2388,8 @@ export function LayerlingEditor({
     setSketchCornerDialog(null);
   }, [sketchSelection, sketchTool, sketchActive]);
   const [edgeModifier, setEdgeModifier] = useState<EdgeModifierSession | null>(null);
-  const [shellTool, setShellTool] = useState<{ thickness: number; openings: ShellOpenings; edges: ShellEdges; busy: boolean; error: string | null; replaces?: string; picked?: boolean } | null>(null);
+  // `mode: "offset"` is the Offset tool (#919), which shares the hollow tool's state: `thickness` is then the distance.
+  const [shellTool, setShellTool] = useState<{ mode?: "offset"; shrink?: boolean; keepCopy?: boolean; thickness: number; openings: ShellOpenings; edges: ShellEdges; busy: boolean; error: string | null; replaces?: string; picked?: boolean } | null>(null);
   const [simplifyToolId, setSimplifyToolId] = useState<string | null>(null);
   /** The window for fonts of one's own (#customFonts), opened from a text's font select. */
   const [fontManagerOpen, setFontManagerOpen] = useState(false);
@@ -4190,6 +4193,8 @@ export function LayerlingEditor({
     const feature = entry.feature;
     if (feature.kind === "shell") {
       setShellTool({ thickness: feature.amount, openings: feature.openings ?? "top", edges: feature.shellEdges ?? "round", busy: false, error: null });
+    } else if (feature.kind === "offset") {
+      setShellTool({ mode: "offset", thickness: feature.amount, shrink: feature.offsetShrink === true, keepCopy: false, openings: "none", edges: feature.shellEdges ?? "round", busy: false, error: null });
     } else {
       edgeEditRequestRef.current = {
         shapeId: restored.shape.id,
@@ -7081,7 +7086,7 @@ export function LayerlingEditor({
    */
   // `watched` is the body in the scene the result replaces; it is the shape
   // itself, except when a resized hollow body is hollowed again from its state before.
-  const shellShape = useCallback(async (shape: WorkplaneShape, thickness: number, openings: ShellOpenings, edges: ShellEdges = "round", watched: WorkplaneShape = shape) => {
+  const shellShape = useCallback(async (shape: WorkplaneShape, thickness: number, openings: ShellOpenings, edges: ShellEdges = "round", watched: WorkplaneShape = shape, offset?: { shrink: boolean }) => {
     if (shape.locked || shape.hole || isNonSolidShapeKind(shape.kind)) {
       throw new Error("Select one unlocked solid object to hollow");
     }
@@ -7091,13 +7096,14 @@ export function LayerlingEditor({
     const { response, sourceParts } = await prepareCadModifierForMcp(shape, 25);
     const previewResponse = await postCadModifierRequestAsync({
       type: "preview",
-      kind: "shell",
+      kind: offset ? "offset" : "shell",
       edgeIds: [],
       amount: thickness,
       quality: "standard",
       chamferAngle: 45,
       shellOpenings: openings,
       shellEdges: edges,
+      ...(offset ? { offsetShrink: offset.shrink } : {}),
       minDeflection: shape.cadMeshDeflection,
     }, [], 60000);
     if (previewResponse.type !== "preview") {
@@ -7112,9 +7118,9 @@ export function LayerlingEditor({
       cadDisplayEdges: cadDisplayEdgesForShape(rawPreview, previewResponse.displayEdges),
       cadDisplayEdgesVersion: 2 as const,
     });
-    const feature = { kind: "shell" as const, amount: thickness, edgeCount: 0, openings, ...(edges === "sharp" ? { shellEdges: edges } : {}) } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number];
+    const feature = { kind: offset ? "offset" as const : "shell" as const, amount: thickness, edgeCount: 0, openings, ...(edges === "sharp" ? { shellEdges: edges } : {}), ...(offset?.shrink ? { offsetShrink: true } : {}) } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number];
     const session: EdgeModifierSession = {
-      kind: "shell",
+      kind: offset ? "offset" : "shell",
       edges: response.edges,
       selectedEdgeIds: [],
       amount: thickness,
@@ -7142,6 +7148,16 @@ export function LayerlingEditor({
     }
     return modifiedShape;
   }, [invalidateCadModifierSession, prepareCadModifierForMcp, postCadModifierRequestAsync]);
+
+  /**
+   * Offset (#919): every face of the body moved by `distance`, out or in. With `keepCopy` the body stays as it is and the
+   * offset one is a copy of it, kept as a hole: the clearance to cut a press fit with.
+   */
+  const offsetShape = useCallback(async (target: WorkplaneShape, distance: number, shrink: boolean, edges: ShellEdges, keepCopy: boolean) => {
+    const source = keepCopy ? cloneWorkplaneShapeTreeWithFreshIds(target, "offset") : target;
+    const offset = await shellShape(source, distance, "none", edges, target, { shrink });
+    return keepCopy ? withHoleMode(offset, true) : offset;
+  }, [shellShape]);
 
   /*
    * Delete face (#451) goes the same way as hollowing: the body goes to the
@@ -7234,7 +7250,7 @@ export function LayerlingEditor({
   }, [invalidateCadModifierSession, prepareCadModifierForMcp, postCadModifierRequestAsync]);
 
   const startShellTool = useCallback(() => {
-    if (shellTool) {
+    if (shellTool && shellTool.mode !== "offset") {
       setShellTool(null);
       return;
     }
@@ -7261,6 +7277,25 @@ export function LayerlingEditor({
     setShellTool({ thickness: Math.max(0.2, Math.min(2, Number((smallest / 5).toFixed(1)))), openings: "top", edges: "round", busy: false, error: null });
   }, [refuseLockedSelection, closeSplit, edgeModifier, invalidateCadModifierSession, selectedShape, selectedShapes.length, shellTool]);
 
+  const startOffsetTool = useCallback(() => {
+    if (shellTool?.mode === "offset") {
+      setShellTool(null);
+      return;
+    }
+    if (refuseLockedSelection()) return;
+    if (selectedShapes.length !== 1 || !selectedShape || selectedShape.locked || selectedShape.hole || isNonSolidShape(selectedShape)) {
+      setNotice(t("status.selectOneSolid", { kind: t("editor.tool.offset") }));
+      return;
+    }
+    if (selectedShape.groupOperation === "bundle") {
+      setNotice(t("status.bundleNotOneBody"));
+      return;
+    }
+    if (edgeModifier) invalidateCadModifierSession();
+    closeSplit();
+    setShellTool({ mode: "offset", shrink: false, keepCopy: false, thickness: 0.2, openings: "none", edges: "round", busy: false, error: null });
+  }, [refuseLockedSelection, closeSplit, edgeModifier, invalidateCadModifierSession, selectedShape, selectedShapes.length, shellTool]);
+
   const applyShellTool = useCallback(() => {
     if (!shellTool || shellTool.busy) return;
     const target = selectedShape;
@@ -7270,6 +7305,25 @@ export function LayerlingEditor({
     }
     const { thickness, openings, edges, replaces } = shellTool;
     setShellTool((current) => current ? { ...current, busy: true, error: null } : current);
+    if (shellTool.mode === "offset") {
+      const shrink = shellTool.shrink === true;
+      const keepCopy = shellTool.keepCopy === true;
+      const size = `${shrink ? "-" : "+"}${Number(thickness.toFixed(2))}`;
+      void offsetShape(target, thickness, shrink, edges, keepCopy)
+        .then((offset) => {
+          commitShapes(
+            keepCopy ? [...shapesRef.current, offset] : shapesRef.current.map((candidate) => candidate.id === target.id ? offset : candidate),
+            offset.id,
+            keepCopy ? t("status.offsetCopy", { size }) : t(shrink ? "status.offsetShrunk" : "status.offsetGrown", { size: Number(thickness.toFixed(2)) }),
+          );
+          setShellTool(null);
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? localizedError(error.message) : String(error);
+          setShellTool((current) => current ? { ...current, busy: false, error: message } : current);
+        });
+      return;
+    }
     const base = replaces
       ? restoreEdgeTreatmentInShape(target, [], replaces, workspaceSettingsRef.current.booleanTriangleLimit).then((restored) => restored?.shape ?? target)
       : Promise.resolve(target);
@@ -7287,7 +7341,7 @@ export function LayerlingEditor({
         const message = error instanceof Error ? localizedError(error.message) : String(error);
         setShellTool((current) => current ? { ...current, busy: false, error: message } : current);
       });
-  }, [commitShapes, selectedShape, selectedShapes.length, shellShape, shellTool]);
+  }, [commitShapes, offsetShape, selectedShape, selectedShapes.length, shellShape, shellTool]);
 
   // Fork (build 28): the outward direction of each side Hollow can leave open, in scene axes (y up).
   const SHELL_SIDE_NORMALS: Record<ShellSide, { x: number; y: number; z: number }> = {
@@ -14451,6 +14505,23 @@ export function LayerlingEditor({
         return { object: mcpShapeSummary(modifiedShape), thickness, openings, edges };
       }
 
+      if (command.action === "offset_object") {
+        const target = findShape(params.id);
+        if (!target) throw new Error("Object not found");
+        if (target.groupOperation === "bundle") throw new Error("A bundle is not one body; group it (layerling_group_objects) or offset its parts one by one");
+        const distance = Math.min(10, Math.max(0.01, mcpNumber(params.distance, 0.2)));
+        const shrink = params.shrink === true;
+        const asHole = params.asHole === true;
+        const edges: ShellEdges = params.edges === "sharp" ? "sharp" : "round";
+        const offset = await offsetShape(target, distance, shrink, edges, asHole);
+        commitShapes(
+          asHole ? [...shapesRef.current, offset] : shapesRef.current.map((candidate) => candidate.id === target.id ? offset : candidate),
+          offset.id,
+          t("status.offsetMcp", { size: `${shrink ? "-" : "+"}${Number(distance.toFixed(2))}` }),
+        );
+        return { object: mcpShapeSummary(offset), distance, shrink, edges, asHole };
+      }
+
       if (command.action === "array_objects") {
         const requestedIds = mcpStringArray(params.ids);
         const ids = requestedIds.length > 0 ? requestedIds : selectedIdsRef.current;
@@ -17263,6 +17334,7 @@ export function LayerlingEditor({
         { key: "chamfer", label: t("editor.tool.chamfer"), onSelect: () => startEdgeModifier("chamfer") },
         { key: "fillet", label: t("editor.tool.fillet"), onSelect: () => startEdgeModifier("fillet") },
         { key: "hollow", label: t("editor.tool.hollow"), onSelect: startShellTool },
+        { key: "offset", label: t("editor.tool.offset"), onSelect: startOffsetTool },
         { key: "deleteFace", label: t("editor.tool.deleteFace"), onSelect: () => startDeleteFaceTool("delete") },
         { key: "draft", label: t("draft.menu"), onSelect: startDraftTool },
         { key: "roundMesh", label: t("meshRound.menu"), onSelect: toggleMeshRound },
@@ -17502,7 +17574,9 @@ export function LayerlingEditor({
         intersectPreviewActive={Boolean(intersectPreviewIds)}
         onFillet={() => edgeModifier?.kind === "fillet" ? cancelEdgeModifier() : startEdgeModifier("fillet")}
         onHollow={startShellTool}
-        hollowActive={Boolean(shellTool)}
+        hollowActive={Boolean(shellTool && shellTool.mode !== "offset")}
+        onOffset={startOffsetTool}
+        offsetActive={shellTool?.mode === "offset"}
         onDeleteFace={() => startDeleteFaceTool("delete")}
         deleteFaceActive={Boolean(deleteFaceTool)}
         canSimplify={selectedShapes.length === 1 && offersMeshSimplify(selectedShape) && !selectedShape?.locked}
@@ -18189,7 +18263,30 @@ export function LayerlingEditor({
           }}
         />
       ) : null}
-      {shellTool && selectedShape ? (
+      {shellTool?.mode === "offset" && selectedShape ? (
+        <OffsetPanel
+          targetName={selectedShape.name}
+          distance={shellTool.thickness}
+          shrink={shellTool.shrink === true}
+          keepCopy={shellTool.keepCopy === true}
+          edges={shellTool.edges}
+          workspace={workspaceSettings}
+          busy={shellTool.busy}
+          error={shellTool.error}
+          appliedFeatureCount={selectedEdgeFeatureCount}
+          reversibleFeatureCount={selectedReversibleEdgeFeatureCount}
+          historyOptions={selectedEdgeHistoryOptions}
+          onRemoveFeature={removeEdgeTreatment}
+          onEditFeature={editEdgeTreatment}
+          onDistanceChange={(value) => setShellTool((current) => current ? { ...current, thickness: value, error: null } : current)}
+          onShrinkChange={(value) => setShellTool((current) => current ? { ...current, shrink: value, error: null } : current)}
+          onKeepCopyChange={(value) => setShellTool((current) => current ? { ...current, keepCopy: value, error: null } : current)}
+          onEdgesChange={(value) => setShellTool((current) => current ? { ...current, edges: value, error: null } : current)}
+          onApply={applyShellTool}
+          onCancel={() => setShellTool(null)}
+        />
+      ) : null}
+      {shellTool && shellTool.mode !== "offset" && selectedShape ? (
         <ShellPanel
           targetName={selectedShape.name}
           thickness={shellTool.thickness}

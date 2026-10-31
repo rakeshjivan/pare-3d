@@ -380,5 +380,15 @@
       "tr": "Döndürme ile çizimde küçük 3B önizleme artık durağan bir resim değil: sol veya sağ düğmeyle sürükleyerek döndür, tekerlekle yakınlaştır, tekerlek düğmesiyle kaydır; böylece alt tarafı da görürsün. Ayarladığın görünüm çizmeye devam ederken korunur.",
       "es": "En el boceto con Revolución, la pequeña vista previa 3D ya no es una imagen fija: arrastra con el botón izquierdo o derecho para girarla, usa la rueda para hacer zoom y el botón de la rueda para moverla, así ves también la parte inferior. La vista que ajustes se mantiene mientras sigues dibujando."
     }
+  },
+  {
+    "title": {
+      "de": "Versatz: Körper um einen Abstand vergrößern oder verkleinern",
+      "en": "Offset: grow or shrink a body by a distance"
+    },
+    "body": {
+      "de": "Das neue Werkzeug „Versatz“ neben „Aushöhlen“ verschiebt jede Fläche eines Körpers um denselben Abstand, nach außen oder innen. So bekommst du das Spiel für Passungen und Schnappverbindungen: Mit dem Haken „Original behalten“ bleibt dein Teil, und die vergrößerte Kopie liegt schon als Loch daneben, bereit zum Gruppieren mit dem Gegenstück.",
+      "en": "The new Offset tool next to Hollow moves every face of a body by the same distance, out or in. That gives you the clearance for press fits and snap joints: with \"Keep the original\" ticked your part stays and the grown copy is already a hole beside it, ready to group with the mating part."
+    }
   }
 ]

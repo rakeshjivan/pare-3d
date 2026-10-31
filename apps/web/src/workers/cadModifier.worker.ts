@@ -3,7 +3,7 @@
 import { cadHasSolidBody } from "@/lib/cadSolidBody";
 import { OcctKernel, type ShapeHandle } from "occt-wasm";
 import { assertCadKernelRunnable } from "@/lib/wasmSupport";
-import { orientedFaceNormal, shellSolid } from "@/lib/cadShell";
+import { CANNOT_OFFSET_MESSAGE, offsetSolid, orientedFaceNormal, shellSolid } from "@/lib/cadShell";
 import { chamfilletSolid } from "@/lib/cadChamfillet";
 import { cadFaceList, cadFaceTessellation, DELETE_FACES_UNCHANGED_MESSAGE, deleteFacesSolid } from "@/lib/cadDeleteFaces";
 import type { CadModifierComponentMesh, CadModifierDeflection, CadModifierDisplayEdge, CadModifierEdge, CadModifierFaces, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierProfilePart, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
@@ -931,7 +931,7 @@ async function bearbeiteAnfrage(request: CadModifierWorkerRequest, halter: { cad
     ? (request.faceIds ?? []).map((id) => ({ id, face: faceHandles[id], owner: faceOwners[id] })).filter((entry): entry is { id: number; face: ShapeHandle; owner: number } => entry.face !== undefined)
     : [];
   if (faceTool && selectedFaces.length === 0) throw new Error("Select at least one face");
-  if (selected.length === 0 && request.kind !== "shell" && !faceTool) throw new Error("Select at least one highlighted edge");
+  if (selected.length === 0 && request.kind !== "shell" && request.kind !== "offset" && !faceTool) throw new Error("Select at least one highlighted edge");
   const componentResults: ShapeHandle[] = [];
   let result: ShapeHandle | null = null;
   try {
@@ -942,6 +942,8 @@ async function bearbeiteAnfrage(request: CadModifierWorkerRequest, halter: { cad
       let component: ShapeHandle;
       if (request.kind === "shell") {
         component = shellSolid(activeCad, solid, request.amount, request.shellOpenings ?? "none", request.shellEdges);
+      } else if (request.kind === "offset") {
+        component = offsetSolid(activeCad, solid, request.amount, request.offsetShrink === true, request.shellEdges);
       } else if (request.kind === "deleteFace") {
         const componentFaces = selectedFaces.filter((entry) => entry.owner === owner).map((entry) => entry.face);
         component = componentFaces.length ? deleteFacesSolid(activeCad, solid, componentFaces) : activeCad.copy(solid);
@@ -1069,6 +1071,8 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
       ? DELETE_FACES_UNCHANGED_MESSAGE
       : request.kind === "draft"
         ? DRAFT_FACES_REFUSED
+      : request.kind === "offset"
+        ? CANNOT_OFFSET_MESSAGE
       : request.kind === "shell"
         ? "The walls cannot be this thick for this body. Choose a thinner wall."
         : `The selected edges cannot be ${request.kind === "fillet" ? "filleted" : "chamfered"} together at this size. Reduce the size or select fewer connected edges.`

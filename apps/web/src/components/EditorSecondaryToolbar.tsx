@@ -35,6 +35,7 @@ import {
   ToolbarFilletIcon,
   ToolbarHistoryIcon,
   ToolbarHollowIcon,
+  ToolbarOffsetIcon,
   ToolbarDeleteFaceIcon,
   ToolbarSimplifyIcon,
   ToolbarMirrorIcon,
@@ -324,6 +325,8 @@ export function SecondaryToolbar({
   onFillet,
   onHollow,
   hollowActive,
+  onOffset,
+  offsetActive,
   onDeleteFace,
   deleteFaceActive,
   canSimplify,
@@ -470,6 +473,8 @@ export function SecondaryToolbar({
   onFillet: () => void;
   onHollow: () => void;
   hollowActive: boolean;
+  onOffset: () => void;
+  offsetActive: boolean;
   onDeleteFace: () => void;
   deleteFaceActive: boolean;
   canSimplify: boolean;
@@ -873,6 +878,7 @@ export function SecondaryToolbar({
     { id: "chamfer", label: t("editor.tool.chamfer"), icon: ToolbarChamferIcon, action: onChamfer, enabled: canEdgeModify, active: edgeModifierKind === "chamfer" || edgeModifierKind === "chamfillet" },
     { id: "fillet", label: t("editor.tool.fillet"), icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify, active: edgeModifierKind === "fillet" },
     { id: "hollow", label: t("editor.tool.hollow"), icon: ToolbarHollowIcon, action: onHollow, enabled: canEdgeModify, active: hollowActive },
+    { id: "offset", label: t("editor.tool.offset"), icon: ToolbarOffsetIcon, action: onOffset, enabled: canEdgeModify, active: offsetActive },
     { id: "deleteFace", label: t("editor.tool.deleteFace"), icon: ToolbarDeleteFaceIcon, action: onDeleteFace, enabled: canEdgeModify, active: deleteFaceActive && !build33.draftActive },
     { id: "draft", label: t("draft.title"), icon: ForkDraftIcon, action: build33.onDraft, enabled: canEdgeModify, active: build33.draftActive },
     { id: "surfaceText", label: t("editor.tool.surfaceText"), icon: Type, action: build33.onText, enabled: true, active: build33.textActive },
