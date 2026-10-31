@@ -118,6 +118,8 @@ export function HomeLauncher({
           {dentalAvailable ? studioCard("dental") : null}
         </div>
       )}
+      {/* Build 104: no Recent list on Home - designs and cases are in their studios; the grid shows search results only. */}
+      {searching ? (
       <section className="home-recent" aria-labelledby="home-recent-title">
         <div className="home-section-head">
           <h2 id="home-recent-title">{searching ? t("home.matches") : t("home.recent")}</h2>
@@ -158,6 +160,7 @@ export function HomeLauncher({
           </div>
         )}
       </section>
+      ) : null}
     </div>
   );
 }
