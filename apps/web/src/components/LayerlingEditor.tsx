@@ -276,6 +276,7 @@ import { silhouetteSketchProfile } from "@/lib/sketchCadProfile";
 import { svgSketchMatchesMesh } from "@/lib/svgSketch";
 import { DEFAULT_SKETCH_STROKE, normalizeSketchStroke, strokedSketchProfile } from "@/lib/sketchStroke";
 import { bottomCadModifierEdgeIds, horizontalCadModifierEdgeIds, insideCadModifierEdgeIds, outsideCadModifierEdgeIds, topCadModifierEdgeIds, verticalCadModifierEdgeIds } from "@/lib/topEdges";
+import { tangentCadEdgeChain } from "@/lib/cadEdgeChain";
 import { movedWithEditedOutline, placedLikeExisting, placeSketchShape, sketchBodyAnchor, type SketchAnchor } from "@/lib/sketchPlacement";
 import { separatesBySketch, sketchOutlineParts } from "@/lib/sketchOutlineParts";
 import { sketchOutlineBounds } from "@/lib/sketchKeyring";
@@ -625,69 +626,6 @@ function cadModifierImportedStepMeshPart(step: string, brepTransform: number[] |
 }
 
 
-function cadEdgeEndpoint(edge: CadModifierEdge, end: "start" | "end") {
-  const offset = end === "start" ? 0 : edge.points.length - 3;
-  return new THREE.Vector3(edge.points[offset], edge.points[offset + 1], edge.points[offset + 2]);
-}
-
-function cadEdgeTangentAt(edge: CadModifierEdge, endpoint: THREE.Vector3) {
-  const start = cadEdgeEndpoint(edge, "start");
-  const end = cadEdgeEndpoint(edge, "end");
-  if (endpoint.distanceToSquared(start) <= endpoint.distanceToSquared(end)) {
-    const next = new THREE.Vector3(edge.points[3], edge.points[4], edge.points[5]);
-    return next.sub(start).normalize();
-  }
-  const offset = Math.max(0, edge.points.length - 6);
-  const previous = new THREE.Vector3(edge.points[offset], edge.points[offset + 1], edge.points[offset + 2]);
-  return previous.sub(end).normalize();
-}
-
-function tangentCadEdgeChain(edges: CadModifierEdge[], startId: number, allowedIds: Set<number>) {
-  const edgeById = new Map(edges.map((edge) => [edge.id, edge]));
-  const selected = new Set<number>([startId]);
-  const queue = [startId];
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let minZ = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  let maxZ = Number.NEGATIVE_INFINITY;
-  edges.forEach((edge) => {
-    for (let index = 0; index + 2 < edge.points.length; index += 3) {
-      minX = Math.min(minX, edge.points[index]);
-      minY = Math.min(minY, edge.points[index + 1]);
-      minZ = Math.min(minZ, edge.points[index + 2]);
-      maxX = Math.max(maxX, edge.points[index]);
-      maxY = Math.max(maxY, edge.points[index + 1]);
-      maxZ = Math.max(maxZ, edge.points[index + 2]);
-    }
-  });
-  const diagonal = [minX, minY, minZ, maxX, maxY, maxZ].every(Number.isFinite)
-    ? Math.hypot(maxX - minX, maxY - minY, maxZ - minZ)
-    : 1;
-  const tolerance = Math.max(1e-6, Math.min(0.01, diagonal * 1e-5));
-  while (queue.length > 0) {
-    const id = queue.shift() as number;
-    const edge = edgeById.get(id);
-    if (!edge) continue;
-    const endpoints = [cadEdgeEndpoint(edge, "start"), cadEdgeEndpoint(edge, "end")];
-    edges.forEach((candidate) => {
-      if (selected.has(candidate.id) || !allowedIds.has(candidate.id)) return;
-      const candidateEndpoints = [cadEdgeEndpoint(candidate, "start"), cadEdgeEndpoint(candidate, "end")];
-      const shared = endpoints.find((point) => candidateEndpoints.some((other) => point.distanceTo(other) <= tolerance));
-      if (!shared) return;
-      const a = cadEdgeTangentAt(edge, shared);
-      const b = cadEdgeTangentAt(candidate, shared);
-      const deviation = (Math.acos(Math.max(-1, Math.min(1, Math.abs(a.dot(b))))) * 180) / Math.PI;
-      if (deviation <= 16) {
-        selected.add(candidate.id);
-        queue.push(candidate.id);
-      }
-    });
-  }
-  return [...selected];
-}
-
 function cadDisplayEdgesAfterTreatment(shape: WorkplaneShape, session: EdgeModifierSession) {
   const removed = new Set(session.selectedEdgeIds);
   const elevation = shape.elevation ?? 0;
@@ -721,12 +659,17 @@ function cadDisplayEdgesForShape(shape: WorkplaneShape, edges: CadModifierDispla
     }));
 }
 
-function cadModifierComponentPreviews(sourceParts: WorkplaneShape[], components: CadModifierComponentMesh[] | undefined, deflection?: CadModifierDeflection): EdgeModifierComponentPreview[] {
+/** `whole`: the preview already built for the whole body, which a body of one component is, from the same source. */
+function cadModifierComponentPreviews(sourceParts: WorkplaneShape[], components: CadModifierComponentMesh[] | undefined, deflection?: CadModifierDeflection, whole?: { source: WorkplaneShape; shape: WorkplaneShape | null }): EdgeModifierComponentPreview[] {
   if (!components?.length) return [];
   const previews: EdgeModifierComponentPreview[] = [];
   components.forEach((component) => {
     const source = sourceParts[component.owner] ?? sourceParts[0];
     if (!source) return;
+    if (components.length === 1 && whole?.shape && whole.source === source) {
+      previews.push({ owner: component.owner, shape: canonicalizeShape(whole.shape) });
+      return;
+    }
     const shape = shapeFromCadMesh(source, component.positions, component.normals, component.indices, component.brep, deflection);
     if (!shape) return;
     previews.push({
@@ -2677,7 +2620,7 @@ export function LayerlingEditor({
           cadDisplayEdges: cadDisplayEdgesForShape(rawPreview, message.displayEdges),
           cadDisplayEdgesVersion: 2 as const,
         } : null;
-        const componentPreviews = cadModifierComponentPreviews(sourceParts, message.components, message.deflection);
+        const componentPreviews = cadModifierComponentPreviews(sourceParts, message.components, message.deflection, base ? { source: base, shape: preview } : undefined);
         setEdgeModifier((current) => current ? {
           ...current,
           preview,
@@ -3173,7 +3116,7 @@ export function LayerlingEditor({
     const real = new Set(edgeModifier.edges.filter((edge) => cadModifierCandidateEdge(edge)).map((edge) => edge.id));
     const picked = new Set(edgeModifier.selectedEdgeIds);
     const reached = new Set<number>();
-    edgeModifier.selectedEdgeIds.forEach((id) => tangentCadEdgeChain(edgeModifier.edges, id, real).forEach((edgeId) => reached.add(edgeId)));
+    tangentCadEdgeChain(edgeModifier.edges, edgeModifier.selectedEdgeIds, real).forEach((edgeId) => reached.add(edgeId));
     return [...reached].filter((edgeId) => !picked.has(edgeId)).length;
   }, [edgeModifier?.edges, edgeModifier?.prepared, edgeModifier?.selectedEdgeIds]);
   // Im Verlaufsblick wird der gezeigte Stand exportiert, ganz und ohne Auswahl.
@@ -7161,7 +7104,7 @@ export function LayerlingEditor({
       prepared: true,
       error: null,
       preview,
-      componentPreviews: cadModifierComponentPreviews(sourceParts, previewResponse.components, previewResponse.deflection),
+      componentPreviews: cadModifierComponentPreviews(sourceParts, previewResponse.components, previewResponse.deflection, { source: shape, shape: preview }),
     };
     const createdAt = Date.now();
     const groupedModifiedShape = groupedShapeWithComponentEdgeTreatment(shape, preview, sourceParts, session, feature, createdAt);
@@ -7251,7 +7194,7 @@ export function LayerlingEditor({
       prepared: true,
       error: null,
       preview,
-      componentPreviews: cadModifierComponentPreviews(sourceParts, previewResponse.components, previewResponse.deflection),
+      componentPreviews: cadModifierComponentPreviews(sourceParts, previewResponse.components, previewResponse.deflection, { source: shape, shape: preview }),
     };
     const createdAt = Date.now();
     const modifiedShape = groupedShapeWithComponentEdgeTreatment(shape, preview, sourceParts, session, feature, createdAt)
@@ -7351,7 +7294,7 @@ export function LayerlingEditor({
       prepared: true,
       error: null,
       preview,
-      componentPreviews: cadModifierComponentPreviews(sourceParts, previewResponse.components, previewResponse.deflection),
+      componentPreviews: cadModifierComponentPreviews(sourceParts, previewResponse.components, previewResponse.deflection, { source: shape, shape: preview }),
     };
     const createdAt = Date.now();
     const modifiedShape = groupedShapeWithComponentEdgeTreatment(shape, preview, sourceParts, session, feature, createdAt)

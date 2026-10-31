@@ -4100,10 +4100,19 @@ export function WorkplaneViewport({
     [renderSelectionIds],
   );
 
+  // The edge lines are built when the edges or their states change; the pointer moving onto
+  // another edge only swaps the hover lines (thousands of edges on a mesh body).
+  const hoverModifierEdgeIdRef = useRef(hoverModifierEdgeId);
+  hoverModifierEdgeIdRef.current = hoverModifierEdgeId;
   useEffect(() => {
     modifierEdgesRef.current = modifierEdges;
-    rebuildModifierEdges(threeRef.current, modifierEdges, selectedModifierEdgeIds, modifierPreviewActive, hoverModifierEdgeId, modifierHighlightedEdgeIds, failedModifierEdgeIds, modifierOnlyVisibleEdges);
-  }, [failedModifierEdgeIds, hoverModifierEdgeId, modifierEdges, modifierHighlightedEdgeIds, modifierOnlyVisibleEdges, modifierPreviewActive, selectedModifierEdgeIds]);
+    rebuildModifierEdges(threeRef.current, modifierEdges, selectedModifierEdgeIds, modifierPreviewActive, hoverModifierEdgeIdRef.current, modifierHighlightedEdgeIds, failedModifierEdgeIds, modifierOnlyVisibleEdges);
+  }, [failedModifierEdgeIds, modifierEdges, modifierHighlightedEdgeIds, modifierOnlyVisibleEdges, modifierPreviewActive, selectedModifierEdgeIds]);
+  useEffect(() => {
+    setModifierEdgeHover(threeRef.current, modifierEdgesRef.current, hoverModifierEdgeId, selectedModifierEdgeIds, modifierPreviewActive, failedModifierEdgeIds);
+    // Only the pointer: everything else rebuilds the lines (and the hover with them) above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoverModifierEdgeId]);
 
   const resolvedThemeRef = useRef(resolvedTheme);
   resolvedThemeRef.current = resolvedTheme;
@@ -13282,28 +13291,63 @@ function rebuildModifierEdges(
   const selected = new Set(selectedIds);
   const highlighted = new Set(highlightedIds);
   const failed = new Set(failedIds);
+  // Drawn as if no edge were under the pointer; the one that is gets its own lines from
+  // setModifierEdgeHover, so moving the pointer onto another edge leaves these thousands alone.
   edges.forEach((edge) => {
     if (edge.points.length < 6) return;
     const active = selected.has(edge.id);
-    const hovered = hoverId === edge.id;
-    const belowThreshold = !active && !hovered && !highlighted.has(edge.id);
-    const style = modifierEdgeMaterialStyle(active, hovered, previewActive, belowThreshold, failed.has(edge.id));
-    if (hovered || (active && failed.has(edge.id))) {
-      if (hovered) {
-        state.modifierLayer.add(wideModifierEdgeLine(state, edge.points, MODIFIER_EDGE_HALO_COLOR, 1002.5, MODIFIER_EDGE_HALO_PX, 0.85));
-      }
-      state.modifierLayer.add(wideModifierEdgeLine(state, edge.points, style.color, hovered ? 1003 : 1002));
+    const belowThreshold = !active && !highlighted.has(edge.id);
+    const style = modifierEdgeMaterialStyle(active, false, previewActive, belowThreshold, failed.has(edge.id));
+    if (active && failed.has(edge.id)) {
+      const wide = wideModifierEdgeLine(state, edge.points, style.color, 1002);
+      wide.userData.modifierEdgeId = edge.id;
+      state.modifierLayer.add(wide);
       return;
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(edge.points, 3));
     const line = new THREE.Line(geometry, modifierEdgeMaterial(style, onlyVisible));
     line.userData.modifierEdgeId = edge.id;
-    line.renderOrder = hovered ? 1003 : active ? 1002 : 1001;
+    line.renderOrder = active ? 1002 : 1001;
     setObjectRenderLayer(line, RENDER_LAYER_MODIFIERS);
     freezeStaticObjectMatrices(line);
     state.modifierLayer.add(line);
   });
+  setModifierEdgeHover(state, edges, hoverId, selectedIds, previewActive, failedIds);
+}
+
+/**
+ * The edge under the pointer: a halo and a wide line in its hovered colour, and its own line from
+ * rebuildModifierEdges hidden meanwhile. Only these two lines are made again when the pointer moves.
+ */
+export function setModifierEdgeHover(
+  state: ThreeState | null,
+  edges: CadModifierEdge[],
+  hoverId: number | null,
+  selectedIds: number[],
+  previewActive = false,
+  failedIds: number[] = [],
+) {
+  if (!state) return;
+  const layer = state.modifierLayer;
+  layer.children
+    .filter((child) => child.userData.modifierEdgeHover)
+    .forEach((child) => {
+      layer.remove(child);
+      disposeObject(child);
+    });
+  layer.children.forEach((child) => {
+    if (typeof child.userData.modifierEdgeId === "number") child.visible = child.userData.modifierEdgeId !== hoverId;
+  });
+  const edge = hoverId === null ? undefined : edges.find((candidate) => candidate.id === hoverId);
+  if (edge && edge.points.length >= 6) {
+    const style = modifierEdgeMaterialStyle(selectedIds.includes(edge.id), true, previewActive, false, failedIds.includes(edge.id));
+    const halo = wideModifierEdgeLine(state, edge.points, MODIFIER_EDGE_HALO_COLOR, 1002.5, MODIFIER_EDGE_HALO_PX, 0.85);
+    const core = wideModifierEdgeLine(state, edge.points, style.color, 1003);
+    halo.userData.modifierEdgeHover = true;
+    core.userData.modifierEdgeHover = true;
+    layer.add(halo, core);
+  }
   state.needsRender = true;
 }
 

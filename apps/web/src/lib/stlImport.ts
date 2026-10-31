@@ -44,6 +44,11 @@ function stlUsesLayerlingYUp(buffer: ArrayBuffer, position: THREE.BufferAttribut
   return Number.isFinite(ySpan) && Number.isFinite(zSpan) && ySpan <= zSpan * 0.55;
 }
 
+/** The name an imported body takes after its file. */
+export function importedMeshName(fileName: string, sourceFormat: NonNullable<WorkplaneShape["importedMesh"]>["sourceFormat"] = "stl") {
+  return fileName.replace(/\.[^.]+$/, "") || `Imported ${sourceFormat.toUpperCase()}`;
+}
+
 export function importedShapeFromTriangleSoup(
   fileName: string,
   rawPositions: number[],
@@ -97,7 +102,7 @@ export function importedShapeFromTriangleSoup(
 
   return {
     id: createLocalId("uploaded-mesh"),
-    name: fileName.replace(/\.[^.]+$/, "") || `Imported ${sourceFormat.toUpperCase()}`,
+    name: importedMeshName(fileName, sourceFormat),
     kind: "mesh",
     // Build 85: Meshmixer's light grey, so a scan's surface reads as it does there.
     color: SCAN_GREY,
