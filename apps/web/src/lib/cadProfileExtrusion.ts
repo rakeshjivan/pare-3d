@@ -20,7 +20,7 @@ import { buildHoneycombHoles, normalizeHoneycombCellSize, normalizeHoneycombFram
 import { dovetailOutlineForShape } from "@/lib/dovetailGeometry";
 import { loftProfileLoops } from "@/lib/loftGeometry";
 import { teardropExactSection } from "@/lib/teardropGeometry";
-import { normalizePortCorner } from "@/lib/portGeometry";
+import { normalizePortCorner, portChamfer } from "@/lib/portGeometry";
 import { screwHoleProfile } from "@/lib/screwHoleGeometry";
 import { DEFAULT_ROUNDED_BOX_CORNER_FILLET, DEFAULT_ROUNDED_BOX_TOP_BOTTOM_FILLET, normalizeCornerFillet, normalizeRoundedBoxQuality, normalizeTopBottomFillet } from "@/lib/roundedBoxGeometry";
 import { textGlyphShapes, textKeyringOf } from "@/lib/textGeometry";
@@ -953,8 +953,24 @@ function roundedRectLoop(width: number, depth: number, radius: number): CadModif
  * ends (a USB-C socket) are one half circle each, not two quarters, so each end
  * is one face; a round opening is one circle.
  */
-function portProfileLoop(width: number, height: number, corner: number): CadModifierProfileLoop {
+function portProfileLoop(width: number, height: number, corner: number, chamfer: ReturnType<typeof portChamfer>): CadModifierProfileLoop {
   const half = height / 2;
+  if (chamfer) {
+    // HDMI and DisplayPort: the lower corners cut off straight, the others rounded by a quarter circle (portContourPoints).
+    const hw = width / 2;
+    const quarter = (x: number, z: number, cx: number, cz: number, start: number): Corner => {
+      if (corner <= 1e-4) return { start: { x, z }, end: { x, z } };
+      const arc: Arc = { cx, cz, rx: corner, rz: corner, start, end: start + Math.PI / 2 };
+      return { start: profileArcPoint(arc, arc.start), end: profileArcPoint(arc, arc.end), arc };
+    };
+    const point = (x: number, z: number): Corner => ({ start: { x, z }, end: { x, z } });
+    return loopFromCorners([
+      ...(chamfer.right ? [point(hw - chamfer.x, 0), point(hw, chamfer.y)] : [quarter(hw, 0, hw - corner, corner, -Math.PI / 2)]),
+      quarter(hw, height, hw - corner, height - corner, 0),
+      quarter(-hw, height, -(hw - corner), height - corner, Math.PI / 2),
+      ...(chamfer.left ? [point(-hw, chamfer.y), point(-(hw - chamfer.x), 0)] : [quarter(-hw, 0, -(hw - corner), corner, Math.PI)]),
+    ]);
+  }
   const roundAcrossHeight = corner >= half - 1e-6;
   const roundAcrossWidth = corner >= width / 2 - 1e-6;
   if (roundAcrossHeight && roundAcrossWidth) return mapLoop(ellipseLoop(width / 2, half), 1, 0, 1, half);
@@ -1014,7 +1030,8 @@ export function cadProfileForShapeKind(shape: WorkplaneShape, designedRound = fa
     }
     case "port": {
       // A rounded rectangle in the front view (createPortGeometry), lifted to stand on z = 0 and pushed along the depth like the teardrop.
-      return { loops: [portProfileLoop(width, shape.height, normalizePortCorner(shape.cornerFillet, width, shape.height))], frame: alongDepthFrame(depth) };
+      const corner = normalizePortCorner(shape.cornerFillet, width, shape.height, shape.portProfile);
+      return { loops: [portProfileLoop(width, shape.height, corner, portChamfer(shape.portProfile, width, shape.height))], frame: alongDepthFrame(depth) };
     }
     case "ellipse":
     case "cylinder": {

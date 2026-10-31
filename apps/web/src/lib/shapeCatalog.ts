@@ -123,7 +123,7 @@ import {
   DEFAULT_TEARDROP_WIDTH,
   teardropHeightForTipAngle,
 } from "@/lib/teardropGeometry";
-import { DEFAULT_PORT_DEPTH, DEFAULT_PORT_PRESET, normalizePortCorner, PORT_PRESETS } from "@/lib/portGeometry";
+import { DEFAULT_PORT_DEPTH, DEFAULT_PORT_PRESET, normalizePortCorner, normalizePortProfile, PORT_PRESETS } from "@/lib/portGeometry";
 import { DEFAULT_LOFT, loftFieldsFromMeasures, loftFrameSize, normalizeLoftMeasures } from "@/lib/loftGeometry";
 import { DEFAULT_VASE_SIZE, normalizeVaseSettings } from "@/lib/vaseSettings";
 import {
@@ -765,6 +765,7 @@ export function sceneShape(shape: Partial<WorkplaneShape> & Pick<WorkplaneShape,
     screwHoleShaft: shape.screwHoleShaft,
     screwHoleHeadDepth: shape.screwHoleHeadDepth,
     screwHoleAngle: shape.screwHoleAngle,
+    portProfile: shape.portProfile,
     cornerFillet: shape.cornerFillet,
     topBottomFillet: shape.topBottomFillet,
     roundedBoxQuality: shape.roundedBoxQuality,
@@ -1075,7 +1076,8 @@ export function makeShapeFromAsset(
     screwHoleHeadDepth: asset.kind === "counterbore" ? normalizeScrewHoleHeadDepth(customization.screwHoleHeadDepth ?? DEFAULT_SCREW_HOLE_HEAD_DEPTH, height) : undefined,
     screwHoleAngle: asset.kind === "countersink" || asset.kind === "doubleCountersink" ? normalizeScrewHoleAngle(customization.screwHoleAngle ?? DEFAULT_SCREW_HOLE_ANGLE) : undefined,
     cornerFillet: asset.kind === "roundedBox" ? normalizeCornerFillet(customization.cornerFillet ?? DEFAULT_ROUNDED_BOX_CORNER_FILLET, Math.min(width, depth) / 2)
-      : asset.kind === "port" ? normalizePortCorner(customization.cornerFillet, width, height) : undefined,
+      : asset.kind === "port" ? normalizePortCorner(customization.cornerFillet, width, height, customization.portProfile) : undefined,
+    portProfile: asset.kind === "port" ? normalizePortProfile(customization.portProfile) : undefined,
     topBottomFillet: asset.kind === "roundedBox" ? normalizeTopBottomFillet(customization.topBottomFillet ?? DEFAULT_ROUNDED_BOX_TOP_BOTTOM_FILLET, height / 2) : undefined,
     roundedBoxQuality: asset.kind === "roundedBox" ? normalizeRoundedBoxQuality(customization.roundedBoxQuality ?? DEFAULT_ROUNDED_BOX_QUALITY) : undefined,
     ...(bentTube ?? {}),

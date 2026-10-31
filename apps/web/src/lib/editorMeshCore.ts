@@ -478,7 +478,7 @@ function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {
       geometry = createTeardropGeometry({ width, depth, height, sides: roundSideCount(shape.sides, width, depth) });
       break;
     case "port":
-      geometry = createPortGeometry({ width, depth, height, cornerFillet: shape.cornerFillet });
+      geometry = createPortGeometry({ width, depth, height, cornerFillet: shape.cornerFillet, portProfile: shape.portProfile });
       break;
     case "knurl":
       geometry = createKnurlGeometry({ width, height, knurlPattern: shape.knurlPattern, knurlCount: shape.knurlCount, knurlDepth: shape.knurlDepth, knurlAngle: shape.knurlAngle, knurlChamfer: shape.knurlChamfer });

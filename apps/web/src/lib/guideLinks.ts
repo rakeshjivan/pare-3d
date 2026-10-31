@@ -67,7 +67,7 @@ export const GUIDE_SECTIONS = {
   flexi: { chapter: "threads", en: "flexi-joints" },
   lid: { chapter: "edges", en: "a-lid-for-an-open-body" },
   vase: { chapter: "shapes", en: "a-vase" },
-  port: { chapter: "threads", en: "port-openings" },
+  ports: { chapter: "threads", en: "port-openings" },
   deleteFace: { chapter: "edges", de: "flaechen-loeschen", en: "deleting-faces", nl: "vlakken-verwijderen", fr: "supprimer-des-faces", ru: "udalenie-graney", cs: "mazani-ploch", sl: "brisanje-ploskev" },
   threads: { chapter: "threads", de: "gewinde", en: "threads", nl: "schroefdraad", ru: "rezba", cs: "zavity", sl: "navoj", hu: "menetek" },
   gears: { chapter: "threads", de: "zahnraeder", en: "gears", nl: "tandwielen", ru: "shesterni", cs: "ozubena-kola", sl: "zobniki", hu: "fogaskerekek" },

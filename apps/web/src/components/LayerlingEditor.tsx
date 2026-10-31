@@ -13938,7 +13938,7 @@ export function LayerlingEditor({
             { ...asset, name, color },
             { x, z, elevation },
             {
-              ...mcpShapeCustomization(asset.kind, portPreset && shapeParams.cornerFillet === undefined ? { ...shapeParams, cornerFillet: portPreset.corner } : shapeParams),
+              ...mcpShapeCustomization(asset.kind, portPreset ? { cornerFillet: portPreset.corner, portProfile: portPreset.profile, ...shapeParams } : shapeParams),
               width: requestedWidth,
               depth: requestedDepth,
               height: requestedHeight,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { createPortGeometry, normalizePortCorner, portContourPoints, PORT_PRESETS, portPresetFor } from "@/lib/portGeometry";
+import { createPortGeometry, maxPortCorner, normalizePortCorner, portChamfer, portContourPoints, PORT_PRESET_ORDER, PORT_PRESETS, portPresetFor } from "@/lib/portGeometry";
 import { cadProfileForShapeKind } from "@/lib/cadProfileExtrusion";
 import { makeShapeFromAsset, toolbarShapeAssets } from "@/lib/shapeCatalog";
 
@@ -50,6 +50,32 @@ describe("the port opening (#1049)", () => {
     expect(portPresetFor(c.width, c.height, c.corner)).toBe("usbC");
     expect(portPresetFor(PORT_PRESETS.usbA.width, PORT_PRESETS.usbA.height, PORT_PRESETS.usbA.corner)).toBe("usbA");
     expect(portPresetFor(c.width + 0.5, c.height, c.corner)).toBeNull();
+  });
+
+  it("cuts the lower corners of HDMI on both sides and of DisplayPort on the left only", () => {
+    const hdmi = portContourPoints(15.7, 6.2, 0.3, 32, "hdmi");
+    const bottom = hdmi.filter((point) => Math.abs(point.y) < 1e-9).map((point) => point.x).sort((a, b) => a - b);
+    expect(bottom[0]).toBeCloseTo(-5.4, 6);
+    expect(bottom[1]).toBeCloseTo(5.4, 6);
+    expect(hdmi.some((point) => Math.abs(point.x - 7.85) < 1e-9 && Math.abs(point.y - 1.2) < 1e-9)).toBe(true);
+    const dp = portContourPoints(17.1, 5.76, 0.8, 32, "displayPort");
+    const dpBottom = dp.filter((point) => Math.abs(point.y) < 1e-9).map((point) => point.x).sort((a, b) => a - b);
+    expect(dpBottom[0]).toBeCloseTo(-8.55 + 1.8, 6);
+    expect(dpBottom[dpBottom.length - 1]).toBeCloseTo(8.55 - 0.8, 6);
+    expect(portChamfer("rounded", 10, 5)).toBeNull();
+    expect(portChamfer("nonsense", 10, 5)).toBeNull();
+    // A cut corner leaves the side shorter, so the round corners above it must fit what is left.
+    expect(maxPortCorner(15.7, 6.2, "hdmi")).toBeCloseTo((6.2 - 1.2) / 2, 6);
+  });
+
+  it("finds every preset again by its size, corner and outline", () => {
+    for (const key of PORT_PRESET_ORDER) {
+      const preset = PORT_PRESETS[key];
+      expect(portPresetFor(preset.width, preset.height, preset.corner, preset.profile), key).toBe(key);
+      const geometry = createPortGeometry({ width: preset.width, depth: 5, height: preset.height, cornerFillet: preset.corner, portProfile: preset.profile });
+      expect(volumeOf(geometry), key).toBeGreaterThan(0);
+    }
+    expect(portPresetFor(15.7, 6.2, 0.3, "rounded")).toBeNull();
   });
 
   it("comes from the library as a USB-C hole with an exact outline laid along its depth", () => {

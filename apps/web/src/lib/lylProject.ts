@@ -18,6 +18,8 @@ import { importedShapeFrom3mf } from "@/lib/threemfImport";
 import { normalizeDesignView, normalizeSavedViews, readDesignView, readSavedViews, type DesignView, type SavedDesignViews } from "@/lib/designView";
 import { isSketchKeyring } from "@/lib/sketchKeyring";
 import { isThreadProfile } from "@/lib/threadProfiles";
+import { PORT_PROFILES } from "@/lib/portGeometry";
+import type { PortProfile } from "@/types/layerling";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/workplaneSettings";
 import type { CadDisplayEdge, GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchRevolveSettings, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
 
@@ -1705,6 +1707,9 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
     : undefined;
   if (kind === "bentTube" || parametricKind === "bentTube") {
     validateBentTubeDefinition(definition, label);
+  }
+  if (kind === "port" && definition.portProfile !== undefined && !PORT_PROFILES.includes(definition.portProfile as PortProfile)) {
+    throw new Error(`${label}.portProfile is not supported`);
   }
   if (kind === "port" && definition.cornerFillet !== undefined) {
     const cornerFillet = finiteNumber(definition.cornerFillet, `${label}.cornerFillet`);

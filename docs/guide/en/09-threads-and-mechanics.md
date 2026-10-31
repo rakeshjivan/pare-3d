@@ -182,7 +182,7 @@ A **tapped hole** on its side sags at the top in the same way. Give it a teardro
 
 ## Port openings
 
-A box for electronics needs an opening for the cable. The {{ui:shape.port}} is that opening: a hole lying on its side, with rounded corners. Pick the socket under {{ui:prop.portPreset}} - {{ui:port.usbC}}, {{ui:port.microUsb}} or {{ui:port.usbA}} - and it gets the socket's size plus about 0.25 mm of room on every side. {{ui:port.usbCPlug}} is for a socket that sits behind the wall, where the plug's housing has to reach in. The width, the height and the {{ui:prop.portCorner}} can be changed by hand; the list then shows {{ui:port.custom}}.
+A box for electronics needs an opening for the cable. The {{ui:shape.port}} is that opening: a hole lying on its side, with rounded corners. Pick the socket under {{ui:prop.portPreset}} - {{ui:port.usbC}}, {{ui:port.microUsb}} or {{ui:port.usbA}} - and it gets the socket's size plus about 0.25 mm of room on every side. {{ui:port.usbCPlug}} is for a socket that sits behind the wall, where the plug's housing has to reach in. The width, the height and the {{ui:prop.portCorner}} can be changed by hand; the list then shows {{ui:port.custom}}. {{ui:port.hdmi}}, {{ui:port.miniHdmi}}, {{ui:port.displayPort}} and {{ui:port.miniDisplayPort}} have their lower corners cut off at a slant like the socket, DisplayPort only the left one, and {{ui:port.rj45}} fits a network jack; these sizes come from the makers' recommended panel cut-outs and the VESA drawings.
 
 It comes as a hole, facing front. Set the {{ui:prop.portDepth}} a little more than the wall is thick, move it to where the socket sits on the board and group it with the box. For a side wall, turn it by 90° around the vertical axis.
 

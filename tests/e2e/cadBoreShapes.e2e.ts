@@ -28,7 +28,7 @@ function worldMesh(source: WorkplaneShape) {
   const geometry = source.kind === "teardrop"
     ? createTeardropGeometry({ width, depth, height })
     : source.kind === "port"
-    ? createPortGeometry({ width, depth, height, cornerFillet: source.cornerFillet })
+    ? createPortGeometry({ width, depth, height, cornerFillet: source.cornerFillet, portProfile: source.portProfile })
     : createScrewHoleGeometry({ kind: source.kind as "counterbore" | "countersink" | "doubleCountersink", width, depth, height, screwHoleShaft: source.screwHoleShaft, screwHoleHeadDepth: source.screwHoleHeadDepth, screwHoleAngle: source.screwHoleAngle });
   const position = geometry.getAttribute("position");
   const index = geometry.getIndex();
@@ -137,6 +137,21 @@ describe("exact bodies for the bore shapes with the real OCCT kernel", () => {
     // Standing upright the round ends are top and bottom; as wide as high it is one round hole.
     expect(surfaceTypes(exact(shape("port", { width: 3.7, depth: 10, height: 9.4, cornerFillet: 1.85 })).solid)).toEqual(["cylinder", "cylinder", "plane", "plane", "plane", "plane"]);
     expect(surfaceTypes(exact(shape("port", { width: 6, depth: 10, height: 6, cornerFillet: 3 })).solid)).toEqual(["cylinder", "plane", "plane"]);
+  });
+
+  it("port opening: HDMI with both lower corners cut, DisplayPort with only the left one", () => {
+    const hdmi = exact(shape("port", { width: 15.7, depth: 10, height: 6.2, cornerFillet: 0.3, portProfile: "hdmi" })).solid;
+    // two rounded upper corners; top, bottom, two sides, two slants and two end caps flat
+    expect(surfaceTypes(hdmi)).toEqual(["cylinder", "cylinder", ...Array(8).fill("plane")]);
+    const hdmiBox = cad.getBoundingBox(hdmi);
+    expect(hdmiBox.xmax - hdmiBox.xmin).toBeCloseTo(15.7, 3);
+    expect(hdmiBox.ymax - hdmiBox.ymin).toBeCloseTo(6.2, 3);
+    const dp = exact(shape("port", { width: 17.1, depth: 10, height: 5.76, cornerFillet: 0.8, portProfile: "displayPort" })).solid;
+    expect(surfaceTypes(dp)).toEqual(["cylinder", "cylinder", "cylinder", ...Array(7).fill("plane")]);
+    // the cut corner takes 1.8 x 1.8 / 2 off the section
+    const r = 0.8;
+    const section = 17.1 * 5.76 - 3 * (r * r - Math.PI * r * r / 4) - 1.8 * 1.8 / 2;
+    expect(cad.getVolume(dp)).toBeCloseTo(section * 10, 2);
   });
 
   it("counterbore: five faces, plane and cylinder only, head end on top", () => {

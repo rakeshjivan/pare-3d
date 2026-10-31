@@ -172,7 +172,7 @@ import { VasePrintReport } from "@/components/workplane/VasePrintReport";
 import { shapeDefaultsAsset, shapeDefaultsFromShape } from "@/lib/shapeDefaults";
 import { MAX_SCREW_HOLE_ANGLE, MIN_SCREW_HOLE_ANGLE, normalizeScrewHoleAngle, normalizeScrewHoleHeadDepth, normalizeScrewHoleShaft } from "@/lib/screwHoleGeometry";
 import { MAX_TEARDROP_TIP_ANGLE, MIN_TEARDROP_TIP_ANGLE, normalizeTeardropTipAngle, teardropHeightForTipAngle, teardropTipAngle } from "@/lib/teardropGeometry";
-import { normalizePortCorner, PORT_PRESET_ORDER, PORT_PRESETS, portPresetFor, type PortPreset } from "@/lib/portGeometry";
+import { maxPortCorner, normalizePortCorner, PORT_PRESET_ORDER, PORT_PRESETS, portPresetFor, type PortPreset } from "@/lib/portGeometry";
 import { MAX_DOVETAIL_CLEARANCE, normalizeDovetailClearance, normalizeDovetailNeckWidth } from "@/lib/dovetailGeometry";
 import { DEFAULT_SKETCH_STROKE, MAX_SKETCH_STROKE_WIDTH, MIN_SKETCH_STROKE_EDGE, MIN_SKETCH_STROKE_WIDTH, normalizeSketchStroke, SKETCH_STROKE_JOINS } from "@/lib/sketchStroke";
 import { MAX_TEXT_EDGE, MIN_TEXT_EDGE, normalizeTextEdge } from "@/lib/textEdge";
@@ -347,7 +347,10 @@ const GEAR_TYPE_OPTIONS: Array<{ value: GearType; label: MessageKey }> = [
   { value: "rack", label: "gear.rack" },
 ];
 /** The vase's choices, by the core's names for them. */
-const PORT_PRESET_LABELS: Record<PortPreset, MessageKey> = { usbC: "port.usbC", usbCPlug: "port.usbCPlug", microUsb: "port.microUsb", usbA: "port.usbA" };
+const PORT_PRESET_LABELS: Record<PortPreset, MessageKey> = {
+  usbC: "port.usbC", usbCPlug: "port.usbCPlug", microUsb: "port.microUsb", usbA: "port.usbA",
+  hdmi: "port.hdmi", miniHdmi: "port.miniHdmi", displayPort: "port.displayPort", miniDisplayPort: "port.miniDisplayPort", rj45: "port.rj45",
+};
 
 const VASE_CHOICES: Partial<Record<VaseChoiceKey, Record<string, MessageKey>>> = {
   profile: { flasche: "vase.profileBottle", bauchig: "vase.profileBellied", schale: "vase.profileBowl", fass: "vase.profileBarrel", zylinder: "vase.profileCylinder", trichter: "vase.profileFunnel", gezeichnet: "vase.profileDrawn" },
@@ -998,12 +1001,14 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
 
   if (shape.kind === "port") {
     // A preset sets the socket's opening at once; a size changed by hand shows as "Custom" (#1049).
-    const corner = normalizePortCorner(shape.cornerFillet, width, shape.height);
-    const preset = portPresetFor(width, shape.height, shape.cornerFillet);
+    // The outline (round corners, or cut ones as on HDMI and DisplayPort) comes with the preset and stays when the size changes.
+    const profile = shape.portProfile;
+    const corner = normalizePortCorner(shape.cornerFillet, width, shape.height, profile);
+    const preset = portPresetFor(width, shape.height, shape.cornerFillet, profile);
     const applyPreset = (value: string) => {
       const chosen = PORT_PRESETS[value as PortPreset];
       if (!chosen) return;
-      onUpdate({ ...widthPatch(chosen.width), height: chosen.height, cornerFillet: chosen.corner });
+      onUpdate({ ...widthPatch(chosen.width), height: chosen.height, cornerFillet: chosen.corner, portProfile: chosen.profile });
     };
     return [
       {
@@ -1018,16 +1023,16 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
         hint: t("prop.portPresetHint"),
         onChange: applyPreset,
       },
-      { id: "width", label: t("prop.width"), value: width, min: MIN_SHAPE_SIZE, max: 100, onChange: (value) => onUpdate({ ...widthPatch(value), cornerFillet: normalizePortCorner(corner, value, shape.height) }, { resizeAxis: "width" }) },
-      { id: "height", label: t("prop.height"), value: shape.height, min: MIN_SHAPE_SIZE, max: 100, onChange: (value) => onUpdate({ height: value, cornerFillet: normalizePortCorner(corner, width, value) }, { resizeAxis: "height" }) },
+      { id: "width", label: t("prop.width"), value: width, min: MIN_SHAPE_SIZE, max: 100, onChange: (value) => onUpdate({ ...widthPatch(value), cornerFillet: normalizePortCorner(corner, value, shape.height, profile) }, { resizeAxis: "width" }) },
+      { id: "height", label: t("prop.height"), value: shape.height, min: MIN_SHAPE_SIZE, max: 100, onChange: (value) => onUpdate({ height: value, cornerFillet: normalizePortCorner(corner, width, value, profile) }, { resizeAxis: "height" }) },
       {
         id: "portCorner",
         label: t("prop.portCorner"),
         value: Math.round(corner * 100) / 100,
         min: 0,
-        max: Math.max(0.05, Math.min(width, shape.height) / 2),
+        max: Math.max(0.05, maxPortCorner(width, shape.height, profile)),
         step: 0.05,
-        onChange: (value) => onUpdate({ cornerFillet: normalizePortCorner(value, width, shape.height) }),
+        onChange: (value) => onUpdate({ cornerFillet: normalizePortCorner(value, width, shape.height, profile) }),
       },
       { id: "length", label: t("prop.portDepth"), value: depth, min: MIN_SHAPE_SIZE, max: 100, onChange: setDepth },
     ];

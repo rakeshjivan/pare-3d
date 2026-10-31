@@ -43,6 +43,9 @@ export type ShapeKind =
   | "ruler"
   | "mesh";
 
+/** Outline of a port opening (portGeometry.ts): rounded corners, or the lower corners cut as on these sockets. */
+export type PortProfile = "rounded" | "hdmi" | "miniHdmi" | "displayPort" | "miniDisplayPort";
+
 /** Cross-section of a bent tube; the inner one may also be "none" for a solid tube. */
 export type BentTubeProfile = "round" | "square" | "hexagon" | "octagon";
 export type BentTubeInnerProfile = BentTubeProfile | "none";
@@ -311,6 +314,8 @@ export type ShapeCustomization = {
   screwHoleHeadDepth?: number;
   /** Countersink and double countersink: opening angle of the cone in degrees. */
   screwHoleAngle?: number;
+  /** Port opening: rounded corners, or the lower ones cut off as on an HDMI or DisplayPort socket. */
+  portProfile?: PortProfile;
   bentTubeProfile?: BentTubeProfile;
   bentTubeInnerProfile?: BentTubeInnerProfile;
   bentTubeSize?: number;
@@ -998,6 +1003,8 @@ export type WorkplaneShape = {
   screwHoleHeadDepth?: number;
   /** Countersink and double countersink: opening angle of the cone in degrees. */
   screwHoleAngle?: number;
+  /** Port opening: rounded corners, or the lower ones cut off as on an HDMI or DisplayPort socket. */
+  portProfile?: PortProfile;
   cornerFillet?: number;
   topBottomFillet?: number;
   roundedBoxQuality?: number;

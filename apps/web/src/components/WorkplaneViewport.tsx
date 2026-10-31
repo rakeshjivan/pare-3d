@@ -1198,6 +1198,7 @@ export function tapeShapeTopologyKey(shape: WorkplaneShape): string {
     screwHoleShaft: shape.screwHoleShaft,
     screwHoleHeadDepth: shape.screwHoleHeadDepth,
     screwHoleAngle: shape.screwHoleAngle,
+    portProfile: shape.portProfile,
     // A dovetail cut-out grows by its clearance, so body and socket differ.
     dovetailHole: shape.kind === "dovetail" ? Boolean(shape.hole) : undefined,
     cornerFillet: shape.cornerFillet,
@@ -1514,6 +1515,7 @@ export function shapeGeometrySignature(shape: WorkplaneShape): string {
     screwHoleShaft: shape.screwHoleShaft,
     screwHoleHeadDepth: shape.screwHoleHeadDepth,
     screwHoleAngle: shape.screwHoleAngle,
+    portProfile: shape.portProfile,
     // A dovetail cut-out grows by its clearance, so body and socket differ.
     dovetailHole: shape.kind === "dovetail" ? Boolean(shape.hole) : undefined,
     cornerFillet: shape.cornerFillet,
@@ -14950,7 +14952,7 @@ function createShapeObject(
       addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createTeardropGeometry({ width, depth, height, sides: roundSideCount(shape.sides, width, depth) })), material, shape);
       break;
     case "port":
-      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createPortGeometry({ width, depth, height, cornerFillet: shape.cornerFillet })), material, shape);
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createPortGeometry({ width, depth, height, cornerFillet: shape.cornerFillet, portProfile: shape.portProfile })), material, shape);
       break;
     case "knurl":
       addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createKnurlGeometry({ width, height, knurlPattern: shape.knurlPattern, knurlCount: shape.knurlCount, knurlDepth: shape.knurlDepth, knurlAngle: shape.knurlAngle, knurlChamfer: shape.knurlChamfer })), material, shape);

@@ -94,7 +94,7 @@ export const SHAPE_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
   doubleCountersink: ["double fraisage", "doppelsenkung"],
   knurl: ["moletage", "moleté", "rändel", "rändelung"],
   teardrop: ["trou de larme", "tropfenbohrung", "larme"],
-  port: ["usb", "usb-c", "usb c", "micro-usb", "socket", "connector", "plug", "anschluss", "buchse", "stecker", "connecteur", "prise"],
+  port: ["usb", "usb-c", "usb c", "micro-usb", "hdmi", "mini hdmi", "displayport", "mini displayport", "rj45", "ethernet", "lan", "network", "netzwerk", "socket", "connector", "plug", "anschluss", "buchse", "stecker", "connecteur", "prise"],
   cone: ["kegel", "spitze"],
   text: ["font", "letters", "schrift", "buchstaben", "beschriftung"],
   nameTag: ["name tag", "key ring", "keychain", "multicolour", "multicolor", "layers", "namensschild", "schlüsselanhänger", "schluesselanhaenger", "mehrfarbig", "schichten"],
