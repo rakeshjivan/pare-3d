@@ -14965,11 +14965,30 @@ function replaceObjectMaterials(object: THREE.Mesh, materials: THREE.Material | 
   trimSharedShapeMaterialCache();
 }
 
-function enableAcceleratedMeshPicking(mesh: THREE.Mesh, geometry: THREE.BufferGeometry, force = false) {
+function geometryTriangleCount(geometry: THREE.BufferGeometry) {
   const position = geometry.getAttribute("position");
-  const triangles = geometry.getIndex()?.count
+  return geometry.getIndex()?.count
     ? Math.floor((geometry.getIndex()?.count ?? 0) / 3)
     : Math.floor((position?.count ?? 0) / 3);
+}
+
+/** From this size a treated body's mesh gets a picking tree: a ray then costs 0.01 ms instead of 1 ms and up (14 ms at 400,000). */
+const TREATED_BVH_TRIANGLE_THRESHOLD = 20_000;
+
+/**
+ * Ported from layerling 1.120: a body with edge treatments is rebuilt for every preview and every change, so it gets
+ * no tree up front. A large one builds it the first time a ray is cast against it (the tape measure, placing a shape on it).
+ */
+function enableLazyMeshPicking(mesh: THREE.Mesh, geometry: THREE.BufferGeometry) {
+  if (geometryTriangleCount(geometry) < TREATED_BVH_TRIANGLE_THRESHOLD) return;
+  mesh.raycast = function lazyAcceleratedRaycast(this: THREE.Mesh, raycaster, intersects) {
+    if (!(geometry as THREE.BufferGeometry & { boundsTree?: unknown }).boundsTree) computeImportedBoundsTree(geometry);
+    acceleratedRaycast.call(this, raycaster, intersects);
+  };
+}
+
+function enableAcceleratedMeshPicking(mesh: THREE.Mesh, geometry: THREE.BufferGeometry, force = false) {
+  const triangles = geometryTriangleCount(geometry);
   mesh.raycast = acceleratedRaycast;
   const bvhGeometry = geometry as THREE.BufferGeometry & { boundsTree?: unknown };
   if ((force || triangles >= BVH_PICKING_TRIANGLE_THRESHOLD) && !bvhGeometry.boundsTree) {
@@ -15637,8 +15656,9 @@ function addMesh(
   mesh.userData.shapeSurface = true;
   retainSharedShapeGeometry(mesh, prepared);
   retainSharedShapeMaterials(mesh, material);
-  if (group.userData.acceleratedPicking !== false && !shape.edgeTreatments?.length) {
-    enableAcceleratedMeshPicking(mesh, prepared, Boolean(shape.importedMesh));
+  if (group.userData.acceleratedPicking !== false) {
+    if (shape.edgeTreatments?.length) enableLazyMeshPicking(mesh, prepared);
+    else enableAcceleratedMeshPicking(mesh, prepared, Boolean(shape.importedMesh));
   }
   mesh.castShadow = true;
   mesh.receiveShadow = false;
