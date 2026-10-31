@@ -92,11 +92,12 @@ export function DentalStart({ onStart, onScans, waxupShown }: { onStart: (tool: 
           if (files.length) onScans(files, tool);
         }}
       >
-        <div className="home-studio-stage">
+        {/* Build 104: the picture starts a new case, as New case does (and as Home's pictures open their studio). */}
+        <button type="button" className="home-studio-stage" aria-label={wax ? t("dentalStart.waxTitle") : t("dentalStart.modelTitle")} onClick={() => onStart(tool)}>
           <img src={wax ? "/assets/home/dental-hero.webp" : "/assets/home/model-builder-hero.webp"} alt="" draggable={false} />
           <span className="home-studio-kicker"><span className="home-studio-dot dental" aria-hidden="true" />{t("dentalStart.workflow")}</span>
           {over === tool ? <span className="dental-workflow-drop">{t("dentalStart.dropHere")}</span> : null}
-        </div>
+        </button>
         <div className="home-studio-body">
           <div className="home-studio-text">
             <h2 id={`dental-workflow-${tool}`}>
