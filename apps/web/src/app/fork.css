@@ -2159,3 +2159,8 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
   left: 50%;
   transform: translateX(-50%);
 }
+/* Build 104: with the "does not fit the build volume" pill showing at the bottom centre, a message
+   stands just above it instead of on top of it. */
+.layerling-editor:not(.studio-dental):has(.bed-overhang-warning) .editor-status {
+  bottom: calc(var(--editor-footer-height) + 78px);
+}
