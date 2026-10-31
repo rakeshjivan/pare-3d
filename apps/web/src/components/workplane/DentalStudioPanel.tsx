@@ -204,13 +204,6 @@ export function DentalStudioPanel({
   const teethHeight = (analysis ? Math.max(...analysis.arches.map((arch) => arch.above)) : 0) + minKeep;
   const gumHeight = Math.max(0, keep - minKeep);
   const ready = Boolean(analysis) && !busy && Boolean(slots.upper || slots.lower);
-  const archInfo = (slot: "upper" | "lower") => {
-    const id = slots[slot];
-    const info = analysis?.arches.find((arch) => arch.id === id);
-    if (!id) return null;
-    if (!info) return stage === "analysing" ? t("dental.checking") : null;
-    return t("dental.archInfo", { holes: info.report.holesFilled, pieces: info.report.fragmentsRemoved + info.report.brokenRemoved, depth: info.depth.toFixed(1) });
-  };
   const pairInfo = () => {
     if (!pair || !analysis?.pair) return null;
     const { inOcclusion, bite, apart } = analysis.pair;
@@ -227,15 +220,16 @@ export function DentalStudioPanel({
     return { text: t("dental.notTouching"), warn: true };
   };
   const pairLine = pairInfo();
-  const slotRow = (slot: DentalSlot, label: string, info: string | null) => (
-    <div className="dental-slot" key={slot}>
+  const slotRow = (slot: DentalSlot, label: string, info: string | null, extra?: ReactNode) => (
+    <div className={`dental-slot${extra ? " with-extra" : ""}`} key={slot}>
       <label>
         <span>{label}</span>
         <select value={slots[slot] ?? ""} disabled={busy} onChange={(event) => onSlotChange(slot, event.currentTarget.value || null)}>
-          <option value="">{t("dental.none")}</option>
+          <option value="">{slot === "bite2" ? t("dental.optional") : t("dental.none")}</option>
           {parts.map((part) => <option key={part.id} value={part.id}>{part.name}</option>)}
         </select>
       </label>
+      {extra}
       {info ? <p className="dental-slot-info">{info}</p> : null}
     </div>
   );
@@ -475,19 +469,19 @@ export function DentalStudioPanel({
           worked in is marked. */}
       {inWaxStep("scans") && inMb("scans") ? card(1, t("dental.step1"), scansDone, t("dental.step1Hint"), scansSummary, (<>
         <div className="dental-slots">
-          {parts.length === 0 ? <p className="dental-status" role="status">{t("dental.noScans")}</p> : null}
           {parts.length === 0 ? <a className="dental-guide-link" href={DENTAL_GUIDE_PDF} download={DENTAL_GUIDE_FILE}><FileDown size={15} aria-hidden="true" /> {t("dental.guidePdfFirst")}</a> : null}
           <div className={onNewPatient ? "dental-import-row" : undefined}>
             <button type="button" className="dental-import" disabled={stage === "making"} onClick={onImport}><Upload size={15} /> {t("dental.import")}</button>
             {onNewPatient ? <button type="button" className="dental-import dental-new-patient" disabled={stage === "making"} title={t("dental.newPatientHint")} onClick={onNewPatient}><FilePlus2 size={15} /> {t("dental.newPatient")}</button> : null}
           </div>
           {modelsHere ? <p className="dental-status warn" role="status">{t("dental.modelsHere")}</p> : null}
-          {slotRow("upper", t("dental.upper"), archInfo("upper"))}
-          <button type="button" className="dental-swap" title={t("dental.swap")} aria-label={t("dental.swap")} disabled={busy || (!slots.upper && !slots.lower)} onClick={onSwap}><ArrowLeftRight size={15} /></button>
-          {slotRow("lower", t("dental.lower"), archInfo("lower"))}
+          {/* Build 104: compact - one line a scan, no cleaning report (what was filled and removed is applied
+              anyway), the swap beside the lower, and both bite scans always offered. */}
+          {slotRow("upper", t("dental.upper"), null)}
+          {slotRow("lower", t("dental.lower"), null, <button type="button" className="dental-swap" title={t("dental.swap")} aria-label={t("dental.swap")} disabled={busy || (!slots.upper && !slots.lower)} onClick={onSwap}><ArrowLeftRight size={15} /></button>)}
           {slotRow("bite", t("dental.bite"), null)}
           {/* Build 79: a second bite scan - one each side aligns the whole arch best. */}
-          {slots.bite || slots.bite2 ? slotRow("bite2", t("dental.bite2"), null) : null}
+          {slotRow("bite2", t("dental.bite2"), null)}
           {stage === "analysing" ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("dental.analysing")}</p> : null}
           {pairLine ? <p className={`dental-status ${pairLine.warn ? "warn" : ""}`} role="status">{pairLine.text}{"fit" in pairLine && onFitBite ? <>{" "}<button type="button" className="link-button" disabled={busy} onClick={onFitBite}>{t(slots.bite2 ? "dental.fitBite2" : "dental.fitBite")}</button></> : null}</p> : null}
           {biteLocked ? <p className="dental-status" role="status">{t("dental.biteLocked")}</p> : null}

@@ -786,3 +786,15 @@
 .studio-dental .dental-studio-panel .range-value-control {
   border-radius: 7px;
 }
+
+/* Build 104: the scans step compact - each label on one line, its field beside it, the swap beside the lower. */
+.studio-dental .dental-studio-panel .dental-slots { gap: 8px; }
+.studio-dental .dental-studio-panel .dental-slot { display: flex; align-items: center; gap: 6px; }
+.studio-dental .dental-studio-panel .dental-slot label {
+  flex: 1 1 auto;
+  min-width: 0;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 10px;
+}
+.studio-dental .dental-studio-panel .dental-slot label > span { white-space: nowrap; min-width: 104px; }
+.studio-dental .dental-studio-panel .dental-slot.with-extra .dental-swap { margin: 0; flex: 0 0 auto; min-height: 30px; padding: 0 7px; }

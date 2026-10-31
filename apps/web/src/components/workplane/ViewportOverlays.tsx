@@ -53,6 +53,8 @@ export type ShapeRenderRecord = {
 };
 
 export type ThreeState = {
+  /** Build 104: Meshmixer's free rotate - the view turns about the screen's axes and can roll, with no fixed up (Dental Studio). */
+  freeRotate?: boolean;
   /** How far the orbit pivot may travel (the plate), as the camera clamp last saw it; the wheel zoom stays within it. */
   pivotLimits?: { halfWidth: number; halfDepth: number; minY: number; maxY: number };
   /** Where "Center view" last went: a part beyond the plate edge may be centred, so the pivot may reach as far as that part. */

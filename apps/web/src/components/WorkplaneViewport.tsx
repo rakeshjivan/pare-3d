@@ -546,6 +546,8 @@ type WorkplaneViewportProps = {
   gimbalAxisLabels?: Partial<Record<RotationAxis, string>>;
   /** Build 104: Dental Studio - the gimbal moves and turns finely, never in steps. */
   gimbalFree?: boolean;
+  /** Build 104: Meshmixer's free rotate - the view turns freely about the screen's axes (Dental Studio). */
+  freeRotate?: boolean;
 };
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;
@@ -3539,6 +3541,7 @@ export function WorkplaneViewport({
   onGimbalDrop,
   gimbalAxisLabels,
   gimbalFree = false,
+  freeRotate = false,
   selectedIds,
   alignMode,
   multiSelect = false,
@@ -3827,6 +3830,8 @@ export function WorkplaneViewport({
   });
   const sectionFineDraggingRef = useRef(false);
   const hostRef = useRef<HTMLDivElement | null>(null);
+  /** Build 104: free rotate wanted (Dental Studio) - read when the scene is made. */
+  const freeRotateRef = useRef(freeRotate);
   const threeRef = useRef<ThreeState | null>(null);
   // Build 104: a tool's panel open over the right of the view shifts the picture left by half of what
   // it covers (see applyViewShift); closing it brings the picture back.
@@ -4896,6 +4901,7 @@ export function WorkplaneViewport({
 
     const state = createThreeScene(host);
     state.palette = themePaletteRef.current;
+    state.freeRotate = freeRotateRef.current;
     threeRef.current = state;
     rebuildWorkplane(state, workspaceRef.current, resolvedThemeRef.current, drawnWorkplane(), projectNameRef.current);
     state.workplaneLayer.visible = !workplaneLayerHiddenRef.current;
@@ -6234,6 +6240,29 @@ export function WorkplaneViewport({
   }, []);
   const gimbalStyle = useHandleStyle();
   gimbalFreeNow = gimbalFree;
+  freeRotateRef.current = freeRotate;
+  useEffect(() => {
+    const state = threeRef.current;
+    if (!state) return;
+    state.freeRotate = freeRotate;
+    // Build 104: Dental Studio draws without the shadow pass (each scan would be drawn twice a frame).
+    const shadows = !freeRotate && effectiveViewSettings(workspaceRef.current).showShadows;
+    if (state.renderer.shadowMap.enabled !== shadows) {
+      state.renderer.shadowMap.enabled = shadows;
+      state.scene.traverse((object) => {
+        const material = (object as THREE.Mesh).material;
+        (Array.isArray(material) ? material : material ? [material] : []).forEach((entry) => { entry.needsUpdate = true; });
+      });
+      state.needsRender = true;
+    }
+    // Back to CAD Studio: the view stands up again (no roll left over from a free turn).
+    if (!freeRotate && Math.abs(state.camera.up.y - 1) > 1e-6) {
+      state.camera.up.set(0, 1, 0);
+      state.camera.lookAt(state.controls.target);
+      state.controls.update();
+      state.needsRender = true;
+    }
+  }, [freeRotate]);
   useEffect(() => {
     handleStyleNow = gimbalStyle;
     const state = threeRef.current;
@@ -11545,6 +11574,44 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
   const releaseAllCameraDrags = () => {
     [...cameraPointers.keys()].forEach(endCameraDrag);
   };
+  /**
+   * Build 104: Meshmixer's free rotate (Dental Studio). A rotate drag turns the view about the screen's own
+   * axes - across about its vertical, up and down about its horizontal - with no up held, so a scan can be
+   * turned over and rolled freely. OrbitControls keeps panning and zoom; its own rotation sits out the drag.
+   */
+  let freeTurn: { pointerId: number; x: number; y: number } | null = null;
+  const freeTurnMove = (event: PointerEvent) => {
+    if (!freeTurn || event.pointerId !== freeTurn.pointerId) return;
+    const dx = event.clientX - freeTurn.x;
+    const dy = event.clientY - freeTurn.y;
+    freeTurn.x = event.clientX;
+    freeTurn.y = event.clientY;
+    if (!dx && !dy) return;
+    const height = Math.max(1, renderer.domElement.clientHeight);
+    // A drag across the whole view height turns it about 1.4 turns, as Meshmixer.
+    const speed = (Math.PI * 2.8) / height;
+    const offset = camera.position.clone().sub(controls.target);
+    const up = camera.up.clone().normalize();
+    const right = new THREE.Vector3().crossVectors(offset, up).normalize();
+    // Dragging right brings the far side round to the right; dragging down tips the top towards you.
+    const turn = new THREE.Quaternion()
+      .setFromAxisAngle(up, -dx * speed)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(right, -dy * speed));
+    offset.applyQuaternion(turn);
+    camera.up.copy(up.applyQuaternion(turn)).normalize();
+    camera.position.copy(controls.target).add(offset);
+    camera.lookAt(controls.target);
+    state.cameraTurn = null;
+    state.needsRender = true;
+  };
+  const freeTurnEnd = (event: PointerEvent) => {
+    if (!freeTurn || event.pointerId !== freeTurn.pointerId) return;
+    freeTurn = null;
+    renderer.domElement.ownerDocument.defaultView?.removeEventListener("pointermove", freeTurnMove, true);
+    renderer.domElement.ownerDocument.defaultView?.removeEventListener("pointerup", freeTurnEnd, true);
+    renderer.domElement.ownerDocument.defaultView?.removeEventListener("pointercancel", freeTurnEnd, true);
+    controls.enableRotate = true;
+  };
   const configureLayerlingMouseButtons = (event: PointerEvent) => {
     // A pen (graphics tablet) steers the camera like a mouse: its barrel button is button 2.
     if (event.pointerType !== "touch" && (event.button === 1 || event.button === 2 || (event.button === 0 && (event.ctrlKey || event.metaKey)))) {
@@ -11554,6 +11621,15 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     controls.mouseButtons.LEFT = leftButtonCameraAction(event);
     controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
     controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
+    const rotates = event.pointerType !== "touch" && (event.button === 2 || (event.button === 0 && controls.mouseButtons.LEFT === THREE.MOUSE.ROTATE));
+    if (state.freeRotate && rotates && !freeTurn) {
+      freeTurn = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+      controls.enableRotate = false;
+      const view = renderer.domElement.ownerDocument.defaultView;
+      view?.addEventListener("pointermove", freeTurnMove, true);
+      view?.addEventListener("pointerup", freeTurnEnd, true);
+      view?.addEventListener("pointercancel", freeTurnEnd, true);
+    }
   };
   const resetLayerlingMouseButtons = (event?: PointerEvent) => {
     if (event) cameraPointers.delete(event.pointerId);
@@ -12079,7 +12155,8 @@ function rebuildWorkplane(
   state.scene.background = new THREE.Color(palette.sceneBackground);
   // Fast mode turns shadows, edge lines and camera inertia off together, and draws fewer pixels.
   const view = effectiveViewSettings(workspace);
-  state.renderer.shadowMap.enabled = view.showShadows;
+  // Build 104: no shadow pass in Dental Studio - a full-arch scan is drawn once a frame instead of twice.
+  state.renderer.shadowMap.enabled = view.showShadows && !state.freeRotate;
   state.controls.enableDamping = view.cameraInertia;
   viewFastMode = Boolean(workspace.fastMode);
   const pixelRatio = viewPixelRatio(workspace, window.devicePixelRatio, state.renderer.domElement.clientWidth, state.renderer.domElement.clientHeight);

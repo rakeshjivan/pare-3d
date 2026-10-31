@@ -12450,20 +12450,21 @@ export function LayerlingEditor({
   // Build 71: and so does New patient. The note is taken only when the Studio opens: an effect run
   // twice (React's checks while developing) must not use it up and then cancel the opening.
   useEffect(() => {
-    let wanted = false;
+    let wanted: string | null = null;
     try {
-      wanted = window.sessionStorage.getItem(OPEN_DENTAL_STUDIO_KEY) === "1";
+      wanted = window.sessionStorage.getItem(OPEN_DENTAL_STUDIO_KEY);
     } catch {
-      wanted = false;
+      wanted = null;
     }
-    if (!wanted) return;
+    if (wanted !== "1" && wanted !== "wax") return;
     const timer = window.setTimeout(() => {
       try {
         window.sessionStorage.removeItem(OPEN_DENTAL_STUDIO_KEY);
       } catch {
         // Nothing to take back.
       }
-      window.dispatchEvent(new Event(DENTAL_MODEL_EVENT));
+      // Build 104: Dental Studio's page starts a case in Model Builder or in Digital Wax-Up.
+      window.dispatchEvent(new Event(wanted === "wax" && WAXUP_ENABLED ? WAXUP_STUDIO_EVENT : DENTAL_MODEL_EVENT));
     }, 600);
     return () => window.clearTimeout(timer);
   }, []);
@@ -18455,6 +18456,7 @@ export function LayerlingEditor({
         onGimbalDrop={dropSelectedToWorkplane}
         gimbalAxisLabels={dentalWorkspace ? DENTAL_GIMBAL_LABELS : undefined}
         gimbalFree={dentalWorkspace}
+        freeRotate={dentalWorkspace}
           projectName={projectName}
           projectId={editorOpen ? projectId ?? null : null}
           shapes={heldViewportShapes}
@@ -19316,7 +19318,8 @@ export function LayerlingEditor({
           onCancel={() => setMeshRoundTool(null)}
         />
       ) : null}
-      {largeMeshOffer ? (
+      {/* Build 104: not in Dental Studio - full-arch scans are its everyday work, and its tools handle them. */}
+      {largeMeshOffer && !dentalWorkspace ? (
         <div className="new-version-notice large-mesh-notice" role="alertdialog" aria-labelledby="large-mesh-title" aria-describedby="large-mesh-body">
           <strong id="large-mesh-title">{t("largeMesh.title")}</strong>
           <p id="large-mesh-body">{t("largeMesh.body", { triangles: largeMeshOffer.triangles.toLocaleString(), limit: largeMeshOffer.limit.toLocaleString(), proposed: largeMeshOffer.proposed.toLocaleString() })}</p>

@@ -1085,6 +1085,8 @@ export default function Home() {
   // Build 104: the studio whose page is open; new designs and imports made there belong to it.
   const sectionStudio: PareStudio | null = dashboardSection === "cad" || dashboardSection === "dental" ? dashboardSection : null;
   const importStudioRef = useRef<PareStudio | null>(null);
+  /** Build 104: the Dental Studio workflow the next new case opens in (Model Builder or Digital Wax-Up). */
+  const dentalToolRef = useRef<"model" | "wax">("model");
   importStudioRef.current = sectionStudio;
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -1844,7 +1846,7 @@ export default function Home() {
     if (studio === "dental") {
       // A new case opens with Dental Studio open, asking for the scans.
       try {
-        window.sessionStorage.setItem(OPEN_DENTAL_STUDIO_KEY, "1");
+        window.sessionStorage.setItem(OPEN_DENTAL_STUDIO_KEY, dentalToolRef.current === "wax" ? "wax" : "1");
       } catch {
         // The case then opens without it.
       }
@@ -2569,7 +2571,7 @@ export default function Home() {
         const project = newProject(projectName, projects.length, importedShapes.length, openFolderId, studio);
         if (studio === "dental") {
           try {
-            window.sessionStorage.setItem(OPEN_DENTAL_STUDIO_KEY, "1");
+            window.sessionStorage.setItem(OPEN_DENTAL_STUDIO_KEY, dentalToolRef.current === "wax" ? "wax" : "1");
           } catch {
             // The case then opens without Dental Studio.
           }
@@ -2909,6 +2911,7 @@ export default function Home() {
               void createProjectInStoreFolder();
               return;
             }
+            dentalToolRef.current = "model";
             createAndOpenProject(undefined, [], studio);
           }}
           onSendToStudio={(projectId, studio) => {
@@ -2916,9 +2919,14 @@ export default function Home() {
             setProjects((current) => current.map((project) => (project.id === projectId ? { ...project, studio, studioPinned: true } : project)));
             if (moved) setDashboardNotice(t(studio === "dental" ? "home.sentToDental" : "home.sentToCad", { name: moved.name }));
           }}
-          onImportScans={(files) => {
+          onImportScans={(files, tool = "model") => {
             importStudioRef.current = "dental";
+            dentalToolRef.current = tool;
             void importFilesFromDashboard(files);
+          }}
+          onStartDental={(tool) => {
+            dentalToolRef.current = tool;
+            createAndOpenProject(undefined, [], "dental");
           }}
           dashboardNotice={dashboardNotice}
           hasProjects={projects.length > 0}
@@ -3155,6 +3163,7 @@ function Dashboard({
   onCreateIn,
   onSendToStudio,
   onImportScans,
+  onStartDental,
   dashboardNotice,
   hasProjects,
   projects,
@@ -3217,7 +3226,8 @@ function Dashboard({
   onCreateIn: (studio: PareStudio) => void;
   onSendToStudio: (projectId: string, studio: PareStudio) => void;
   /** Scans dropped on Dental Studio's page: a new case from them. */
-  onImportScans: (files: File[]) => void;
+  onImportScans: (files: File[], tool?: "model" | "wax") => void;
+  onStartDental: (tool: "model" | "wax") => void;
   dashboardNotice: string;
   hasProjects: boolean;
   projects: DashboardProject[];
@@ -3957,7 +3967,7 @@ function Dashboard({
                 </div>
               ) : null}
               {pageStudio === "cad" ? <FirstRunCard /> : null}
-              {pageStudio === "dental" ? <DentalStart onScans={onImportScans} onPick={onImportFile} waxupShown={WAXUP_ENABLED} /> : null}
+              {pageStudio === "dental" ? <DentalStart onStart={onStartDental} onScans={onImportScans} waxupShown={WAXUP_ENABLED} /> : null}
               <SavedFileToast />
 
               <div className="dashboard-section-header">

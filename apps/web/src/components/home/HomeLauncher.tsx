@@ -73,14 +73,15 @@ export function HomeLauncher({
       : [t("home.dentalChip1"), t("home.dentalChip2"), t("home.dentalChip3"), t("home.dentalChip4")];
     return (
       <section className={`home-studio-card ${studio}`} aria-labelledby={`home-${studio}-title`}>
-        <div className="home-studio-stage">
+        {/* Build 104: the picture opens the studio - where the hand goes first. */}
+        <button type="button" className="home-studio-stage" aria-label={cad ? t("home.openCad") : t("home.openDental")} onClick={() => onOpenStudio(studio)}>
           <img
             src={cad ? "/assets/home/cad-hero.webp" : "/assets/home/dental-hero.webp"}
             alt={cad ? t("home.cadImageAlt") : t("home.dentalImageAlt")}
             draggable={false}
           />
           <span className="home-studio-kicker"><span className={`home-studio-dot ${studio}`} aria-hidden="true" />{t("home.studio")}</span>
-        </div>
+        </button>
         <div className="home-studio-body">
           <div className="home-studio-text">
             <h2 id={`home-${studio}-title`}>{cad ? t("home.cadStudio") : t("home.dentalStudio")}</h2>
@@ -91,10 +92,13 @@ export function HomeLauncher({
             {!cad && waxupShown ? <li className="test">{t("home.waxupTestChip")}</li> : null}
           </ul>
           <div className="home-studio-actions">
-            <button type="button" className={`home-primary ${studio}`} onClick={() => onNew(studio)}>
-              <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
-              {cad ? t("home.newDesign") : t("home.newCase")}
-            </button>
+            {/* Build 104: Dental Studio starts its cases from its own page, where the workflow is chosen. */}
+            {cad ? (
+              <button type="button" className="home-primary cad" onClick={() => onNew(studio)}>
+                <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
+                {t("home.newDesign")}
+              </button>
+            ) : null}
             <button type="button" className="home-secondary" onClick={() => onOpenStudio(studio)}>
               {cad ? t("home.openCad") : t("home.openDental")}
               <ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />

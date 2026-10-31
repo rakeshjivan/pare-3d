@@ -4,7 +4,7 @@
  * Build 104: the head of a studio's own page (CAD Studio or Dental Studio) and, for Dental Studio,
  * the place to start a case: drop the scans, and Pare 3D sorts upper, lower and bite itself.
  */
-import { ArrowLeftRight, CircleDot, Layers, Plus, Upload } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { useState, type DragEvent, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -38,95 +38,106 @@ export function StudioHeader({
           <p>{cad ? t("home.cadPageSummary") : t("home.dentalPageSummary")}</p>
           {extra}
         </div>
-        <div className="studio-head-actions">
-          <button type="button" className="home-secondary" onClick={onImport}>
-            <Upload size={16} strokeWidth={2.2} aria-hidden="true" />
-            {cad ? t("home.importCad") : t("home.openCaseFile")}
-          </button>
-          <button type="button" className={`home-primary ${studio}`} onClick={onNew}>
-            <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
-            {cad ? t("home.newDesign") : t("home.newCase")}
-          </button>
-        </div>
+        {/* Build 104: Dental Studio starts its cases from the workflow cards below, so its head has no buttons. */}
+        {cad ? (
+          <div className="studio-head-actions">
+            <button type="button" className="home-secondary" onClick={onImport}>
+              <Upload size={16} strokeWidth={2.2} aria-hidden="true" />
+              {t("home.importCad")}
+            </button>
+            <button type="button" className="home-primary cad" onClick={onNew}>
+              <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
+              {t("home.newDesign")}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
 /** Dental Studio's start: a drop zone for the scans beside the list of what the studio can do. */
-export function DentalStart({ onScans, onPick, waxupShown }: { onScans: (files: File[]) => void; onPick: () => void; waxupShown: boolean }) {
+/**
+ * Build 104: Dental Studio's page offers its two workflows side by side, as Home offers the studios -
+ * Model Builder and Digital Wax-Up. Each starts a new case open in that workflow; scans dropped on a
+ * card (or opened from it) start the case with them.
+ */
+export function DentalStart({ onStart, onScans, waxupShown }: { onStart: (tool: "model" | "wax") => void; onScans: (files: File[], tool: "model" | "wax") => void; waxupShown: boolean }) {
   useLanguage();
-  const [over, setOver] = useState(false);
-  const onDrop = (event: DragEvent) => {
-    event.preventDefault();
-    setOver(false);
-    const files = Array.from(event.dataTransfer.files ?? []);
-    if (files.length) onScans(files);
-  };
-  const slots = [
-    { title: t("home.slotUpper"), hint: t("home.slotUpperHint") },
-    { title: t("home.slotLower"), hint: t("home.slotLowerHint") },
-    { title: t("home.slotBite"), hint: t("home.slotBiteHint") },
-    { title: t("home.slotBite2"), hint: t("home.slotBite2Hint") },
-  ];
-  return (
-    <div className="dental-start">
+  const [over, setOver] = useState<"model" | "wax" | null>(null);
+  const card = (tool: "model" | "wax") => {
+    const wax = tool === "wax";
+    const chips = wax
+      ? [t("dentalStart.waxChip1"), t("dentalStart.waxChip2"), t("dentalStart.waxChip3"), t("dentalStart.waxChip4")]
+      : [t("dentalStart.modelChip1"), t("dentalStart.modelChip2"), t("dentalStart.modelChip3"), t("dentalStart.modelChip4")];
+    const inputId = `dental-start-files-${tool}`;
+    return (
       <section
-        className={`dental-drop${over ? " over" : ""}`}
-        aria-labelledby="dental-drop-title"
-        onDragOver={(event) => {
+        key={tool}
+        className={`home-studio-card dental dental-workflow ${tool}${over === tool ? " over" : ""}`}
+        aria-labelledby={`dental-workflow-${tool}`}
+        onDragOver={(event: DragEvent) => {
           if (!event.dataTransfer.types.includes("Files")) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = "copy";
-          setOver(true);
+          setOver(tool);
         }}
-        onDragLeave={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false);
+        onDragLeave={(event: DragEvent) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(null);
         }}
-        onDrop={onDrop}
+        onDrop={(event: DragEvent) => {
+          event.preventDefault();
+          setOver(null);
+          const files = Array.from(event.dataTransfer.files ?? []);
+          if (files.length) onScans(files, tool);
+        }}
       >
-        <div className="dental-drop-head">
-          <h2 id="dental-drop-title">{t("home.startCase")}</h2>
-          <p>{t("home.startCaseHint")}</p>
+        <div className="home-studio-stage">
+          <img src="/assets/home/dental-hero.webp" alt="" draggable={false} />
+          <span className="home-studio-kicker"><span className="home-studio-dot dental" aria-hidden="true" />{t("dentalStart.workflow")}</span>
+          {over === tool ? <span className="dental-workflow-drop">{t("dentalStart.dropHere")}</span> : null}
         </div>
-        <div className="dental-drop-slots">
-          {slots.map((slot) => (
-            <button key={slot.title} type="button" className="dental-drop-slot" onClick={onPick}>
-              <Upload size={26} strokeWidth={1.6} aria-hidden="true" />
-              <strong>{slot.title}</strong>
-              <span>{slot.hint}</span>
+        <div className="home-studio-body">
+          <div className="home-studio-text">
+            <h2 id={`dental-workflow-${tool}`}>
+              {wax ? t("dentalStart.waxTitle") : t("dentalStart.modelTitle")}
+              {wax ? <em className="test-pill">{t("home.testBuild")}</em> : null}
+            </h2>
+            <p>{wax ? t("dentalStart.waxSummary") : t("dentalStart.modelSummary")}</p>
+          </div>
+          <ul className="home-chips" aria-label={t("home.includes")}>
+            {chips.map((chip) => <li key={chip}>{chip}</li>)}
+          </ul>
+          <div className="home-studio-actions">
+            <button type="button" className="home-primary dental" onClick={() => onStart(tool)}>
+              <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
+              {t("home.newCase")}
             </button>
-          ))}
+            <label className="home-secondary" htmlFor={inputId}>
+              <Upload size={16} strokeWidth={2.2} aria-hidden="true" />
+              {t("dentalStart.openScans")}
+            </label>
+            <input
+              id={inputId}
+              type="file"
+              multiple
+              accept=".stl,.ply,.obj,.3mf"
+              hidden
+              onChange={(event) => {
+                const files = Array.from(event.currentTarget.files ?? []);
+                event.currentTarget.value = "";
+                if (files.length) onScans(files, tool);
+              }}
+            />
+          </div>
         </div>
-        <p className="dental-drop-foot">
-          {t("home.scanFormats")}
-          <span aria-hidden="true"> · </span>
-          <button type="button" onClick={onPick}>{t("home.browseFiles")}</button>
-        </p>
       </section>
-      <section className="dental-tools" aria-labelledby="dental-tools-title">
-        <h2 id="dental-tools-title">{t("home.tools")}</h2>
-        <ul>
-          <li>
-            <span className="dental-tool-icon" aria-hidden="true"><Layers size={20} strokeWidth={1.8} /></span>
-            <span><strong>{t("home.toolModelBuilder")}</strong><span>{t("home.toolModelBuilderHint")}</span></span>
-          </li>
-          <li>
-            <span className="dental-tool-icon" aria-hidden="true"><CircleDot size={20} strokeWidth={1.8} /></span>
-            <span><strong>{t("home.toolBite")}</strong><span>{t("home.toolBiteHint")}</span></span>
-          </li>
-          <li>
-            <span className="dental-tool-icon" aria-hidden="true"><ArrowLeftRight size={20} strokeWidth={1.8} /></span>
-            <span><strong>{t("home.toolSendTo")}</strong><span>{t("home.toolSendToHint")}</span></span>
-          </li>
-          {waxupShown ? (
-            <li>
-              <span className="dental-tool-icon test" aria-hidden="true"><Plus size={20} strokeWidth={1.8} /></span>
-              <span><strong>{t("home.toolWaxup")} <em className="test-pill">{t("home.testBuild")}</em></strong><span>{t("home.toolWaxupHint")}</span></span>
-            </li>
-          ) : null}
-        </ul>
-      </section>
+    );
+  };
+  return (
+    <div className={`dental-workflows${waxupShown ? "" : " single"}`}>
+      {card("model")}
+      {waxupShown ? card("wax") : null}
     </div>
   );
 }

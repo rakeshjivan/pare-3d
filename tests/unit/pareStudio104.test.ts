@@ -49,7 +49,8 @@ describe("build 104: the two studios", () => {
     const launcher = readFileSync("apps/web/src/components/home/HomeLauncher.tsx", "utf8");
     const start = readFileSync("apps/web/src/components/home/StudioPage.tsx", "utf8");
     expect(launcher).toMatch(/waxupShown \? <li className="test">/);
-    expect(start).toMatch(/\{waxupShown \? \(/);
+    // Build 104: the Digital Wax-Up workflow card only with the test-build switch.
+    expect(start).toMatch(/\{waxupShown \? card\("wax"\) : null\}/);
     const page = readFileSync("apps/web/src/app/page.tsx", "utf8");
     expect(page).toContain("waxupShown={WAXUP_ENABLED}");
     expect(page).not.toMatch(/waxupShown=\{true\}/);
