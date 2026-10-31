@@ -2227,3 +2227,8 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 /* Build 104: the tooth gimbal's direction names and its key hint. */
 .tooth-gimbal-label { font: 700 10.5px/1 var(--font-sans, system-ui, sans-serif); paint-order: stroke; stroke: rgba(31, 35, 40, 0.85); stroke-width: 3px; pointer-events: none; }
 .tooth-gimbal-panel .tooth-gimbal-keys { display: block; margin-top: 4px; padding: 2px 6px; color: #e8e6e3; background: rgba(31, 35, 40, 0.7); border-radius: 5px; font-size: 10.5px; white-space: nowrap; width: fit-content; }
+
+/* Build 104: the pin's distance from the teeth, drawn on the articulator pictures. */
+.dental-picture.articulator .pin-gap .measure { fill: none; stroke: #1662b3; stroke-width: 0.9; }
+.dental-picture.articulator .pin-gap text { font-size: 7.5px; }
+.dental-picture.articulator.sides .measure { fill: none; stroke: #1662b3; stroke-width: 0.9; }

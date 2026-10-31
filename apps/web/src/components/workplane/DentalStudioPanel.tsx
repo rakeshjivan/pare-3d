@@ -12,7 +12,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
-import { ArticulatorPicture, BaseStylePicture, ModelHeightPicture } from "@/components/workplane/DentalPictures";
+import { ArticulatorPicture, ArticulatorSidesPicture, BaseStylePicture, ModelHeightPicture } from "@/components/workplane/DentalPictures";
 import { WaxupCard, waxupSummary, type WaxupActions, type WaxupPart, type WaxupView } from "@/components/workplane/WaxupCard";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -708,7 +708,10 @@ export function DentalStudioPanel({
             {options.hinge ? (
               <div className="dental-hinge-options">
                 {/* Build 78: the one articulator - two seats on ball condyles and the incisal pin. */}
-                <ArticulatorPicture pinRaise={options.incisalPin === false ? 0 : options.pinRaise ?? 0} pin={options.incisalPin !== false} />
+                {/* Build 104: the pin either side is drawn from the front; the pictures follow the sliders. */}
+                {options.incisalPin !== false && (options.pinPlace ?? (waxup?.view.placed.length ? "sides" : "midline")) === "sides"
+                  ? <ArticulatorSidesPicture pinGap={options.pinGap ?? PIN_CLEAR} />
+                  : <ArticulatorPicture pinRaise={options.incisalPin === false ? 0 : options.pinRaise ?? 0} pin={options.incisalPin !== false} pinGap={options.pinGap ?? PIN_CLEAR} />}
                 <p className="blend-hint">{t(options.incisalPin === false ? "dental.articulatorHowNoPin" : (options.pinPlace ?? (waxup?.view.placed.length ? "sides" : "midline")) === "sides" ? "dental.articulatorHowSides" : "dental.articulatorHow")}</p>
                 {/* Build 82: the pin can be left out - the condyles alone, closing to the scanned bite. */}
                 <label className="edge-modifier-check dental-pin-check" title={t("dental.incisalPinHint")}>

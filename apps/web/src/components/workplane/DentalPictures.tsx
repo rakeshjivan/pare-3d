@@ -144,13 +144,17 @@ export function articulatorOpening(raise: number) {
   return { degrees: (a * 180) / Math.PI, front: part(44, PLANE), back: part(186, PLANE) };
 }
 
-export function ArticulatorPicture({ pinRaise, pin = true }: { pinRaise: number; /** Build 82: false - no pin, boss or cup drawn. */ pin?: boolean }) {
+/** Build 104: the picture's units per mm of the pin's distance from the teeth (beyond the least, 2 mm). */
+const GAP_UNIT = 1.8;
+
+export function ArticulatorPicture({ pinRaise, pin = true, pinGap = 2 }: { pinRaise: number; /** Build 82: false - no pin, boss or cup drawn. */ pin?: boolean; /** Build 104: the pin's distance from the teeth, mm - it moves out as the slider moves. */ pinGap?: number }) {
   const raise = Math.max(0, Math.min(10, pinRaise));
   const gap = raise * 2.6;
   const { degrees } = articulatorOpening(raise);
-  const jx = JX, jy = JY, pinX = PIN_X;
+  const out = Math.max(0, Math.min(8, pinGap - 2)) * GAP_UNIT;
+  const jx = JX, jy = JY, pinX = PIN_X - out;
   return (
-    <svg className="dental-picture articulator" viewBox="0 -20 244 146" aria-hidden="true">
+    <svg className="dental-picture articulator" viewBox="-16 -20 260 146" aria-hidden="true">
       {/* Build 78: the lower model, its ball condyle and its half of the pin: these stay put. */}
       <g className="lower-model">
         <path className="lower" d={`M42 ${PLANE + 26} H186 Q190 ${PLANE + 26} 190 ${PLANE + 30} V${PLANE + 48} H38 V${PLANE + 30} Q38 ${PLANE + 26} 42 ${PLANE + 26} Z`} />
@@ -161,7 +165,7 @@ export function ArticulatorPicture({ pinRaise, pin = true }: { pinRaise: number;
         <circle className="lower" cx={jx} cy={jy} r={6.2} />
         {/* Build 84: the lower half of the split pin on an arm along the bottom of the lower base, a dish in its top. */}
         {pin ? (<>
-          <rect className="lower" x={pinX - 8} y={PLANE + 45} width={42} height="3" />
+          <rect className="lower" x={pinX - 8} y={PLANE + 45} width={42 + out} height="3" />
           <path className="lower" d={`M${pinX - 3} ${PLANE + 46} V${TABLE_TOP} H${pinX - 2} Q${pinX} ${TABLE_TOP + 1.4} ${pinX + 2} ${TABLE_TOP} H${pinX + 3} V${PLANE + 46} Z`} />
         </>) : null}
       </g>
@@ -176,10 +180,16 @@ export function ArticulatorPicture({ pinRaise, pin = true }: { pinRaise: number;
         <path className="upper" d={`M${jx - 10} ${PLANE - 42} H${jx + 10} V${jy + 3.1} L${jx + 5.25} ${jy - 3.67} A6.4 6.4 0 0 0 ${jx - 5.25} ${jy + 3.67} L${jx - 2.2} ${jy + 8} H${jx - 10} Z`} />
         {/* Build 84: the upper half of the split pin, longer by the opening, its rounded end in the dish. */}
         {pin ? (<>
-          <rect className="upper" x={pinX - 8} y={PIN_TOP - 2} width={42} height="3" />
+          <rect className="upper" x={pinX - 8} y={PIN_TOP - 2} width={42 + out} height="3" />
           <path className="upper" d={`M${pinX - 3} ${PIN_TOP} V${TABLE_TOP - 3 - gap} A3 3 0 0 0 ${pinX + 3} ${TABLE_TOP - 3 - gap} V${PIN_TOP} Z`} />
         </>) : null}
       </g>
+      {/* Build 104: the pin's distance from the front teeth, measured at the occlusal plane. */}
+      {pin ? (
+        <g className="pin-gap">
+          <path className="measure" d={`M${f(pinX + 3.5)} ${PLANE + 4} H${FRONT - 1} M${f(pinX + 3.5)} ${PLANE + 1} V${PLANE + 7} M${FRONT - 1} ${PLANE + 1} V${PLANE + 7}`} />
+        </g>
+      ) : null}
       {raise > 0 ? (
         <g className="opening">
           <path className="turn" d={`M${jx - 13} ${jy - 18} A22 22 0 0 0 ${jx - 21} ${jy - 5}`} />
@@ -187,6 +197,47 @@ export function ArticulatorPicture({ pinRaise, pin = true }: { pinRaise: number;
           <text className="raise" x={pinX - 8} y={PLANE + 58}>{`+${raise} mm`}</text>
         </g>
       ) : null}
+    </svg>
+  );
+}
+
+/**
+ * Build 104: the pin either side, from the front - the models in occlusion, a split post each side in the
+ * premolar region on arms from both bases, standing as far from the teeth as set (it moves with the slider).
+ */
+export function ArticulatorSidesPicture({ pinGap = 2 }: { pinGap?: number }) {
+  const out = Math.max(0, Math.min(8, pinGap - 2)) * GAP_UNIT * 1.4;
+  const cx = 122, half = 58; // the bases' half width
+  const toothW = 11;
+  const upperTeeth = [-3.5, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5, 3.5].map((i) => cx + i * toothW);
+  const post = (side: -1 | 1) => {
+    const edge = cx + side * half; // the side of the bases at the premolars
+    const x = edge + side * (7 + out);
+    const near = side < 0 ? x + 3 : x - 3;
+    return (
+      <g key={side}>
+        <rect className="upper" x={f(Math.min(cx + side * half, x) - (side < 0 ? 3 : 0))} y="8" width={f(Math.abs(cx + side * half - x) + 3)} height="4" />
+        <rect className="lower" x={f(Math.min(cx + side * half, x) - (side < 0 ? 3 : 0))} y="108" width={f(Math.abs(cx + side * half - x) + 3)} height="4" />
+        <path className="upper" d={`M${f(x - 3)} 10 V58 A3 3 0 0 0 ${f(x + 3)} 58 V10 Z`} />
+        <path className="lower" d={`M${f(x - 3)} 110 V62 H${f(x - 2)} Q${f(x)} 63.4 ${f(x + 2)} 62 H${f(x + 3)} V110 Z`} />
+        <path className="measure" d={`M${f(near)} 74 H${f(edge)} M${f(near)} 71 V77 M${f(edge)} 71 V77`} />
+      </g>
+    );
+  };
+  return (
+    <svg className="dental-picture articulator sides" viewBox="0 -14 244 134" aria-hidden="true">
+      <path className="upper" d={`M${cx - half} 6 H${cx + half} V36 Q${cx + half} 42 ${cx + half - 6} 42 H${cx - half + 6} Q${cx - half} 42 ${cx - half} 36 Z`} />
+      <path className="lower" d={`M${cx - half} 114 H${cx + half} V84 Q${cx + half} 78 ${cx + half - 6} 78 H${cx - half + 6} Q${cx - half} 78 ${cx - half} 84 Z`} />
+      <path className="upper-gum" d={`M${cx - half + 4} 40 H${cx + half - 4} V46 H${cx - half + 4} Z`} />
+      <path className="lower-gum" d={`M${cx - half + 4} 74 H${cx + half - 4} V80 H${cx - half + 4} Z`} />
+      {upperTeeth.map((x, i) => {
+        const far = Math.abs(i - 3.5) > 2;
+        return <rect key={`u${i}`} className="tooth" x={f(x - toothW / 2 + 0.6)} y="44" width={f(toothW - 1.2)} height={far ? 14 : 18} rx="3" />;
+      })}
+      {[-3.5, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5, 3.5].map((i, k) => (
+        <rect key={`l${k}`} className="tooth" x={f(cx + i * 10.5 - 4.6)} y={Math.abs(i) > 2 ? 60 : 59} width="9.2" height={Math.abs(i) > 2 ? 16 : 17} rx="3" />
+      ))}
+      {[-1, 1].map((side) => post(side as -1 | 1))}
     </svg>
   );
 }
