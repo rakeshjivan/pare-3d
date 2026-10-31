@@ -11139,10 +11139,13 @@ export function LayerlingEditor({
     if (!ids.length) return;
     window.layerlingShowParts?.(ids, from === "above" ? [0, 1, 0] : from === "below" ? [0, -1, 0] : [0, 0.15, 1]);
   };
+  /** Build 105: while the tooth marks are shown (Teeth step, marking), what draws them - the area tint gives way to it. */
+  const marksOverlay = useRef<(() => void) | null>(null);
   // The area tinted over the scans while it can be edited.
   useEffect(() => {
     const state = dentalStudioRef.current;
     highlightDrawn.current = null;
+    if (marksOverlay.current) { marksOverlay.current(); return; }
     // Build 74: shown while the teeth are being set (or when asked for), not while a scan is trimmed.
     if (!dentalAreaManual || !state || state.stage === "making" || dentalTrim || (!dentalAreaShown && !dentalAreaTool)) { window.layerlingHighlight?.(null); return; }
     const parts: number[] = [];
@@ -11730,9 +11733,11 @@ export function LayerlingEditor({
     setDentalHidden([...(Object.values(state.slots).filter((id) => id && id !== arch.shape.id) as string[]), ...waxTeethOf(arch.shape.id).map((shape) => shape.id)]);
     setSelectedIds([]);
     showDentalView(arch.slot, "front");
-    showToothMarks(next);
+    marksOverlay.current = () => { const now = waxupRef.current; showToothMarks(now, now.toothPick?.points ?? []); };
+    window.setTimeout(() => marksOverlay.current?.(), 120);
   }, [waxArch, showToothMarks]); // eslint-disable-line react-hooks/exhaustive-deps
   const stopToothMarks = useCallback(() => {
+    marksOverlay.current = null;
     setWaxup((current) => ({ ...current, toothPick: null }));
     setDentalHidden([]);
     window.layerlingHighlight?.(null);
@@ -11835,8 +11840,12 @@ export function LayerlingEditor({
     if (!arch || !state) return;
     setDentalHidden([...(Object.values(state.slots).filter((id) => id && id !== arch.shape.id) as string[]), ...waxTeethOf(arch.shape.id).map((shape) => shape.id)]);
     setSelectedIds([]);
-    showToothMarks(waxupRef.current);
+    // After the view has redrawn for the parts hidden (that clears the highlight layer).
+    marksOverlay.current = () => showToothMarks(waxupRef.current);
+    const timer = window.setTimeout(() => showToothMarks(waxupRef.current), 120);
     return () => {
+      marksOverlay.current = null;
+      window.clearTimeout(timer);
       setDentalHidden([]);
       window.layerlingHighlight?.(null);
       highlightDrawn.current = null;
