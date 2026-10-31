@@ -17831,6 +17831,66 @@ export function LayerlingEditor({
   // while Dental Studio covered the right of the window.
   const handleStyleChoice = useHandleStyle();
   const handleStyleItem = (): ShapeContextMenuItem => ({ key: "handleStyle", label: t(handleStyleChoice === "gimbal" ? "contextMenu.useBox" : "contextMenu.useGimbal"), onSelect: () => setHandleStyle(handleStyleChoice === "gimbal" ? "box" : "gimbal") });
+  /** Build 104: the right-click menu in Dental Studio. */
+  const dentalContextMenuItems = (selectOther: ShapeContextMenuItem[]): ShapeContextMenuItem[] => {
+    const onPart = Boolean(shapeContextMenu?.onShape) && hasSelection;
+    const parts = onPart ? selectedShapes : shapes.filter((shape) => !shape.hidden && !shape.hole);
+    const ids = parts.map((shape) => shape.id);
+    const show = (direction: [number, number, number]) => () => { if (ids.length) window.layerlingShowParts?.(ids, direction); };
+    const isUpper = (shape: WorkplaneShape) => /upper|maxill|oberkiefer|\bUJ\b/i.test(displayShapeName(shape));
+    const isLower = (shape: WorkplaneShape) => /lower|mandib|unterkiefer|\bLJ\b/i.test(displayShapeName(shape));
+    const uppers = parts.filter(isUpper);
+    const lowers = parts.filter(isLower);
+    const items: ShapeContextMenuItem[] = [];
+    // Views: the mouth faces the front of the plate, the patient's right is on the viewer's left.
+    items.push({ key: "viewFront", label: t("dentalMenu.viewFront"), onSelect: show([0, 0, 1]) });
+    if (uppers.length && lowers.length) {
+      items.push(
+        { key: "viewOcclusalUpper", label: t("dentalMenu.viewOcclusalUpper"), onSelect: () => window.layerlingShowParts?.(uppers.map((shape) => shape.id), [0, -1, 0]) },
+        { key: "viewOcclusalLower", label: t("dentalMenu.viewOcclusalLower"), onSelect: () => window.layerlingShowParts?.(lowers.map((shape) => shape.id), [0, 1, 0]) },
+      );
+    } else {
+      // An upper's teeth point down: its occlusal surface is seen from below.
+      items.push({ key: "viewOcclusal", label: t("dentalMenu.viewOcclusal"), onSelect: show(uppers.length ? [0, -1, 0] : [0, 1, 0]) });
+    }
+    items.push(
+      { key: "viewRight", label: t("dentalMenu.viewRight"), onSelect: show([-1, 0, 0]) },
+      { key: "viewLeft", label: t("dentalMenu.viewLeft"), onSelect: show([1, 0, 0]) },
+      { key: "viewLingual", label: t("dentalMenu.viewLingual"), onSelect: show([0, 0, -1]) },
+    );
+    if (onPart) {
+      const others = shapes.filter((shape) => !ids.includes(shape.id) && !shape.hidden);
+      if (others.length) items.push({ key: "isolate", label: t(ids.length > 1 ? "dentalMenu.isolateMany" : "dentalMenu.isolate"), separated: true, onSelect: () => commitShapes(shapes.map((shape) => (ids.includes(shape.id) ? { ...shape, hidden: false } : { ...shape, hidden: true })), ids, t("dentalMenu.isolated")) });
+    }
+    if (shapes.some((shape) => shape.hidden)) items.push({ key: "showAll", label: t("dentalMenu.showAll"), separated: !onPart, onSelect: showHidden });
+    items.push(...selectOther.map((item, index) => ({ ...item, separated: index === 0 })));
+    const single = onPart && selectedShapes.length === 1 ? selectedShapes[0] : null;
+    // Wax-up Studio: the selected wax tooth.
+    if (dentalStudio?.waxStudio && single?.dental === "wax" && single.waxTooth) {
+      const confirmed = Boolean(waxup.locks[single.waxTooth.fdi]);
+      items.push({ key: "waxConfirm", label: t(confirmed ? "dentalMenu.waxRelease" : "dentalMenu.waxConfirm"), shortcut: confirmed ? undefined : "Enter", separated: true, onSelect: () => confirmWaxTooth(single.id, !confirmed) });
+    } else if (single && single.importedMesh && !single.hole && !selectionLocked) {
+      // A scan or model: the Model Builder's clean-up tools.
+      items.push(
+        { key: "planeCut", label: t("dentalChrome.planeCut"), separated: true, onSelect: toggleSplitMode },
+        { key: "fillHoles", label: t("dentalChrome.fillHoles"), onSelect: startFillHole },
+        { key: "makeSolid", label: t("dentalChrome.makeSolid"), onSelect: () => void makePartsSolid([single.id]) },
+        { key: "smooth", label: t("dentalChrome.smooth"), onSelect: toggleMeshRound },
+        { key: "sculpt", label: t("sculpt.menu"), onSelect: toggleSculpt },
+      );
+      if (offersMeshSimplify(single)) items.push({ key: "reduce", label: t("dentalChrome.reduce"), onSelect: startSimplifyTool });
+    }
+    if (biteMap?.on || biteCandidate) items.push({ key: "bite", label: t(biteMap?.on ? "dentalMenu.biteOff" : "dentalChrome.biteContacts"), separated: true, onSelect: () => toggleBiteMap(!biteMap?.on) });
+    items.push({ ...handleStyleItem(), separated: true });
+    if (onPart) {
+      items.push(
+        { key: "hide", label: t("contextMenu.hide"), shortcut: "Ctrl+H", separated: true, onSelect: toggleHidden },
+        { key: "lock", label: t(selectedShapes.every((shape) => shape.locked) ? "contextMenu.unlock" : "contextMenu.lock"), shortcut: "Ctrl+L", onSelect: toggleLocked },
+        ...(selectionLocked ? [] : [{ key: "delete", label: t("common.delete"), shortcut: t("contextMenu.deleteKey"), danger: true, separated: true, onSelect: deleteSelected }]),
+      );
+    }
+    return items;
+  };
   const shapeContextMenuItems = (): ShapeContextMenuItem[] => {
     if (!shapeContextMenu) return [];
     // The bodies under the pointer, front to back: a row marks its body through what stands in front, a click selects it,
@@ -17850,6 +17910,9 @@ export function LayerlingEditor({
     const selectOther: ShapeContextMenuItem[] = stack.length > 1
       ? [{ key: "selectOther", label: t("contextMenu.selectOther"), keepOpen: true, onSelect: () => setShapeContextMenu((current) => current ? { ...current, listing: true } : current) }]
       : [];
+    // Build 104: Dental Studio has a menu of its own - views as the mouth is looked at, and the tools of the
+    // workflow open (Model Builder or Wax-up), instead of CAD Studio's.
+    if (dentalWorkspace) return dentalContextMenuItems(selectOther);
     if (!shapeContextMenu.onShape || !hasSelection) {
       const items: ShapeContextMenuItem[] = [
         { key: "paste", label: t("contextMenu.paste"), shortcut: "Ctrl+V", onSelect: () => void pasteShape() },
@@ -18391,6 +18454,7 @@ export function LayerlingEditor({
         onGimbalLayFlat={toggleLayFlat}
         onGimbalDrop={dropSelectedToWorkplane}
         gimbalAxisLabels={dentalWorkspace ? DENTAL_GIMBAL_LABELS : undefined}
+        gimbalFree={dentalWorkspace}
           projectName={projectName}
           projectId={editorOpen ? projectId ?? null : null}
           shapes={heldViewportShapes}

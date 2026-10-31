@@ -544,6 +544,8 @@ type WorkplaneViewportProps = {
   onGimbalDrop?: () => void;
   /** Build 104 (gimbal 2): names for the gimbal's directions - in Dental Studio, the mouth's (left-right, front-back, occlusal). */
   gimbalAxisLabels?: Partial<Record<RotationAxis, string>>;
+  /** Build 104: Dental Studio - the gimbal moves and turns finely, never in steps. */
+  gimbalFree?: boolean;
 };
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;
@@ -3536,6 +3538,7 @@ export function WorkplaneViewport({
   onGimbalLayFlat,
   onGimbalDrop,
   gimbalAxisLabels,
+  gimbalFree = false,
   selectedIds,
   alignMode,
   multiSelect = false,
@@ -6230,6 +6233,7 @@ export function WorkplaneViewport({
     if (state) state.needsRender = true;
   }, []);
   const gimbalStyle = useHandleStyle();
+  gimbalFreeNow = gimbalFree;
   useEffect(() => {
     handleStyleNow = gimbalStyle;
     const state = threeRef.current;
@@ -6426,7 +6430,7 @@ export function WorkplaneViewport({
         // The bottom lands on the grid of the workplane, not a step from where it stood.
         // Build 99: a gimbal arrow moves by whole snap steps from where the part stood.
         // Build 104 (gimbal 2): Shift moves in tenths of the snap step, Ctrl (Cmd) freely; a typed number exactly.
-        const gimbalStep = gimbalCtrlHeld ? 0 : shiftKey ? step / 10 : step;
+        const gimbalStep = gimbalFreeNow ? 0.01 : gimbalCtrlHeld ? 0 : shiftKey ? step / 10 : step;
         const delta = transform.gimbalMove && Number.isFinite(typedValue)
           ? typedValue
           : transform.gimbalMove
@@ -6450,7 +6454,7 @@ export function WorkplaneViewport({
             x: readoutPoint.x + 28,
             y: readoutPoint.y - 30,
             text: transform.gimbalMove
-              ? gimbalReadoutText("move", transform, delta, gimbalCtrlHeld ? "free" : shiftKey ? "fine" : "snap", workspaceRef.current.accuracy)
+              ? gimbalReadoutText("move", transform, delta, gimbalFreeNow || gimbalCtrlHeld ? "free" : shiftKey ? "fine" : "snap", workspaceRef.current.accuracy)
               : formatMeasure((transform.liftStartValue ?? 0) + delta, workspaceRef.current.accuracy),
           });
         }
@@ -6541,11 +6545,12 @@ export function WorkplaneViewport({
       // Tinkercad's arc does), Shift in 5° steps; a typed number turns it exactly.
       const gimbalTurn = transform.handleKey.startsWith("gimbal-rotate");
       const gimbalFar = gimbalTurn && Math.hypot(localClientX - rotationCenter.x, localClientY - rotationCenter.y) > (transform.handleKey === "gimbal-rotate-view" ? GIMBAL_VIEW_RING * 1.35 : GIMBAL_RING * 1.55);
-      const gimbalSnap: "snap" | "fine" | "free" = gimbalCtrlHeld || gimbalFar ? "free" : shiftKey ? "fine" : "snap";
+      const gimbalSnap: "snap" | "fine" | "free" = gimbalFreeNow || gimbalCtrlHeld || gimbalFar ? "free" : shiftKey ? "fine" : "snap";
+      const gimbalDegrees = gimbalFreeNow ? 0.1 : gimbalSnap === "free" ? 1 : gimbalSnap === "fine" ? 5 : 15;
       const delta = gimbalTurn && Number.isFinite(typedValue)
         ? typedValue
         : gimbalTurn
-        ? Math.round(rawDelta / (gimbalSnap === "free" ? 1 : gimbalSnap === "fine" ? 5 : 15)) * (gimbalSnap === "free" ? 1 : gimbalSnap === "fine" ? 5 : 15)
+        ? Math.round(rawDelta / gimbalDegrees) * gimbalDegrees
         : wheelRotation?.delta ?? snappedRotationDelta(rawDelta, false, shiftKey);
 
       const deltaQuaternion = new THREE.Quaternion().setFromAxisAngle(axisVector, THREE.MathUtils.degToRad(delta));
@@ -13673,6 +13678,8 @@ const GIMBAL_VIEW_RING = 104;
 
 /** Build 104 (gimbal 2): Ctrl (Cmd) held - a gimbal moves and turns freely, without snapping. */
 let gimbalCtrlHeld = false;
+/** Build 104: Dental Studio's gimbal never snaps - it moves and turns finely (0.01 mm, 0.1°). */
+let gimbalFreeNow = false;
 /** Build 104 (gimbal 2): the gimbal's axes - the part's own (local) or the plate's (world); remembered. */
 type GimbalSpace = "local" | "world";
 const GIMBAL_SPACE_KEY = "pare3d.gimbalSpace";
