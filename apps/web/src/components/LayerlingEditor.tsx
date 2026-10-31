@@ -2178,6 +2178,11 @@ export function LayerlingEditor({
     () => (historyViewState ? historyStepsAround(history, historyViewState.index, openGroupCount) : null),
     [history, historyViewState, openGroupCount],
   );
+  // The step that led to each state, for the History view's list of steps (#1023).
+  const describeHistoryViewStep = useCallback(
+    (index: number) => describeHistoryStep(history[index - 1], history[index], openGroupCount),
+    [history, openGroupCount],
+  );
   const setOpenGroupLevels = useCallback((levels: OpenGroupLevel[]) => {
     openGroupsRef.current = levels;
     setOpenGroups(levels);
@@ -18708,6 +18713,7 @@ export function LayerlingEditor({
           objectCount={historyViewState.shapes.length}
           lastStep={historyViewSteps?.last ?? null}
           nextStep={historyViewSteps?.next ?? null}
+          describeStep={describeHistoryViewStep}
           accuracy={workspaceSettings.accuracy}
           creating={historyProjectCreating}
           canCreateProject={Boolean(onCreateProjectFromState)}

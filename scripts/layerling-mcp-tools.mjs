@@ -1228,13 +1228,14 @@ export const tools = [
   },
   {
     name: "layerling_set_history_view",
-    description: "Look back at an earlier state of the project, like the editor's History view: the workplane shows that state while the real design stays untouched. Give `index` (0 is the oldest state, the last one is the current design) to open the view at that state or move it, `open: false` to close it, or no settings to read where it stands. While it is open, tools that change the design answer with an error - close it first; reading, `layerling_capture_image` (a picture of the shown state) and the section view still work. `layerling_read_scene` keeps describing the live design. Returns the state shown, how many there are and its bodies; a group lists its `parts` at every depth, whose ids `layerling_restore_from_history` takes. Every answer also has undoStep and redoStep: what undo and redo would take back or bring again from the design's own state, as a sentence with the measure in brackets where the step has one (\"Rounded the edges of Box (5 mm)\"); lastStep and nextStep carry measures the same way.",
+    description: "Look back at an earlier state of the project, like the editor's History view: the workplane shows that state while the real design stays untouched. Give `index` (0 is the oldest state, the last one is the current design) to open the view at that state or move it, `open: false` to close it, or no settings to read where it stands. While it is open, tools that change the design answer with an error - close it first; reading, `layerling_capture_image` (a picture of the shown state) and the section view still work. `layerling_read_scene` keeps describing the live design. Returns the state shown, how many there are and its bodies; a group lists its `parts` at every depth, whose ids `layerling_restore_from_history` takes. Every answer also has undoStep and redoStep: what undo and redo would take back or bring again from the design's own state, as a sentence with the measure in brackets where the step has one (\"Rounded the edges of Box (5 mm)\"); lastStep and nextStep carry measures the same way. With `steps: true` it also lists every state with the step that led to it (`steps`, newest last), as the History view's list does.",
     inputSchema: {
       ...editorTargetSchema,
       properties: {
         ...editorTargetSchema.properties,
         open: { type: "boolean", description: "false closes the view; true (or an index) opens it." },
         index: { type: "number", description: "The state to show, 0 = oldest. Clamped to the existing states." },
+        steps: { type: "boolean", description: "true adds `steps`: every state's index with the step that led to it, as a sentence." },
       },
     },
   },

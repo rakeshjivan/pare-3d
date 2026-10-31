@@ -420,5 +420,15 @@
       "de": "Eine neue Form neben dem Zahnrad: eine Scheibe mit V-förmigen Zähnen, die strahlenförmig von der Mitte ausgehen. Eine umgedrehte Kopie greift in jedem Zahnschritt hinein und zentriert sich selbst, etwa für ein verstellbares Gelenk oder einen Rastknopf.",
       "en": "A new shape next to the gears: a disc with V-shaped teeth running out from the centre. A copy turned over locks into it at every tooth and centres itself, for a hinge you can set at an angle or a knob that clicks into place."
     }
+  },
+  {
+    "title": {
+      "de": "Der Verlauf als Liste",
+      "en": "The history as a list"
+    },
+    "body": {
+      "de": "Der Listen-Knopf in der Verlaufsansicht zeigt alle Schritte mit Namen und Maß untereinander, den neuesten oben. Ein Klick springt zu diesem Stand, ohne erst am Schieber zu suchen.",
+      "en": "The list button in the History view shows every step by name and measure, the newest at the top. A click jumps to that state without hunting along the slider."
+    }
   }
 ]

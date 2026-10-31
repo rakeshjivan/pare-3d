@@ -1,6 +1,6 @@
 import { historyStateAt, type EditorHistoryEntry, type ResolvedHistoryState } from "@/lib/editorHistory";
 import { historyStatePartsTree } from "@/lib/historyRestore";
-import { historyStepsAround, type HistoryStepDescription, type OpenGroupCount } from "@/lib/historyStepDescription";
+import { describeHistoryStep, historyStepsAround, type HistoryStepDescription, type OpenGroupCount } from "@/lib/historyStepDescription";
 import { historyStepTextIn } from "@/lib/historyStepText";
 import type { WorkplaneShape } from "@/types/layerling";
 
@@ -38,6 +38,13 @@ function undoRedoSteps(context: HistoryViewMcpContext) {
   return { undoStep: stepText(steps.last), redoStep: stepText(steps.next) };
 }
 
+/** Every state with the step that led to it, as the History view's list shows them (#1023); only when asked, since each compares two states. */
+function stepList(context: HistoryViewMcpContext, params: Record<string, unknown>) {
+  if (params.steps !== true) return {};
+  const entries = context.entries();
+  return { steps: entries.map((entry, index) => ({ index, step: stepText(describeHistoryStep(entries[index - 1], entry, context.openGroups)) })) };
+}
+
 /**
  * Runs `clear_history`, `set_history_view` and `restore_from_history`.
  * Returns undefined for any other action, which the editor runs itself.
@@ -54,12 +61,12 @@ export function historyViewMcpCommand(action: string, params: Record<string, unk
     const showing = context.showing();
     if (params.open === false) {
       if (showing) context.closeView();
-      return { open: false, states: entries.length, current: context.current(), ...undoRedoSteps(context) };
+      return { open: false, states: entries.length, current: context.current(), ...undoRedoSteps(context), ...stepList(context, params) };
     }
     if (params.open === undefined && params.index === undefined) {
       return showing
-        ? { open: true, index: showing.index, states: entries.length, current: context.current(), recordedAt: showing.entry.at ?? null, shapeCount: showing.shapes.length, ...undoRedoSteps(context) }
-        : { open: false, states: entries.length, current: context.current(), ...undoRedoSteps(context) };
+        ? { open: true, index: showing.index, states: entries.length, current: context.current(), recordedAt: showing.entry.at ?? null, shapeCount: showing.shapes.length, ...undoRedoSteps(context), ...stepList(context, params) }
+        : { open: false, states: entries.length, current: context.current(), ...undoRedoSteps(context), ...stepList(context, params) };
     }
     if (entries.length <= 1) throw new Error("There is no earlier state to look at yet");
     if (!showing) {
@@ -80,6 +87,7 @@ export function historyViewMcpCommand(action: string, params: Record<string, unk
       lastStep: stepText(steps.last),
       nextStep: stepText(steps.next),
       ...undoRedoSteps(context),
+      ...stepList(context, params),
       shapeCount: state.shapes.length,
       objects: state.shapes.map((shape) => ({ id: shape.id, name: shape.name, kind: shape.kind, x: shape.x, z: shape.z, width: shape.width, depth: shape.depth, height: shape.height, hidden: Boolean(shape.hidden), ...historyStatePartsTree(shape) })),
     };
