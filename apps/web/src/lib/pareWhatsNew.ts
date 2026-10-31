@@ -11,6 +11,12 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "Send a design to the other studio from its menu (⋮). Designs from earlier builds are sorted for you: the ones with dental work go to Dental Studio, the rest to CAD Studio.",
       "Dental Studio has its own workspace, laid out like Meshmixer: a slim bar on top (Home, Undo, Redo, Send to CAD Studio, Export), a column of tools down the left - Import, Model Builder, Sculpt, Edit (plane cut, make solid, fill holes, smooth, hollow, reduce, mirror), Analysis (bite contacts, print check), Objects and Export - and the open tool's settings docked beside it. It is dark, as Meshmixer is; CAD Studio keeps your own theme.",
       "CAD Studio no longer shows the dental tools; its Dental button sends the design to Dental Studio, and Dental Studio's Send to CAD Studio brings it back with all its parts and undo history.",
+      "New in CAD Studio, brought over from layerling 1.125 (under Modify > More): Offset (grow or shrink a body by one distance - for press-fit clearances), Cut out (one body out of another with a clearance), Cookie cutter, Loft between two sketches, Flexi joints and Lid.",
+      "New shapes: Paraboloid, Vase (vases, pots and lampshades, with patterns, drainage, lamp sockets and accessories), Hirth joint, and Port openings for USB-C, Micro USB, USB-A, HDMI, DisplayPort and RJ45. Screws can now have a hex socket, Torx or Phillips drive and a set head diameter.",
+      "Undo and Redo name the step they take back, the History view lists its steps, the section view's cut is hatched, the font list previews each font, and delta printers get a round plate.",
+      "STEP files with several solids come in as one body each, in their colours; STEP import and export run off the page. Shading of round bodies is several times faster, the edge tool's preview is about a third quicker, large filleted bodies respond sooner, and the offline copy downloads about 10 MB less. The CAD kernel is updated (occt-wasm 5.11, brepjs 20) and the shared-folder server script has layerling's latest hardening.",
+      "Start page: the ⋮ menu is smaller and no longer cut off, and Select lets you tick several designs and delete them together.",
+      "Dental Studio no longer asks whether imported scans should be made solid - scans are the work there.",
     ],
   },
   {
