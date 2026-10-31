@@ -745,7 +745,7 @@ function bedOverhangMessage(overhangs: BedOverhang[], printer: string) {
   if (overhangs.length > 1) return t("status.bedOverhangMany", { count: overhangs.length, printer });
   const [overhang] = overhangs;
   const mm = (value: number) => Number(value.toFixed(1));
-  const sides = (["left", "right", "back", "front", "top"] as const)
+  const sides = (["left", "right", "back", "front", "edge", "top"] as const)
     .filter((side) => overhang[side] > 0.01)
     .map((side) => t(`bed.side.${side}`, { mm: mm(overhang[side]) }))
     .join(", ");
@@ -2089,7 +2089,7 @@ export function LayerlingEditor({
   const [workspaceSettings, setWorkspaceSettings] = useState<WorkplaneWorkspaceSettings>(() => normalizeWorkspaceSettings(initialWorkspace));
   const bedPrinter = printerPresetById(workspaceSettings.printer);
   const overhangs = useMemo(
-    () => bedPrinter ? bedOverhangs(shapes, bedPrinter.width, bedPrinter.depth, bedPrinter.height) : [],
+    () => bedPrinter ? bedOverhangs(shapes, bedPrinter.width, bedPrinter.depth, bedPrinter.height, bedPrinter.round) : [],
     [bedPrinter, shapes],
   );
   // Bodies whose warning was clicked away (#640), for this session only. A body drops out of the
