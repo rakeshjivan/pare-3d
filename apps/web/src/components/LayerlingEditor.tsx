@@ -2047,6 +2047,9 @@ export function LayerlingEditor({
   // Build 104: both studios are light, whatever the app's theme (it comes back on leaving): CAD Studio in
   // its Tinkercad colours on the plate, Dental Studio in Meshmixer's warm grey panels round its dark view.
   const dentalWorkspace = studio === "dental";
+  // Build 104: in Dental Studio imported scans are the work itself, so the open-mesh check is never offered there.
+  const dentalWorkspaceRef = useRef(dentalWorkspace);
+  dentalWorkspaceRef.current = dentalWorkspace;
   const themePreferenceRef = useRef(themePreference);
   themePreferenceRef.current = themePreference;
   // The editor stays mounted behind the start page, so this follows whether it is on screen.
@@ -15851,7 +15854,7 @@ export function LayerlingEditor({
     arrived.forEach((shape) => pendingMeshChecks.delete(shape.id));
     // Build 91: with Dental Studio open the scans go straight into it (it closes their openings itself),
     // so the check - a second or more on two full-arch scans, holding the page - is not made.
-    if (dentalStudioRef.current) return;
+    if (dentalStudioRef.current || dentalWorkspaceRef.current) return;
     const unsound = arrived.flatMap((shape) => {
       if (!shape.importedMesh?.positions?.length || shape.groupedShapes?.length) return [];
       try {
