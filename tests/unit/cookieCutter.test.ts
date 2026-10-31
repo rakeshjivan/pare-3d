@@ -69,7 +69,7 @@ describe("cookie cutter", () => {
 
   it("takes the options as given within their limits, and the nearest allowed value outside", () => {
     expect(normalizeCookieCutterOptions()).toEqual(COOKIE_CUTTER_DEFAULTS);
-    const given = { wall: 2, height: 20, rim: 6, rimHeight: 3, edge: 0.8, mirror: false, inner: false, imprint: 5, bridgeCount: 3, bridge: 3, bridgeHeight: 4 };
+    const given = { wall: 2, height: 20, rim: 6, rimHeight: 3, edge: 0.8, mirror: false, inner: false, imprint: 5, bridgeCount: 3, bridge: 3, bridgeHeight: 4, plate: 1.5, fillet: 2 };
     expect(normalizeCookieCutterOptions(given)).toEqual(given);
     expect(normalizeCookieCutterOptions({ mirror: "no", inner: "no" })).toMatchObject({ mirror: true, inner: true });
     expect(normalizeCookieCutterOptions({ height: 3, bridgeHeight: 10 }).bridgeHeight).toBe(3);
@@ -217,6 +217,60 @@ describe("bridges that hold the inner walls (#982)", () => {
     // A hole 1 mm from the right side of a long frame and 50 mm from its left end: the far side gets no bar.
     const long = cookieCutterBridges(squares([0, 0, 60], [55, 0, 4]), 1.2, 2, 2)!;
     expect(long.points.every((point) => point.x > 40)).toBe(true);
+  });
+
+  /** Outlines given corner by corner, one ring each, as a sketch. */
+  const rings = (...loops: Array<Array<[number, number]>>): SketchProfile => {
+    const profile: SketchProfile = { points: [], segments: [] };
+    loops.forEach((loop, ring) => loop.forEach(([x, z], index) => {
+      profile.points.push({ id: `q${ring}-${index}`, x, z, mode: "corner" });
+      profile.segments.push({ id: `u${ring}-${index}`, startId: `q${ring}-${index}`, endId: `q${ring}-${(index + 1) % loop.length}`, kind: "line" });
+    }));
+    return profile;
+  };
+  const middleOf = (profile: SketchProfile, bar: number) => {
+    const points = corners(profile, bar);
+    return { x: points.reduce((sum, point) => sum + point.x, 0) / 4, z: points.reduce((sum, point) => sum + point.z, 0) / 4 };
+  };
+
+  it("puts a bar in the middle of a side that runs along the outline, not where the side starts (avxmw, #982)", () => {
+    // The hole's right side runs 2 mm from the frame's all the way along: the bar sits at its middle, z = 0.
+    expect(middleOf(cookieCutterBridges(squares([0, 0, 10], [4, 0, 4]), 1.2, 2)!, 0).z).toBeCloseTo(0, 6);
+  });
+
+  it("holds a symmetrical piece symmetrically with two bars (avxmw, #982)", () => {
+    // A slot 16 x 10 in a frame of 40: 12 mm to the left and to the right side, 15 mm up and down.
+    const bridges = cookieCutterBridges(rings([[-20, -20], [20, -20], [20, 20], [-20, 20]], [[-8, -5], [8, -5], [8, 5], [-8, 5]]), 1.2, 4, 2)!;
+    const [one, other] = [middleOf(bridges, 0), middleOf(bridges, 1)];
+    expect(Math.abs(one.x + other.x)).toBeLessThan(0.6);
+    expect(Math.abs(one.z)).toBeLessThan(0.6);
+    expect(Math.abs(other.z)).toBeLessThan(0.6);
+  });
+
+  it("runs no bar across another piece, taking the next side it can reach clear (avxmw, #982)", () => {
+    // Two pieces side by side near the frame's right side: the left one is not held through the right one but downwards.
+    const bridges = cookieCutterBridges(squares([0, 0, 30], [17, 0, 2], [24, 0, 2]), 1.2, 2, 1)!;
+    for (let bar = 0; corners(bridges, bar).length; bar += 1) {
+      const points = corners(bridges, bar);
+      const xs = points.map((point) => point.x);
+      const zs = points.map((point) => point.z);
+      // No bar overlaps the right piece, x 22 to 26 and z -2 to 2, other than the one that holds it.
+      const holdsRight = Math.min(...xs) > 22;
+      const overlaps = Math.max(...xs) > 22 && Math.min(...xs) < 26 && Math.max(...zs) > -2 && Math.min(...zs) < 2;
+      expect(holdsRight || !overlaps).toBe(true);
+    }
+  });
+
+  it("fills the silhouette as a plate instead of the bridges when asked (avxmw, #982)", () => {
+    const framed = squares([0, 0, 20], [0, 0, 12], [0, 0, 4]);
+    const plated = cookieCutterProfiles(framed, { ...COOKIE_CUTTER_DEFAULTS, plate: 1 });
+    expect(plated.bridges).toBeNull();
+    expect(plated.plate?.silhouette).toBe(true);
+    expect(plated.plate?.stroke).toBeUndefined();
+    expect(cookieCutterProfiles(framed, COOKIE_CUTTER_DEFAULTS).plate).toBeNull();
+    // Too thin to hold is no plate, and the inner walls stay at least as high as the plate.
+    expect(normalizeCookieCutterOptions({ plate: 0.2 }).plate).toBe(0);
+    expect(normalizeCookieCutterOptions({ plate: 2, height: 15, imprint: 40 }).imprint).toBe(13);
   });
 
   it("builds the holes' walls as a sketch of their own, inside the holes, only with inner walls (#982)", () => {

@@ -26,7 +26,7 @@ import { DEFAULT_TEXT_LAYERS, layerTextKeyringArgument, placedKeyring, layerText
 import { NAME_TAG_LAYERS, NAME_TAG_LETTER_SIZE, textShrinkPatch, textSpacingPatch } from "@/lib/nameTag";
 import { DEFAULT_ICON_TAG_WIDTH, ICON_TAG_LAYERS, MAX_ICON_TAG_WIDTH, MIN_ICON_TAG_WIDTH, isIconLayerBody, normalizeIconTagCount } from "@/lib/iconTag";
 import { automaticFlexiJoints, FLEXI_DEFAULTS, normalizeFlexiOptions, type FlexiOptions } from "@/lib/flexiJoints";
-import { cookieCutterProfiles, normalizeCookieCutterOptions, outlineFromCurves, outlineFromLoops, sampledCurveLoop, unitedFootprint, type CookieCutterOptions, type CurveLoop } from "@/lib/cookieCutter";
+import { cookieCutterFillets, cookieCutterProfiles, normalizeCookieCutterOptions, outlineFromCurves, outlineFromLoops, sampledCurveLoop, unitedFootprint, type CookieCutterOptions, type CurveLoop } from "@/lib/cookieCutter";
 import type { IconLayerPatch, IconTagControls, TextLayerPatch } from "@/components/workplane/ShapeInspector";
 import { IconTagPanel } from "@/components/workplane/IconTagPanel";
 import { QrCodePanel } from "@/components/workplane/QrCodePanel";
@@ -101,6 +101,7 @@ import { DentalStudioPanel, dentalPreset, type DentalAreaTool, type DentalPreset
 import { ShellPanel } from "./workplane/ShellPanel";
 import { OffsetPanel } from "./workplane/OffsetPanel";
 import { CutOutPanel } from "./workplane/CutOutPanel";
+import { COOKIE_CUTTER_SETTINGS_DEFAULTS, CookieCutterPanel, type CookieCutterSettings } from "./workplane/CookieCutterPanel";
 import { FlexiPanel, type FlexiToolSettings } from "./workplane/FlexiPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
 import { MateFacesPanel } from "./workplane/MateFacesPanel";
@@ -1905,6 +1906,9 @@ function withSelectionPivot(shape: WorkplaneShape, pivot: PivotPoint | null): Wo
   return pivot ? { ...shape, rotationPivot: shapePivotFromWorld(shape, pivot) } : shape;
 }
 
+/** Where the cookie cutter panel keeps its settings for the next cutter (#982). */
+const COOKIE_CUTTER_SETTINGS_STORAGE_KEY = "layerling.cookieCutterSettings";
+
 export function LayerlingEditor({
   initialAssets = [],
   initialShapes = [],
@@ -2457,6 +2461,8 @@ export function LayerlingEditor({
   const [cutOutTool, setCutOutTool] = useState<{ partId: string; hostId: string; clearance: number; busy: boolean; error: string | null } | null>(null);
   /** Flexi joints (Liane's mail, 29.10.2026): the bodies `targetIds` are cut into links with a joint at every cut. */
   const [flexiTool, setFlexiTool] = useState<(FlexiToolSettings & { targetIds: string[]; busy: boolean; error: string | null }) | null>(null);
+  /** The cookie cutter's panel (#982): what it is made from and the settings it is built with, kept for the next cutter. */
+  const [cookieCutterTool, setCookieCutterTool] = useState<(CookieCutterSettings & { targetIds: string[]; busy: boolean; error: string | null }) | null>(null);
   const [simplifyToolId, setSimplifyToolId] = useState<string | null>(null);
   /** The window for fonts of one's own (#customFonts), opened from a text's font select. */
   const [fontManagerOpen, setFontManagerOpen] = useState(false);
@@ -12979,6 +12985,16 @@ export function LayerlingEditor({
       // into the dough; the bridges hold them, standing on the rim's level, on the side the hand presses.
       if (profiles.inner) parts.push(finish(await extrudeWall(profiles.inner, options.height - options.imprint), "Inner walls"));
       if (profiles.bridges) parts.push(finish(await extrude(profiles.bridges, options.bridgeHeight), "Bridges"));
+      // Instead of the bridges, a plate over the whole outline on the side the hand presses (avxmw, #982).
+      if (profiles.plate) parts.push(finish(await extrude(profiles.plate, options.plate), "Plate"));
+      // The fillets where the walls stand on the rim, the bridges or the plate: one mesh of fine steps, lifted to where it starts.
+      const fillets = options.fillet > 0 ? cookieCutterFillets(await getManifoldRuntime(), profiles, options) : null;
+      const filletSource = canonicalizeShape({ id: createLocalId("cutter"), name: "Fillets", kind: "mesh", color, x: 0, z: 0, elevation: 0, size: 1, width: 1, depth: 1, height: 1, rotation: 0 });
+      const filletBody = fillets ? shapeFromCadMesh(filletSource, fillets.positions, new Float32Array(0), fillets.indices, "") : null;
+      if (filletBody) {
+        const placed = finish({ ...filletBody, cadBrep: undefined }, "Fillets");
+        parts.push(canonicalizeShape({ ...placed, elevation: (placed.elevation ?? 0) + (filletBody.elevation ?? 0) }));
+      }
       if (projectInfoRef.current.projectId !== sourceProjectId || projectShapesFingerprint(shapesRef.current) !== sourceFingerprint) {
         return fail(t("status.cookieCutterChanged"));
       }
@@ -12996,6 +13012,57 @@ export function LayerlingEditor({
       return { ok: false as const, message };
     }
   }, [commitShapes, selectedShapes, activeRotationPivot]);
+
+  /** The settings the last cutter was built with, so the next one starts from them; the defaults where none are kept. */
+  const storedCookieCutterSettings = useCallback((): CookieCutterSettings => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(COOKIE_CUTTER_SETTINGS_STORAGE_KEY) ?? "null") as Partial<CookieCutterSettings> | null;
+      return { ...COOKIE_CUTTER_SETTINGS_DEFAULTS, ...(stored && typeof stored === "object" ? stored : {}) };
+    } catch {
+      return COOKIE_CUTTER_SETTINGS_DEFAULTS;
+    }
+  }, []);
+
+  const startCookieCutterTool = useCallback(() => {
+    if (cookieCutterTool) {
+      setCookieCutterTool(null);
+      return;
+    }
+    if (refuseLockedSelection()) return;
+    const targets = selectedShapes.filter((shape) => !isNonSolidShape(shape));
+    if (!targets.length) {
+      setNotice(t("status.cookieCutterNeedsShape"));
+      return;
+    }
+    if (edgeModifier) invalidateCadModifierSession();
+    closeSplit();
+    setCookieCutterTool({ ...storedCookieCutterSettings(), targetIds: targets.map((shape) => shape.id), busy: false, error: null });
+  }, [closeSplit, cookieCutterTool, edgeModifier, invalidateCadModifierSession, refuseLockedSelection, selectedShapes, storedCookieCutterSettings]);
+
+  const applyCookieCutterTool = useCallback(() => {
+    if (!cookieCutterTool || cookieCutterTool.busy) return;
+    const targets = shapesRef.current.filter((shape) => cookieCutterTool.targetIds.includes(shape.id));
+    if (!targets.length) {
+      setCookieCutterTool(null);
+      return;
+    }
+    const { support, plate, fillet, imprint, mirror } = cookieCutterTool;
+    try {
+      window.localStorage.setItem(COOKIE_CUTTER_SETTINGS_STORAGE_KEY, JSON.stringify({ support, plate, fillet, imprint, mirror }));
+    } catch {
+      // Not kept for next time, but built all the same.
+    }
+    setCookieCutterTool((current) => current ? { ...current, busy: true, error: null } : current);
+    void makeCookieCutter({ plate: support === "plate" ? plate : 0, fillet, imprint, mirror }, targets).then((result) => {
+      if (result.ok) setCookieCutterTool(null);
+      else setCookieCutterTool((current) => current ? { ...current, busy: false, error: result.message } : current);
+    });
+  }, [cookieCutterTool, makeCookieCutter]);
+
+  // The panel belongs to the bodies it was opened for; another selection closes it.
+  useEffect(() => {
+    setCookieCutterTool((current) => current && !current.busy && !(selectedIds.length === current.targetIds.length && current.targetIds.every((id) => selectedIds.includes(id))) ? null : current);
+  }, [selectedIds]);
 
   // Each step answers with what happened, so the buttons can show it and MCP can pass it on.
   const refuseOpenGroupStep = useCallback((message: string): OpenGroupOutcome => {
@@ -14606,7 +14673,7 @@ export function LayerlingEditor({
         const ids = new Set(mcpStringArray(params.ids));
         const targets = currentShapes().filter((shape) => ids.has(shape.id));
         if (!targets.length) throw new Error("Pass the ids of the objects to make a cookie cutter from");
-        const result = await makeCookieCutter({ wall: params.wall, height: params.height, rim: params.rim, rimHeight: params.rimHeight, edge: params.edge, mirror: params.mirror, inner: params.inner, imprint: params.imprint, bridgeCount: params.bridgeCount, bridge: params.bridge, bridgeHeight: params.bridgeHeight }, targets);
+        const result = await makeCookieCutter({ wall: params.wall, height: params.height, rim: params.rim, rimHeight: params.rimHeight, edge: params.edge, mirror: params.mirror, inner: params.inner, imprint: params.imprint, bridgeCount: params.bridgeCount, bridge: params.bridge, bridgeHeight: params.bridgeHeight, plate: params.plate, fillet: params.fillet }, targets);
         if (!result.ok) throw new Error(result.message);
         const cutter = currentShapes().find((shape) => shape.id === result.id);
         return { object: cutter ? mcpShapeSummary(cutter) : { id: result.id }, ...(result.edgeLeftOut ? { note: "The outline could not take the cutting edge; the wall has a flat top." } : {}) };
@@ -17952,7 +18019,7 @@ export function LayerlingEditor({
         onGroup={groupSelected}
         onBundle={bundleSelected}
         onIntersect={intersectSelected}
-        onCookieCutter={() => void makeCookieCutter()}
+        onCookieCutter={startCookieCutterTool}
         onFlexi={startFlexiTool}
         onLoftSketches={() => void loftSketches()}
         onIntersectPreview={toggleIntersectPreview}
@@ -18649,6 +18716,18 @@ export function LayerlingEditor({
             setMateTool(null);
             setNotice(t("status.mateCancelled"));
           }}
+        />
+      ) : null}
+      {cookieCutterTool ? (
+        <CookieCutterPanel
+          targetName={shapesRef.current.filter((shape) => cookieCutterTool.targetIds.includes(shape.id)).map((shape) => shape.name).join(", ")}
+          settings={cookieCutterTool}
+          workspace={workspaceSettings}
+          busy={cookieCutterTool.busy}
+          error={cookieCutterTool.error}
+          onChange={(patch) => setCookieCutterTool((current) => current ? { ...current, ...patch, error: null } : current)}
+          onApply={applyCookieCutterTool}
+          onCancel={() => setCookieCutterTool(null)}
         />
       ) : null}
       {flexiTool ? (() => {
