@@ -11834,6 +11834,7 @@ export function LayerlingEditor({
     const state = dentalStudioRef.current;
     if (!arch || !state) return;
     setDentalHidden([...(Object.values(state.slots).filter((id) => id && id !== arch.shape.id) as string[]), ...waxTeethOf(arch.shape.id).map((shape) => shape.id)]);
+    setSelectedIds([]);
     showToothMarks(waxupRef.current);
     return () => {
       setDentalHidden([]);
@@ -19458,7 +19459,7 @@ export function LayerlingEditor({
       ) : null}
       {/* Build 104: the gimbal over the selected wax tooth again (arrows, rings and size squares, typed values),
           with the arrow keys sizing it - the tooth itself can still be dragged as before. */}
-      {waxGimbal && waxup.stage === "position" ? (
+      {waxGimbal && waxup.stage === "position" && !marksEditing ? (
         <ToothGimbal
           key={waxGimbal.id}
           tooth={waxGimbal.tooth}
