@@ -6272,6 +6272,10 @@ export function WorkplaneViewport({
   }, [freeRotate]);
   useEffect(() => {
     const state = threeRef.current;
+    if (state) state.orbitIds = selectedIds;
+  }, [selectedIds]);
+  useEffect(() => {
+    const state = threeRef.current;
     if (!state) return;
     state.dentalView = dentalView;
     state.workplaneLayer.visible = !workplaneLayerHiddenRef.current && !dentalView;
@@ -11595,17 +11599,28 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
    * turned over and rolled freely. OrbitControls keeps panning and zoom; its own rotation sits out the drag.
    */
   let freeTurn: { pointerId: number; x: number; y: number; pivot: THREE.Vector3 } | null = null;
-  /** The middle of what is shown (the models), so a free turn spins them in place rather than about a spot beside them. */
+  /**
+   * The middle of the selected scans (of all shown when none is), so a turn in Dental Studio spins the
+   * models in place rather than about a spot the zoom left beside them.
+   */
   const freeTurnPivot = () => {
     const box = new THREE.Box3();
     const part = new THREE.Box3();
-    state.shapeLayer.traverseVisible((object) => {
+    const ids = new Set(state.orbitIds ?? []);
+    const shapeIdOf = (object: THREE.Object3D | null): string | undefined => {
+      for (let at = object; at; at = at.parent) if (typeof at.userData.shapeId === "string") return at.userData.shapeId;
+      return undefined;
+    };
+    const gather = (selectedOnly: boolean) => state.shapeLayer.traverseVisible((object) => {
       if (!(object instanceof THREE.Mesh) || !object.geometry) return;
+      if (selectedOnly && !ids.has(shapeIdOf(object) ?? "")) return;
       if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
       if (!object.geometry.boundingBox) return;
       part.copy(object.geometry.boundingBox).applyMatrix4(object.matrixWorld);
       box.union(part);
     });
+    if (ids.size) gather(true);
+    if (box.isEmpty()) gather(false);
     return box.isEmpty() ? controls.target.clone() : box.getCenter(new THREE.Vector3());
   };
   const freeTurnMove = (event: PointerEvent) => {
@@ -11616,19 +11631,34 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     freeTurn.y = event.clientY;
     if (!dx && !dy) return;
     const height = Math.max(1, renderer.domElement.clientHeight);
-    // A drag across the whole view height turns it about two thirds of a turn: fine enough to place a scan.
-    const speed = (Math.PI * 1.3) / height;
     const pivot = freeTurn.pivot;
-    const up = camera.up.clone().normalize();
-    const right = new THREE.Vector3().crossVectors(camera.position.clone().sub(controls.target), up).normalize();
-    // Dragging right brings the far side round to the right; dragging down tips the top towards you.
-    const turn = new THREE.Quaternion()
-      .setFromAxisAngle(up, -dx * speed)
-      .multiply(new THREE.Quaternion().setFromAxisAngle(right, -dy * speed));
-    // The camera and its target both swing about the models' middle, so the models turn in place on screen.
+    let turn: THREE.Quaternion;
+    if (state.freeRotate) {
+      // Meshmixer's free rotate: about the screen's own axes, no up kept. A drag across the whole view
+      // height turns it about two thirds of a turn.
+      const speed = (Math.PI * 1.3) / height;
+      const up = camera.up.clone().normalize();
+      const right = new THREE.Vector3().crossVectors(camera.position.clone().sub(controls.target), up).normalize();
+      // Dragging right brings the far side round to the right; dragging down tips the top towards you.
+      turn = new THREE.Quaternion()
+        .setFromAxisAngle(up, -dx * speed)
+        .multiply(new THREE.Quaternion().setFromAxisAngle(right, -dy * speed));
+      camera.up.applyQuaternion(turn).normalize();
+    } else {
+      // The usual orbit (up kept, at the orbit's own speed), only about the models' middle.
+      const speed = (Math.PI * 2 * controls.rotateSpeed) / height;
+      const offset = camera.position.clone().sub(controls.target);
+      const right = new THREE.Vector3().crossVectors(offset, camera.up).normalize();
+      // Stop short of the poles, as the orbit does, so the view never flips over.
+      const polar = offset.angleTo(camera.up);
+      const tilt = THREE.MathUtils.clamp(-dy * speed, 0.001 - polar, Math.PI - 0.001 - polar);
+      turn = new THREE.Quaternion()
+        .setFromAxisAngle(camera.up, -dx * speed)
+        .multiply(new THREE.Quaternion().setFromAxisAngle(right, -tilt));
+    }
+    // The camera and its target both swing about the pivot, so the models turn in place on screen.
     camera.position.sub(pivot).applyQuaternion(turn).add(pivot);
     controls.target.sub(pivot).applyQuaternion(turn).add(pivot);
-    camera.up.copy(up.applyQuaternion(turn)).normalize();
     camera.lookAt(controls.target);
     state.cameraTurn = null;
     state.needsRender = true;
@@ -11651,7 +11681,7 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
     controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
     const rotates = event.pointerType !== "touch" && (event.button === 2 || (event.button === 0 && controls.mouseButtons.LEFT === THREE.MOUSE.ROTATE));
-    if (state.freeRotate && rotates && !freeTurn) {
+    if ((state.freeRotate || state.dentalView) && rotates && !freeTurn) {
       freeTurn = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, pivot: freeTurnPivot() };
       controls.enableRotate = false;
       const view = renderer.domElement.ownerDocument.defaultView;

@@ -57,6 +57,8 @@ export type ThreeState = {
   freeRotate?: boolean;
   /** Build 104: Dental Studio's view - no plate and no footprint boxes under the selected scans. */
   dentalView?: boolean;
+  /** Build 104: the selected parts, so Dental Studio's view turns about their middle. */
+  orbitIds?: string[];
   /** How far the orbit pivot may travel (the plate), as the camera clamp last saw it; the wheel zoom stays within it. */
   pivotLimits?: { halfWidth: number; halfDepth: number; minY: number; maxY: number };
   /** Where "Center view" last went: a part beyond the plate edge may be centred, so the pivot may reach as far as that part. */
