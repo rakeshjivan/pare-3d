@@ -9683,6 +9683,9 @@ export function LayerlingEditor({
   const sculptRefineBalls = (stroke: SculptStroke, milliseconds: number) => {
     const state = sculptState.current;
     if (!state || stroke.refine === "off" || !stroke.balls.length) { stroke.balls = []; return; }
+    // Build 105: a stroke never adds more than SCULPT_STROKE_TRIANGLES (a long fine stroke over a whole arch
+    // could add millions); past it the brush still works, on the triangles there are.
+    if (stroke.trianglesAtStart !== undefined && state.live.tCount - stroke.trianglesAtStart > SCULPT_STROKE_TRIANGLES) { stroke.balls = []; return; }
     const factor = stroke.refine === "fine" ? 0.06 : stroke.refine === "coarse" ? 0.2 : 0.11;
     // Fewer, wider balls: neighbouring dabs overlap, so only every few is refined.
     const balls = stroke.balls;
@@ -9820,7 +9823,7 @@ export function LayerlingEditor({
       // Build 90: Ctrl with Freeze frees what it paints.
       dig: Boolean(keys?.ctrl && !keys.shift && (brush === "draw" || brush === "crease" || brush === "mask")),
       brush, sizePx: tool.size, strength: tool.strength, refine: brush === "move" || brush === "mask" ? "off" : tool.refine, symmetry: tool.symmetry,
-      pending: [], last: null, frame: 0, balls: [], touched: false,
+      pending: [], last: null, frame: 0, balls: [], touched: false, trianglesAtStart: state.live.tCount,
       edits: state.live.topologyEdits,
       lazy: tool.brushOptions?.lazy ?? 0, lazyAt: [x, y],
     };
@@ -20014,7 +20017,11 @@ type SculptSession = {
 };
 /** Build 85: the speed readout's figures for the last stroke. */
 type SculptSpeed = { brush: LiveBrush; refine: SculptRefine; seconds: number; fps: number; longest: number; work: number; workMost: number; gpu: number; end: number; triangles: number };
+/** Build 105: the most triangles one sculpt stroke's refinement adds. */
+const SCULPT_STROKE_TRIANGLES = 250_000;
 type SculptStroke = {
+  /** Build 105: the mesh's triangle slots when the stroke began - refinement stops once a stroke has added SCULPT_STROKE_TRIANGLES. */
+  trianglesAtStart?: number;
   /** Build 87: when the last frame's work ran, and the frame interval seen so far (ms). */
   lastFrameAt?: number;
   frameMs?: number;
