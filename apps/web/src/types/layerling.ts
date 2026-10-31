@@ -21,6 +21,7 @@ export type ShapeKind =
   | "heart"
   | "crescent"
   | "gear"
+  | "hirth"
   | "honeycomb"
   | "hinge"
   | "knurl"

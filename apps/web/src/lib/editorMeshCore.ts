@@ -7,6 +7,7 @@ import { numberLocale } from "@/lib/i18n";
 import { sphereTessellation } from "@/lib/sphereTessellation";
 import { torusTessellation } from "@/lib/torusTessellation";
 import { createGearGeometry } from "@/lib/gearGeometry";
+import { createHirthGeometry } from "@/lib/hirthGeometry";
 import { createStarGeometry } from "@/lib/starGeometry";
 import { createHeartGeometry } from "@/lib/heartGeometry";
 import { createCrescentGeometry } from "@/lib/crescentGeometry";
@@ -580,6 +581,9 @@ function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {
         gearPressureAngle: shape.gearPressureAngle,
         gearBacklash: shape.gearBacklash,
       });
+      break;
+    case "hirth":
+      geometry = createHirthGeometry(width, height, depth, shape);
       break;
     case "honeycomb":
       geometry = createHoneycombGeometry({
