@@ -93,7 +93,7 @@ export function DentalStart({ onStart, onScans, waxupShown }: { onStart: (tool: 
         }}
       >
         <div className="home-studio-stage">
-          <img src="/assets/home/dental-hero.webp" alt="" draggable={false} />
+          <img src={wax ? "/assets/home/dental-hero.webp" : "/assets/home/model-builder-hero.webp"} alt="" draggable={false} />
           <span className="home-studio-kicker"><span className="home-studio-dot dental" aria-hidden="true" />{t("dentalStart.workflow")}</span>
           {over === tool ? <span className="dental-workflow-drop">{t("dentalStart.dropHere")}</span> : null}
         </div>

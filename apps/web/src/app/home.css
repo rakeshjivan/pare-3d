@@ -1340,7 +1340,6 @@ html[data-theme="dark"] .pare-home .home-recent-thumb .project-preview {
   margin: 28px 0 32px;
 }
 .pare-home .dental-workflows.single { grid-template-columns: minmax(0, 560px); }
-.pare-home .dental-workflow.wax .home-studio-stage img { filter: sepia(0.5) saturate(1.5) hue-rotate(-14deg) brightness(1.03); }
 .pare-home .dental-workflow.over { border-color: var(--h-dental); box-shadow: 0 0 0 3px color-mix(in srgb, var(--h-dental) 30%, transparent); }
 .pare-home .dental-workflow-drop {
   position: absolute;

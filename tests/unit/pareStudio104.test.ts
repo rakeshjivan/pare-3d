@@ -40,7 +40,7 @@ describe("build 104: the two studios", () => {
   });
 
   it("ships the two Home pictures", () => {
-    for (const name of ["cad-hero.webp", "dental-hero.webp"]) {
+    for (const name of ["cad-hero.webp", "dental-hero.webp", "model-builder-hero.webp"]) {
       expect(existsSync(`apps/web/public/assets/home/${name}`)).toBe(true);
     }
   });
