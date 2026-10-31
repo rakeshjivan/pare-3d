@@ -13,11 +13,11 @@ const square: SketchProfile = {
 
 describe("cookie cutter", () => {
   it("builds the wall and the rim as lines outside the same outline, the rim round its silhouette", () => {
-    const { wall, rim } = cookieCutterProfiles(square, { ...COOKIE_CUTTER_DEFAULTS, mirror: false });
-    // The wall runs round the holes too (#982), so the inside of an e or an a is cut; the rim only goes round the outside.
-    expect(wall.silhouette).toBeUndefined();
+    const { wall, rim, inner } = cookieCutterProfiles(square, { ...COOKIE_CUTTER_DEFAULTS, mirror: false });
+    // Both go round the outside only; the holes' walls are a sketch of their own (#982), and a square has none.
+    expect(wall.silhouette).toBe(true);
     expect(rim.silhouette).toBe(true);
-    expect(cookieCutterProfiles(square, { ...COOKIE_CUTTER_DEFAULTS, inner: false }).wall.silhouette).toBe(true);
+    expect(inner).toBeNull();
     for (const profile of [wall, rim]) {
       expect(profile.stroke?.align).toBe("outside");
       expect(profile.points).toEqual(square.points.map((point) => ({ ...point })));
@@ -69,10 +69,14 @@ describe("cookie cutter", () => {
 
   it("takes the options as given within their limits, and the nearest allowed value outside", () => {
     expect(normalizeCookieCutterOptions()).toEqual(COOKIE_CUTTER_DEFAULTS);
-    const given = { wall: 2, height: 20, rim: 6, rimHeight: 3, edge: 0.8, mirror: false, inner: false, bridge: 3, bridgeHeight: 4 };
+    const given = { wall: 2, height: 20, rim: 6, rimHeight: 3, edge: 0.8, mirror: false, inner: false, imprint: 5, bridgeCount: 3, bridge: 3, bridgeHeight: 4 };
     expect(normalizeCookieCutterOptions(given)).toEqual(given);
     expect(normalizeCookieCutterOptions({ mirror: "no", inner: "no" })).toMatchObject({ mirror: true, inner: true });
     expect(normalizeCookieCutterOptions({ height: 3, bridgeHeight: 10 }).bridgeHeight).toBe(3);
+    // Whole bridges only, and inner walls no lower than the bridges holding them.
+    expect(normalizeCookieCutterOptions({ bridgeCount: 2.6 }).bridgeCount).toBe(3);
+    expect(normalizeCookieCutterOptions({ bridgeCount: 0 }).bridgeCount).toBe(1);
+    expect(normalizeCookieCutterOptions({ height: 15, bridgeHeight: 3, imprint: 40 }).imprint).toBe(12);
     expect(normalizeCookieCutterOptions({ wall: 0, height: 5000, rim: -1 })).toMatchObject({ wall: 0.4, height: 100, rim: 0.5 });
     expect(normalizeCookieCutterOptions({ wall: "abc", height: "", rim: null })).toEqual(COOKIE_CUTTER_DEFAULTS);
     expect(normalizeCookieCutterOptions({ wall: "1.5" }).wall).toBe(1.5);
@@ -171,7 +175,7 @@ describe("bridges that hold the inner walls (#982)", () => {
   };
   const corners = (profile: SketchProfile, bar: number) => profile.points.filter((point) => point.id.startsWith(`b${bar}-`));
 
-  it("runs one bar from a hole to the outline round it, where they come closest, a wall past both ends", () => {
+  it("runs a bar from a hole to the outline round it, where they come closest, a wall past both ends", () => {
     // A frame 20 wide round a hole 8 wide sitting 4 off the middle: the hole comes closest to the right side, 2 mm away.
     const bridges = cookieCutterBridges(squares([0, 0, 10], [4, 0, 4]), 1.2, 2)!;
     expect(bridges.points).toHaveLength(4);
@@ -192,10 +196,41 @@ describe("bridges that hold the inner walls (#982)", () => {
     expect(cookieCutterBridges(squares([0, 0, 10]), 1.2, 2)).toBeNull();
   });
 
-  it("is part of the cutter only with inner walls", () => {
-    const framed = squares([0, 0, 10], [4, 0, 4]);
-    expect(cookieCutterProfiles(framed, { ...COOKIE_CUTTER_DEFAULTS, mirror: false }).bridges).not.toBeNull();
-    expect(cookieCutterProfiles(framed, { ...COOKIE_CUTTER_DEFAULTS, inner: false }).bridges).toBeNull();
+  it("ends the bar of a piece in a hole on both outlines, so it does not reach into the piece or past the hole (#982)", () => {
+    // The square of 4 sits in the hole of 12: both walls stand in the gap between x = 4 and x = 12, and so does the bar.
+    const bridges = cookieCutterBridges(squares([0, 0, 20], [0, 0, 12], [2, 0, 4]), 1.2, 2)!;
+    const bar = corners(bridges, 1);
+    const xs = bar.map((point) => point.x);
+    expect(Math.min(...xs)).toBeCloseTo(6, 6);
+    expect(Math.max(...xs)).toBeCloseTo(12, 6);
+  });
+
+  it("spreads several bars round each hole, leaving out places far off (#982)", () => {
+    // A hole of 8 in the middle of a frame of 20: 6 mm all round, so two bars hold it on opposite sides.
+    const two = cookieCutterBridges(squares([0, 0, 10], [0, 0, 4]), 1.2, 2, 2)!;
+    expect(two.points).toHaveLength(8);
+    const middles = [0, 1].map((bar) => {
+      const points = corners(two, bar);
+      return { x: points.reduce((sum, point) => sum + point.x, 0) / 4, z: points.reduce((sum, point) => sum + point.z, 0) / 4 };
+    });
+    expect(Math.hypot(middles[0].x - middles[1].x, middles[0].z - middles[1].z)).toBeGreaterThan(10);
+    // A hole 1 mm from the right side of a long frame and 50 mm from its left end: the far side gets no bar.
+    const long = cookieCutterBridges(squares([0, 0, 60], [55, 0, 4]), 1.2, 2, 2)!;
+    expect(long.points.every((point) => point.x > 40)).toBe(true);
+  });
+
+  it("builds the holes' walls as a sketch of their own, inside the holes, only with inner walls (#982)", () => {
+    const framed = squares([0, 0, 20], [0, 0, 12], [0, 0, 4]);
+    const profiles = cookieCutterProfiles(framed, { ...COOKIE_CUTTER_DEFAULTS, mirror: false });
+    expect(profiles.bridges).not.toBeNull();
+    // The frame's outside is the wall; the hole and the piece in it are the inner walls, a line inside them.
+    expect(profiles.wall.silhouette).toBe(true);
+    expect(profiles.inner?.points.map((point) => point.id)).toEqual(framed.points.slice(4).map((point) => point.id));
+    expect(profiles.inner?.stroke).toMatchObject({ align: "inside", width: COOKIE_CUTTER_DEFAULTS.wall, edge: COOKIE_CUTTER_DEFAULTS.edge });
+    expect(profiles.inner?.silhouette).toBeUndefined();
+    const without = cookieCutterProfiles(framed, { ...COOKIE_CUTTER_DEFAULTS, inner: false });
+    expect(without.inner).toBeNull();
+    expect(without.bridges).toBeNull();
   });
 });
 

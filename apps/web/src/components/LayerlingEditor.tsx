@@ -12842,17 +12842,20 @@ export function LayerlingEditor({
       const extrude = (profile: SketchProfile, height: number) => cadShapeFromSketchProfile(profile, height, null);
       // An outline with steps shorter than the edge's chamfer cannot take it; the cutter is built with a flat top then, and says so.
       let edgeLeftOut = false;
-      const wallBuilt = await extrude(profiles.wall, options.height).catch((error: unknown) => {
-        if (!(error instanceof Error && error.message === t("sketch.edgeFailed")) || !profiles.wall.stroke) throw error;
+      const extrudeWall = (profile: SketchProfile, height: number) => extrude(profile, height).catch((error: unknown) => {
+        if (!(error instanceof Error && error.message === t("sketch.edgeFailed")) || !profile.stroke) throw error;
         edgeLeftOut = true;
-        const { edge: _edge, ...flat } = profiles.wall.stroke;
-        return extrude({ ...profiles.wall, stroke: flat }, options.height);
+        const { edge: _edge, ...flat } = profile.stroke;
+        return extrude({ ...profile, stroke: flat }, height);
       });
+      const wallBuilt = await extrudeWall(profiles.wall, options.height);
       const anchor = { x: wallBuilt.x, z: wallBuilt.z };
       const finish = (built: WorkplaneShape, name: string) =>
         canonicalizeShape({ ...place(built, anchor), id: createLocalId("cutter"), name, color, hole: false });
       const parts = [finish(wallBuilt, "Wall"), finish(await extrude(profiles.rim, options.rimHeight), "Rim")];
-      // The bridges hold the walls round the holes; they stand on the rim's level, on the side the hand presses.
+      // The walls round the holes are a body of their own, so they can be lower than the outer wall and only press the inside
+      // into the dough; the bridges hold them, standing on the rim's level, on the side the hand presses.
+      if (profiles.inner) parts.push(finish(await extrudeWall(profiles.inner, options.height - options.imprint), "Inner walls"));
       if (profiles.bridges) parts.push(finish(await extrude(profiles.bridges, options.bridgeHeight), "Bridges"));
       if (projectInfoRef.current.projectId !== sourceProjectId || projectShapesFingerprint(shapesRef.current) !== sourceFingerprint) {
         return fail(t("status.cookieCutterChanged"));
@@ -14479,7 +14482,7 @@ export function LayerlingEditor({
         const ids = new Set(mcpStringArray(params.ids));
         const targets = currentShapes().filter((shape) => ids.has(shape.id));
         if (!targets.length) throw new Error("Pass the ids of the objects to make a cookie cutter from");
-        const result = await makeCookieCutter({ wall: params.wall, height: params.height, rim: params.rim, rimHeight: params.rimHeight, edge: params.edge, mirror: params.mirror, inner: params.inner, bridge: params.bridge, bridgeHeight: params.bridgeHeight }, targets);
+        const result = await makeCookieCutter({ wall: params.wall, height: params.height, rim: params.rim, rimHeight: params.rimHeight, edge: params.edge, mirror: params.mirror, inner: params.inner, imprint: params.imprint, bridgeCount: params.bridgeCount, bridge: params.bridge, bridgeHeight: params.bridgeHeight }, targets);
         if (!result.ok) throw new Error(result.message);
         const cutter = currentShapes().find((shape) => shape.id === result.id);
         return { object: cutter ? mcpShapeSummary(cutter) : { id: result.id }, ...(result.edgeLeftOut ? { note: "The outline could not take the cutting edge; the wall has a flat top." } : {}) };

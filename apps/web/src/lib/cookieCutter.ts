@@ -1,6 +1,6 @@
 import type { ManifoldToplevel } from "manifold-3d";
 import type { SketchProfile } from "@/types/layerling";
-import { cadSketchRegions, type OrderedCadSketchPath } from "@/lib/sketchCadProfile";
+import { cadSketchRegions, silhouetteSketchProfile, type OrderedCadSketchPath } from "@/lib/sketchCadProfile";
 import { sampledPath } from "@/lib/sketchStroke";
 
 /**
@@ -9,13 +9,15 @@ import { sampledPath } from "@/lib/sketchStroke";
  * line outside its silhouette (the outline without its holes), low, so the cutter stands on it and the thumb has something to
  * press. The wall's top runs in to a cutting edge, and the outline is mirrored: the cutter is printed on its rim and turned
  * over to cut, so a text or a logo would come out the wrong way round otherwise. Holes in the outline - the inside of an e or
- * an a - get walls of their own, held to the outer wall by bridges at the rim, on the side the hand presses.
+ * an a - get walls of their own, a body of their own as well, held to the outer wall by bridges at the rim, on the side the hand
+ * presses. Lower than the outer wall, they only press the inside into the dough instead of cutting it out.
  */
 
 /**
  * The wall's thickness, how high the cutter stands, how far the rim reaches beyond the wall and how high it is, and how wide
  * the cutting edge on top of the wall is (0 for a flat top), in mm; whether the outline is mirrored left to right; whether
- * holes get walls of their own, and how wide and how high the bridges holding them are, in mm.
+ * holes get walls of their own, how much lower than the outer wall they are (0: they cut through), how many bridges hold each
+ * of them and how wide and how high those are, in mm.
  */
 export type CookieCutterOptions = {
   wall: number;
@@ -25,6 +27,8 @@ export type CookieCutterOptions = {
   edge: number;
   mirror: boolean;
   inner: boolean;
+  imprint: number;
+  bridgeCount: number;
   bridge: number;
   bridgeHeight: number;
 };
@@ -39,8 +43,10 @@ export const COOKIE_CUTTER_DEFAULTS: CookieCutterOptions = {
   edge: 0.4,
   mirror: true,
   inner: true,
-  bridge: 2,
-  bridgeHeight: 2,
+  imprint: 0,
+  bridgeCount: 2,
+  bridge: 4,
+  bridgeHeight: 3,
 };
 
 const LIMITS: Record<CookieCutterSize, readonly [number, number]> = {
@@ -49,6 +55,8 @@ const LIMITS: Record<CookieCutterSize, readonly [number, number]> = {
   rim: [0.5, 30],
   rimHeight: [0.4, 20],
   edge: [0, 10],
+  imprint: [0, 100],
+  bridgeCount: [1, 8],
   bridge: [0.8, 20],
   bridgeHeight: [0.4, 20],
 };
@@ -64,9 +72,12 @@ export function normalizeCookieCutterOptions(value?: Partial<Record<keyof Cookie
   }
   if (typeof value?.mirror === "boolean") result.mirror = value.mirror;
   if (typeof value?.inner === "boolean") result.inner = value.inner;
+  result.bridgeCount = Math.round(result.bridgeCount);
   // The rim and the bridges cannot be higher than the cutter itself: they would then be the cutter.
   result.rimHeight = Math.min(result.rimHeight, result.height);
   result.bridgeHeight = Math.min(result.bridgeHeight, result.height);
+  // The inner walls stay at least as high as the bridges that hold them.
+  result.imprint = Math.min(result.imprint, result.height - result.bridgeHeight);
   // An edge as wide as the wall, or wider, is the flat top.
   if (result.edge >= result.wall) result.edge = 0;
   return result;
@@ -118,12 +129,68 @@ function insideLoop(loop: readonly Vec[], point: Vec) {
   return inside;
 }
 
+/** A closed polyline with a point at least every `step` mm along it, so a long straight side offers places for a bridge too. */
+function densified(loop: readonly Vec[], step: number): Vec[] {
+  const result: Vec[] = [];
+  loop.forEach((start, index) => {
+    const end = loop[(index + 1) % loop.length];
+    const pieces = Math.max(1, Math.ceil(Math.hypot(end.x - start.x, end.z - start.z) / step));
+    for (let piece = 0; piece < pieces; piece += 1) {
+      const t = piece / pieces;
+      result.push({ x: start.x + (end.x - start.x) * t, z: start.z + (end.z - start.z) * t });
+    }
+  });
+  return result;
+}
+
+/** No more places than this are tried round one loop for its bridges. */
+const MAX_BRIDGE_PLACES = 400;
+
 /**
- * The bridges that hold the inner walls (#982): one straight bar for each hole of the outline, from the hole to the outline
- * round it where the two come closest, and one for each piece lying inside another's hole (the dot in a ring), to that hole.
- * Each bar reaches a wall's thickness past both ends, so it runs into both walls. Null when the outline has nothing inside.
+ * Where the bridges between two loops go: `count` places along `from`, each the one closest to `to` within its share of the
+ * loop, the first share starting where the two come closest of all, so the bridges hold the piece from all sides. A place
+ * much farther off than the closest one is left out: a long bar holds less than it costs. The bars run from `from` to `to`.
  */
-export function cookieCutterBridges(outline: SketchProfile, wall: number, width: number): SketchProfile | null {
+function bridgePlaces(from: readonly Vec[], to: readonly Vec[], count: number): Array<{ a: Vec; b: Vec; distance: number }> {
+  let perimeter = 0;
+  from.forEach((point, index) => {
+    const next = from[(index + 1) % from.length];
+    perimeter += Math.hypot(next.x - point.x, next.z - point.z);
+  });
+  const places = densified(from, Math.max(perimeter / MAX_BRIDGE_PLACES, 0.5));
+  const candidates = places.map((point) => {
+    const near = nearestOnLoop(to, point);
+    return { a: point, b: near.point, distance: near.distance };
+  });
+  let first = 0;
+  candidates.forEach((candidate, index) => {
+    if (candidate.distance < candidates[first].distance) first = index;
+  });
+  const closest = candidates[first].distance;
+  const reach = Math.max(closest * 3, closest + 15);
+  const result: Array<{ a: Vec; b: Vec; distance: number }> = [];
+  for (let share = 0; share < count; share += 1) {
+    // Share 0 is centred on the closest place; the others follow round the loop.
+    const middle = first + Math.round((share * candidates.length) / count);
+    const half = Math.floor(candidates.length / (2 * count));
+    let best: { a: Vec; b: Vec; distance: number } | null = null;
+    for (let offset = -half; offset <= half; offset += 1) {
+      const candidate = candidates[(((middle + offset) % candidates.length) + candidates.length) % candidates.length];
+      if (!best || candidate.distance < best.distance) best = candidate;
+    }
+    if (best && best.distance > 1e-6 && best.distance <= reach) result.push(best);
+  }
+  return result;
+}
+
+/**
+ * The bridges that hold the inner walls (#982): `count` straight bars for each hole of the outline, from the hole to the outline
+ * round it, spread round the hole, and as many for each piece lying inside another's hole (the dot in a ring), to that hole.
+ * Between a hole and the outline round it lies the dough, and the walls stand on its far sides: those bars reach a wall's
+ * thickness past both ends, into both walls. Between a piece and the hole round it there is no dough, and both walls stand in
+ * the gap: those bars end on the outlines, so they do not reach into the piece. Null when the outline has nothing inside.
+ */
+export function cookieCutterBridges(outline: SketchProfile, wall: number, width: number, count = 1): SketchProfile | null {
   let regions: ReturnType<typeof cadSketchRegions>;
   try {
     regions = cadSketchRegions(outline);
@@ -132,32 +199,28 @@ export function cookieCutterBridges(outline: SketchProfile, wall: number, width:
   }
   const polyline = (path: OrderedCadSketchPath) => sampledPath(path);
   const holes = regions.flatMap((region) => region.holes.map((hole) => ({ hole: polyline(hole), outer: polyline(region.outer) })));
-  const pairs: Array<[Vec[], Vec[]]> = holes.map(({ hole, outer }) => [hole, outer]);
+  const pairs: Array<{ from: Vec[]; to: Vec[]; past: number }> = holes.map(({ hole, outer }) => ({ from: hole, to: outer, past: wall }));
   regions.forEach((region) => {
     const outer = polyline(region.outer);
     const around = outer.length ? holes.find(({ hole }) => insideLoop(hole, outer[0])) : undefined;
-    if (around) pairs.push([outer, around.hole]);
+    if (around) pairs.push({ from: outer, to: around.hole, past: 0 });
   });
   const bars: Vec[][] = [];
-  for (const [from, to] of pairs) {
+  for (const { from, to, past } of pairs) {
     if (from.length < 3 || to.length < 3) continue;
-    let best: { a: Vec; b: Vec; distance: number } | null = null;
-    for (const point of from) {
-      const near = nearestOnLoop(to, point);
-      if (!best || near.distance < best.distance) best = { a: point, b: near.point, distance: near.distance };
+    for (const { a, b, distance } of bridgePlaces(from, to, count)) {
+      const dx = (b.x - a.x) / distance;
+      const dz = (b.z - a.z) / distance;
+      const start = { x: a.x - dx * past, z: a.z - dz * past };
+      const end = { x: b.x + dx * past, z: b.z + dz * past };
+      const side = { x: -dz * (width / 2), z: dx * (width / 2) };
+      bars.push([
+        { x: start.x + side.x, z: start.z + side.z },
+        { x: end.x + side.x, z: end.z + side.z },
+        { x: end.x - side.x, z: end.z - side.z },
+        { x: start.x - side.x, z: start.z - side.z },
+      ]);
     }
-    if (!best || best.distance < 1e-6) continue;
-    const dx = (best.b.x - best.a.x) / best.distance;
-    const dz = (best.b.z - best.a.z) / best.distance;
-    const start = { x: best.a.x - dx * wall, z: best.a.z - dz * wall };
-    const end = { x: best.b.x + dx * wall, z: best.b.z + dz * wall };
-    const side = { x: -dz * (width / 2), z: dx * (width / 2) };
-    bars.push([
-      { x: start.x + side.x, z: start.z + side.z },
-      { x: end.x + side.x, z: end.z + side.z },
-      { x: end.x - side.x, z: end.z - side.z },
-      { x: start.x - side.x, z: start.z - side.z },
-    ]);
   }
   if (!bars.length) return null;
   const round = (value: number) => Math.round(value * 1e5) / 1e5;
@@ -169,24 +232,37 @@ export function cookieCutterBridges(outline: SketchProfile, wall: number, width:
   return profile;
 }
 
+/** The outline without its silhouette: every hole, and every piece inside one, or null when there is none. */
+function innerOutline(outline: SketchProfile): SketchProfile | null {
+  const kept = new Set(silhouetteSketchProfile(outline).segments.map((segment) => segment.id));
+  const segments = outline.segments.filter((segment) => !kept.has(segment.id));
+  if (!segments.length) return null;
+  const used = new Set(segments.flatMap((segment) => [segment.startId, segment.endId]));
+  return { ...outline, points: outline.points.filter((point) => used.has(point.id)), segments };
+}
+
 /**
- * The sketches a cutter is built from: the wall - a line `wall` mm wide outside the outline, holes included unless `inner`
- * is off, with its cutting edge - and the rim, a line `wall + rim` mm wide outside the silhouette, which holds the wall's foot
- * as well; with inner walls, the bridges that hold them. Round corners, so a thin wall does not run to a point.
+ * The sketches a cutter is built from: the wall - a line `wall` mm wide outside the silhouette, with its cutting edge - and the
+ * rim, a line `wall + rim` mm wide outside the silhouette as well, which holds the wall's foot; with inner walls, those as a
+ * sketch of their own and the bridges that hold them. Without the silhouette the holes are the outermost outlines, so the inner
+ * walls are a line inside them: into the hole, and outside a piece lying in it, as they were in the whole outline. Round
+ * corners, so a thin wall does not run to a point.
  */
-export function cookieCutterProfiles(source: SketchProfile, options: CookieCutterOptions): { wall: SketchProfile; rim: SketchProfile; bridges: SketchProfile | null } {
+export function cookieCutterProfiles(source: SketchProfile, options: CookieCutterOptions): { wall: SketchProfile; rim: SketchProfile; inner: SketchProfile | null; bridges: SketchProfile | null } {
   const outline = outlineOf(source, options.mirror);
-  const line = (width: number, silhouette: boolean, edge?: number): SketchProfile => ({
-    ...outline,
-    points: outline.points.map((point) => ({ ...point })),
-    segments: outline.segments.map((segment) => ({ ...segment })),
+  const line = (from: SketchProfile, width: number, align: "outside" | "inside", silhouette: boolean, edge?: number): SketchProfile => ({
+    ...from,
+    points: from.points.map((point) => ({ ...point })),
+    segments: from.segments.map((segment) => ({ ...segment })),
     ...(silhouette ? { silhouette: true } : {}),
-    stroke: { width, align: "outside", join: "round", cap: "flat", ...(edge ? { edge } : {}) },
+    stroke: { width, align, join: "round", cap: "flat", ...(edge ? { edge } : {}) },
   });
+  const holes = options.inner ? innerOutline(outline) : null;
   return {
-    wall: line(options.wall, !options.inner, options.edge),
-    rim: line(options.wall + options.rim, true),
-    bridges: options.inner ? cookieCutterBridges(outline, options.wall, options.bridge) : null,
+    wall: line(outline, options.wall, "outside", true, options.edge),
+    rim: line(outline, options.wall + options.rim, "outside", true),
+    inner: holes ? line(holes, options.wall, "inside", false, options.edge) : null,
+    bridges: holes ? cookieCutterBridges(outline, options.wall, options.bridge, options.bridgeCount) : null,
   };
 }
 
