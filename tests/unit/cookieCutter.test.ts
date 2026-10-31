@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { COOKIE_CUTTER_DEFAULTS, MAX_COOKIE_CUTTER_POINTS, cookieCutterProfiles, normalizeCookieCutterOptions, outlineFromLoops } from "@/lib/cookieCutter";
+import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
+import { beforeAll, describe, expect, it } from "vitest";
+import { COOKIE_CUTTER_DEFAULTS, MAX_COOKIE_CUTTER_POINTS, cookieCutterProfiles, normalizeCookieCutterOptions, outlineFromLoops, unitedFootprint } from "@/lib/cookieCutter";
 import type { SketchProfile } from "@/types/layerling";
 
 const square: SketchProfile = {
@@ -112,5 +113,41 @@ describe("outline of what a body stands on", () => {
     expect(outlineFromLoops([{ closed: false, points: [{ u: 0, v: 0 }, { u: 1, v: 0 }, { u: 1, v: 1 }] }])).toBeNull();
     const many = { closed: true, points: Array.from({ length: MAX_COOKIE_CUTTER_POINTS + 10 }, (_, index) => ({ u: Math.cos(index) * 50 + index, v: Math.sin(index) * 50 })) };
     expect(() => outlineFromLoops([many])).toThrow();
+  });
+});
+
+describe("what several bodies stand on together (#982)", () => {
+  let runtime: ManifoldToplevel;
+  beforeAll(async () => {
+    runtime = await manifoldModule();
+    runtime.setup();
+  });
+
+  const square = (cu: number, cv: number, half: number, clockwise = false) => {
+    const points = [[-half, -half], [half, -half], [half, half], [-half, half]].map(([u, v]) => ({ u: cu + u, v: cv + v }));
+    return { closed: true, points: clockwise ? points.reverse() : points };
+  };
+  const area = (loop: { points: ReadonlyArray<{ u: number; v: number }> }) =>
+    Math.abs(loop.points.reduce((sum, point, index, all) => {
+      const next = all[(index + 1) % all.length];
+      return sum + point.u * next.v - next.u * point.v;
+    }, 0) / 2);
+
+  it("joins two bodies that overlap into one outline round both", () => {
+    // A box and a second box over its corner, as a box and a cylinder were in the report: one outline, not two crossing.
+    const loops = unitedFootprint(runtime, [[square(0, 0, 10)], [square(15, 0, 10)]]);
+    expect(loops).toHaveLength(1);
+    expect(area(loops[0])).toBeCloseTo(20 * 35, 6);
+  });
+
+  it("keeps bodies apart that do not touch, and a hole inside a body, whichever way its outlines run", () => {
+    const loops = unitedFootprint(runtime, [[square(0, 0, 10), square(0, 0, 4)], [square(40, 0, 5, true)]]);
+    expect(loops).toHaveLength(3);
+    expect(loops.map(area).sort((a, b) => a - b)).toEqual([expect.closeTo(64, 6), expect.closeTo(100, 6), expect.closeTo(400, 6)]);
+  });
+
+  it("leaves out open lines and gives nothing for nothing", () => {
+    expect(unitedFootprint(runtime, [[{ closed: false, points: [{ u: 0, v: 0 }, { u: 5, v: 0 }, { u: 5, v: 5 }] }]])).toEqual([]);
+    expect(unitedFootprint(runtime, [])).toEqual([]);
   });
 });

@@ -1,3 +1,4 @@
+import type { ManifoldToplevel } from "manifold-3d";
 import type { SketchProfile } from "@/types/layerling";
 
 /**
@@ -83,6 +84,26 @@ const MIN_POINT_GAP = 0.05;
 export const MAX_COOKIE_CUTTER_POINTS = 6000;
 
 type OutlineLoop = { points: ReadonlyArray<{ u: number; v: number }>; closed: boolean };
+
+/**
+ * What several bodies stand on together (#982): each body's closed outlines - holes inside it by the even-odd rule, whichever
+ * way they run - united with the others', so two shapes that overlap give one outline round both, not two walls crossing
+ * in the middle. Open lines and specks are left out. The outlines come back closed, in the same u/v.
+ */
+export function unitedFootprint(runtime: ManifoldToplevel, bodies: ReadonlyArray<readonly OutlineLoop[]>): OutlineLoop[] {
+  const sections = bodies
+    .map((loops) => loops.filter((loop) => loop.closed && loop.points.length >= 3).map((loop) => loop.points.map((point) => [point.u, point.v] as [number, number])))
+    .filter((polygons) => polygons.length)
+    .map((polygons) => new runtime.CrossSection(polygons, "EvenOdd"));
+  if (!sections.length) return [];
+  const united = runtime.CrossSection.union(sections);
+  try {
+    return united.toPolygons().map((polygon) => ({ points: polygon.map(([u, v]) => ({ u, v })), closed: true }));
+  } finally {
+    united.delete();
+    sections.forEach((section) => section.delete());
+  }
+}
 
 /**
  * What a body stands on - the closed outlines the workplane cuts through it, seen from above (u across, v towards the front, as
