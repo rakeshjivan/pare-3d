@@ -836,3 +836,31 @@
 .studio-shell-on .dental-studio-panel.studio-framed .dental-bite-map {
   display: none !important;
 }
+
+.studio-shell-on .dental-studio-panel.studio-framed .dental-move-undo {
+  margin-top: 8px;
+}
+
+.studio-shell-on .dental-studio-panel.studio-framed .dental-move-undo button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Build 106: Model Builder's Prepare - Trim's tools inside the right panel, nothing over the model. */
+.studio-tool-slot:empty { display: none; }
+.studio-tool-slot { margin-top: 12px; }
+.studio-tool-slot .mesh-sculpt-panel {
+  position: static !important; inset: auto !important; transform: none !important;
+  width: auto !important; max-width: none !important; max-height: none !important;
+  margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; overflow: visible;
+}
+.studio-tool-slot .mesh-sculpt-panel > header,
+.studio-tool-slot .mesh-sculpt-panel .edge-modifier-panel-header { cursor: default; }
+.studio-tool-slot .edge-modifier-selection-help:not(.sculpt-preparing),
+.studio-tool-slot .blend-hint:not([role=status]),
+.studio-tool-slot .sculpt-keys,
+.studio-tool-slot .sculpt-help-list { display: none; }
+.studio-shell-on .dental-trim-hint { display: none; }
+.studio-framed .dental-fix-link { display: none; }

@@ -10475,6 +10475,8 @@ export function LayerlingEditor({
   const studioWax = studioShellOn && Boolean(dentalStudio?.waxStudio);
   // Build 106: the bite map's card goes under the case's objects in the frame.
   const studioCaseSlot = useStudioSlot("case");
+  // Build 106: Trim's tools, in the Prepare step's panel instead of over the view.
+  const studioToolSlot = useStudioSlot("tool");
   useEffect(() => { setWaxTint(studioWax); }, [studioWax]);
   useEffect(() => { if (!studioShellOn) setStudioHidden([]); }, [studioShellOn]);
   // The 3D view is sized when the window is: the frame coming or going resizes it too.
@@ -18328,7 +18330,8 @@ export function LayerlingEditor({
   // held them still and put the box away in the studio, which was too restrictive).
   // Build 102: and while a wax tooth is selected in Wax-up Studio - its own gimbal moves it.
   const waxToothSelected = Boolean(dentalStudio?.waxStudio && selectedIds.length === 1 && shapes.some((shape) => shape.id === selectedIds[0] && shape.dental === "wax" && shape.waxTooth && !shape.hidden));
-  const handlesAway = Boolean(sculptTool) || waxToothSelected;
+  // Build 106: Model Builder's frame is for looking at the case: no handles, gimbal or guides on a picked scan.
+  const handlesAway = Boolean(sculptTool) || waxToothSelected || (studioShellOn && !dentalStudio?.waxStudio);
   const heldViewportShapes = historyView.shapes ?? viewportShapes;
   useEffect(() => { window.layerlingTransformHandles?.(handlesHidden || handlesAway); }, [handlesHidden, handlesAway]);
   // Build 101: closing Dental Studio puts the view back as it should be - handles as chosen, no drag left held.
@@ -19975,6 +19978,12 @@ export function LayerlingEditor({
           onDone={() => setDentalStudio(null)}
           editing={Boolean(dentalStudio.editing?.length)}
           shell={studioShellOn}
+          moveUndo={{
+            canUndo: !splitSession && !projectInteractionActive && historyViewIndex === null && historyIndex > 0,
+            canRedo: !splitSession && !projectInteractionActive && historyViewIndex === null && historyIndex < history.length - 1,
+            onUndo: undo,
+            onRedo: redo,
+          }}
         />
       ) : null}
       {meshRoundTool ? (
@@ -20009,7 +20018,7 @@ export function LayerlingEditor({
           </div>
         </div>
       ) : null}
-      {sculptTool ? (
+      {sculptTool ? ((panel: React.ReactNode) => (studioShellOn && sculptTool.trim && studioToolSlot ? createPortal(panel, studioToolSlot) : panel))(
         <MeshSculptPanel
           onSpeed={() => setSculptSpeedShown((shown) => { try { window.localStorage.setItem("pare3d.sculptSpeed", shown ? "off" : "on"); } catch { /* this visit */ } return !shown; })}
           speedShown={sculptSpeedShown}
@@ -20067,7 +20076,7 @@ export function LayerlingEditor({
           onRemesh={applyRemesh}
           onClose={() => { flushSculptRef.current(); setSculptTool(null); }}
           besideDental={Boolean(dentalStudio)}
-        />
+        />,
       ) : null}
       {sculptTool?.tool && !sculptTool.busy && sculptTool.selectShape === "lasso" && (sculptTool.tool === "select" || sculptTool.tool === "unselect") ? (
         <SculptLassoOverlay

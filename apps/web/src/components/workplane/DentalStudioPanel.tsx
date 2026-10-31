@@ -10,7 +10,8 @@ const BITE_KEPT_CHECK = 0.5;
 import { ArrowLeft, ArrowLeftRight, ArrowRight, Check, ChevronDown, FileDown, FilePlus2, LoaderCircle, Redo2, Undo2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useStudioSlot } from "@/lib/studioSlots";
+import { setStudioSlot, useStudioSlot } from "@/lib/studioSlots";
+const toolSlot = (element: HTMLElement | null) => setStudioSlot("tool", element);
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
 import { EdgeModifierSlider, SmoothSliders } from "@/components/workplane/EdgeModifierPanel";
@@ -130,6 +131,7 @@ export function DentalStudioPanel({
   onDone,
   editing = false,
   shell = false,
+  moveUndo,
 }: {
   parts: DentalPartChoice[];
   slots: Record<DentalSlot, string | null>;
@@ -195,6 +197,8 @@ export function DentalStudioPanel({
   waxStudio?: { flow: "waxup" | "imt"; arches: "upper" | "lower" | "both"; onFlow: (flow: "waxup" | "imt") => void; onArches: (arches: "upper" | "lower" | "both") => void };
   /** Build 106: shown in the studio frame - the steps along its top, Back and Next along its bottom. */
   shell?: boolean;
+  /** Build 106: a scan nudged by accident put back (the design's own Undo and Redo), under the layout buttons. */
+  moveUndo?: { canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void };
 }) {
   useLanguage();
   const title = t(waxStudio ? "waxStudio.title" : "dental.title");
@@ -578,6 +582,12 @@ export function DentalStudioPanel({
               ))}
             </div>
           ) : null}
+          {framed && moveUndo && analysis && (slots.upper || slots.lower) ? (
+            <div className="dental-trim-mode dental-move-undo" role="group" aria-label={t("studio.moveUndo")}>
+              <button type="button" disabled={busy || !moveUndo.canUndo} onClick={moveUndo.onUndo}><Undo2 size={15} aria-hidden="true" /> {t("studio.undoMove")}</button>
+              <button type="button" disabled={busy || !moveUndo.canRedo} onClick={moveUndo.onRedo}><Redo2 size={15} aria-hidden="true" /> {t("studio.redoMove")}</button>
+            </div>
+          ) : null}
           {/* Build 84: the bite contacts & clearance map, in occlusion. */}
           {onBiteMap && analysis && slots.upper && slots.lower ? (
             <div className="dental-bite-map">
@@ -592,9 +602,9 @@ export function DentalStudioPanel({
       </>)) : null}
 
       {/* Build 106: Wax-up Studio's Import step holds the trim too. */}
-      {(inWaxStep("trim") || (Boolean(waxSteps) && inWaxStep("scans"))) && inMb("prepare") ? card(2, t("dental.step2Prepare"), scansDone, null, prepareSummary, (<>
+      {(inWaxStep("trim") || (Boolean(waxSteps) && inWaxStep("scans"))) && inMb("prepare") ? card(2, t(framed ? "studio.trimTitle" : "dental.step2Prepare"), scansDone, null, prepareSummary, (<>
         <div className="dental-substep">
-          <h4 className="dental-substep-title">{t("dental.trimStep")}</h4>
+          <h4 className="dental-substep-title">{t(framed ? "studio.trimArch" : "dental.trimStep")}</h4>
           <p className="blend-hint">{t("dental.trimHint")}</p>
           <div className="dental-trim-buttons" role="group" aria-label={t("dental.trimStep")}>
             {(["upper", "lower"] as const).filter((slot) => slots[slot]).map((slot) => (
@@ -607,11 +617,13 @@ export function DentalStudioPanel({
             <div className="dental-trim-buttons" role="group" aria-label={t("dental.restore")}>
               {(["upper", "lower"] as const).filter((slot) => slots[slot]).map((slot) => (
                 <button key={slot} type="button" disabled={busy} title={t("dental.restoreHint")} onClick={() => onRestore(slot)}>
-                  {t(slot === "upper" ? "dental.restoreUpper" : "dental.restoreLower")}
+                  {t(framed ? (slot === "upper" ? "studio.resetUpper" : "studio.resetLower") : slot === "upper" ? "dental.restoreUpper" : "dental.restoreLower")}
                 </button>
               ))}
             </div>
           ) : null}
+          {/* Build 106: in the frame, Trim's own tools open here, under the arch's buttons. */}
+          {framed ? <div className="studio-tool-slot" ref={toolSlot} /> : null}
         </div>
         <div className="dental-substep">
           {/* Build 104: the teeth are found automatically; fixing them by hand is a link, not a choice up front. */}
