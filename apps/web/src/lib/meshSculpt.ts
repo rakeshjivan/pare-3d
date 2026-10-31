@@ -11,6 +11,8 @@ import { weldTriangles } from "@/lib/meshRepair";
 export type SculptBrush = "smooth" | "flatten" | "inflate" | "deflate";
 export type ScreenPoint = [number, number];
 
+import { regionSmooth } from "@/lib/regionSmooth";
+
 export type SculptMesh = {
   /** Corner positions, x y z each. */
   points: Float64Array;
@@ -503,7 +505,11 @@ export function applyToSelection(mesh: SculptMesh, chosen: Uint8Array, action: "
     if (chosen[t]) continue;
     for (let k = 0; k < 3; k += 1) { const i = mesh.triangles[t * 3 + k]; if (weights[i] === 1) weights[i] = 0.5; }
   }
-  return action === "smooth" ? smooth(mesh, weights, 8) : flatten(mesh, weights);
+  // Build 105: Smooth as a shape-preserving region smooth (geometry3Sharp's RegionSmooth): the border
+  // stays exactly where it is and two rings inside it ease the join, the inside becomes the smoothest
+  // surface spanning it - a bumpy patch evens out, a base rounds off - instead of 8 shrinking passes.
+  if (action === "smooth") { const moved = regionSmooth(mesh.points, mesh.triangles, chosen, { rings: 2 }); return moved || smooth(mesh, weights, 8); }
+  return flatten(mesh, weights);
 }
 
 /** The soup without the chosen triangles. */
