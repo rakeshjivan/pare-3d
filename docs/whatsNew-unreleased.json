@@ -423,6 +423,16 @@
   },
   {
     "title": {
+      "de": "Schraffierter Schnitt",
+      "en": "A hatched cut"
+    },
+    "body": {
+      "de": "Die Schnittansicht schraffiert den Schnitt jetzt wie eine Zeichnung, und ein Körper in einem anderen ist andersherum schraffiert. Unter „Schnittfläche“ kannst du ihn auch einfarbig füllen oder offen lassen.",
+      "en": "The section view now hatches the cut like a drawing, and a body inside another is hatched the other way. Under \"Cut face\" you can also fill it plain or leave it open."
+    }
+  },
+  {
+    "title": {
       "de": "Der Verlauf als Liste",
       "en": "The history as a list"
     },

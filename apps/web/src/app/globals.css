@@ -7345,6 +7345,21 @@ html[data-theme="dark"] .panel-grip:hover {
   white-space: nowrap;
 }
 
+/* The cut face (#446): its name above the three looks, so a long name in any language fits the panel. */
+.section-popover-axis-row.section-cut-face-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.section-cut-face-row .section-axis-buttons {
+  flex: none;
+}
+
+.camera-controls .section-tool-popover .section-cut-face-row .section-orientation-btn {
+  flex: 1 1 0;
+}
+
 .camera-controls .section-tool-popover .section-axis-btn:hover {
   background: rgba(255, 255, 255, 0.5);
   color: #2b1f14;

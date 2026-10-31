@@ -291,6 +291,7 @@ import { screenAlignedNudge } from "@/lib/keyboardNudge";
 import { LAYERLING_MCP_HEARTBEAT_MS, LAYERLING_MCP_POLL_RETRY_MS, LAYERLING_MCP_ROUTE, type LayerlingMcpCommand, type LayerlingMcpSceneSummary, type LayerlingMcpViewFace } from "@/lib/layerlingMcpProtocol";
 import type { CadFaceInfo, CadModifierComponentMesh, CadModifierDeflection, CadModifierDisplayEdge, CadModifierEdge, CadModifierFaces, CadModifierGridfinityPart, CadModifierHelicalGearPart, CadModifierHirthPart, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierProfilePart, CadModifierQuality, CadModifierSpringPart, CadModifierThreadPart, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { getSectionBounds, sectionAxisLetter, sectionMeshInFrame, sectionPlacementWorkplane, sectionPointFromFrame, sectionPointToFrame, type SectionFrame, type SectionOrientation, type SectionPlaneAxis, type SectionPlaneSettings } from "@/lib/sectionView";
+import { SECTION_CUT_FACES, type SectionCutFace } from "@/lib/sectionCaps";
 import { FOOTPRINT_CUT_HEIGHT, footprintCutOffset, projectSectionPoint, SECTION_VIEW_FACE, sectionSvgDocument, sliceMeshContours } from "@/lib/sectionSvg";
 import type { AlignAxis, AlignTarget, GridSize, ParametricSource, ProjectAsset, ShapeAsset, ShapeCustomization, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, ShellEdges, ShellOpenings, ShellSide, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/layerling";
 import { type Vec3, type MeshData, type ShapeUpdatePatch, MIN_SHAPE_DIMENSION, resetManifoldRuntime, cleanModelDimension, getManifoldRuntime, meshForShape, meshReachAlong, appendMeshData, formatTriangleCount, boundsForShapes, boundsForCuboids, meshAabb, boundsForPositions } from "@/lib/editorMeshCore";
@@ -490,7 +491,7 @@ declare global {
     layerlingCaptureCanvasAsync?: () => Promise<string>;
     layerlingCaptureView?: (face?: LayerlingMcpViewFace) => Promise<string> | string;
     /** The section view for MCP: applies what is given, returns the settings it ends on and the plane's range. */
-    layerlingSectionView?: (patch: Partial<SectionPlaneSettings> & { center?: boolean }) => { settings: SectionPlaneSettings; bounds: { min: number; max: number; center: number } };
+    layerlingSectionView?: (patch: Partial<SectionPlaneSettings> & { center?: boolean; cutFace?: SectionCutFace }) => { settings: SectionPlaneSettings; bounds: { min: number; max: number; center: number }; cutFace: SectionCutFace };
     /** "Hide workplane" in the camera bar for MCP: sets it when given, returns whether the plate is shown. */
     layerlingWorkplaneDisplay?: (visible?: boolean) => { visible: boolean };
     /** The four saved views (keys 7, 8, 9, 0) for MCP: saves or shows one when asked, returns which keys hold a view. */
@@ -15381,6 +15382,8 @@ export function LayerlingEditor({
         if (orientation !== undefined && orientation !== "world" && orientation !== "workplane" && orientation !== "view") {
           throw new Error("orientation must be world, workplane or view");
         }
+        const cutFace = params.cutFace === undefined ? undefined : mcpString(params.cutFace, "hatch").toLowerCase();
+        if (cutFace !== undefined && !SECTION_CUT_FACES.includes(cutFace as SectionCutFace)) throw new Error("cutFace must be hatch, fill or open");
         const result = window.layerlingSectionView({
           ...(typeof params.enabled === "boolean" ? { enabled: params.enabled } : {}),
           ...(orientation ? { orientation: orientation as SectionOrientation } : {}),
@@ -15389,6 +15392,7 @@ export function LayerlingEditor({
           ...(typeof params.flipped === "boolean" ? { flipped: params.flipped } : {}),
           ...(typeof params.showPlane === "boolean" ? { showPlane: params.showPlane } : {}),
           ...(params.center === true ? { center: true } : {}),
+          ...(cutFace ? { cutFace: cutFace as SectionCutFace } : {}),
         });
         return result;
       }

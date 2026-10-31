@@ -11,7 +11,7 @@ import { useMovablePanel, type MovablePanelOptions } from "@/lib/useMovablePanel
 import { createHirthGeometry } from "@/lib/hirthGeometry";
 import { computeSectionPlaneVector, DEFAULT_SECTION_SETTINGS, getSectionBounds, SECTION_AXES_SHOWN, sectionAxisLetter, sectionAxisVector, sectionFineWindow, sectionFrameFromView, sectionFrameFromWorkplane, sectionPlacementWorkplane, sectionPointFromFrame, sectionPointToFrame, type SectionFrame, type SectionOrientation, type SectionPlaneAxis, type SectionPlaneSettings } from "@/lib/sectionView";
 import { projectSectionPoint, type SectionBody, type SectionLoop, type SectionPoint } from "@/lib/sectionSvg";
-import { sectionCapMesh } from "@/lib/sectionCaps";
+import { normalizeSectionCutFace, SECTION_CUT_FACES, sectionCapMesh, sectionHatchSpacing, sectionHatchTexture, sectionHatchTurned, sectionHatchUvs, type SectionCutFace } from "@/lib/sectionCaps";
 import { circleOfLoop, sectionMeasurement, sectionPointToWorld, snapSectionPoint, type SectionSnap } from "@/lib/sectionMeasure";
 import * as THREE from "three";
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from "three-mesh-bvh";
@@ -577,6 +577,7 @@ function readMoveDimensionsEnabled() {
 
 const PROPORTION_LOCK_STORAGE_KEY = "layerling.editor.keepProportions";
 const POINT_CARD_OFFSET_STORAGE_KEY = "layerling.editor.pointCardOffset";
+const SECTION_CUT_FACE_STORAGE_KEY = "layerling.editor.sectionCutFace";
 const POINT_CARD_OFFSETS_STORAGE_KEY = "layerling.editor.pointCardOffsets";
 
 
@@ -601,6 +602,14 @@ function readPointCardOffsets(): Record<string, PointCardOffset> {
       .map(([id, offset]) => [id, { x: Number(offset.x), y: Number(offset.y) }]));
   } catch {
     return {};
+  }
+}
+
+function readSectionCutFace(): SectionCutFace {
+  try {
+    return normalizeSectionCutFace(window.localStorage.getItem(SECTION_CUT_FACE_STORAGE_KEY));
+  } catch {
+    return "hatch";
   }
 }
 
@@ -717,7 +726,7 @@ declare global {
     layerlingCaptureView?: (face?: LayerlingMcpViewFace) => Promise<string> | string;
     layerlingCaptureImage?: (options?: { plate?: boolean; transparent?: boolean; scale?: number }) => string;
     /** The section view for MCP: applies what is given, returns the settings it ends on and the plane's range. */
-    layerlingSectionView?: (patch: Partial<SectionPlaneSettings> & { center?: boolean }) => { settings: SectionPlaneSettings; bounds: { min: number; max: number; center: number } };
+    layerlingSectionView?: (patch: Partial<SectionPlaneSettings> & { center?: boolean; cutFace?: SectionCutFace }) => { settings: SectionPlaneSettings; bounds: { min: number; max: number; center: number }; cutFace: SectionCutFace };
     /** "Hide workplane" in the camera bar for MCP: sets it when given, returns whether the plate is shown. */
     layerlingWorkplaneDisplay?: (visible?: boolean) => { visible: boolean };
     /** The four saved views (keys 7, 8, 9, 0) for MCP: saves or shows one when asked, returns which keys hold a view. */
@@ -3741,6 +3750,25 @@ export function WorkplaneViewport({
   const [sectionSettings, setSectionSettings] = useState<SectionPlaneSettings>(DEFAULT_SECTION_SETTINGS);
   const sectionSettingsRef = useRef(sectionSettings);
   sectionSettingsRef.current = sectionSettings;
+  // How the cut face looks (#446) is the person's choice, kept in this browser for every design;
+  // read after mounting, so the page drawn on the server and the first one in the browser agree.
+  const [sectionCutFace, setSectionCutFace] = useState<SectionCutFace>("hatch");
+  const sectionCutFaceRef = useRef(sectionCutFace);
+  sectionCutFaceRef.current = sectionCutFace;
+  useEffect(() => {
+    const stored = readSectionCutFace();
+    sectionCutFaceRef.current = stored;
+    setSectionCutFace(stored);
+  }, []);
+  const changeSectionCutFace = useCallback((cutFace: SectionCutFace) => {
+    sectionCutFaceRef.current = cutFace;
+    setSectionCutFace(cutFace);
+    try {
+      window.localStorage.setItem(SECTION_CUT_FACE_STORAGE_KEY, cutFace);
+    } catch {
+      // The choice still holds in this editor session when storage is unavailable.
+    }
+  }, []);
   const sectionViewOpenRef = useRef(sectionViewOpen);
   sectionViewOpenRef.current = sectionViewOpen;
   // Messen auf der Schnittebene: zwei Punkte, an den Umriss des Schnitts gerastet.
@@ -4610,7 +4638,7 @@ export function WorkplaneViewport({
   // The face is cut for the newest plane, one round at a time, and a round is never thrown away because the plane
   // moved on: with a delay that every move restarts, a plane that moves faster than the delay never let the face
   // be cut, and it only came back when the hand rested (#516, rondlh: "lags behind, sometimes a second").
-  type SectionCapWish = { axis: SectionPlaneAxis; offset: number; frame: SectionFrame | null; shapes: typeof shapes };
+  type SectionCapWish = { axis: SectionPlaneAxis; offset: number; frame: SectionFrame | null; shapes: typeof shapes; cutFace: SectionCutFace };
   const sectionBodiesRef = useRef(onSectionBodies);
   sectionBodiesRef.current = onSectionBodies;
   const sectionCapRunnerRef = useRef<LatestRunner<SectionCapWish> | null>(null);
@@ -4623,9 +4651,9 @@ export function WorkplaneViewport({
         const current = threeRef.current;
         const now = runner.wanted();
         // The face of a design that has changed since, or of a section that is off, is not shown.
-        if (current && now && now.shapes === wish.shapes) buildSectionCaps(current, bodies, wish.axis, wish.offset, wish.frame);
+        if (current && now && now.shapes === wish.shapes && now.cutFace === wish.cutFace) buildSectionCaps(current, bodies, wish.axis, wish.offset, wish.frame, wish.cutFace);
       },
-      (a, b) => a.axis === b.axis && a.offset === b.offset && a.frame === b.frame && a.shapes === b.shapes,
+      (a, b) => a.axis === b.axis && a.offset === b.offset && a.frame === b.frame && a.shapes === b.shapes && a.cutFace === b.cutFace,
     );
     sectionCapRunnerRef.current = runner;
   }
@@ -4633,13 +4661,14 @@ export function WorkplaneViewport({
   useEffect(() => {
     const runner = sectionCapRunnerRef.current;
     if (!runner) return;
-    if (!sectionSettings.enabled || !onSectionBodies) {
+    // "Open" leaves the cut as the clipping makes it (#446): nothing is cut, nothing is drawn.
+    if (!sectionSettings.enabled || !onSectionBodies || sectionCutFace === "open") {
       runner.clear();
       if (threeRef.current) clearSectionCaps(threeRef.current);
       return;
     }
-    runner.request({ axis: sectionSettings.axis, offset: sectionSettings.offset, frame: sectionSettings.frame ?? null, shapes });
-  }, [sectionSettings.enabled, sectionSettings.axis, sectionSettings.offset, sectionSettings.frame, shapes, onSectionBodies]);
+    runner.request({ axis: sectionSettings.axis, offset: sectionSettings.offset, frame: sectionSettings.frame ?? null, shapes, cutFace: sectionCutFace });
+  }, [sectionSettings.enabled, sectionSettings.axis, sectionSettings.offset, sectionSettings.frame, shapes, onSectionBodies, sectionCutFace]);
 
   useEffect(() => () => sectionCapRunnerRef.current?.clear(), []);
 
@@ -10020,6 +10049,7 @@ export function WorkplaneViewport({
       const bounds = getSectionBounds(shapesRef.current, axis, workspaceRef.current.width, workspaceRef.current.depth, frame);
       const switchingOn = patch.enabled === true && !current.enabled && current.offset === 0;
       const recenter = patch.center === true || axis !== current.axis || orientation !== currentOrientation || patch.orientation === "view" || switchingOn;
+      if (patch.cutFace !== undefined) changeSectionCutFace(normalizeSectionCutFace(patch.cutFace));
       const next: SectionPlaneSettings = {
         enabled: patch.enabled ?? current.enabled,
         axis,
@@ -10031,12 +10061,12 @@ export function WorkplaneViewport({
       };
       sectionSettingsRef.current = next;
       setSectionSettings(next);
-      return { settings: next, bounds: { min: bounds.min, max: bounds.max, center: bounds.center } };
+      return { settings: next, bounds: { min: bounds.min, max: bounds.max, center: bounds.center }, cutFace: sectionCutFaceRef.current };
     };
     return () => {
       delete window.layerlingSectionView;
     };
-  }, []);
+  }, [changeSectionCutFace]);
 
   // The editor stays mounted when you go back to the overview, so a cut set in
   // one design used to carry over into the next one: shapes placed there
@@ -10624,6 +10654,30 @@ export function WorkplaneViewport({
                           </div>
                         );
                       })()}
+
+                      {/* The cut face (#446): hatched like a drawing, filled plain, or open to look into the skin of the body. */}
+                      <div className="section-popover-axis-row section-cut-face-row">
+                        <span className="section-label">{t("camera.sectionCutFace")}</span>
+                        <div className="section-axis-buttons section-orientation-buttons" role="radiogroup" aria-label={t("camera.sectionCutFace")}>
+                          {SECTION_CUT_FACES.map((cutFace) => {
+                            const active = sectionCutFace === cutFace;
+                            const name = cutFace === "hatch" ? "Hatch" : cutFace === "fill" ? "Fill" : "Open";
+                            return (
+                              <button
+                                key={cutFace}
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                className={`section-axis-btn section-orientation-btn ${active ? "active" : ""}`}
+                                onClick={() => changeSectionCutFace(cutFace)}
+                                title={t(`camera.sectionCutFace${name}Hint`)}
+                              >
+                                {t(`camera.sectionCutFace${name}`)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
 
                       <div className="section-measure-row">
                         <button
@@ -12852,21 +12906,29 @@ function clearSectionCaps(state: ThreeState) {
   state.needsRender = true;
 }
 
-/** The filled cut face of the section view: one flat mesh per body, on the plane, in its colour a little darker. */
-function buildSectionCaps(state: ThreeState, bodies: readonly SectionBody[], axis: SectionPlaneAxis, offset: number, frame: SectionFrame | null = null) {
+/**
+ * The filled cut face of the section view: one flat mesh per body, on the plane, in its colour a little darker,
+ * hatched unless the panel says "Filled" (#446). "Open" never gets here.
+ */
+function buildSectionCaps(state: ThreeState, bodies: readonly SectionBody[], axis: SectionPlaneAxis, offset: number, frame: SectionFrame | null = null, cutFace: SectionCutFace = "hatch") {
   clearSectionCaps(state);
+  if (cutFace === "open") return;
   const group = new THREE.Group();
   group.name = "SectionCaps";
-  for (const body of bodies) {
-    const cap = sectionCapMesh(body.loops);
-    if (cap.triangles.length === 0) continue;
+  const caps = bodies.map((body) => ({ body, cap: sectionCapMesh(body.loops) })).filter(({ cap }) => cap.triangles.length > 0);
+  const hatch = cutFace === "hatch" && caps.length > 0 ? sectionHatchTexture() : null;
+  const spacing = hatch ? sectionHatchSpacing(caps.map(({ cap }) => cap)) : 1;
+  const turned = hatch ? sectionHatchTurned(caps.map(({ body, cap }) => ({ cap, loops: body.loops }))) : [];
+  caps.forEach(({ body, cap }, index) => {
     const positions: number[] = [];
     cap.points.forEach((point) => positions.push(...sectionPointFromFrame(sectionPointToWorld(point, axis, offset), frame)));
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    if (hatch) geometry.setAttribute("uv", new THREE.Float32BufferAttribute(sectionHatchUvs(cap.points, spacing, turned[index]), 2));
     geometry.setIndex(cap.triangles);
     const material = new THREE.MeshBasicMaterial({
       color: new THREE.Color(body.color).multiplyScalar(0.78),
+      map: hatch,
       // A see-through body keeps a see-through cut face (#575), as dim as the body itself.
       transparent: Boolean(body.seeThrough),
       opacity: body.seeThrough ? TRANSPARENT_SOLID_OPACITY : 1,
@@ -12879,7 +12941,7 @@ function buildSectionCaps(state: ThreeState, bodies: readonly SectionBody[], axi
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = "SectionCap";
     group.add(mesh);
-  }
+  });
   if (group.children.length === 0) return;
   state.scene.add(group);
   state.sectionCapGroup = group;
