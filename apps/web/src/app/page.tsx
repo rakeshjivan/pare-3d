@@ -4,7 +4,7 @@ import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { requestPersistentStorage } from "@/lib/persistentStorage";
 import { designDiskAvailable, designDiskDelete, designDiskGet, designDiskId, designDiskList, designDiskPut } from "@/lib/designDiskStore";
 import { PareBuildBadge, PareVersionStatus } from "@/components/PareVersionStatus";
-import { ArrowLeft, ArrowLeftRight, Clock3, Copy, Download, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, CheckSquare, Clock3, Copy, Download, EllipsisVertical, Folder, FolderInput, FolderKanban, FolderPlus, FolderUp, GraduationCap, Grid3X3, List, Pencil, Plus, RefreshCw, Search, Server, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 import { AppFooter } from "@/components/AppFooter";
 import { checkPareUpdate, dismissPareUpdate, PARE_BUILD, type PareUpdate } from "@/lib/pareUpdate";
@@ -2659,6 +2659,31 @@ export default function Home() {
       });
   };
 
+  // Build 104: several designs deleted at once from the start page's Select mode.
+  const deleteProjects = (projectIds: readonly string[]) => {
+    const doomed = new Set(projectIds);
+    const deleted = projects.filter((project) => doomed.has(project.id));
+    if (!deleted.length) return;
+    const remainingIds = projects.filter((project) => !doomed.has(project.id)).map((project) => project.id);
+    setProjects((current) => current.filter((project) => !doomed.has(project.id)));
+    setProjectShapesById((current) => {
+      const next = { ...current };
+      doomed.forEach((projectId) => delete next[projectId]);
+      return next;
+    });
+    if (activeProjectId && doomed.has(activeProjectId)) setActiveProjectId(null);
+    for (const project of deleted) {
+      if (!STATIC_EXPORT_BUILD) {
+        void fetch(`/api/project-thumbnail?projectId=${encodeURIComponent(project.id)}`, { method: "DELETE" });
+      }
+      knownDesignThumbnails.delete(project.id);
+      void deleteDesignThumbnail(project.id);
+      void deleteProjectShapes(project.id)
+        .then(() => deleteHiddenCopies(project, remainingIds))
+        .catch(() => setDashboardNotice(t("notice.projectShapesDeleteFailed")));
+    }
+  };
+
   const emptyProjectPrompt = view === "dashboard" && emptyProjectPromptId ? projects.find((project) => project.id === emptyProjectPromptId) ?? null : null;
 
   const removeEmptyProject = () => {
@@ -2936,6 +2961,7 @@ export default function Home() {
           localOnlyProjects={projects.filter((project) => !project.sharedProject).length}
           onSendAllToServer={() => void sendAllProjectsToServer()}
           onDeleteProject={deleteProject}
+          onDeleteProjects={deleteProjects}
           onDeleteSharedProject={(project) => void deleteSharedProject(project)}
           onDuplicateProject={(projectId) => void duplicateProject(projectId)}
           onDuplicateSharedProject={(project) => void duplicateSharedProject(project)}
@@ -3161,6 +3187,7 @@ function Dashboard({
   viewMode,
   onCreate,
   onDeleteProject,
+  onDeleteProjects,
   onDeleteSharedProject,
   onDuplicateProject,
   onDuplicateSharedProject,
@@ -3226,6 +3253,7 @@ function Dashboard({
   onCreate: () => void;
   onStarter: (id: StarterId) => void;
   onDeleteProject: (projectId: string) => void;
+  onDeleteProjects: (projectIds: readonly string[]) => void;
   onDeleteSharedProject: (project: SharedProject) => void;
   onDuplicateProject: (projectId: string) => void;
   onDuplicateSharedProject: (project: SharedProject) => void;
@@ -3270,6 +3298,20 @@ function Dashboard({
   const backupNeedsAttention = hasProjects && (backupStatus.state === "paused" || (backupStatus.state === "on" && Boolean(backupStatus.error)) || backupStatus.state === "off");
   const pageStudio: PareStudio = dashboardSection === "dental" ? "dental" : "cad";
   const [openProjectMenuId, setOpenProjectMenuId] = useState<string | null>(null);
+  // Build 104: Select mode - tick several designs and delete them together.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const toggleSelected = (projectId: string) => setSelectedIds((current) => {
+    const next = new Set(current);
+    if (next.has(projectId)) next.delete(projectId); else next.add(projectId);
+    return next;
+  });
+  const leaveSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setBatchDeleteOpen(false);
+  };
   const [openSharedProjectMenuKey, setOpenSharedProjectMenuKey] = useState<string | null>(null);
   const [projectPendingDeleteId, setProjectPendingDeleteId] = useState<string | null>(null);
   const [sharedProjectPendingDeleteKey, setSharedProjectPendingDeleteKey] = useState<string | null>(null);
@@ -3984,6 +4026,17 @@ function Dashboard({
                       <span>{t("shared.newFolder")}</span>
                     </button>
                   )}
+                  {projects.length > 0 ? (
+                    <button
+                      className={`dashboard-select dashboard-backup-button home-select-toggle${selectMode ? " active" : ""}`}
+                      type="button"
+                      aria-pressed={selectMode}
+                      onClick={() => (selectMode ? leaveSelectMode() : (setOpenProjectMenuId(null), setSelectMode(true)))}
+                    >
+                      <CheckSquare size={17} />
+                      <span>{selectMode ? t("home.selectDone") : t("home.select")}</span>
+                    </button>
+                  ) : null}
                   <label className="dashboard-select">
                     <SlidersHorizontal size={17} />
                     <select value={sortMode} onChange={(event) => onSortModeChange(event.currentTarget.value)} aria-label={t("dashboard.sortLabel")}>
@@ -4006,8 +4059,25 @@ function Dashboard({
                   server, the cards beside it what this browser holds. Side by
                   side they cannot be mistaken for one another - and the folder
                   stays visible even when the browser has nothing in it yet. */}
+              {selectMode ? (
+                <div className="home-select-bar" role="toolbar" aria-label={t("home.select")}>
+                  <strong>{t("home.selectedCount", { count: selectedIds.size })}</strong>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds(selectedIds.size === projects.length ? new Set() : new Set(projects.map((project) => project.id)))}
+                  >
+                    {selectedIds.size === projects.length ? t("home.selectNone") : t("home.selectAll")}
+                  </button>
+                  <span className="home-select-spacer" />
+                  <button className="danger" type="button" disabled={selectedIds.size === 0} onClick={() => setBatchDeleteOpen(true)}>
+                    <Trash2 size={15} />
+                    <span>{t("home.deleteSelected")}</span>
+                  </button>
+                  <button type="button" onClick={leaveSelectMode}>{t("home.selectDone")}</button>
+                </div>
+              ) : null}
               {projects.length > 0 || visibleFolders.length > 0 || (sharedProjectsEnabled && !openFolderId) || (openFolderId && !localSearch) ? (
-                <div className={viewMode === "grid" ? "project-grid" : "project-list"}>
+                <div className={`${viewMode === "grid" ? "project-grid" : "project-list"}${selectMode ? " selecting" : ""}`}>
                   {/* The way back out of a folder, first in the row like in the server folder. */}
                   {openFolderId && !localSearch ? (
                     <article
@@ -4148,9 +4218,9 @@ function Dashboard({
                   })}
                   {projects.map((project) => (
                     <article
-                      className={`project-card${draggedProjectId === project.id ? " dragging" : ""}`}
+                      className={`project-card${draggedProjectId === project.id ? " dragging" : ""}${openProjectMenuId === project.id ? " menu-open" : ""}${selectMode && selectedIds.has(project.id) ? " selected" : ""}`}
                       key={project.id}
-                      draggable
+                      draggable={!selectMode}
                       title={sharedProjectsEnabled ? t("dashboard.dragHintServer") : t("shared.dragHint")}
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = "move";
@@ -4159,7 +4229,15 @@ function Dashboard({
                       }}
                       onDragEnd={clearLocalDrag}
                     >
-                      <button className="project-card-open" type="button" onClick={() => onOpenProject(project.id)}>
+                      <button
+                        className="project-card-open"
+                        type="button"
+                        aria-pressed={selectMode ? selectedIds.has(project.id) : undefined}
+                        onClick={() => (selectMode ? toggleSelected(project.id) : onOpenProject(project.id))}
+                      >
+                        {selectMode ? (
+                          <span className="project-card-check" aria-hidden="true">{selectedIds.has(project.id) ? <Check size={14} strokeWidth={3} /> : null}</span>
+                        ) : null}
                         <ProjectPreview accent={project.accent} thumbnailUrl={project.thumbnailUrl} />
                         <span className="project-card-title" translate="no">{project.name}</span>
                         <span className="project-card-meta">
@@ -4181,7 +4259,7 @@ function Dashboard({
                           <span>{folderPathNames(designFolders, project.folderId).join(" / ")}</span>
                         </button>
                       ) : null}
-                      <button
+                      {selectMode ? null : <button
                         className="project-menu-trigger"
                         type="button"
                         aria-label={t("dashboard.projectOptionsFor", { name: project.name })}
@@ -4194,9 +4272,9 @@ function Dashboard({
                           setOpenProjectMenuId((current) => (current === project.id ? null : project.id));
                         }}
                       >
-                        <EllipsisVertical size={19} strokeWidth={2.5} />
-                      </button>
-                      {openProjectMenuId === project.id ? (
+                        <EllipsisVertical size={16} strokeWidth={2.25} />
+                      </button>}
+                      {openProjectMenuId === project.id && !selectMode ? (
                         <div className="project-card-menu" role="menu" aria-label={t("dashboard.optionsFor", { name: project.name })}>
                           <button type="button" role="menuitem" onClick={() => startProjectRename(project)}>
                             <Pencil size={16} />
@@ -4284,6 +4362,35 @@ function Dashboard({
           <AppFooter version={LYL_CREATED_WITH_VERSION} updateInfo={update} />
         </section>
       </div>
+
+      {batchDeleteOpen && selectedIds.size > 0 ? (
+        <section className="dashboard-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-many-title">
+          <div className="dashboard-confirm-dialog">
+            <header>
+              <strong id="delete-many-title">{t("home.deleteManyTitle", { count: selectedIds.size })}</strong>
+              <button type="button" aria-label={t("confirm.cancel")} onClick={() => setBatchDeleteOpen(false)}>
+                <X size={18} />
+              </button>
+            </header>
+            <p>{t("home.deleteManyBody", { count: selectedIds.size })}</p>
+            <div className="dashboard-confirm-actions">
+              <button className="dashboard-confirm-cancel" type="button" onClick={() => setBatchDeleteOpen(false)}>
+                {t("confirm.cancel")}
+              </button>
+              <button
+                className="dashboard-confirm-delete"
+                type="button"
+                onClick={() => {
+                  onDeleteProjects([...selectedIds]);
+                  leaveSelectMode();
+                }}
+              >
+                {t("confirm.delete")}
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {projectPendingDelete ? (
         <section className="dashboard-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-project-title">
