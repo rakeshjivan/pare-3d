@@ -797,4 +797,12 @@ createServer(async (req, res) => {
 }).listen(port, "127.0.0.1", () => console.log(`Pare 3D running at http://localhost:${port}/  (close this window to stop)`));
 
 setTimeout(() => void checkForUpdate(), 5000);
-setInterval(() => void checkForUpdate(), UPDATE_EVERY_MS);
+// Build 104: a test build looks for a newer test build every half hour (they come often); a public
+// build every six hours, as before.
+let lastUpdateCheck = Date.now();
+setInterval(() => {
+  const every = updateState.preview ? 30 * 60 * 1000 : UPDATE_EVERY_MS;
+  if (Date.now() - lastUpdateCheck < every) return;
+  lastUpdateCheck = Date.now();
+  void checkForUpdate();
+}, 5 * 60 * 1000);
