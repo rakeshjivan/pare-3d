@@ -14673,7 +14673,7 @@ export function LayerlingEditor({
         const ids = new Set(mcpStringArray(params.ids));
         const targets = currentShapes().filter((shape) => ids.has(shape.id));
         if (!targets.length) throw new Error("Pass the ids of the objects to make a cookie cutter from");
-        const result = await makeCookieCutter({ wall: params.wall, height: params.height, rim: params.rim, rimHeight: params.rimHeight, edge: params.edge, mirror: params.mirror, inner: params.inner, imprint: params.imprint, bridgeCount: params.bridgeCount, bridge: params.bridge, bridgeHeight: params.bridgeHeight, plate: params.plate, fillet: params.fillet }, targets);
+        const result = await makeCookieCutter({ wall: params.wall, height: params.height, rim: params.rim, rimHeight: params.rimHeight, edge: params.edge, mirror: params.mirror, inner: params.inner, imprint: params.imprint, innerEdge: params.innerEdge, bridgeCount: params.bridgeCount, bridge: params.bridge, bridgeHeight: params.bridgeHeight, plate: params.plate, fillet: params.fillet }, targets);
         if (!result.ok) throw new Error(result.message);
         const cutter = currentShapes().find((shape) => shape.id === result.id);
         return { object: cutter ? mcpShapeSummary(cutter) : { id: result.id }, ...(result.edgeLeftOut ? { note: "The outline could not take the cutting edge; the wall has a flat top." } : {}) };
