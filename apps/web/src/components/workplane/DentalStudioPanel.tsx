@@ -52,7 +52,8 @@ export function dentalPreset(preset: DentalPreset, depth: number, pair: boolean,
   }
   // Study model: hollow and open underneath to save resin, all the anatomy kept.
   // Fork (build 49): on a clean base - trimmed to a smooth outline a few mm round the teeth, low.
-  return { ...common, keep: null, base: 3, baseStyle: "clean", gum: 3, inside: "open" };
+  // Build 104: hollow with the honeycomb in the base only, by default.
+  return { ...common, keep: null, base: 3, baseStyle: "clean", gum: 3, inside: "open", infill: "base" };
 }
 
 export type DentalPartChoice = { id: string; name: string };
@@ -612,10 +613,10 @@ export function DentalStudioPanel({
         {options.inside !== "solid" ? (
           <>
             <EdgeModifierSlider label={t("dental.wall")} value={options.wall} min={DENTAL_MIN_WALL} max={DENTAL_MAX_WALL} step={0.1} coarse={{ step: 0.5, max: DENTAL_MAX_WALL }} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ wall: value })} />
-            {choice(t("dental.infill"), options.infill ?? "honeycomb", [["none", t("dental.infillNone")], ["base", t("dental.infillBase")], ["honeycomb", t("dental.infillFull")]] as Array<[DentalInfill, string]>, (infill) => onOptionsChange({ infill }), t("dental.infillHint"))}
+            {choice(t("dental.infill"), options.infill ?? "base", [["none", t("dental.infillNone")], ["base", t("dental.infillBase")], ["honeycomb", t("dental.infillFull")]] as Array<[DentalInfill, string]>, (infill) => onOptionsChange({ infill }))}
           </>
         ) : null}
-        <p className="blend-hint">{t(options.inside === "solid" ? (options.baseStyle === "ortho" ? "dental.orthoNote" : options.baseStyle === "plate" ? "dental.crownNote" : "dental.solidNote") : options.inside === "open" ? "dental.hollowNote" : "dental.closedNote")}</p>
+        {/* Build 104: no note under the choices - the presets already pick solid where accuracy matters. */}
       </>)) : null}
 
       {inMb("base") ? card(n(5), t("dental.stepBase"), scansDone, t("dental.stepBaseHint"), baseSummary, (<>

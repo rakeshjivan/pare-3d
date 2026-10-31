@@ -745,7 +745,7 @@ function buildArch(
     voxel = cavity.voxel;
     if (!cavity.solid.isEmpty()) {
       // Fork (build 49): a honeycomb inside carries the shell, so hollow is as stiff as solid.
-      const infill = options.infill ?? "honeycomb";
+      const infill = options.infill ?? "base";
       const taken = infill === "none" ? cavity.solid : keepSolid(honeycombIn(runtime, cavity.solid, floor, open, infill === "base" ? floor + HONEYCOMB_BASE_HEIGHT : Infinity));
       solid = keepSolid(runtime.Manifold.difference(solid, taken.isEmpty() ? cavity.solid : taken));
       if (!open) {
