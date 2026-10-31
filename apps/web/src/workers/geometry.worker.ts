@@ -60,6 +60,12 @@ self.onmessage = async (event: MessageEvent<GeometryWorkerRequest>) => {
       // The CAD kernel loads here the first time a STEP file comes; reading a file of 390 parts held the page for 4 s.
       const { fileName, buffer } = args as { fileName: string; buffer: ArrayBuffer };
       result = await importedShapesFromStepFile(fileName, buffer);
+    } else if (request.task === "stepExport") {
+      // The text, not the Blob: the page hands it on as text anyway.
+      const { shapes } = args as { shapes: WorkplaneShape[] };
+      const { exportShapesToStep } = await import("@/lib/stepExport");
+      const { blob, exportedCount, skipped } = await exportShapesToStep(shapes);
+      result = { text: await blob.text(), exportedCount, skipped };
     } else if (request.task === "estimate") {
       const { source } = args as { source: WorkplaneShape[] };
       result = await exportSolidVolume(source);

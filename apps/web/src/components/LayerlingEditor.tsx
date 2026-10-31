@@ -16515,8 +16515,8 @@ export function LayerlingEditor({
     setStepExporting(true);
     setNotice(t("status.buildingBrep"), true);
     try {
-      const { exportShapesToStep } = await import("@/lib/stepExport");
-      const { blob, exportedCount, skipped } = await exportShapesToStep(sourceShapes);
+      const { exportShapesToStepOffThread } = await import("@/lib/geometryWorker");
+      const { blob, exportedCount, skipped } = await exportShapesToStepOffThread(sourceShapes);
       const text = await blob.text();
       await downloadTextFile(projectExportFileName(exportName, "step"), text, "application/step");
       setTopPanel(null);

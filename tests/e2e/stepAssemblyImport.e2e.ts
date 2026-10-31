@@ -109,6 +109,20 @@ describe("a STEP file read the geometry worker's way", () => {
     const strip = (result: typeof onPage) => result.shapes.map(({ id: _id, ...rest }) => ({ ...rest, importedMesh: { ...rest.importedMesh!, brepStep: stepText(rest.importedMesh!.brepStep) } }));
     expect(strip(arrived)).toEqual(strip(onPage));
 
+    // And back out: the parts written the worker's way (packed in, the text out) give the same file.
+    const sentShapes = packValue({ shapes: onPage.shapes });
+    const { shapes: workerShapes } = unpackValue(sentShapes.value, sentShapes.buffers) as { shapes: typeof arrived.shapes };
+    const written = await exportShapesToStep(workerShapes);
+    const direct = await exportShapesToStep(onPage.shapes);
+    expect(written.exportedCount).toBe(2);
+    // The kernel lists the colour entries of one file in a different order from one call to the next, so the two files
+    // are compared by what they bring back in: the same parts, names, colours and sizes.
+    const back = async (result: typeof written) => (await importedShapesFromStepFile("back.step", await result.blob.arrayBuffer())).shapes
+      .map((part) => ({ name: part.name, color: part.color, size: [part.width, part.height, part.depth].map((value) => Math.round(value * 1e4) / 1e4) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    expect(await back(written)).toEqual(await back(direct));
+    await expect(exportShapesToStep([shape({ kind: "box", name: "Gap", hole: true, width: 4, depth: 4, height: 4 })])).rejects.toMatchObject({ name: "StepExportEmptyError" });
+
     const one = await exportShapesToStep([shape({ kind: "box", name: "Only", width: 10, depth: 6, height: 4 })]);
     const single = await importedShapesFromStepFile("one.step", await one.blob.arrayBuffer());
     expect(single.assembly).toBe(false);
