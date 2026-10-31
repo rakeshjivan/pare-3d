@@ -12,6 +12,7 @@ import type { ModelSplitPlane } from "@/lib/modelSplit";
 import { simplifyTrianglePositions, type SimplifiedMesh } from "@/lib/meshSimplify";
 import { importedShapesFromObj, type ObjImportResult } from "@/lib/objImport";
 import { importedShapeFromStl } from "@/lib/stlImport";
+import { importedShapesFromStepFile, type StepFileImport } from "@/lib/stepFileImport";
 import type { WorkplaneShape } from "@/types/layerling";
 import type { CutConnectorOptions } from "@/lib/cutConnectors";
 
@@ -282,6 +283,16 @@ export function lidForShapesOffThread(targets: readonly WorkplaneShape[], option
  */
 export function importedShapeFromStlOffThread(fileName: string, buffer: ArrayBuffer): Promise<WorkplaneShape> {
   return runGeometryTask("stl", { fileName, buffer }, async () => importedShapeFromStl(fileName, buffer), () => {
+    throw new Error(t("status.computeTimedOut"));
+  }, undefined, true);
+}
+
+/**
+ * A STEP file read off the page (importedShapesFromStepFile in lib/stepFileImport.ts): the kernel reads, meshes and writes
+ * every part in one go, and a file of 390 parts held the page for over 4 seconds. The import window shows its progress.
+ */
+export function importedShapesFromStepOffThread(fileName: string, buffer: ArrayBuffer): Promise<StepFileImport> {
+  return runGeometryTask("step", { fileName, buffer }, async () => importedShapesFromStepFile(fileName, buffer), () => {
     throw new Error(t("status.computeTimedOut"));
   }, undefined, true);
 }

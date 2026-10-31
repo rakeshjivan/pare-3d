@@ -13,6 +13,7 @@ import { importedShapesFromObj } from "@/lib/objImport";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { exportMeshesTo3mf } from "@/lib/threemfExport";
 import { unflattenThreeMfMeshes, type FlatThreeMfMesh } from "@/lib/threemfFlat";
+import { importedShapesFromStepFile } from "@/lib/stepFileImport";
 import { setLanguage } from "@/lib/i18n";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
 import type { WorkplaneShape } from "@/types/layerling";
@@ -55,6 +56,10 @@ self.onmessage = async (event: MessageEvent<GeometryWorkerRequest>) => {
     } else if (request.task === "obj") {
       const { fileName, text, mtlSources } = args as { fileName: string; text: string; mtlSources: string[] };
       result = importedShapesFromObj(fileName, text, mtlSources);
+    } else if (request.task === "step") {
+      // The CAD kernel loads here the first time a STEP file comes; reading a file of 390 parts held the page for 4 s.
+      const { fileName, buffer } = args as { fileName: string; buffer: ArrayBuffer };
+      result = await importedShapesFromStepFile(fileName, buffer);
     } else if (request.task === "estimate") {
       const { source } = args as { source: WorkplaneShape[] };
       result = await exportSolidVolume(source);
