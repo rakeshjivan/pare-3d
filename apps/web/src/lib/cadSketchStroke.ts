@@ -1,4 +1,4 @@
-import { JoinType, type OcctKernel, type ShapeHandle } from "occt-wasm";
+import { JoinType, type BoundingBox, type OcctKernel, type ShapeHandle } from "occt-wasm";
 import { cadSketchRegions, orderedCadSketchPaths, type OrderedCadSketchPath } from "@/lib/sketchCadProfile";
 import { pathWire } from "@/lib/sketchCadWire";
 import { sampledPath } from "@/lib/sketchStroke";
@@ -91,6 +91,7 @@ export function buildStrokedSketchSolid(cad: OcctKernel, profile: SketchProfile,
             ? [-stroke.width, null]
             : [stroke.width / 2, -stroke.width / 2];
     let result: ShapeHandle | null = null;
+    const pieceBoxes: BoundingBox[] = [];
     for (const region of regions) {
       const outer = regionPrism(cad, region, outerDelta, join, height);
       if (!outer) return null;
@@ -100,9 +101,15 @@ export function buildStrokedSketchSolid(cad: OcctKernel, profile: SketchProfile,
         if (!inner) return null;
         piece = cad.cut(outer, cad.translate(inner, 0, -1, 0));
       }
+      pieceBoxes.push(cad.getBoundingBox(piece, false));
       result = result ? cad.fuse(result, piece) : piece;
     }
     if (!result || !cad.isValid(result) || !(cad.getVolume(result) > 1e-9)) return null;
+    // Two walls grown into each other can lose one of them in the fuse, and the rest is still a valid solid (#982: the rim of a
+    // mirrored "Rb" kept the R alone). The whole has to reach as far as every piece did.
+    const box = cad.getBoundingBox(result, false);
+    const reach = 1e-3;
+    if (pieceBoxes.some((piece) => piece.xmin < box.xmin - reach || piece.xmax > box.xmax + reach || piece.zmin < box.zmin - reach || piece.zmax > box.zmax + reach)) return null;
     return result;
   } catch (error) {
     // A kernel that has crashed is for the caller to reset; any other failure is the polygon route's to handle.
@@ -118,10 +125,11 @@ const LARGE_TOP_EDGES = 750;
 
 /**
  * A wall with a cutting edge (#982): every edge along the very top of the solid - the wall's outer and inner rim - gets a 45°
- * chamfer reaching `amount` in, so the top runs in to a narrow edge. The solid stands from 0 to `height` (y up). Null when
- * the solid has no edge up there or the kernel cannot chamfer it (outlines with steps shorter than the chamfer).
+ * chamfer reaching `amount` in, so the top runs in to a narrow edge. The solid stands from 0 to `height` (y up). A cut or a
+ * fuse leaves a compound, which the kernel does not chamfer: each solid in it is chamfered on its own. Null when no solid has
+ * an edge up there or the kernel cannot chamfer one (outlines with steps shorter than the chamfer).
  */
-export function chamferTopEdges(cad: OcctKernel, solid: ShapeHandle, height: number, amount: number): ShapeHandle | null {
+export function chamferTopEdges(cad: OcctKernel, shape: ShapeHandle, height: number, amount: number): ShapeHandle | null {
   const atTop = (edge: ShapeHandle) => {
     const { first, last } = cad.curveParameters(edge);
     for (let step = 0; step <= 4; step += 1) {
@@ -129,13 +137,18 @@ export function chamferTopEdges(cad: OcctKernel, solid: ShapeHandle, height: num
     }
     return true;
   };
-  const edges = cad.getSubShapes(solid, "edge").filter(atTop);
-  if (!edges.length) return null;
   try {
-    const chamfered = cad.chamfer(solid, edges, amount);
+    let edgeCount = 0;
+    const chamfered = cad.getSubShapes(shape, "solid").map((solid) => {
+      const edges = cad.getSubShapes(solid, "edge").filter(atTop);
+      edgeCount += edges.length;
+      return edges.length ? cad.chamfer(solid, edges, amount) : solid;
+    });
+    if (!chamfered.length || !edgeCount) return null;
+    const result = chamfered.length === 1 ? chamfered[0] : cad.makeCompound(chamfered);
     // The validity check grows steeply with the edges (#461): a traced outline is checked by its volume alone.
-    if (edges.length <= LARGE_TOP_EDGES && !cad.isValid(chamfered)) return null;
-    return cad.getVolume(chamfered) > 1e-9 ? chamfered : null;
+    if (edgeCount <= LARGE_TOP_EDGES && !cad.isValid(result)) return null;
+    return cad.getVolume(result) > 1e-9 ? result : null;
   } catch (error) {
     if (/memory|WebAssembly|abort/i.test(error instanceof Error ? error.message : String(error))) throw error;
     return null;
