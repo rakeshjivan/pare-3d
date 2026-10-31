@@ -2164,3 +2164,20 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .layerling-editor:not(.studio-dental):has(.bed-overhang-warning) .editor-status {
   bottom: calc(var(--editor-footer-height) + 78px);
 }
+/* Build 104: CAD Studio has no Box / Gimbal switch; the gimbal is a right-click choice there. */
+.layerling-editor:not(.studio-dental) .snap-units.handle-style {
+  display: none;
+}
+/* Build 104: a ready part's how-to, folded until asked for. */
+.ready-part-howto { margin: 0 0 8px; padding: 0 2px; }
+.ready-part-howto summary {
+  cursor: pointer;
+  width: fit-content;
+  font: 600 12px/1.4 var(--font-ui);
+  color: var(--accent, #2456d3);
+  list-style: none;
+}
+.ready-part-howto summary::-webkit-details-marker { display: none; }
+.ready-part-howto summary::before { content: "▸ "; }
+.ready-part-howto[open] summary::before { content: "▾ "; }
+.ready-part-howto .ready-part-note { margin-top: 6px; padding: 8px 10px; background: color-mix(in srgb, currentColor 4%, transparent); border-radius: 8px; }

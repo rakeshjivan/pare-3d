@@ -89,7 +89,7 @@ import { MeshSculptPanel, type SculptBrushOptions, type SoftTransform, type Scul
 import { DentalBrushOverlay, DentalTrimOverlay, SculptLassoOverlay, trimLineDistance, type TrimPoint } from "./workplane/DentalTrimOverlay";
 import { SculptSelectionBar } from "./workplane/SculptSelectionBar";
 import { BiteContactsCard } from "./workplane/BiteContactsCard";
-import { setHandleStyle, useHandleStyle } from "@/lib/handleStyle";
+import { setHandleStyle, setHandleStyleStudio, useHandleStyle } from "@/lib/handleStyle";
 import { RADIAL_TOOLS, SculptRadialMenu, radialIndex } from "./workplane/SculptRadialMenu";
 import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
@@ -2068,6 +2068,10 @@ export function LayerlingEditor({
   }, [editorOpen]);
   useEffect(() => {
     if (editorOpen) setViewLook(dentalWorkspace ? "dark" : "plate");
+  }, [dentalWorkspace, editorOpen]);
+  // Build 104: CAD Studio opens with Tinkercad's box handles every time; the gimbal is on the right-click menu.
+  useEffect(() => {
+    if (editorOpen) setHandleStyleStudio(dentalWorkspace ? "dental" : "cad");
   }, [dentalWorkspace, editorOpen]);
   /** The icon tag window: an SVG file, its width and OK (the library's Icon tag). */
   const [iconTagPanelOpen, setIconTagPanelOpen] = useState(false);

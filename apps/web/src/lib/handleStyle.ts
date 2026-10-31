@@ -12,7 +12,15 @@ export type HandleStyle = "box" | "gimbal";
 const KEY = "pare3d.handleStyle";
 const EVENT = "pare3d-handle-style";
 
+/**
+ * Build 104: each studio has its own choice. CAD Studio always opens with Tinkercad's box; the gimbal is
+ * a right-click choice there, kept until the design is closed. Dental Studio remembers its choice (the
+ * switch beside Snap Grid), as before.
+ */
+let studio: "cad" | "dental" = "cad";
+
 export function readHandleStyle(): HandleStyle {
+  if (studio === "cad") return "box";
   try {
     return window.localStorage.getItem(KEY) === "gimbal" ? "gimbal" : "box";
   } catch {
@@ -29,7 +37,16 @@ export function handleStyle(): HandleStyle {
 
 export function setHandleStyle(style: HandleStyle) {
   current = style;
-  try { window.localStorage.setItem(KEY, style); } catch { /* remembered for this visit only */ }
+  if (studio === "dental") {
+    try { window.localStorage.setItem(KEY, style); } catch { /* remembered for this visit only */ }
+  }
+  window.dispatchEvent(new Event(EVENT));
+}
+
+/** The studio the editor opens in: CAD Studio starts with the box each time, Dental Studio with its own choice. */
+export function setHandleStyleStudio(next: "cad" | "dental") {
+  studio = next;
+  current = readHandleStyle();
   window.dispatchEvent(new Event(EVENT));
 }
 

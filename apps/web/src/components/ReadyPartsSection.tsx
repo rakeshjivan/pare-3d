@@ -261,7 +261,11 @@ export function ReadyPartsSection({ onInsert, onMake }: { onInsert: (parts: Read
           ) : null}
           {/* Fork (build 54): the two cutters that make a clicker round a keyboard switch. */}
           <h4 className="ready-parts-category">{t("readyParts.cat.clicker")}</h4>
-          <p className="ready-part-note">{t("readyParts.clickerHowTo")}</p>
+          {/* Build 104: the how-to folded away until asked for, so it does not fill the window. */}
+          <details className="ready-part-howto">
+            <summary>{t("readyParts.howItWorks")}</summary>
+            <p className="ready-part-note">{t("readyParts.clickerHowTo")}</p>
+          </details>
           {/* Fork (build 57): the base sets the gap between the halves; the top is the kit's cutter. */}
           <div className="ready-part has-size" data-ready-part="clicker-base">
             <ClickerBasePartIcon />

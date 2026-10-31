@@ -10,8 +10,10 @@ describe("handle style switch (build 99)", () => {
       removeEventListener: () => {},
       dispatchEvent: () => { listeners.forEach((fn) => fn()); return true; },
     };
-    const { handleStyle, setHandleStyle, readHandleStyle } = await import("@/lib/handleStyle");
+    const { handleStyle, setHandleStyle, setHandleStyleStudio, readHandleStyle } = await import("@/lib/handleStyle");
     expect(handleStyle()).toBe("box");
+    // Build 104: Dental Studio remembers the choice; CAD Studio always starts with the box.
+    setHandleStyleStudio("dental");
     let heard = 0;
     (globalThis as unknown as { window: { addEventListener: (e: string, f: () => void) => void } }).window.addEventListener("x", () => { heard += 1; });
     setHandleStyle("gimbal");

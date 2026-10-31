@@ -1957,6 +1957,7 @@ export const MESSAGES_EN = {
   "clicker.tooThin": "The part is thinner than the cutter is deep ({depth} mm): the cut may go through.",
   "clicker.faceSmall": "The face is smaller than the cutter ({size} mm across): the cut reaches its edge.",
   "clicker.cut": "{cutter} cut into {part}, centred on the face.",
+  "readyParts.howItWorks": "How it works",
   "readyParts.clickerHowTo": "Turn any shape into a clicker with a keyboard switch (Cherry MX style). Split your shape into a base and a top, and lay each half flat face up. Choose the gap and Add the Clicker base, then click the base's flat face; then Add the Clicker top and click the top's flat face. Each cutter goes into the middle of the face and is cut in straight away. They keep their size, so they fit standard switches.",
   "readyParts.clickerBase": "Clicker base",
   "readyParts.clickerBaseHint": "The pocket the switch presses into, deep enough that only {gap} mm of it stands out - the gap between the halves. Notches hold its clips.",
