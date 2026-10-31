@@ -43,6 +43,7 @@ export type StudioChart = {
 const stepsSlot = (element: HTMLElement | null) => setStudioSlot("steps", element);
 const hintSlot = (element: HTMLElement | null) => setStudioSlot("hint", element);
 const navSlot = (element: HTMLElement | null) => setStudioSlot("nav", element);
+const caseSlot = (element: HTMLElement | null) => setStudioSlot("case", element);
 
 const VIEWS: Array<{ view: DentalView; label: string; icon: string }> = [
   { view: "front", label: "studio.viewFront", icon: "M7 4h10v9a5 5 0 0 1-10 0z" },
@@ -53,6 +54,7 @@ const VIEWS: Array<{ view: DentalView; label: string; icon: string }> = [
 
 export function StudioShell({
   title,
+  caseTitle,
   objects,
   colour,
   chart,
@@ -66,11 +68,13 @@ export function StudioShell({
   helpSection,
 }: {
   title: string;
+  caseTitle?: string;
   objects: StudioCaseObject[];
   colour?: { on: boolean; onChange: (on: boolean) => void } | null;
   chart?: StudioChart | null;
   onView?: (view: DentalView) => void;
-  contacts?: { on: boolean; busy?: boolean; onToggle: () => void } | null;
+  /** legend false: the studio shows its own key (the bite map's, in the case panel). */
+  contacts?: { on: boolean; busy?: boolean; onToggle: () => void; legend?: boolean } | null;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -98,7 +102,7 @@ export function StudioShell({
 
       <aside className="studio-left" aria-label={t("studio.case")}>
         <button type="button" className="studio-sec studio-sec-toggle" aria-expanded={caseOpen} onClick={() => setCaseOpen((open) => !open)}>
-          {t("studio.caseObjects")} {caseOpen ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+          {caseTitle ?? t("studio.caseObjects")} {caseOpen ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
         </button>
         {caseOpen ? (
           <div className="studio-objects">
@@ -128,6 +132,8 @@ export function StudioShell({
             ) : null}
           </div>
         ) : null}
+        {/* Build 106: the bite contacts & clearance, when on, under the objects. */}
+        <div className="studio-case-extra" ref={caseSlot} />
         {chart ? <ToothChart chart={chart} /> : null}
       </aside>
 
@@ -149,7 +155,7 @@ export function StudioShell({
           ) : null}
         </div>
       ) : null}
-      {contacts?.on ? (
+      {contacts?.on && contacts.legend !== false ? (
         <div className="studio-clegend" role="img" aria-label={t("studio.contactsKey")}>
           <b>{t("studio.contacts")}</b>
           <div className="studio-cbar" />

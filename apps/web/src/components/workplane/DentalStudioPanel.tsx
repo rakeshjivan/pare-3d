@@ -441,7 +441,7 @@ export function DentalStudioPanel({
   const mbHintKey: Record<ModelStepId, string> = { scans: "dental.step1Hint", prepare: "dental.trimHint", model: "dental.step3Hint", base: "dental.stepBaseHint", articulator: "dental.step4Hint", label: pair ? "dental.step4Hint" : "dental.stepNameHint" };
   const longHint = !framed ? null : stage === "made" ? t("dental.madeHint") : waxStep ? t(`waxStudio.stepHint.${waxStep}` as "waxStudio.stepHint.scans") : mbStep ? t(mbHintKey[mbStep] as "dental.step1Hint") : null;
   // The line over the 3D view: what to do now, in a few words; the rest is behind the (?).
-  const frameHint = !framed ? null : stage === "made" ? t("studio.hint.made") : waxStep ? t(`studio.hint.${waxStep}` as "studio.hint.scans") : mbStep ? t(`studio.hint.mb.${mbStep}` as "studio.hint.mb.scans") : null;
+  const frameHint = !framed ? null : stage === "made" ? t("studio.hint.made") : waxStep ? t(`studio.hint.${waxStep}` as "studio.hint.scans") : mbStep ? t(mbStep === "scans" && scansDone ? "studio.hint.mb.scansLoaded" : `studio.hint.mb.${mbStep}` as "studio.hint.mb.scans") : null;
   const makeButton = (
     <button type="button" className="primary" disabled={!ready} onClick={onApply}>
       {stage === "making" ? <LoaderCircle className="edge-modifier-spinner" size={17} /> : <Check size={17} />}

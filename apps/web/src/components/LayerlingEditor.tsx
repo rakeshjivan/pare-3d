@@ -98,7 +98,10 @@ import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
 import { looksLikeDentalScan, type DentalAnalysis, type DentalRole, type DentalStudioInput, type DentalStudioOptions } from "@/lib/dentalModel";
 import { DentalChrome } from "./workplane/DentalChrome";
 import { STUDIO_SHELL, WAXUP_ENABLED } from "@/lib/pareFeatures";
+import { fitArchLine, layOnArchLine, type ArchTooth } from "@/lib/waxArchLine";
 import { StudioShell } from "./workplane/StudioShell";
+import { useStudioSlot } from "@/lib/studioSlots";
+import { createPortal } from "react-dom";
 import type { PareStudio } from "@/lib/pareStudio";
 import { applyAppTheme } from "@/lib/appTheme";
 import { DentalStudioPanel, dentalPreset, type DentalAreaTool, type DentalPreset, type DentalSlot, type DentalView } from "./workplane/DentalStudioPanel";
@@ -3275,19 +3278,21 @@ export function LayerlingEditor({
   const [studioHidden, setStudioHidden] = useState<string[]>([]);
   const [waxColourful, setWaxColourful] = useState(() => { try { return window.localStorage.getItem("pare3d.waxColourful") === "1"; } catch { return false; } });
   const [waxTint, setWaxTint] = useState(false);
+  // Build 106: the wax teeth drawn see-through over the scan while its landmarks are checked.
+  const [waxSeeThrough, setWaxSeeThrough] = useState(false);
   const waxTintCache = useRef<{ key: string; map: WeakMap<WorkplaneShape, WorkplaneShape> }>({ key: "", map: new WeakMap() });
   const viewportShapes = useMemo(() => {
     let result = baseViewportShapes;
     if (dentalHidden.length) result = result.filter((shape) => !dentalHidden.includes(shape.id));
     if (studioHidden.length) result = result.filter((shape) => !studioHidden.includes(shape.id));
-    if (waxTint) {
-      const key = waxColourful ? "colour" : "blue";
+    if (waxTint || waxSeeThrough) {
+      const key = `${waxTint ? (waxColourful ? "colour" : "blue") : "own"}${waxSeeThrough ? ":see" : ""}`;
       if (waxTintCache.current.key !== key) waxTintCache.current = { key, map: new WeakMap() };
       const cache = waxTintCache.current.map;
       result = result.map((shape) => {
         if (shape.dental !== "wax" || !shape.waxTooth) return shape;
         let tinted = cache.get(shape);
-        if (!tinted) { tinted = { ...shape, color: waxColourful ? WAX_TOOTH_COLOURS[shape.waxTooth.fdi] ?? WAX_BLUE : WAX_BLUE }; cache.set(shape, tinted); }
+        if (!tinted) { tinted = { ...shape, ...(waxTint ? { color: waxColourful ? WAX_TOOTH_COLOURS[shape.waxTooth.fdi] ?? WAX_BLUE : WAX_BLUE } : {}), ...(waxSeeThrough ? { transparent: true } : {}) }; cache.set(shape, tinted); }
         return tinted;
       });
     }
@@ -3311,7 +3316,7 @@ export function LayerlingEditor({
       result = [...result.map((shape) => (overlapping.has(shape.id) ? { ...shape, transparent: true } : shape)), ...fitOverlay];
     }
     return result;
-  }, [baseViewportShapes, dentalHidden, studioHidden, waxTint, waxColourful, dragTextGhost, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape, surfaceTextTool?.editingId, surfaceTextTool?.preview]);
+  }, [baseViewportShapes, dentalHidden, studioHidden, waxTint, waxColourful, waxSeeThrough, dragTextGhost, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape, surfaceTextTool?.editingId, surfaceTextTool?.preview]);
   // A revolve sketch on the base plate is a side view: the bodies are shown from the front, as the profile is drawn (#525).
   // Opened again to edit a body that stands upright, it is the same side view: that body stands at its height, not on the plate's workplane.
   const editedRevolveShape = sketchActive && sketchOperation === "revolve" && editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) : undefined;
@@ -10468,6 +10473,8 @@ export function LayerlingEditor({
   // Build 106: Wax-up Studio and Model Builder in the studio frame (Dental Studio, test builds).
   const studioShellOn = STUDIO_SHELL && dentalWorkspace && Boolean(dentalStudio);
   const studioWax = studioShellOn && Boolean(dentalStudio?.waxStudio);
+  // Build 106: the bite map's card goes under the case's objects in the frame.
+  const studioCaseSlot = useStudioSlot("case");
   useEffect(() => { setWaxTint(studioWax); }, [studioWax]);
   useEffect(() => { if (!studioShellOn) setStudioHidden([]); }, [studioShellOn]);
   // The 3D view is sized when the window is: the frame coming or going resizes it too.
@@ -10986,7 +10993,7 @@ export function LayerlingEditor({
     setDentalHidden((Object.values(state.slots).filter((id) => id && id !== state.slots[slot]) as string[]));
   }, []);
   /** Looks at one arch from a named side, framed. */
-  const showDentalView = useCallback((slot: "upper" | "lower", view: DentalView) => {
+  const showDentalView = useCallback((slot: "upper" | "lower", view: DentalView, frame?: string[]) => {
     const state = dentalStudioRef.current;
     const id = state?.slots[slot];
     const info = id ? state?.analysis?.arches.find((arch) => arch.id === id) : undefined;
@@ -10994,7 +11001,8 @@ export function LayerlingEditor({
     if (!id || !info || !toScene || !window.layerlingShowParts) return;
     const { up, front, left } = info.axes;
     const along = view === "occlusal" ? up : view === "front" ? front : view === "left" ? left : view === "right" ? left.map((value) => -value) as [number, number, number] : front.map((value) => -value) as [number, number, number];
-    window.layerlingShowParts([id], toScene(along));
+    // Build 106: framed on the parts given (both arches in the studio frame), else the arch looked along.
+    window.layerlingShowParts(frame?.length ? frame : [id], toScene(along));
   }, []);
   const stopDentalTrim = useCallback(() => {
     setDentalTrim(null);
@@ -11504,8 +11512,10 @@ export function LayerlingEditor({
   const WAX_COLOR = "#f1e7d0";
   type WaxupState = Omit<WaxupView, "marked" | "selected" | "mirror" | "found" | "chosen" | "confirmed" | "markTeeth" | "markedTeeth" | "markPick" | "scanSeeThrough"> & { /** Build 103: confirmed teeth (FDI), each held at its whole change as confirmed. */ locks: Record<number, ToothAdjust>; landmarks: WaxLandmarks | null; guessed: boolean; marks: Array<[number, number, number]>; /** Build 102: each tooth's own adjustment (by FDI number), kept through every placing. */ adjust: Record<number, ToothAdjust>;
     /** Build 105: the four marks on each tooth (FDI; scan's input coordinates), those the finder made (not yet checked by hand), the teeth to wax up, and the marking under way (teeth still to mark, the points of the one being marked). */
-    toothMarks: Record<number, ToothMarks>; autoMarked: number[]; markTeeth: number[] | null; toothPick: { queue: number[]; points: Array<[number, number, number]> } | null };
-  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: BUILT_IN_FINDER.name, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 1, red: null, checks: null, adjust: {}, stage: "position", setMove: { width: 0, depth: 0, midline: 0, height: 0 }, chain: true, restrict: "free", moveAll: false, locks: {}, manual: true, toothMarks: {}, autoMarked: [], markTeeth: null, toothPick: null, contacts: { on: false, busy: false, occlusal: 0.1, adapting: false, note: null, opposing: false }, occlusion: { ready: false, busy: false, raise: 0, scheme: "canine", guidance: 30, bennett: 15, result: null } });
+    toothMarks: Record<number, ToothMarks>; autoMarked: number[]; markTeeth: number[] | null; toothPick: { queue: number[]; points: Array<[number, number, number]> } | null;
+    /** Build 106: the teeth laid along the arch line (through the incisal marks to the canine tips), and its curve (1 = the patient's). */
+    archLine: boolean; archCurve: number };
+  const [waxup, setWaxup] = useState<WaxupState>({ slot: "upper", setName: null, teeth: 0, picking: null, lengthen: 0, centralRatio: CENTRAL_RATIO, arcDepth: null, arcUsed: null, proportions: "natural", builtIn: [], builtInCredit: null, setId: null, busy: false, placed: [], alternate: false, error: null, landmarks: null, guessed: false, marks: [], finder: { name: BUILT_IN_FINDER.name, busy: false, progress: null }, teethShown: true, fit: "teeth", ghost: 1, ideal: 1, red: null, checks: null, adjust: {}, stage: "position", setMove: { width: 0, depth: 0, midline: 0, height: 0 }, chain: true, restrict: "free", moveAll: false, locks: {}, manual: true, toothMarks: {}, autoMarked: [], markTeeth: null, toothPick: null, archLine: true, archCurve: 1, contacts: { on: false, busy: false, occlusal: 0.1, adapting: false, note: null, opposing: false }, occlusion: { ready: false, busy: false, raise: 0, scheme: "canine", guidance: 30, bennett: 15, result: null } });
   // Build 94: the teeth found on each scan (by its part id): each scan triangle's FDI (as the studio
   // reads the scan), the teeth, the landmarks from them, and the teeth chosen for the wax-up.
   type FoundTeeth = { key: string; input: Float32Array; fdi: Uint8Array; teeth: ScanTeeth["teeth"]; landmarks: WaxLandmarks | null; chosen: number[] };
@@ -11834,6 +11844,8 @@ export function LayerlingEditor({
   // "modify contact points"); the teeth are fitted again to the marks moved when the step is left.
   const [marksEditing, setMarksEditing] = useState(false);
   const marksMoved = useRef(false);
+  // Build 106: marks moved since the teeth were last fitted to them (Update fits them again).
+  const [marksChanged, setMarksChanged] = useState(false);
   const markScan = useRef<{ id: string; tris: Float32Array } | null>(null);
   const markSurfaceAt = useCallback((x: number, y: number): [number, number, number] | null => {
     const arch = waxArch();
@@ -11862,7 +11874,7 @@ export function LayerlingEditor({
     if (!m) return;
     const inInput = new THREE.Vector3(...point).applyMatrix4(arch.sceneToInput).toArray() as [number, number, number];
     const next: WaxupState = { ...current, toothMarks: { ...current.toothMarks, [fdi]: { ...m, [key]: inInput } }, autoMarked: done ? current.autoMarked.filter((n) => n !== fdi) : current.autoMarked };
-    if (done) { waxRecordRef.current(); marksMoved.current = true; }
+    if (done) { waxRecordRef.current(); marksMoved.current = true; setMarksChanged(true); }
     setWaxup(next);
     showToothMarks(next);
   };
@@ -11871,7 +11883,9 @@ export function LayerlingEditor({
     const arch = waxArch();
     const state = dentalStudioRef.current;
     if (!arch || !state) return;
-    setDentalHidden([...(Object.values(state.slots).filter((id) => id && id !== arch.shape.id) as string[]), ...waxTeethOf(arch.shape.id).map((shape) => shape.id)]);
+    // Build 106: the wax stays in view, see-through, so Update shows what the marks do to it.
+    setDentalHidden(Object.values(state.slots).filter((id) => id && id !== arch.shape.id) as string[]);
+    setWaxSeeThrough(true);
     setSelectedIds([]);
     // After the view has redrawn for the parts hidden (that clears the highlight layer).
     marksOverlay.current = () => showToothMarks(waxupRef.current);
@@ -11880,6 +11894,7 @@ export function LayerlingEditor({
       marksOverlay.current = null;
       window.clearTimeout(timer);
       setDentalHidden([]);
+      setWaxSeeThrough(false);
       window.layerlingHighlight?.(null);
       highlightDrawn.current = null;
     };
@@ -11888,6 +11903,7 @@ export function LayerlingEditor({
   useEffect(() => {
     if (marksEditing || !marksMoved.current) return;
     marksMoved.current = false;
+    setMarksChanged(false);
     if (waxupRef.current.placed.length) window.setTimeout(() => void placeWaxupRef.current({ record: false }), 60);
   }, [marksEditing]);
   /**
@@ -11948,6 +11964,55 @@ export function LayerlingEditor({
     for (const [fdi, held] of Object.entries(current.locks ?? {})) out[Number(fdi)] = held;
     return out;
   };
+  /**
+   * Build 106: the arch line - fitted through the incisal marks (to the canine tips) and the placed teeth
+   * laid along it, only moved and turned. `curve` scales its curvature (1 = the patient's arch).
+   */
+  const waxLineUp = (curve: number): boolean => {
+    const arch = waxArch();
+    const current = waxupRef.current;
+    if (!arch) return false;
+    const back = arch.sceneToInput.clone().invert();
+    const fdis = markTeethFor({ ...current, slot: arch.slot }).filter((fdi) => current.toothMarks[fdi]);
+    const points: Record<number, [number, number, number]> = {};
+    for (const fdi of fdis) points[fdi] = new THREE.Vector3(...current.toothMarks[fdi].incisal).applyMatrix4(back).toArray() as [number, number, number];
+    const teeth: ArchTooth[] = [];
+    const upSum = new THREE.Vector3(), outSum = new THREE.Vector3();
+    for (const shape of waxTeethOf(arch.shape.id)) {
+      const toWorld = shape.waxTooth ? localToWorld(shape) : null;
+      if (!shape.waxTooth || !toWorld || shape.waxTooth.fdi % 10 > 5) continue;
+      const f = moveFrame(shape.waxTooth.frame, toWorld);
+      upSum.add(new THREE.Vector3(...f.up)); outSum.add(new THREE.Vector3(...f.out));
+      teeth.push({ id: shape.id, fdi: shape.waxTooth.fdi, width: shape.waxTooth.width, origin: f.origin, mesial: f.mesial, out: f.out, up: f.up });
+    }
+    if (teeth.length < 2) return false;
+    const line = fitArchLine(points, upSum.normalize().toArray() as [number, number, number], outSum.normalize().toArray() as [number, number, number]);
+    if (!line) return false;
+    const moves = layOnArchLine(teeth, line, { curve });
+    const changed = new Map<string, WorkplaneShape>();
+    for (const shape of waxTeethOf(arch.shape.id)) {
+      const move = moves.get(shape.id);
+      const tooth = shape.waxTooth;
+      const toWorld = localToWorld(shape);
+      if (!move || !tooth || !toWorld || current.locks[tooth.fdi]) continue;
+      const frame = moveFrame(tooth.frame, toWorld);
+      const triangles = worldTriangles(shape);
+      const p = new THREE.Vector3();
+      for (let i = 0; i + 2 < triangles.length; i += 3) {
+        p.set(triangles[i], triangles[i + 1], triangles[i + 2]).applyMatrix4(move);
+        triangles[i] = p.x; triangles[i + 1] = p.y; triangles[i + 2] = p.z;
+      }
+      const rebuilt = shapeWithWorldPositions(shape, triangles);
+      const local = localToWorld(rebuilt);
+      if (!local) continue;
+      changed.set(shape.id, canonicalizeShape({ ...rebuilt, waxTooth: { ...tooth, frame: moveFrame(moveFrame(frame, move), local.clone().invert()) } }));
+    }
+    if (!changed.size) return false;
+    commitShapes(shapesRef.current.map((shape) => changed.get(shape.id) ?? shape), selectedIdsRef.current, t("waxup.archLined"));
+    return true;
+  };
+  const waxLineUpRef = useRef(waxLineUp);
+  waxLineUpRef.current = waxLineUp;
   const placeWaxup = useCallback(async (options: { record?: boolean } = {}) => {
     if (options.record !== false) waxRecordRef.current();
     const current = waxupRef.current;
@@ -11992,6 +12057,8 @@ export function LayerlingEditor({
       const old = new Set(waxTeethOf(arch.shape.id).map((shape) => shape.id));
       const kept = selectedIdsRef.current.filter((id) => teeth.some((tooth) => tooth.shape.id === id));
       commitShapes([...shapesRef.current.filter((shape) => !old.has(shape.id)), ...teeth.map((tooth) => tooth.shape)], kept, t("waxup.placed", { count: teeth.length }));
+      // Build 106 (manual): laid along the arch line straight away, unless the dentist turned that off.
+      if (onMarks && current.manual && current.archLine) waxLineUpRef.current(current.archCurve);
       // Build 105: the first time, the teeth looked at from the front.
       if (!old.size && onMarks) window.setTimeout(() => showDentalView(arch.slot, "front"), 50);
       setWaxup((latest) => ({
@@ -12209,6 +12276,83 @@ export function LayerlingEditor({
    * Build 106: one change to every tooth of the arch being waxed (those not held), straight onto the teeth -
    * for the Position sliders, so what a slider does shows as it moves.
    */
+  /**
+   * Build 106: a slider drawn live - while it moves, the teeth are drawn moved (no change made yet); a
+   * moment after it stops the change is made once, as one step of Undo. `moves` gives each tooth's move
+   * from where the teeth stood when the slider started (`start`, kept from then); `commit` makes it.
+   */
+  const waxLive = useRef<{ key: string; start: unknown; timer: number; finish: () => void } | null>(null);
+  const waxLiveBase = useRef(new Map<string, Float32Array>());
+  const waxLiveShow = <S,>(key: string, start: () => S, moves: (start: S) => Map<string, THREE.Matrix4>, commit: (start: S) => void) => {
+    let live = waxLive.current;
+    if (live && live.key !== key) { window.clearTimeout(live.timer); live.finish(); live = null; }
+    if (!live) { waxRecord(); waxLiveBase.current = new Map(); live = { key, start: start(), timer: 0, finish: () => {} }; }
+    const begun = live.start as S;
+    const v = new THREE.Vector3();
+    for (const [id, matrix] of moves(begun)) {
+      let base = waxLiveBase.current.get(id);
+      if (!base) {
+        const shape = shapesRef.current.find((candidate) => candidate.id === id);
+        if (!shape) continue;
+        base = Float32Array.from(worldTriangles(shape));
+        waxLiveBase.current.set(id, base);
+      }
+      const moved = new Float32Array(base.length);
+      for (let i = 0; i + 2 < base.length; i += 3) {
+        v.set(base[i], base[i + 1], base[i + 2]).applyMatrix4(matrix);
+        moved[i] = v.x; moved[i + 1] = v.y; moved[i + 2] = v.z;
+      }
+      window.layerlingSculptPreview?.(id, moved);
+    }
+    const current = live;
+    current.finish = () => {
+      for (const id of waxLiveBase.current.keys()) window.layerlingSculptPreview?.(id, null);
+      waxLiveBase.current = new Map();
+      if (waxLive.current === current) waxLive.current = null;
+      commit(begun);
+    };
+    window.clearTimeout(current.timer);
+    current.timer = window.setTimeout(() => current.finish(), 280);
+    waxLive.current = current;
+  };
+  /** Build 106: each unheld tooth's move for an adjustment of it (as moveWaxTeethDirect would make it). */
+  const waxAdjustMoves = (make: (tooth: { fdi: number; width: number; length: number }) => ToothAdjust | null) => {
+    const out = new Map<string, THREE.Matrix4>();
+    const arch = waxArch();
+    if (!arch) return out;
+    const current = waxupRef.current;
+    for (const shape of waxTeethOf(arch.shape.id)) {
+      const toWorld = shape.waxTooth ? localToWorld(shape) : null;
+      if (!shape.waxTooth || !toWorld || current.locks[shape.waxTooth.fdi]) continue;
+      const change = make(shape.waxTooth);
+      if (!change || isIdentityAdjust(change)) continue;
+      out.set(shape.id, adjustMatrix(moveFrame(shape.waxTooth.frame, toWorld), shape.waxTooth.width, shape.waxTooth.length, change));
+    }
+    return out;
+  };
+  /** Build 106: the arch line's moves for the teeth as they stand (as waxLineUp makes them). */
+  const waxArchMoves = (curve: number) => {
+    const arch = waxArch();
+    const current = waxupRef.current;
+    if (!arch) return new Map<string, THREE.Matrix4>();
+    const back = arch.sceneToInput.clone().invert();
+    const points: Record<number, [number, number, number]> = {};
+    for (const fdi of markTeethFor({ ...current, slot: arch.slot }).filter((n) => current.toothMarks[n])) points[fdi] = new THREE.Vector3(...current.toothMarks[fdi].incisal).applyMatrix4(back).toArray() as [number, number, number];
+    const teeth: ArchTooth[] = [];
+    const upSum = new THREE.Vector3(), outSum = new THREE.Vector3();
+    for (const shape of waxTeethOf(arch.shape.id)) {
+      const toWorld = shape.waxTooth ? localToWorld(shape) : null;
+      if (!shape.waxTooth || !toWorld || shape.waxTooth.fdi % 10 > 5) continue;
+      const f = moveFrame(shape.waxTooth.frame, toWorld);
+      upSum.add(new THREE.Vector3(...f.up)); outSum.add(new THREE.Vector3(...f.out));
+      teeth.push({ id: shape.id, fdi: shape.waxTooth.fdi, width: shape.waxTooth.width, origin: f.origin, mesial: f.mesial, out: f.out, up: f.up });
+    }
+    const line = teeth.length >= 2 ? fitArchLine(points, upSum.normalize().toArray() as [number, number, number], outSum.normalize().toArray() as [number, number, number]) : null;
+    if (!line) return new Map<string, THREE.Matrix4>();
+    const moves = layOnArchLine(teeth, line, { curve });
+    for (const shape of waxTeethOf(arch.shape.id)) if (shape.waxTooth && current.locks[shape.waxTooth.fdi]) moves.delete(shape.id);
+    return moves;
+  };
   const waxSetDirect = (make: (tooth: { fdi: number; width: number; length: number }) => ToothAdjust | null) => {
     const current = waxupRef.current;
     const arch = waxArch();
@@ -12790,6 +12934,7 @@ export function LayerlingEditor({
     confirmed: Object.keys(waxup.locks).map(Number),
     manual: waxup.manual,
     colourful: studioWax ? waxColourful : undefined,
+    marksChanged,
     // Build 103: the selected tooth's own change, for the exact values in the card.
     selectedAdjust: (() => {
       const shape = selectedIds.length === 1 ? shapes.find((candidate) => candidate.id === selectedIds[0]) : undefined;
@@ -18441,7 +18586,7 @@ export function LayerlingEditor({
   };
 
   return (
-    <div className={`layerling-editor ${historyViewState ? "history-view-active" : ""}${dentalWorkspace ? " studio-dental" : ""}${dentalWorkspace && dentalStudio ? " dental-docked" : ""}${studioShellOn ? " studio-shell-on" : ""}${STUDIO_SHELL && dentalWorkspace ? " studio-new-look" : ""}`}>
+    <div className={`layerling-editor ${historyViewState ? "history-view-active" : ""}${dentalWorkspace ? " studio-dental" : ""}${dentalWorkspace && dentalStudio ? " dental-docked" : ""}${studioShellOn ? " studio-shell-on" : ""}${STUDIO_SHELL && dentalWorkspace ? " studio-new-look" : ""}${studioShellOn && !dentalStudio?.waxStudio ? " studio-mb" : ""}`}>
       {dentalWorkspace && !studioShellOn ? (
         <DentalChrome
           caseName={projectName}
@@ -19559,6 +19704,7 @@ export function LayerlingEditor({
         const selectedFdi = waxupView.markPick?.fdi ?? placedHere.find((tooth) => tooth.id === waxupView.selected)?.fdi ?? null;
         return (
           <StudioShell
+            caseTitle={t(dentalStudio.waxStudio ? "studio.caseObjects" : "studio.objectViewer")}
             title={t(dentalStudio.waxStudio ? "waxStudio.title" : "dentalChrome.modelBuilder")}
             objects={objects}
             colour={studioWax ? { on: waxColourful, onChange: setWaxColourful } : null}
@@ -19579,10 +19725,10 @@ export function LayerlingEditor({
                 setWaxup((current) => { const teeth = markTeethFor(current); return { ...current, markTeeth: teeth.includes(fdi) ? teeth.filter((n) => n !== fdi) : [...teeth, fdi].sort((a, b) => archOrder(a) - archOrder(b)) }; });
               },
             } : null}
-            onView={(view) => showDentalView(studioWax ? waxSlot : dentalStudio.slots.upper ? "upper" : "lower", view)}
+            onView={(view) => showDentalView(studioWax ? waxSlot : dentalStudio.slots.upper ? "upper" : "lower", view, studioWax ? undefined : (["upper", "lower"] as const).map((slot) => dentalStudio.slots[slot]).filter((id): id is string => Boolean(id) && !studioHidden.includes(id!)))}
             contacts={studioWax
               ? (placedHere.length ? { on: waxup.contacts.on, onToggle: () => { const on = !waxupRef.current.contacts.on; if (on && biteMapRef.current?.on) toggleBiteMap(false); setWaxup((current) => ({ ...current, contacts: { ...current.contacts, on } })); } } : null)
-              : dentalStudio.slots.upper && dentalStudio.slots.lower ? { on: Boolean(biteMap?.on), busy: Boolean(biteMap?.busy), onToggle: () => toggleBiteMap(!biteMap?.on) } : null}
+              : dentalStudio.slots.upper && dentalStudio.slots.lower ? { on: Boolean(biteMap?.on), busy: Boolean(biteMap?.busy), onToggle: () => toggleBiteMap(!biteMap?.on), legend: false } : null}
             canUndo={studioWax ? Boolean(waxupView.canUndo) : !splitSession && !projectInteractionActive && historyViewIndex === null && (historyIndex > 0 || Boolean(edgeModifier))}
             canRedo={studioWax ? Boolean(waxupView.canRedo) : !splitSession && !projectInteractionActive && historyViewIndex === null && historyIndex < history.length - 1}
             onUndo={studioWax ? waxUndo : undo}
@@ -19713,23 +19859,28 @@ export function LayerlingEditor({
               onMarkTeethChoose: (fdi: number) => setWaxup((current) => { const teeth = markTeethFor(current); return { ...current, markTeeth: teeth.includes(fdi) ? teeth.filter((n) => n !== fdi) : [...teeth, fdi].sort((a, b) => archOrder(a) - archOrder(b)) }; }),
               // Build 106 (manual): the sliders change the placed teeth themselves, as they move - nothing waits for "Place them again".
               onLengthen: (lengthen) => {
-                waxRecord(true);
-                const current = waxupRef.current, delta = lengthen - current.lengthen;
-                if (current.manual && Math.abs(delta) > 1e-6) waxSetDirect((tooth) => ({ longer: Math.max(0.2, (tooth.length + delta) / Math.max(0.5, tooth.length)) }));
+                const current = waxupRef.current;
+                if (current.manual && current.placed.length) {
+                  const make = (start: number) => (tooth: { length: number }) => { const d = lengthen - start; return Math.abs(d) > 1e-6 ? { longer: Math.max(0.2, (tooth.length + d) / Math.max(0.5, tooth.length)) } : null; };
+                  waxLiveShow("lengthen", () => current.lengthen, (start) => waxAdjustMoves(make(start)), (start) => waxSetDirect(make(start)));
+                } else waxRecord(true);
                 setWaxup((now) => ({ ...now, lengthen }));
               },
               onCentralRatio: (centralRatio) => {
-                waxRecord(true);
-                const current = waxupRef.current, factor = centralRatio / Math.max(0.01, current.centralRatio);
-                if (current.manual && Math.abs(factor - 1) > 1e-6) waxSetDirect((tooth) => (tooth.fdi % 10 === 1 ? { wider: factor } : null));
+                const current = waxupRef.current;
+                if (current.manual && current.placed.length) {
+                  const make = (start: number) => (tooth: { fdi: number }) => (tooth.fdi % 10 === 1 && Math.abs(centralRatio / start - 1) > 1e-6 ? { wider: centralRatio / start } : null);
+                  waxLiveShow("ratio", () => current.centralRatio, (start) => waxAdjustMoves(make(start)), (start) => waxSetDirect(make(start)));
+                } else waxRecord(true);
                 setWaxup((now) => ({ ...now, centralRatio }));
               },
               onArcDepth: (arcDepth) => {
-                waxRecord(true);
                 const current = waxupRef.current;
-                const before = current.arcDepth ?? current.arcUsed ?? 1, after = arcDepth ?? current.arcUsed ?? 1, delta = after - before;
-                // The canine tips rise towards the gum (a tooth's up runs from its neck to its edge); the laterals half as far.
-                if (current.manual && Math.abs(delta) > 1e-6) waxSetDirect((tooth) => (tooth.fdi % 10 === 3 ? { up: -delta } : tooth.fdi % 10 === 2 ? { up: -delta / 2 } : null));
+                if (current.manual && current.placed.length) {
+                  // The canine tips rise towards the gum (a tooth's up runs from its neck to its edge); the laterals half as far.
+                  const make = (start: number) => (tooth: { fdi: number }) => { const d = (arcDepth ?? current.arcUsed ?? 1) - start; return Math.abs(d) < 1e-6 ? null : tooth.fdi % 10 === 3 ? { up: -d } : tooth.fdi % 10 === 2 ? { up: -d / 2 } : null; };
+                  waxLiveShow("arc", () => current.arcDepth ?? current.arcUsed ?? 1, (start) => waxAdjustMoves(make(start)), (start) => waxSetDirect(make(start)));
+                } else waxRecord(true);
                 setWaxup((now) => ({ ...now, arcDepth }));
               },
               onProportions: (proportions) => { waxRecord(); setWaxup((current) => ({ ...current, proportions })); },
@@ -19757,18 +19908,29 @@ export function LayerlingEditor({
               onConfirmTooth: (id: string, on: boolean) => confirmWaxTooth(id, on),
               onAdjust: (id: string, change: ToothAdjust) => adjustWaxToothBy(id, change),
               onEggshell: (wall: number) => { void makeEggshell(wall); },
+              onUpdateFromMarks: () => {
+                marksMoved.current = false;
+                setMarksChanged(false);
+                void placeWaxupRef.current({ record: true }).then(() => window.setTimeout(() => showToothMarks(waxupRef.current), 150));
+              },
+              onArchLine: (on: boolean) => {
+                waxRecord();
+                setWaxup((now) => ({ ...now, archLine: on }));
+                if (on) waxLineUp(waxupRef.current.archCurve);
+              },
+              onArchCurve: (curve: number) => {
+                setWaxup((now) => ({ ...now, archCurve: curve, archLine: true }));
+                waxLiveShow("arch", () => null, () => waxArchMoves(curve), () => waxLineUp(curve));
+              },
               onSetMove: (patch) => {
-                waxRecord(true);
                 // Build 103 (manual): the set's teeth moved where they are by the change (never placed again).
+                // Build 106: drawn live as the slider moves, made once it stops.
                 const current = waxupRef.current;
-                if (current.manual) {
-                  const before = current.setMove, after = { ...before, ...patch };
-                  const diff = { width: after.width - before.width, depth: after.depth - before.depth, midline: after.midline - before.midline, height: after.height - before.height };
-                  const arch = waxArch();
-                  const changes = new Map<string, ToothAdjust>();
-                  for (const shape of arch ? waxTeethOf(arch.shape.id) : []) if (shape.waxTooth && !current.locks[shape.waxTooth.fdi]) changes.set(shape.id, setMoveAdjust(diff, shape.waxTooth.fdi));
-                  moveWaxTeethDirect(changes);
-                }
+                if (current.manual && current.placed.length) {
+                  const after = { ...current.setMove, ...patch };
+                  const make = (before: typeof current.setMove) => (tooth: { fdi: number }) => setMoveAdjust({ width: after.width - before.width, depth: after.depth - before.depth, midline: after.midline - before.midline, height: after.height - before.height }, tooth.fdi);
+                  waxLiveShow(`set:${Object.keys(patch).join(",")}`, () => current.setMove, (before) => waxAdjustMoves(make(before)), (before) => waxSetDirect(make(before)));
+                } else waxRecord(true);
                 setWaxup((now) => ({ ...now, setMove: { ...now.setMove, ...patch } }));
               },
               onChain: (chain) => setWaxup((current) => ({ ...current, chain })),
@@ -19927,14 +20089,14 @@ export function LayerlingEditor({
         />
       ) : null}
       {/* Build 96: the bite contacts, one click away in Dental Studio (build 97: there only). */}
-      {!sculptTool && dentalStudio && dentalStudio.stage !== "making" && (biteMap?.on || biteCandidate) ? (
+      {!sculptTool && dentalStudio && dentalStudio.stage !== "making" && (biteMap?.on || biteCandidate) ? ((card: React.ReactNode) => (studioShellOn && studioCaseSlot ? (biteMap?.on ? createPortal(card, studioCaseSlot) : null) : card))(
         <BiteContactsCard biteMap={biteMap}
           inBite={dentalStudio.layout === "occlusion"}
           onToggle={toggleBiteMap}
           onContactOnly={(contactOnly) => setBiteMap((current) => current ? { ...current, contactOnly } : current)}
           onRange={(range) => setBiteMap((current) => current ? { ...current, range } : current)}
           onOpacity={(arch, value) => setBiteMap((current) => current ? { ...current, [arch === "upper" ? "upperOpacity" : "lowerOpacity"]: value } : current)}
-          onLook={lookAtBite} />
+          onLook={lookAtBite} />,
       ) : null}
       {/* Build 101: handles put away from the right-click menu stay away for the visit - say so, with the way back, so a selected part never looks stuck. */}
       {handlesHidden && !sculptTool && selectedIds.length > 0 ? (

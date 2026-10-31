@@ -799,3 +799,40 @@
 .studio-panel-head strong .studio-help-tip {
   left: -60px;
 }
+
+/* ---------------------------------------------------------------- Model Builder's case screen (build 106) */
+/* Looking at the case, not moving parts: no gimbal, box handles or size labels on a picked scan. */
+.studio-mb .gimbal-overlay,
+.studio-mb .transform-overlay,
+.studio-mb .move-dimension-overlay,
+.studio-mb .origin-dimension-overlay,
+.studio-mb .handles-hidden-chip {
+  display: none !important;
+}
+
+/* The bite map's card, in the case panel under the objects (the Contacts button turns it on). */
+.studio-case-extra:empty {
+  display: none;
+}
+
+.studio-case-extra {
+  margin: 4px 0 6px;
+  padding-top: 14px;
+  border-top: 1px solid #eef0f3;
+}
+
+.studio-shell-on .studio-case-extra .bite-contacts-card {
+  position: static !important;
+  inset: auto !important;
+  width: auto !important;
+  max-width: none !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  font-size: 12.5px;
+}
+
+.studio-shell-on .dental-studio-panel.studio-framed .dental-bite-map {
+  display: none !important;
+}

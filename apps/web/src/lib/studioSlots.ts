@@ -5,7 +5,7 @@
  */
 import { useSyncExternalStore } from "react";
 
-export type StudioSlotName = "steps" | "nav" | "hint" | "undo";
+export type StudioSlotName = "steps" | "nav" | "hint" | "undo" | "case";
 
 const slots: Partial<Record<StudioSlotName, HTMLElement | null>> = {};
 const listeners = new Set<() => void>();

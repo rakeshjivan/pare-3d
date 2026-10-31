@@ -89,6 +89,11 @@ export type WaxupView = {
   scanSeeThrough: boolean;
   /** Build 106: each wax tooth in its own colour (else all in WAX_BLUE). */
   colourful?: boolean;
+  /** Build 106: the teeth laid along the arch line, and its curve (1 = the patient's). */
+  archLine?: boolean;
+  archCurve?: number;
+  /** Build 106: marks moved since the teeth were last fitted to them. */
+  marksChanged?: boolean;
   /** Build 105: the wax teeth's contacts with the opposing arch and each other, as a colour map, and Adapt (exocad's static occlusion clearance). */
   contacts: { on: boolean; busy: boolean; occlusal: number; adapting: boolean; note: string | null; opposing: boolean };
   /** Build 101: the wax-up's own Undo and Redo. */
@@ -157,6 +162,11 @@ export type WaxupActions = {
   onStopMarks?: () => void;
   onAutoMarks?: () => void;
   onMarkTeethChoose?: (fdi: number) => void;
+  /** Build 106: the arch line - the teeth laid along it (on/off), and its curve (1 = the patient's). */
+  onArchLine?: (on: boolean) => void;
+  /** Build 106: the teeth fitted to the marks again, now (the marks stay in view). */
+  onUpdateFromMarks?: () => void;
+  onArchCurve?: (curve: number) => void;
   /** Build 106: the teeth to wax up, all at once (a quick pick). */
   onMarkTeethSet?: (teeth: number[]) => void;
   onScanSeeThrough?: (on: boolean) => void;
@@ -455,6 +465,13 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
       <div className="dental-substep">
         <p className="blend-hint">{t("waxup.marksHint")}</p>
         <WaxMarksPicture />
+        {view.placed.length && actions.onUpdateFromMarks && !marking ? (
+          <div className="dental-trim-buttons">
+            <button type="button" className={view.marksChanged ? "active" : "secondary"} disabled={working} onClick={actions.onUpdateFromMarks}>
+              {view.busy ? <LoaderCircle className="edge-modifier-spinner" size={15} /> : null} {t("waxup.updateFromMarks")}
+            </button>
+          </div>
+        ) : null}
         {marking ? <p className="blend-hint waxup-mark-now" role="status">{t("waxup.markPoint", { fdi: view.markPick!.fdi, point: t(`waxup.markPoint.${(["mesial", "distal", "cervical", "incisal"] as const)[view.markPick!.point]}`), n: view.markPick!.point + 1, left: 0 })}</p> : null}
         <div className="waxup-teeth waxup-found" role="group" aria-label={t("waxup.chooseTeeth")}>
           {allTeeth.map((fdi) => {
@@ -605,6 +622,17 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
         {view.placed.length && part === "place" ? <p className="blend-hint">{t("waxup.placedLive", { count: view.placed.length })}</p> : null}
         {view.placed.length && part === "place" ? (
           <>
+            {/* Build 106: the arch line - the teeth set along the curve through the incisal edges to the canine tips. */}
+            {view.manual && actions.onArchCurve ? (
+              <>
+                <h5 className="waxup-subhead">{t("waxup.archLine")}</h5>
+                <EdgeModifierSlider label={t("waxup.archCurve")} title={t("waxup.archCurveHint")} value={Math.round((view.archCurve ?? 1) * 100)} min={50} max={150} step={1} unit="%" workspace={workspace} disabled={working} onChange={(value) => actions.onArchCurve?.(Math.max(0.5, Math.min(1.5, Math.round(value) / 100)))} />
+                <div className="dental-trim-buttons">
+                  <button type="button" className={view.archLine ? "active" : "secondary"} disabled={working} onClick={() => actions.onArchLine?.(true)}>{t("waxup.archLineApply")}</button>
+                  {Math.abs((view.archCurve ?? 1) - 1) > 1e-6 ? <button type="button" className="secondary" disabled={working} onClick={() => actions.onArchCurve?.(1)}>{t("waxup.archCurveReset")}</button> : null}
+                </div>
+              </>
+            ) : null}
             {/* Build 103: Position - the whole library teeth, moved as a set, as a chain or one by one, then confirmed. */}
             <h5 className="waxup-subhead">{t("waxup.setMove")}</h5>
             {([["width", -4, 4], ["depth", -3, 3], ["midline", -3, 3], ["height", -2, 2]] as const).map(([key, min, max]) => (
