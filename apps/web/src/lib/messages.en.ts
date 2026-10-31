@@ -5438,6 +5438,8 @@ export const MESSAGES_EN = {
   "tips.sendToCad": "Send a model from Dental Studio to CAD Studio to add a label, a stand or anything else with the full CAD tools.",
   "tips.freeRotate": "In Dental Studio, right-click and choose Free rotate to turn the view right over the top, as Meshmixer does.",
   "dentalMenu.freeRotateOn": "Free rotate (Meshmixer)",
+  "dentalMenu.basicRenderOn": "Basic rendering (faster)",
+  "dentalMenu.basicRenderOff": "Full rendering",
   "dentalMenu.freeRotateOff": "Normal rotate",
   "tips.selectDelete": "On a studio's page, Select lets you tick several designs and delete them together.",
   "tips.readyParts": "Make's ready-made parts include a living hinge, a jar with a screw lid and an electronics enclosure.",

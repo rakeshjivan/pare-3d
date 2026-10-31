@@ -6254,18 +6254,7 @@ export function WorkplaneViewport({
     const state = threeRef.current;
     if (!state) return;
     state.freeRotate = freeRotate;
-    // Build 104: Dental Studio draws without the shadow pass (each scan would be drawn twice a frame).
-    const shadows = !freeRotate && effectiveViewSettings(workspaceRef.current).showShadows;
-    if (state.renderer.shadowMap.enabled !== shadows) {
-      state.renderer.shadowMap.enabled = shadows;
-      state.scene.traverse((object) => {
-        const material = (object as THREE.Mesh).material;
-        (Array.isArray(material) ? material : material ? [material] : []).forEach((entry) => { entry.needsUpdate = true; });
-      });
-      state.needsRender = true;
-    }
-    state.needsRender = true;
-    // Back to CAD Studio: the view stands up again (no roll left over from a free turn).
+    // Free rotate off again: the view stands up again (no roll left over from a free turn).
     if (!freeRotate && Math.abs(state.camera.up.y - 1) > 1e-6) {
       state.camera.up.set(0, 1, 0);
       state.camera.lookAt(state.controls.target);
@@ -6283,6 +6272,15 @@ export function WorkplaneViewport({
     state.dentalView = dentalView;
     state.workplaneLayer.visible = !workplaneLayerHiddenRef.current && !dentalView;
     if (dentalView) disposeChildren(state.helperLayer);
+    // Build 104: Dental Studio draws without the shadow pass (each scan would be drawn twice a frame).
+    const shadows = !dentalView && effectiveViewSettings(workspaceRef.current).showShadows;
+    if (state.renderer.shadowMap.enabled !== shadows) {
+      state.renderer.shadowMap.enabled = shadows;
+      state.scene.traverse((object) => {
+        const material = (object as THREE.Mesh).material;
+        (Array.isArray(material) ? material : material ? [material] : []).forEach((entry) => { entry.needsUpdate = true; });
+      });
+    }
     state.needsRender = true;
   }, [dentalView]);
   useEffect(() => {
@@ -12218,7 +12216,7 @@ function rebuildWorkplane(
   // Fast mode turns shadows, edge lines and camera inertia off together, and draws fewer pixels.
   const view = effectiveViewSettings(workspace);
   // Build 104: no shadow pass in Dental Studio - a full-arch scan is drawn once a frame instead of twice.
-  state.renderer.shadowMap.enabled = view.showShadows && !state.freeRotate;
+  state.renderer.shadowMap.enabled = view.showShadows && !state.dentalView;
   state.controls.enableDamping = view.cameraInertia;
   viewFastMode = Boolean(workspace.fastMode);
   const pixelRatio = viewPixelRatio(workspace, window.devicePixelRatio, state.renderer.domElement.clientWidth, state.renderer.domElement.clientHeight);

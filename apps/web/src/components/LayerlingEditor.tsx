@@ -17848,6 +17848,17 @@ export function LayerlingEditor({
       try { window.localStorage.setItem(FREE_ROTATE_KEY, next ? "on" : "off"); } catch { /* private window */ }
     },
   });
+  // Build 104: Basic rendering (Fast mode: fewer pixels, no edge lines or camera inertia) from Dental Studio's menu.
+  const basicRenderItem = (): ShapeContextMenuItem => ({
+    key: "basicRender",
+    label: t(workspaceSettings.fastMode ? "dentalMenu.basicRenderOff" : "dentalMenu.basicRenderOn"),
+    onSelect: () => {
+      const fastMode = !workspaceSettings.fastMode;
+      updateProjectWorkspaceSettings({ workspace: { ...workspaceSettingsRef.current, fastMode }, snap: snapGridRef.current });
+      const saved = readWorkspaceDefault();
+      saveWorkspaceDefault({ ...(saved?.workspace ?? workspaceSettingsRef.current), fastMode }, saved?.snap ?? snapGridRef.current);
+    },
+  });
   const dentalContextMenuItems = (selectOther: ShapeContextMenuItem[]): ShapeContextMenuItem[] => {
     const onPart = Boolean(shapeContextMenu?.onShape) && hasSelection;
     const parts = onPart ? selectedShapes : shapes.filter((shape) => !shape.hidden && !shape.hole);
@@ -17897,7 +17908,7 @@ export function LayerlingEditor({
       if (offersMeshSimplify(single)) items.push({ key: "reduce", label: t("dentalChrome.reduce"), onSelect: startSimplifyTool });
     }
     if (biteMap?.on || biteCandidate) items.push({ key: "bite", label: t(biteMap?.on ? "dentalMenu.biteOff" : "dentalChrome.biteContacts"), separated: true, onSelect: () => toggleBiteMap(!biteMap?.on) });
-    items.push({ ...handleStyleItem(), separated: true }, freeRotateItem());
+    items.push({ ...handleStyleItem(), separated: true }, freeRotateItem(), basicRenderItem());
     if (onPart) {
       items.push(
         { key: "hide", label: t("contextMenu.hide"), shortcut: "Ctrl+H", separated: true, onSelect: toggleHidden },
