@@ -905,6 +905,17 @@ async function deleteHiddenCopies(design: Pick<DashboardProject, "name" | "creat
   }
 }
 
+/** Build 104: deleteHiddenCopies for several designs, reading the stored designs only once. */
+async function deleteHiddenCopiesOfMany(designs: Array<Pick<DashboardProject, "name" | "createdAt">>, listedIds: string[]) {
+  const orphans = await orphanedProjectRecords(listedIds);
+  const doomed = new Set<string>();
+  for (const design of designs) for (const projectId of hiddenCopiesOf(design, orphans)) doomed.add(projectId);
+  for (const projectId of doomed) {
+    await deleteProjectShapes(projectId);
+    void deleteDesignThumbnail(projectId);
+  }
+}
+
 /** The stored designs no card points to, with name and creation time read from their package. */
 async function orphanedProjectRecords(listedIds: string[]) {
   const orphans = orphanedProjectIds(listedIds, await storedProjectShapeIds());
@@ -2680,10 +2691,15 @@ export default function Home() {
       }
       knownDesignThumbnails.delete(project.id);
       void deleteDesignThumbnail(project.id);
-      void deleteProjectShapes(project.id)
-        .then(() => deleteHiddenCopies(project, remainingIds))
-        .catch(() => setDashboardNotice(t("notice.projectShapesDeleteFailed")));
     }
+    // Build 104: one after the other, and the search for hidden copies once for them all. Each search
+    // opens every stored design no card points to - with several deleted at once each search opened all
+    // the others still being deleted (large scans among them), and the app hung.
+    void (async () => {
+      for (const project of deleted) await deleteProjectShapes(project.id);
+      if (deleted.length === 1) await deleteHiddenCopies(deleted[0], remainingIds);
+      else await deleteHiddenCopiesOfMany(deleted, remainingIds);
+    })().catch(() => setDashboardNotice(t("notice.projectShapesDeleteFailed")));
   };
 
   const emptyProjectPrompt = view === "dashboard" && emptyProjectPromptId ? projects.find((project) => project.id === emptyProjectPromptId) ?? null : null;
