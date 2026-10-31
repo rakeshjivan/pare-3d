@@ -1371,3 +1371,39 @@ html[data-theme="dark"] .pare-home .home-recent-thumb .project-preview {
   cursor: pointer;
 }
 .pare-home button.home-studio-stage:focus-visible { outline: 3px solid var(--h-cad); outline-offset: -3px; }
+
+/* Build 104: the tip of the day. */
+.pare-home .home-tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 10px 10px 10px 14px;
+  color: var(--h-muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+  background: var(--h-surface);
+  border: 1px solid var(--h-border);
+  border-radius: 10px;
+}
+.pare-home .home-tip > svg { flex: 0 0 auto; color: #c58a12; }
+.pare-home .home-tip strong { color: var(--h-text); font-weight: 600; margin-right: 2px; }
+.pare-home .home-tip .home-spacer { flex: 1; }
+.pare-home .home-tip button {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  color: var(--h-text);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--h-border);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.pare-home .home-tip .home-tip-hide { padding: 0; width: 28px; border-color: transparent; color: var(--h-muted); }
+.pare-home .home-tip button:hover { background: var(--h-hover); }
