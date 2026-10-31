@@ -3080,7 +3080,8 @@ function resizeShapeFromFrameHandle(
   // A cylinder is always circular - every horizontal handle (side or corner)
   // drives the one shared diameter instead of stretching width and depth
   // independently into an ellipse.
-  if ((shape.kind === "cylinder" || shape.kind === "star") && (signs.x || signs.z)) {
+  // A Hirth joint too: stretched, its teeth no longer interlock all round (#1016).
+  if ((shape.kind === "cylinder" || shape.kind === "star" || shape.kind === "hirth") && (signs.x || signs.z)) {
     const diameter = signs.x && signs.z ? (nextWidth + nextDepth) / 2 : signs.x ? nextWidth : nextDepth;
     nextWidth = diameter;
     nextDepth = diameter;
@@ -6653,7 +6654,7 @@ export function WorkplaneViewport({
       } else {
         // A cylinder is always circular - the diameter mark writes both
         // fields, the same as the inspector's diameter field does.
-        const patch: Partial<WorkplaneShape> = shape.kind === "cylinder" || shape.kind === "star"
+        const patch: Partial<WorkplaneShape> = shape.kind === "cylinder" || shape.kind === "star" || shape.kind === "hirth"
           ? { width: nextValue, depth: nextValue, size: nextValue }
           : { width: nextValue, size: resizedShapeSize(nextValue, shapeDepth(shape)) };
         if (shape.kind === "cone") {
@@ -6682,7 +6683,7 @@ export function WorkplaneViewport({
         // Defense in depth: the cylinder's dimension mark never offers this
         // axis (see makeFootprintDimensionMark above), but keep it circular
         // regardless of how the patch got here.
-        const patch: Partial<WorkplaneShape> = shape.kind === "cylinder" || shape.kind === "star"
+        const patch: Partial<WorkplaneShape> = shape.kind === "cylinder" || shape.kind === "star" || shape.kind === "hirth"
           ? { width: nextValue, depth: nextValue, size: nextValue }
           : { depth: nextValue, size: resizedShapeSize(shapeWidth(shape), nextValue) };
         return patchWithResizeAnchor(shape, patch, axis, anchor);
@@ -13568,7 +13569,7 @@ function syncTransformOverlay(
   // handle shows that single mark instead of a separate width and depth line
   // (which used to appear together at a corner handle, and independently
   // editable at all, letting the two drift apart).
-  const isCircularFootprint = frame.singleShape?.kind === "cylinder" || frame.singleShape?.kind === "star";
+  const isCircularFootprint = frame.singleShape?.kind === "cylinder" || frame.singleShape?.kind === "star" || frame.singleShape?.kind === "hirth";
   const footprintDimensionMarks = Object.fromEntries(
     footprintHandleKeys.map((handleKey) => {
       if (isCircularFootprint) {

@@ -498,9 +498,9 @@ export function canonicalizeShape(unrepaired: WorkplaneShape): WorkplaneShape {
   // authoritative, depth follows. This is the single enforcement point: every
   // creation, edit and project load runs through canonicalizeShape.
   // A gear set by module too, involute or round: its size is its module, the same both ways (#201) -
-  // except the rack, a bar whose depth is its own.
+  // except the rack, a bar whose depth is its own. A Hirth joint interlocks only when it is round (#1016).
   const involuteGear = shape.kind === "gear" && shape.gearType !== "rack" && (shape.gearProfile === "involute" || shape.gearProfile === "round");
-  if ((shape.kind === "cylinder" || shape.kind === "star" || shape.kind === "knurl" || involuteGear) && next.width !== next.depth) {
+  if ((shape.kind === "cylinder" || shape.kind === "star" || shape.kind === "knurl" || shape.kind === "hirth" || involuteGear) && next.width !== next.depth) {
     next.depth = next.width;
     next.size = next.width;
   }

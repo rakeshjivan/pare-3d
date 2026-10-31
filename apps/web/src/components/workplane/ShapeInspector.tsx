@@ -2184,8 +2184,18 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
         step: 0.1,
         onChange: (value) => onUpdate({ centerHoleSize: normalizeHirthBore(value, baseWidth, baseDepth) }),
       },
-      { id: "length", label: t("prop.length"), value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: (value) => keepAngle(depthPatch(value), teeth, { resizeAxis: "depth" }) },
-      { id: "width", label: t("prop.width"), value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: (value) => keepAngle(widthPatch(value), teeth, { resizeAxis: "width" }) },
+      // Round like a cylinder: stretched, the teeth would no longer interlock all round.
+      {
+        id: "diameter",
+        label: t("prop.diameter"),
+        value: width,
+        min: MIN_SHAPE_SIZE,
+        max: 160,
+        onChange: (value) => {
+          const patch = widthPatch(value);
+          keepAngle({ ...patch, depth: patch.width ?? value }, teeth, { resizeAxis: "width" });
+        },
+      },
       {
         id: "height",
         label: t("prop.height"),
