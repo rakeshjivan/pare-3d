@@ -41,6 +41,7 @@ export const COMMAND_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
   fillet: ["fillet", "round", "radius", "verrunden", "abrunden", "runden", "kante", "afronden", "rand"],
   simplify: ["simplify", "decimate", "reduce", "fewer triangles", "optimize", "vereinfachen", "reduzieren", "dezimieren", "weniger dreiecke", "netz", "mesh", "optimieren"],
   hollow: ["hollow", "shell", "aushoehlen", "aushöhlen", "wand", "wandstaerke", "wandstärke", "hohl"],
+  cutOut: ["cut out", "subtract", "subtract copy", "mating part", "fit", "clearance", "tolerance", "sleeve", "socket", "female", "male", "ausschneiden", "abziehen", "subtrahieren", "gegenstück", "gegenstueck", "passung", "spiel", "aussparung", "hülse", "huelse"],
   offset: ["offset", "grow", "expand", "shrink", "clearance", "tolerance", "gap", "press fit", "enlarge", "versatz", "versetzen", "vergroessern", "vergrößern", "verkleinern", "spiel", "toleranz", "passung", "aufdicken", "schrumpfen"],
   deleteFace: ["delete face", "remove face", "defeature", "remove fillet", "fill hole", "close hole", "flaeche loeschen", "fläche löschen", "flaeche entfernen", "fläche entfernen", "rundung entfernen", "loch schliessen", "loch schließen"],
   carry: ["carry", "cruise", "set down", "place on face", "snap faces", "snap to face", "pick up", "auf fläche setzen", "auf flaeche setzen", "aufheben", "absetzen", "fläche", "flaeche"],
@@ -107,8 +108,8 @@ export const SHAPE_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
   pyramid: ["pyramide", "triangle", "dreieck"],
   slot: ["slot", "capsule", "kapsel", "langloch", "oblong", "stadium", "adjustable"],
   "half-sphere": ["dome", "halbkugel", "kuppel"],
-  star: ["stern"],
   paraboloid: ["parabola", "parabel", "bullet", "kuppe"],
+  star: ["stern"],
   heart: ["herz"],
   ruler: ["lineal", "measure", "messen"],
 };

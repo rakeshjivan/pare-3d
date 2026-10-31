@@ -121,6 +121,7 @@ export type LayerlingMcpCommandName =
   | "delete_faces"
   | "hollow_object"
   | "offset_object"
+  | "cut_out"
   | "array_objects"
   | "inspect_errors"
   | "estimate_print"

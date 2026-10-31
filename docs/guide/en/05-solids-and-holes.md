@@ -79,6 +79,10 @@ Select the blend - the group, or the piece if it was kept separate - and click {
 
 A hull never has dents, so it does not follow an L shape round its inside corner: for that, build the parts as they are and group them.
 
+## Cutting one body out of another
+
+For parts that have to fit, a shaft in a collar, a bolt in a case, you make the one part and cut it out of the other. Select the two bodies and click {{ui:editor.tool.cutOut}} in the {{ui:editor.group.combine}} area, or right-click and choose it there. The panel names the part that stays and the body that gets the cavity; layerling takes the smaller one as the part, and a click on {{ui:cutOut.swap}} turns it around. The {{ui:cutOut.clearance}} makes the cavity that much larger than the part on every side: 0 fits exactly, 0.2 mm is a usual room for a printed fit. {{ui:cutOut.apply}} cuts a copy of the part out of the other body and leaves the part itself where it is. The result is a group: {{ui:editor.tool.ungroup}} takes the cut apart again. A clearance needs the part to be an exact body, like the {{ui:editor.tool.offset}} tool, which it uses.
+
 ## Editing a group
 
 If a bore turned out too small, you do not have to dissolve the group and rebuild. Select the group and click {{ui:group.edit}} in its settings, the folder icon in the object list, or press [[E]]. A double click on the group does the same, as in Tinkercad, on a bundle too; if you would rather not, switch off {{ui:workspace.doubleClickOpensGroup}} in the settings. A part only starts to move once the pointer has been dragged a few pixels, so a shaky click or double click does not nudge it. The parts now lie separately and you change them with every tool: make a hole larger, move a body, add a hole.

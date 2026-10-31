@@ -882,6 +882,20 @@ export const tools = [
     },
   },
   {
+    name: "layerling_cut_out",
+    description: "Cut one solid out of another so the two fit, like the editor's Cut out tool: a copy of the part is subtracted from the host and the part itself stays where it is. This replaces copying the part, making the copy a hole, aligning it and grouping. `clearance` (millimetres, 0 to 10, default 0) makes the cavity that much larger than the part on every side, the room for a printed fit (0.2 is usual); it needs the part to be an exact CAD body, like layerling_offset_object. The host is replaced by the result, a group that can be ungrouped again; the part is returned unchanged. Both must be unlocked solids, neither a hole nor a bundle.",
+    inputSchema: {
+      ...editorTargetSchema,
+      required: ["partId", "hostId"],
+      properties: {
+        ...editorTargetSchema.properties,
+        partId: { type: "string", description: "The part that stays, such as a shaft, a bolt or a sleeve." },
+        hostId: { type: "string", description: "The body that is cut, such as a collar or a case." },
+        clearance: { type: "number", description: "Extra room all round in millimetres, 0 to 10; 0 when omitted." },
+      },
+    },
+  },
+  {
     name: "layerling_array_objects",
     description: "Repeat objects n times in a row or around a circle - hole rows, hole grids, bolt circles, the teeth of a ring - like the editor's Pattern tool. `count` includes the originals. Coordinates are as in a slicer: X to the right, Y to the back, Z up. A row steps `spacing` millimetres along `direction` (negative runs the other way), or along several axes at once with `spacingX`, `spacingY` and `spacingZ` (a diagonal row, a staircase; give any of them and the others count as 0). A circle turns about the vertical axis through (`centerX`, `centerY`) over `angle` degrees: 360 (default) spreads the pieces evenly, a smaller angle puts the first and last piece on its ends; positive runs counter-clockwise seen from above. `rise` lifts every copy that many millimetres more than the one before (a screw, an ascending spiral) and `radiusChange` moves it that far further from the centre (negative: closer) for a flat or conical spiral. `rotateCopies` (default true) turns each copy with the circle. The copies are added as one undo step and returned with their ids; the originals stay where they are.",
     inputSchema: {

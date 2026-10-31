@@ -390,5 +390,15 @@
       "de": "Das neue Werkzeug „Versatz“ neben „Aushöhlen“ verschiebt jede Fläche eines Körpers um denselben Abstand, nach außen oder innen. So bekommst du das Spiel für Passungen und Schnappverbindungen: Mit dem Haken „Original behalten“ bleibt dein Teil, und die vergrößerte Kopie liegt schon als Loch daneben, bereit zum Gruppieren mit dem Gegenstück.",
       "en": "The new Offset tool next to Hollow moves every face of a body by the same distance, out or in. That gives you the clearance for press fits and snap joints: with \"Keep the original\" ticked your part stays and the grown copy is already a hole beside it, ready to group with the mating part."
     }
+  },
+  {
+    "title": {
+      "de": "Passend ausschneiden: einen Körper aus einem anderen",
+      "en": "Cut out: one body out of another"
+    },
+    "body": {
+      "de": "Bei Teilen, die zusammenpassen müssen, wählst du beide Körper und klickst im Bereich Kombinieren auf „Passend ausschneiden“. Das Teil bleibt, der andere Körper bekommt seine Form als Aussparung, auf Wunsch mit Spiel ringsum, etwa 0,2 mm für eine gedruckte Passung. Das Kopieren, Zum-Loch-Machen und Ausrichten entfällt.",
+      "en": "For parts that have to fit, select both bodies and click Cut out in the Combine area. The part stays and the other body gets its shape as a cavity, with a clearance all round if you want one, 0.2 mm for a printed fit, say. No more copying, making a hole and aligning it."
+    }
   }
 ]

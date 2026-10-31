@@ -98,6 +98,7 @@ import { applyAppTheme } from "@/lib/appTheme";
 import { DentalStudioPanel, dentalPreset, type DentalAreaTool, type DentalPreset, type DentalSlot, type DentalView } from "./workplane/DentalStudioPanel";
 import { ShellPanel } from "./workplane/ShellPanel";
 import { OffsetPanel } from "./workplane/OffsetPanel";
+import { CutOutPanel } from "./workplane/CutOutPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
 import { MateFacesPanel } from "./workplane/MateFacesPanel";
 import { concentricMotion, mateMotion, type FacePick, type MateMode } from "@/lib/mateFaces";
@@ -2390,6 +2391,8 @@ export function LayerlingEditor({
   const [edgeModifier, setEdgeModifier] = useState<EdgeModifierSession | null>(null);
   // `mode: "offset"` is the Offset tool (#919), which shares the hollow tool's state: `thickness` is then the distance.
   const [shellTool, setShellTool] = useState<{ mode?: "offset"; shrink?: boolean; keepCopy?: boolean; thickness: number; openings: ShellOpenings; edges: ShellEdges; busy: boolean; error: string | null; replaces?: string; picked?: boolean } | null>(null);
+  /** Cut out (#927): `partId` stays, a copy of it grown by `clearance` is cut out of `hostId`. */
+  const [cutOutTool, setCutOutTool] = useState<{ partId: string; hostId: string; clearance: number; busy: boolean; error: string | null } | null>(null);
   const [simplifyToolId, setSimplifyToolId] = useState<string | null>(null);
   /** The window for fonts of one's own (#customFonts), opened from a text's font select. */
   const [fontManagerOpen, setFontManagerOpen] = useState(false);
@@ -7295,6 +7298,81 @@ export function LayerlingEditor({
     closeSplit();
     setShellTool({ mode: "offset", shrink: false, keepCopy: false, thickness: 0.2, openings: "none", edges: "round", busy: false, error: null });
   }, [refuseLockedSelection, closeSplit, edgeModifier, invalidateCadModifierSession, selectedShape, selectedShapes.length, shellTool]);
+
+  /**
+   * Cut out (#927): a copy of `part`, grown by `clearance`, is kept as a hole and grouped with `host`, so `host`
+   * gets the part's shape as a cavity with that much room all round. The part itself stays where it is.
+   */
+  const cutOutShape = useCallback(async (part: WorkplaneShape, host: WorkplaneShape, clearance: number) => {
+    for (const shape of [part, host]) {
+      if (shape.locked) throw new Error("Unlock both objects before cutting one out of the other");
+      if (shape.hole || isNonSolidShape(shape)) throw new Error("Cutting out needs two solids");
+      if (shape.groupOperation === "bundle") throw new Error("A bundle is not one body; group it (layerling_group_objects) first");
+    }
+    if (part.id === host.id) throw new Error("The part and the body to cut must be two different objects");
+    const hole = clearance > 0.0001
+      ? await offsetShape(part, clearance, false, "round", true)
+      : withHoleMode(cloneWorkplaneShapeTreeWithFreshIds(part, "cutout"), true);
+    const sourceFingerprint = projectShapesFingerprint(shapesRef.current);
+    const sourceProjectId = projectInfoRef.current.projectId;
+    const result = await buildGroupedShapeOffThread([host, hole], workspaceSettingsRef.current.booleanTriangleLimit, geometryAbortRef.current?.signal);
+    if (projectInfoRef.current.projectId !== sourceProjectId || projectShapesFingerprint(shapesRef.current) !== sourceFingerprint) {
+      throw new Error(t("status.cutOutChanged"));
+    }
+    if (!result.group && !result.consumed) throw new Error(result.failureNotice);
+    return {
+      group: result.group ? canonicalizeShape({ ...result.group, groupOperation: "group" }) : null,
+      closedHoles: result.closedHoles,
+    };
+  }, [offsetShape]);
+
+  const startCutOutTool = useCallback(() => {
+    if (cutOutTool) {
+      setCutOutTool(null);
+      return;
+    }
+    if (refuseLockedSelection()) return;
+    const [first, second] = selectedShapes;
+    if (selectedShapes.length !== 2 || [first, second].some((shape) => shape.hole || isNonSolidShape(shape) || shape.groupOperation === "bundle")) {
+      setNotice(t("status.cutOutSelectTwo"));
+      return;
+    }
+    // The smaller body is most likely the part that fits into the other.
+    const volume = (shape: WorkplaneShape) => shapeWidth(shape) * shapeDepth(shape) * shape.height;
+    const [part, host] = volume(first) <= volume(second) ? [first, second] : [second, first];
+    if (edgeModifier) invalidateCadModifierSession();
+    closeSplit();
+    setCutOutTool({ partId: part.id, hostId: host.id, clearance: 0, busy: false, error: null });
+  }, [closeSplit, cutOutTool, edgeModifier, invalidateCadModifierSession, refuseLockedSelection, selectedShapes]);
+
+  const applyCutOutTool = useCallback(() => {
+    if (!cutOutTool || cutOutTool.busy) return;
+    const part = shapesRef.current.find((shape) => shape.id === cutOutTool.partId);
+    const host = shapesRef.current.find((shape) => shape.id === cutOutTool.hostId);
+    if (!part || !host) {
+      setCutOutTool(null);
+      return;
+    }
+    const { clearance } = cutOutTool;
+    setCutOutTool((current) => current ? { ...current, busy: true, error: null } : current);
+    void cutOutShape(part, host, clearance)
+      .then(({ group, closedHoles }) => {
+        const remaining = shapesRef.current.filter((shape) => shape.id !== host.id);
+        const size = Number(clearance.toFixed(2));
+        const message = clearance > 0.0001 ? t("status.cutOutDoneClearance", { part: part.name, host: host.name, size }) : t("status.cutOutDone", { part: part.name, host: host.name });
+        commitShapes(group ? [...remaining, group] : remaining, group ? group.id : part.id, withClosedHolesNote(message, closedHoles));
+        setCutOutTool(null);
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? localizedError(error.message) : String(error);
+        setCutOutTool((current) => current ? { ...current, busy: false, error: message } : current);
+      });
+  }, [commitShapes, cutOutShape, cutOutTool]);
+
+  // The panel belongs to the two selected bodies; another selection closes it.
+  useEffect(() => {
+    setCutOutTool((current) => current && !current.busy && !(selectedIds.length === 2 && selectedIds.includes(current.partId) && selectedIds.includes(current.hostId)) ? null : current);
+  }, [selectedIds]);
 
   const applyShellTool = useCallback(() => {
     if (!shellTool || shellTool.busy) return;
@@ -14522,6 +14600,17 @@ export function LayerlingEditor({
         return { object: mcpShapeSummary(offset), distance, shrink, edges, asHole };
       }
 
+      if (command.action === "cut_out") {
+        const part = findShape(params.partId);
+        const host = findShape(params.hostId);
+        if (!part || !host) throw new Error("Object not found: pass partId and hostId of two solids");
+        const clearance = Math.min(10, Math.max(0, mcpNumber(params.clearance, 0)));
+        const { group, closedHoles } = await cutOutShape(part, host, clearance);
+        const remaining = shapesRef.current.filter((shape) => shape.id !== host.id);
+        commitShapes(group ? [...remaining, group] : remaining, group ? group.id : part.id, withClosedHolesNote(t("status.cutOutMcp", { part: part.name, host: host.name }), closedHoles));
+        return group ? { object: mcpShapeSummary(group), part: mcpShapeSummary(part), clearance, ...(closedHoles ? { closedHoles } : {}) } : { consumed: true, part: mcpShapeSummary(part), clearance };
+      }
+
       if (command.action === "array_objects") {
         const requestedIds = mcpStringArray(params.ids);
         const ids = requestedIds.length > 0 ? requestedIds : selectedIdsRef.current;
@@ -17320,6 +17409,7 @@ export function LayerlingEditor({
         : { key: "hole", label: t("contextMenu.toHole"), shortcut: "H", separated: true, onSelect: () => setSelectionHoleMode(true) });
     }
     if (selectedShapes.length >= 2 && !selectionLocked) items.push({ key: "group", label: t("contextMenu.group"), shortcut: "Ctrl+G", onSelect: () => void groupSelected() });
+    if (selectedShapes.length === 2 && !selectionLocked && selectedShapes.every((shape) => !shape.hole && !isNonSolidShape(shape) && shape.groupOperation !== "bundle")) items.push({ key: "cutOut", label: t("editor.tool.cutOut"), onSelect: startCutOutTool });
     if (single && (single.groupedShapes?.length || wasGroupBeforeEdgeTreatments(single)) && !selectionLocked) items.push({ key: "ungroup", label: t("contextMenu.ungroup"), shortcut: "Ctrl+Shift+G", onSelect: ungroupSelected });
     if (canSeparateSelectedParts && !selectionLocked) items.push({ key: "separateParts", label: t("inspector.separateParts"), onSelect: separateSelectedParts });
     // Build 90: Sculpt straight from the menu for a scan or other mesh (it is under Surface › too).
@@ -17577,6 +17667,9 @@ export function LayerlingEditor({
         hollowActive={Boolean(shellTool && shellTool.mode !== "offset")}
         onOffset={startOffsetTool}
         offsetActive={shellTool?.mode === "offset"}
+        onCutOut={startCutOutTool}
+        canCutOut={!selectionLocked && selectedShapes.length === 2 && selectedShapes.every((shape) => !shape.hole && !isNonSolidShape(shape) && shape.groupOperation !== "bundle")}
+        cutOutActive={Boolean(cutOutTool)}
         onDeleteFace={() => startDeleteFaceTool("delete")}
         deleteFaceActive={Boolean(deleteFaceTool)}
         canSimplify={selectedShapes.length === 1 && offersMeshSimplify(selectedShape) && !selectedShape?.locked}
@@ -18261,6 +18354,20 @@ export function LayerlingEditor({
             setMateTool(null);
             setNotice(t("status.mateCancelled"));
           }}
+        />
+      ) : null}
+      {cutOutTool ? (
+        <CutOutPanel
+          partName={shapesRef.current.find((shape) => shape.id === cutOutTool.partId)?.name ?? ""}
+          hostName={shapesRef.current.find((shape) => shape.id === cutOutTool.hostId)?.name ?? ""}
+          clearance={cutOutTool.clearance}
+          workspace={workspaceSettings}
+          busy={cutOutTool.busy}
+          error={cutOutTool.error}
+          onClearanceChange={(value) => setCutOutTool((current) => current ? { ...current, clearance: value, error: null } : current)}
+          onSwap={() => setCutOutTool((current) => current ? { ...current, partId: current.hostId, hostId: current.partId, error: null } : current)}
+          onApply={applyCutOutTool}
+          onCancel={() => setCutOutTool(null)}
         />
       ) : null}
       {shellTool?.mode === "offset" && selectedShape ? (

@@ -158,6 +158,8 @@ async function callTool(name, args) {
       return bridgeCommand("hollow_object", args, 90000);
     case "layerling_offset_object":
       return bridgeCommand("offset_object", args, 90000);
+    case "layerling_cut_out":
+      return bridgeCommand("cut_out", args, 90000);
     case "layerling_array_objects":
       return bridgeCommand("array_objects", args, 30000);
     case "layerling_apply_edge_treatment":

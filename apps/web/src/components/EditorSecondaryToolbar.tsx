@@ -57,7 +57,8 @@ import {
   ToolbarTrashIcon,
   ToolbarUngroupIcon,
   ToolbarUndoIcon,
-  ToolbarVectorExportIcon
+  ToolbarVectorExportIcon,
+  ToolbarCutOutIcon
 } from "./icons";
 import { type SketchPrimitive, type SketchTool } from "./SketchWorkspace";
 import { MORE_SHAPE_IDS, moreShapeIcon, type MoreShapeId } from "@/lib/moreShapes";
@@ -327,6 +328,9 @@ export function SecondaryToolbar({
   hollowActive,
   onOffset,
   offsetActive,
+  onCutOut,
+  canCutOut,
+  cutOutActive,
   onDeleteFace,
   deleteFaceActive,
   canSimplify,
@@ -475,6 +479,9 @@ export function SecondaryToolbar({
   hollowActive: boolean;
   onOffset: () => void;
   offsetActive: boolean;
+  onCutOut: () => void;
+  canCutOut: boolean;
+  cutOutActive: boolean;
   onDeleteFace: () => void;
   deleteFaceActive: boolean;
   canSimplify: boolean;
@@ -862,6 +869,7 @@ export function SecondaryToolbar({
     { id: "bundle", label: t("editor.tool.bundle"), icon: ToolbarBundleIcon, action: onBundle, enabled: canGroup },
     { id: "ungroup", label: t("editor.tool.ungroup"), icon: ToolbarUngroupIcon, action: onUngroup, enabled: canUngroup },
     { id: "intersect", label: t("editor.tool.intersect"), icon: ToolbarIntersectionIcon, action: onIntersect, enabled: canIntersect || intersectPreviewActive },
+    { id: "cutOut", label: t("editor.tool.cutOut"), icon: ToolbarCutOutIcon, action: onCutOut, enabled: canCutOut || cutOutActive, active: cutOutActive },
     { id: "intersect-preview", label: t("editor.tool.intersectPreview"), icon: Blend, action: onIntersectPreview, enabled: canIntersect || intersectPreviewActive, active: intersectPreviewActive },
     // Fork (build 25): a smooth piece joining two bodies.
     { id: "blendBodies", label: t("blend.title"), icon: ForkBlendIcon, action: onBlendBodies, enabled: canBlendBodies || blendBodiesActive, active: blendBodiesActive },
