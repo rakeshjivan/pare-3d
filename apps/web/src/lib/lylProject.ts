@@ -863,6 +863,8 @@ async function serializeState(
 function nodeGroupOperation(node: LylShapeNodeV1, nodeById: Map<string, LylShapeNodeV1>) {
   if (node.definition.groupOperation === "intersection") return "boolean-intersection";
   if (node.definition.groupOperation === "bundle") return "group";
+  // A loft between two sketches keeps its two outlines as a group does; the operation itself travels in the definition.
+  if (node.definition.groupOperation === "loft") return "group";
   const children = (node.groupedShapeNodeIds ?? []).map((id) => nodeById.get(id)).filter(Boolean) as LylShapeNodeV1[];
   const hasHole = children.some((child) => child.definition.hole === true);
   const hasSolid = children.some((child) => child.definition.hole !== true);

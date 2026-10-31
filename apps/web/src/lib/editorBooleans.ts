@@ -2387,6 +2387,8 @@ export function restoreGroupedChildren(group: WorkplaneShape): WorkplaneShape[] 
  * hole is the exact shape it was. A group that mixes solids and holes cuts only its own solids, so it stays closed (#394).
  */
 export function restoreGroupedChildrenForEdges(group: WorkplaneShape): WorkplaneShape[] {
+  // A loft between two sketches is its own body, not the sum of its parts: its parts are only its two outlines.
+  if (group.groupOperation === "loft") return [group];
   return restoreGroupedChildren(group).flatMap((child) => {
     const grandChildren = child.groupedShapes ?? [];
     const opensCleanly = grandChildren.length > 0
@@ -2409,7 +2411,8 @@ function expandGroupsForBoolean(selection: WorkplaneShape[]): WorkplaneShape[] {
 }
 
 function expandGroupsForBoxBoolean(selection: WorkplaneShape[]): WorkplaneShape[] {
-  return selection.flatMap((shape) => (shape.groupedShapes?.length ? restoreGroupedChildren(shape) : [shape]));
+  // A loft between two sketches is not the sum of its parts: opened, it would be cut as its two outlines.
+  return selection.flatMap((shape) => (shape.groupedShapes?.length && shape.groupOperation !== "loft" ? restoreGroupedChildren(shape) : [shape]));
 }
 
 function canUseBoxBoolean(selection: WorkplaneShape[]) {

@@ -79,6 +79,12 @@ Select the blend - the group, or the piece if it was kept separate - and click {
 
 A hull never has dents, so it does not follow an L shape round its inside corner: for that, build the parts as they are and group them.
 
+{{ui:editor.tool.loftSketches}} joins two sketch bodies or imported SVGs into one body: the outline of the lower one at the bottom, the outline of the upper one at the top, with straight walls between them. That makes a funnel, a transition piece from square to round, or a frame that narrows towards the top. Put the two bodies one above the other where they belong, shifted and turned if you like, select both and click the tool. The loft reaches from the bottom of the lower body to the top of the upper one.
+
+Each of the two needs exactly one outline. If it has a hole, a ring say, the other needs as many, and the holes are lofted too: two rings give a hollow wall. A sketch built as a line (a line outside, inside or centred under Properties) counts as such a ring. An imported SVG comes in filled; to make it a ring, give it a line under Properties. Both bodies must lie flat; the tool refuses tipped ones.
+
+The loft is an exact CAD body; the edge tools and the STEP export take it as one. The two sketches stay inside it: {{ui:group.edit}} opens them like a group, and moving or changing one there, or editing its sketch, and closing it builds the loft anew. {{ui:editor.tool.ungroup}} sets the two sketches free again. For two rectangles, circles or polygons there is also the Loft shape among the shapes, whose ends you set as numbers.
+
 ## Cutting one body out of another
 
 For parts that have to fit, a shaft in a collar, a bolt in a case, you make the one part and cut it out of the other. Select the two bodies and click {{ui:editor.tool.cutOut}} in the {{ui:editor.group.combine}} area, or right-click and choose it there. The panel names the part that stays and the body that gets the cavity; layerling takes the smaller one as the part, and a click on {{ui:cutOut.swap}} turns it around. The {{ui:cutOut.clearance}} makes the cavity that much larger than the part on every side: 0 fits exactly, 0.2 mm is a usual room for a printed fit. {{ui:cutOut.apply}} cuts a copy of the part out of the other body and leaves the part itself where it is. The result is a group: {{ui:editor.tool.ungroup}} takes the cut apart again. A clearance needs the part to be an exact body, like the {{ui:editor.tool.offset}} tool, which it uses.

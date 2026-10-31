@@ -7,6 +7,7 @@ import { cadSketchRegions } from "@/lib/sketchCadProfile";
 import { buildRevolvedSketchSolid } from "@/lib/cadSketchRevolve";
 import { buildStrokedSketchSolid, chamferTopEdges } from "@/lib/cadSketchStroke";
 import { buildSweptSketchSolid } from "@/lib/cadSketchSweep";
+import { buildSketchLoftSolid } from "@/lib/cadSketchLoft";
 import { buildInsetSketchSolid } from "@/lib/cadSketchInset";
 import { pathWire } from "@/lib/sketchCadWire";
 import { buildMessage } from "@/lib/buildStamp";
@@ -52,7 +53,9 @@ self.onmessage = async (event: MessageEvent<SketchCadBuildRequest>) => {
     cad = await kernel();
     cad.releaseAll();
     let result: ShapeHandle;
-    if (request.revolve) {
+    if (request.loft) {
+      result = buildSketchLoftSolid(cad, request.loft.bottom, request.loft.top);
+    } else if (request.revolve) {
       result = buildRevolvedSketchSolid(cad, request.profile, request.revolve.startAngle, request.revolve.sweepAngle);
     } else if (request.sweep) {
       result = buildSweptSketchSolid(cad, request.profile);
@@ -79,7 +82,7 @@ self.onmessage = async (event: MessageEvent<SketchCadBuildRequest>) => {
       const sound = edgeCount > LARGE_SKETCH_EDGES ? cad.getVolume(result) > 1e-9 : cad.isValid(result);
       if (!sound) throw new Error("OpenCascade produced invalid sketch topology");
     }
-    if (request.topChamfer && !request.revolve && !request.sweep) {
+    if (request.topChamfer && !request.revolve && !request.sweep && !request.loft) {
       const chamfered = chamferTopEdges(cad, result, request.height, request.topChamfer);
       if (!chamfered) throw new Error(SKETCH_EDGE_FAILED);
       result = chamfered;

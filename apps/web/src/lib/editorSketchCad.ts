@@ -11,6 +11,7 @@ import { placementWorkplaneCoordinates, type PlacementWorkplane } from "@/lib/pl
 import { silhouetteSketchProfile } from "@/lib/sketchCadProfile";
 import { sweepPlan } from "@/lib/cadSketchSweep";
 import { filledGrowPockets, steppedEdgeWall, strokeEdgeChamfer, strokedSketchProfile } from "@/lib/sketchStroke";
+import { SKETCH_LOFT_FAILED, SKETCH_LOFT_HOLES, SKETCH_LOFT_OUTLINES, SKETCH_LOFT_STROKE_UNSUPPORTED, type SketchLoftSection } from "@/lib/cadSketchLoft";
 import { keyringSketchProfile } from "@/lib/sketchKeyring";
 import type { ManifoldToplevel } from "manifold-3d";
 import type { CadModifierDeflection } from "@/lib/cadModifierTypes";
@@ -205,6 +206,59 @@ export async function cadShapeFromSketchSweep(profile: SketchProfile, existing?:
   const shape = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.deflection ?? SKETCH_CAD_DEFLECTION);
   if (!shape) throw new Error(t("sketch.sweepFailed"));
   return { ...shape, sketchProfile: cloneSketchProfile(profile), sketchOperation: "sweep" as const };
+}
+
+// Ported with the loft between two sketches: one build request to the sketch kernel worker, with the usual time-out.
+function requestSketchCad(message: Record<string, unknown>, timeoutMs = 30_000) {
+  const worker = ensureSketchCadWorker();
+  const requestId = ++sketchCadRequestId;
+  return new Promise<SketchCadBuildResponse>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      sketchCadPending.delete(requestId);
+      reject(new Error("OpenCascade timed out while building the sketch"));
+    }, timeoutMs);
+    sketchCadPending.set(requestId, { resolve, reject, timer });
+    worker.postMessage({ ...message, requestId });
+  });
+}
+
+/**
+ * A loft from the outline of one sketch to the outline of another, each placed where its body stands: an exact CAD body
+ * standing in the world, so its middle and bottom are where the loft is. A sketch built as a line goes as that line,
+ * which the kernel widens itself so its corners stay arcs; where it cannot, `filled` gives the line's area as straight
+ * pieces instead. Throws with a sentence for what does not fit.
+ */
+export async function cadShapeFromSketchLoft(bottom: SketchLoftSection & { filled: SketchProfile }, top: SketchLoftSection & { filled: SketchProfile }) {
+  const section = ({ profile, stroke, place }: SketchLoftSection): SketchLoftSection => ({ profile: cloneSketchProfile(profile), ...(stroke ? { stroke } : {}), place });
+  const build = (lower: SketchLoftSection, upper: SketchLoftSection) =>
+    requestSketchCad({ type: "build", profile: cloneSketchProfile(lower.profile), height: MIN_SHAPE_DIMENSION, loft: { bottom: section(lower), top: section(upper) } });
+  let response = await build(bottom, top);
+  if (response.type === "error" && response.message === SKETCH_LOFT_STROKE_UNSUPPORTED) {
+    response = await build({ profile: bottom.filled, place: bottom.place }, { profile: top.filled, place: top.place });
+  }
+  if (response.type === "error") {
+    throw new Error(response.message === SKETCH_LOFT_OUTLINES
+      ? t("status.loftOneOutline")
+      : response.message === SKETCH_LOFT_HOLES
+        ? t("status.loftHoles")
+        : response.message === SKETCH_LOFT_FAILED ? t("status.loftFailed") : response.message);
+  }
+  const source = canonicalizeShape({
+    id: createLocalId("sketch-loft"),
+    name: "Loft",
+    kind: "mesh",
+    color: "#d41721",
+    x: 0,
+    z: 0,
+    size: 1,
+    width: 1,
+    depth: 1,
+    height: 1,
+    rotation: 0,
+  });
+  const shape = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.deflection ?? SKETCH_CAD_DEFLECTION);
+  if (!shape) throw new Error(t("status.loftFailed"));
+  return shape;
 }
 
 /**

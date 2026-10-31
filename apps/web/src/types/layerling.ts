@@ -1184,7 +1184,7 @@ export type WorkplaneShape = {
    * them together: no cutting, every part keeps its colour and goes out as
    * its own body.
    */
-  groupOperation?: "group" | "intersection" | "bundle";
+  groupOperation?: "group" | "intersection" | "bundle" | "loft";
   /**
    * The point this body turns about, kept with the body: a fraction of its
    * width, height and depth from its centre, in its own frame, so it moves,

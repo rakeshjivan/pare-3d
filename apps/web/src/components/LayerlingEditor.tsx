@@ -288,6 +288,7 @@ import { type Vec3, type MeshData, type ShapeUpdatePatch, MIN_SHAPE_DIMENSION, r
 import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, withClosedHolesNote, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { meshPartCount } from "@/lib/meshPartCount";
 import { buildGroupedShapeOffThread, exportMeshesTo3mfOffThread, exportSolidVolumeOffThread, simplifyTrianglePositionsOffThread, splitShapesByPlaneOffThread, subscribeGeometryBusy, warmGeometryWorker } from "@/lib/geometryWorker";
+import { buildSketchLoftFromSelection, canSketchLoft } from "@/lib/sketchLoft";
 import { handleViewArrowKey } from "@/lib/viewArrowKeys";
 import { escapeWasHandled } from "@/lib/escapeHandled";
 import { sketchEscapeAction } from "@/lib/sketchEscape";
@@ -12800,6 +12801,28 @@ export function LayerlingEditor({
   const intersectSelectedRef = useRef(intersectSelected);
   intersectSelectedRef.current = intersectSelected;
 
+  /** Loft between two sketches: two sketch or SVG bodies become one body from the outline of one to the other, kept as a group. */
+  const loftSketches = useCallback(async (only?: readonly WorkplaneShape[]) => {
+    const fail = (message: string) => {
+      setNotice(message, true);
+      return { ok: false as const, message };
+    };
+    const targets = (only ?? selectedShapes).filter((shape) => !isNonSolidShape(shape));
+    if (targets.some((shape) => shape.locked)) return fail(t("status.objectLocked"));
+    const sourceFingerprint = projectShapesFingerprint(shapesRef.current);
+    const sourceProjectId = projectInfoRef.current.projectId;
+    setNotice(t("status.lofting"), true);
+    const result = await buildSketchLoftFromSelection(targets);
+    if (projectInfoRef.current.projectId !== sourceProjectId || projectShapesFingerprint(shapesRef.current) !== sourceFingerprint) {
+      return fail(t("status.loftChanged"));
+    }
+    if (!result.group) return fail(localizedError(result.failureNotice));
+    const consumed = new Set(targets.map((shape) => shape.id));
+    const loft = withSelectionPivot(result.group, activeRotationPivot);
+    commitShapes([...shapesRef.current.filter((shape) => !consumed.has(shape.id)), loft], loft.id, t("status.lofted"));
+    return { ok: true as const, id: loft.id };
+  }, [commitShapes, selectedShapes, activeRotationPivot]);
+
   /**
    * A cookie cutter from the selection (#982): the wall and the rim as two sketch bodies in a bundle, in place of what it is made
    * from. One extruded sketch body gives its own outline; anything else - bodies built here, an imported mesh, several parts -
@@ -12972,10 +12995,12 @@ export function LayerlingEditor({
     openGroupBusyRef.current = true;
     setOpenGroupBusy(true);
     try {
-      const operation = original.groupOperation === "intersection" ? "intersection" : original.groupOperation === "bundle" ? "bundle" : "group";
+      const operation = original.groupOperation === "intersection" ? "intersection" : original.groupOperation === "bundle" ? "bundle" : original.groupOperation === "loft" ? "loft" : "group";
       const result = operation === "intersection"
         ? await buildIntersectionShapeFromSelection(parts, workspaceSettingsRef.current.booleanTriangleLimit)
-        : operation === "bundle"
+        : operation === "loft"
+          ? await buildSketchLoftFromSelection(parts)
+          : operation === "bundle"
           ? { group: groupedShape(parts) }
           : await buildGroupedShapeOffThread(parts, workspaceSettingsRef.current.booleanTriangleLimit, geometryAbortRef.current?.signal);
       if (
@@ -14486,6 +14511,16 @@ export function LayerlingEditor({
         if (!result.ok) throw new Error(result.message);
         const cutter = currentShapes().find((shape) => shape.id === result.id);
         return { object: cutter ? mcpShapeSummary(cutter) : { id: result.id }, ...(result.edgeLeftOut ? { note: "The outline could not take the cutting edge; the wall has a flat top." } : {}) };
+      }
+
+      if (command.action === "loft_sketches") {
+        const ids = new Set(mcpStringArray(params.ids));
+        const targets = currentShapes().filter((shape) => ids.has(shape.id));
+        if (targets.length !== 2) throw new Error("Pass the ids of the two sketch bodies to loft between");
+        const result = await loftSketches(targets);
+        if (!result.ok) throw new Error(result.message);
+        const loft = currentShapes().find((shape) => shape.id === result.id);
+        return { object: loft ? mcpShapeSummary(loft) : { id: result.id } };
       }
 
       if (command.action === "ungroup_objects") {
@@ -17707,6 +17742,7 @@ export function LayerlingEditor({
         canGroup={!selectionLocked && selectedShapes.length > 1 && selectedShapes.every((shape) => !isNonSolidShapeKind(shape.kind))}
         canIntersect={!selectionLocked && canIntersectShapes(selectedShapes.filter((shape) => !isNonSolidShapeKind(shape.kind)))}
         canCookieCutter={!selectionLocked && selectedShapes.some((shape) => !isNonSolidShape(shape))}
+        canLoftSketches={!selectionLocked && canSketchLoft(selectedShapes)}
         canUngroup={!selectionLocked && selectedShapes.some((shape) => Boolean(shape.groupedShapes?.length) || wasGroupBeforeEdgeTreatments(shape))}
         canModifySelection={hasSelection && !selectionLocked}
         hasClipboard={clipboard.length > 0 || systemClipboardSupported}
@@ -17806,6 +17842,7 @@ export function LayerlingEditor({
         onBundle={bundleSelected}
         onIntersect={intersectSelected}
         onCookieCutter={() => void makeCookieCutter()}
+        onLoftSketches={() => void loftSketches()}
         onIntersectPreview={toggleIntersectPreview}
         intersectPreviewActive={Boolean(intersectPreviewIds)}
         onFillet={() => edgeModifier?.kind === "fillet" ? cancelEdgeModifier() : startEdgeModifier("fillet")}

@@ -58,7 +58,8 @@ import {
   ToolbarUngroupIcon,
   ToolbarUndoIcon,
   ToolbarVectorExportIcon,
-  ToolbarCutOutIcon
+  ToolbarCutOutIcon,
+  ToolbarLoftSketchesIcon
 } from "./icons";
 import { type SketchPrimitive, type SketchTool } from "./SketchWorkspace";
 import { MORE_SHAPE_IDS, moreShapeIcon, type MoreShapeId } from "@/lib/moreShapes";
@@ -250,6 +251,7 @@ export function SecondaryToolbar({
   canGroup,
   canIntersect,
   canCookieCutter,
+  canLoftSketches,
   canRedo,
   canUngroup,
   canUndo,
@@ -323,6 +325,7 @@ export function SecondaryToolbar({
   onBundle,
   onIntersect,
   onCookieCutter,
+  onLoftSketches,
   onIntersectPreview,
   intersectPreviewActive,
   onFillet,
@@ -402,6 +405,7 @@ export function SecondaryToolbar({
   canGroup: boolean;
   canIntersect: boolean;
   canCookieCutter: boolean;
+  canLoftSketches: boolean;
   canRedo: boolean;
   canUngroup: boolean;
   canUndo: boolean;
@@ -476,6 +480,7 @@ export function SecondaryToolbar({
   onBundle: () => void;
   onIntersect: () => void;
   onCookieCutter: () => void;
+  onLoftSketches: () => void;
   onIntersectPreview: () => void;
   intersectPreviewActive: boolean;
   onFillet: () => void;
@@ -880,6 +885,7 @@ export function SecondaryToolbar({
     // Fork (build 33).
     { id: "hull", label: t("hull.title"), icon: Spline, action: build33.onHull, enabled: build33.canHull },
     { id: "cookieCutter", label: t("editor.tool.cookieCutter"), icon: Cookie, action: onCookieCutter, enabled: canCookieCutter },
+    { id: "loftSketches", label: t("editor.tool.loftSketches"), icon: ToolbarLoftSketchesIcon, action: onLoftSketches, enabled: canLoftSketches },
   ];
   const modifyTools = [
     { id: "mirror", label: t("editor.tool.mirror"), icon: ToolbarMirrorIcon, action: onMirror, enabled: canModifySelection, active: mirrorMode },

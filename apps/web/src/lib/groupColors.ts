@@ -11,10 +11,12 @@ import type { WorkplaneShape } from "@/types/layerling";
 export function groupShowsPartColors(shape: WorkplaneShape): boolean {
   if (!shape.groupedShapes?.length) return false;
   if (shape.groupOperation === "bundle") return true;
+  // A loft between two sketches is one body round its two outlines: no part of it shows in its own colour.
+  if (shape.groupOperation === "loft") return false;
   return shape.multicolor ?? !shape.importedMesh;
 }
 
 /** Whether the "Multicolor" switch applies to this shape at all. */
 export function canToggleGroupColors(shape: WorkplaneShape): boolean {
-  return Boolean(shape.groupedShapes?.length) && shape.groupOperation !== "bundle" && !shape.hole;
+  return Boolean(shape.groupedShapes?.length) && shape.groupOperation !== "bundle" && shape.groupOperation !== "loft" && !shape.hole;
 }
