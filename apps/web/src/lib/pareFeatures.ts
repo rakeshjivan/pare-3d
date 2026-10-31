@@ -6,3 +6,5 @@
 
 /** Dental Studio's digital wax-up (build 79) and Wax-up Studio (build 94), being developed further in test builds. */
 export const WAXUP_ENABLED = process.env.NEXT_PUBLIC_PARE_WAXUP === "on";
+/** Build 106: Wax-up Studio and Model Builder in the new studio frame - test builds only until it is signed off. */
+export const STUDIO_SHELL = WAXUP_ENABLED;

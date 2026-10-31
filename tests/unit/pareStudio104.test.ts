@@ -64,7 +64,7 @@ describe("build 104: Dental Studio's workspace", () => {
 
   it("frames only a Dental Studio design, with Wax-up only in test builds", () => {
     expect(editor).toContain('const dentalWorkspace = studio === "dental";');
-    expect(editor).toMatch(/\{dentalWorkspace \? \(\s*<DentalChrome/);
+    expect(editor).toMatch(/\{dentalWorkspace && !studioShellOn \? \(\s*<DentalChrome/);
     expect(editor).toContain("waxup={WAXUP_ENABLED ?");
   });
 

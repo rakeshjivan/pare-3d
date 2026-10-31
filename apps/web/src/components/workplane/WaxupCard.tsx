@@ -11,6 +11,8 @@ import { EGGSHELL_MAX_WALL, EGGSHELL_MIN_WALL, EGGSHELL_WALL } from "@/lib/denta
 import type { WaxRestrict } from "@/components/workplane/WaxToothDrag";
 /** Build 103: a confirmed tooth's colour, by FDI (each tooth its own, as Meshmixer shows them). */
 /** Build 105: each library tooth in its own colour while it is being positioned (light; a confirmed tooth takes the stronger colour below). */
+/** Build 106: the wax teeth in one colour (the studio's default; each tooth in its own colour is a switch). */
+export const WAX_BLUE = "#a8c3ea";
 export const WAX_TOOTH_COLOURS: Record<number, string> = {
   13: "#9ad8a8", 12: "#9cc8ef", 11: "#f2aaa4", 21: "#f3cf86", 22: "#c8b0ec", 23: "#8fd8d0",
   14: "#e6b3d9", 15: "#d7d38e", 24: "#a9b8f0", 25: "#f0bb90",
@@ -85,6 +87,8 @@ export type WaxupView = {
   markPick: { fdi: number; point: number } | null;
   /** Build 105: the scan being waxed drawn see-through. */
   scanSeeThrough: boolean;
+  /** Build 106: each wax tooth in its own colour (else all in WAX_BLUE). */
+  colourful?: boolean;
   /** Build 105: the wax teeth's contacts with the opposing arch and each other, as a colour map, and Adapt (exocad's static occlusion clearance). */
   contacts: { on: boolean; busy: boolean; occlusal: number; adapting: boolean; note: string | null; opposing: boolean };
   /** Build 101: the wax-up's own Undo and Redo. */
@@ -153,6 +157,8 @@ export type WaxupActions = {
   onStopMarks?: () => void;
   onAutoMarks?: () => void;
   onMarkTeethChoose?: (fdi: number) => void;
+  /** Build 106: the teeth to wax up, all at once (a quick pick). */
+  onMarkTeethSet?: (teeth: number[]) => void;
   onScanSeeThrough?: (on: boolean) => void;
   /** Build 105: the Teeth step open (its marks shown and draggable) or closed. */
   onMarksEditing?: (on: boolean) => void;
@@ -193,7 +199,7 @@ export const archOrder = (fdi: number) => { const q = Math.floor(fdi / 10), n = 
 /** Build 101: Wax-up Studio's steps that live in this card (shown one at a time; all of them without a step). */
 /** Build 103: the whole set's move - intercanine width, forward/back, midline (to the patient's left), edges longer. */
 export type WaxSetMove = { width: number; depth: number; midline: number; height: number };
-export type WaxupPart = "teeth" | "find" | "choose" | "set" | "place" | "adjust" | "occlusion" | "sculpt";
+export type WaxupPart = "select" | "teeth" | "find" | "choose" | "set" | "place" | "adjust" | "occlusion" | "sculpt";
 
 /** Build 102: reductions shown from this, mm (less is within a scan's own noise). */
 const WAX_REDUCE_SHOWN = 0.2;
@@ -417,6 +423,33 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
       </div>
       ) : null}
 
+      {/* Build 106: Select teeth - the teeth to wax up, before their marks. */}
+      {part === "select" ? (
+      <div className="dental-substep">
+        <div className="waxup-teeth waxup-found" role="group" aria-label={t("waxup.chooseTeeth")}>
+          {allTeeth.map((fdi) => {
+            const on = view.markTeeth.includes(fdi);
+            return (
+              <button key={fdi} type="button" aria-pressed={on} className={`waxup-tooth${on ? " active" : ""}`} style={on ? { background: view.colourful ? WAX_TOOTH_COLOURS[fdi] : WAX_BLUE, color: "#1d1d1f" } : undefined} disabled={working} onClick={() => actions.onMarkTeethChoose?.(fdi)}>{fdi}</button>
+            );
+          })}
+        </div>
+        {actions.onMarkTeethSet ? (
+          <>
+            <h4 className="dental-substep-title">{t("studio.quickPicks")}</h4>
+            <div className="dental-trim-buttons waxup-groups">
+              {([["studio.pickCanines", 3], ["studio.pickPremolars", 5], ["studio.pickCentrals", 1]] as const).map(([label, reach]) => {
+                const teeth = allTeeth.filter((fdi) => fdi % 10 <= reach);
+                const on = teeth.length === view.markTeeth.length && teeth.every((fdi) => view.markTeeth.includes(fdi));
+                return <button key={label} type="button" className={on ? "active" : "secondary"} disabled={working} onClick={() => actions.onMarkTeethSet?.(teeth)}>{t(label)}</button>;
+              })}
+            </div>
+          </>
+        ) : null}
+        <p className="blend-hint">{t("studio.selectHint")}</p>
+      </div>
+      ) : null}
+
       {/* Build 105: the teeth to wax up and the four marks on each. */}
       {part === "teeth" ? (
       <div className="dental-substep">
@@ -429,7 +462,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
             const marked = view.markedTeeth.includes(fdi);
             const auto = view.autoMarked.includes(fdi);
             return (
-              <button key={fdi} type="button" aria-pressed={on} className={`waxup-tooth${on ? " active" : ""}${auto ? " unsure" : ""}`} style={on ? { background: WAX_TOOTH_COLOURS[fdi], color: "#1d1d1f" } : undefined} title={t(marked ? (auto ? "waxup.markAuto" : "waxup.markDone") : "waxup.markNone", { fdi })} disabled={working || marking} onClick={() => actions.onMarkTeethChoose?.(fdi)}>
+              <button key={fdi} type="button" aria-pressed={on} className={`waxup-tooth${on ? " active" : ""}${auto ? " unsure" : ""}`} style={on ? { background: view.colourful === false ? WAX_BLUE : WAX_TOOTH_COLOURS[fdi], color: "#1d1d1f" } : undefined} title={t(marked ? (auto ? "waxup.markAuto" : "waxup.markDone") : "waxup.markNone", { fdi })} disabled={working || marking} onClick={() => actions.onMarkTeethChoose?.(fdi)}>
                 {marked ? <Check size={12} aria-hidden="true" /> : null}{fdi}
               </button>
             );
@@ -588,7 +621,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
                     className={`waxup-tooth${view.selected === tooth.id ? " active" : ""}${low ? " warn" : ""}`}
                     title={t("waxup.toothInfo", { fdi: tooth.fdi, width: tooth.width.toFixed(1), length: tooth.length.toFixed(1), ratio: Math.round((tooth.width / Math.max(0.1, tooth.length)) * 100), wax: tooth.clearance === null ? "-" : tooth.clearance.toFixed(2) })}
                     onClick={() => actions.onSelect(tooth.id)}
-                    style={view.confirmed.includes(tooth.fdi) ? { background: WAX_CONFIRMED_COLOURS[tooth.fdi] ?? "#9aa0a6", color: "#fff" } : view.stage === "position" && WAX_TOOTH_COLOURS[tooth.fdi] ? { background: WAX_TOOTH_COLOURS[tooth.fdi], color: "#1d1d1f" } : undefined}
+                    style={view.confirmed.includes(tooth.fdi) ? { background: WAX_CONFIRMED_COLOURS[tooth.fdi] ?? "#9aa0a6", color: "#fff" } : (view.stage === "position" || view.colourful !== undefined) && WAX_TOOTH_COLOURS[tooth.fdi] ? { background: view.colourful === false ? WAX_BLUE : WAX_TOOTH_COLOURS[tooth.fdi], color: "#1d1d1f" } : undefined}
                   >
                     {low ? <AlertTriangle size={12} aria-hidden="true" /> : null}{view.confirmed.includes(tooth.fdi) ? <Check size={12} aria-hidden="true" /> : null}{tooth.fdi}
                   </button>

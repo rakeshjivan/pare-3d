@@ -2,12 +2,13 @@
  * Build 85: the look of the 3D view - the workplane (plate and grid), no workplane, or Meshmixer's dark
  * background with a light that follows the camera. Remembered in this browser.
  */
-export type ViewLook = "plate" | "clear" | "dark";
+/** Build 106: "studio" - the studio frame's soft light-grey ground, no plate. */
+export type ViewLook = "plate" | "clear" | "dark" | "studio";
 const KEY = "pare3d.viewLook";
 export function readViewLook(): ViewLook {
   try {
     const stored = window.localStorage.getItem(KEY);
-    return stored === "clear" || stored === "dark" ? stored : "plate";
+    return stored === "clear" || stored === "dark" || stored === "studio" ? stored : "plate";
   } catch {
     return "plate";
   }

@@ -12155,6 +12155,25 @@ let beforeFrame: (() => void) | null = null;
 /** Build 87: set when only the sculpted surface changed this frame. */
 let sculptFrameOnly = false;
 const MESHMIXER_BACKGROUND = "#444240";
+let studioGround: THREE.CanvasTexture | null = null;
+/** Build 106: a radial grey drawn once; three.js stretches a background texture over the view. */
+function studioBackground() {
+  if (studioGround) return studioGround;
+  const canvas = document.createElement("canvas");
+  canvas.width = 512; canvas.height = 512;
+  const g = canvas.getContext("2d");
+  if (g) {
+    const grad = g.createRadialGradient(256, 225, 20, 256, 256, 400);
+    grad.addColorStop(0, "#fbfbfc");
+    grad.addColorStop(0.55, "#eceef2");
+    grad.addColorStop(1, "#dde1e7");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 512, 512);
+  }
+  studioGround = new THREE.CanvasTexture(canvas);
+  studioGround.colorSpace = THREE.SRGBColorSpace;
+  return studioGround;
+}
 const baseLight = new WeakMap<object, { ambient: number; key: number; fill: number; background: string }>();
 function applyViewLook(state: ThreeState | null) {
   if (!state) return;
@@ -12162,7 +12181,9 @@ function applyViewLook(state: ThreeState | null) {
   if (!base) return;
   state.workplaneLayer.visible = viewLook === "plate" && !state.dentalView;
   const dark = viewLook === "dark";
-  state.scene.background = new THREE.Color(dark ? MESHMIXER_BACKGROUND : base.background);
+  // Build 106: the studio frame's ground - a soft light grey, lighter in the middle, as 3Shape's.
+  const studio = viewLook === "studio";
+  state.scene.background = studio ? studioBackground() : new THREE.Color(dark ? MESHMIXER_BACKGROUND : base.background);
   // Build 88: Meshmixer's lighting in the dark look - nearly all of it from the camera, so faces turned
   // to you are bright and hollows and creases fall dark, with only a little soft grey all round (the
   // light blue ground light of the workplane look made scans dull and flat).
@@ -12170,7 +12191,7 @@ function applyViewLook(state: ThreeState | null) {
   // even light of earlier builds a near-white scan washed out against the white workplane (only its
   // outline showed). Less even light, the sun and fill turned down (the shadow and a coloured part's look
   // kept), so a scan's faces turned away and its creases shade as they do in the dark look.
-  state.lights.ambient.intensity = dark ? 0.35 : base.ambient * 0.33;
+  state.lights.ambient.intensity = dark ? 0.35 : base.ambient * (studio ? 0.42 : 0.33);
   state.lights.ambient.groundColor.set(dark ? "#505050" : "#d6edf5");
   state.lights.key.intensity = dark ? 0 : base.key * 0.39;
   state.lights.fill.intensity = dark ? 0 : base.fill * 0.25;
@@ -12180,7 +12201,7 @@ function applyViewLook(state: ThreeState | null) {
     head.name = "ViewHeadlight";
     state.scene.add(head, head.target);
   }
-  head.intensity = dark ? 3.0 : 2.4;
+  head.intensity = dark ? 3.0 : studio ? 2.6 : 2.4;
   head.visible = true;
   state.needsRender = true;
 }

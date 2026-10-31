@@ -82,7 +82,7 @@ import { adjustMatrix, isIdentityAdjust, mirrorAdjust, setMoveAdjust, waxedNeigh
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { WaxupPointOverlay, markerTriangles, rayHit } from "./workplane/WaxupPointOverlay";
 import { WaxMarkDrag, type DragMark } from "./workplane/WaxMarkDrag";
-import { WAXUP_LANDMARKS, WAX_CONFIRMED_COLOURS, WAX_TOOTH_COLOURS, defaultMarkTeeth, archOrder, type WaxupView } from "./workplane/WaxupCard";
+import { WAXUP_LANDMARKS, WAX_BLUE, WAX_CONFIRMED_COLOURS, WAX_TOOTH_COLOURS, defaultMarkTeeth, archOrder, type WaxupView } from "./workplane/WaxupCard";
 import { brushArea, lassoArea, screenTriangles } from "@/lib/dentalArea";
 import { applyToSelection, brushChoice, lassoChoice, type LassoMode, cornerPositions, growChoice, soupFloat32, invertChoice, sculptMeshOf, soupOf, withoutTriangles, type SculptMesh, type SelectReach } from "@/lib/meshSculpt";
 import { remeshRegion, LiveMesh, averageEdgeOf, stampBrush, type LiveBrush, type LivePatch } from "@/lib/liveSculpt";
@@ -97,7 +97,8 @@ import type { DentalTrimMode } from "@/lib/dentalTrim";
 import { layerlingToZUp, zUpToLayerling } from "@/lib/meshCoordinates";
 import { looksLikeDentalScan, type DentalAnalysis, type DentalRole, type DentalStudioInput, type DentalStudioOptions } from "@/lib/dentalModel";
 import { DentalChrome } from "./workplane/DentalChrome";
-import { WAXUP_ENABLED } from "@/lib/pareFeatures";
+import { STUDIO_SHELL, WAXUP_ENABLED } from "@/lib/pareFeatures";
+import { StudioShell } from "./workplane/StudioShell";
 import type { PareStudio } from "@/lib/pareStudio";
 import { applyAppTheme } from "@/lib/appTheme";
 import { DentalStudioPanel, dentalPreset, type DentalAreaTool, type DentalPreset, type DentalSlot, type DentalView } from "./workplane/DentalStudioPanel";
@@ -2075,7 +2076,7 @@ export function LayerlingEditor({
     return () => applyAppTheme(themePreferenceRef.current);
   }, [editorOpen]);
   useEffect(() => {
-    if (editorOpen) setViewLook(dentalWorkspace ? "dark" : "plate");
+    if (editorOpen) setViewLook(dentalWorkspace ? (STUDIO_SHELL ? "studio" : "dark") : "plate");
   }, [dentalWorkspace, editorOpen]);
   // Build 104: CAD Studio opens with Tinkercad's box handles every time; the gimbal is on the right-click menu.
   useEffect(() => {
@@ -3269,9 +3270,27 @@ export function LayerlingEditor({
   const [dentalHidden, setDentalHidden] = useState<string[]>([]);
   const dentalHiddenRef = useRef(dentalHidden);
   dentalHiddenRef.current = dentalHidden;
+  // Build 106: the studio frame's case list - scans set aside on screen only - and the wax teeth drawn in
+  // one colour or each in its own (on screen only: the parts keep their own colour).
+  const [studioHidden, setStudioHidden] = useState<string[]>([]);
+  const [waxColourful, setWaxColourful] = useState(() => { try { return window.localStorage.getItem("pare3d.waxColourful") === "1"; } catch { return false; } });
+  const [waxTint, setWaxTint] = useState(false);
+  const waxTintCache = useRef<{ key: string; map: WeakMap<WorkplaneShape, WorkplaneShape> }>({ key: "", map: new WeakMap() });
   const viewportShapes = useMemo(() => {
     let result = baseViewportShapes;
     if (dentalHidden.length) result = result.filter((shape) => !dentalHidden.includes(shape.id));
+    if (studioHidden.length) result = result.filter((shape) => !studioHidden.includes(shape.id));
+    if (waxTint) {
+      const key = waxColourful ? "colour" : "blue";
+      if (waxTintCache.current.key !== key) waxTintCache.current = { key, map: new WeakMap() };
+      const cache = waxTintCache.current.map;
+      result = result.map((shape) => {
+        if (shape.dental !== "wax" || !shape.waxTooth) return shape;
+        let tinted = cache.get(shape);
+        if (!tinted) { tinted = { ...shape, color: waxColourful ? WAX_TOOTH_COLOURS[shape.waxTooth.fdi] ?? WAX_BLUE : WAX_BLUE }; cache.set(shape, tinted); }
+        return tinted;
+      });
+    }
     if (intersectPreviewIds) {
       const operands = new Set(intersectPreviewIds);
       const ghosts = result.map((shape) => (operands.has(shape.id) && !shape.hole ? { ...shape, transparent: true } : shape));
@@ -3292,7 +3311,7 @@ export function LayerlingEditor({
       result = [...result.map((shape) => (overlapping.has(shape.id) ? { ...shape, transparent: true } : shape)), ...fitOverlay];
     }
     return result;
-  }, [baseViewportShapes, dentalHidden, dragTextGhost, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape, surfaceTextTool?.editingId, surfaceTextTool?.preview]);
+  }, [baseViewportShapes, dentalHidden, studioHidden, waxTint, waxColourful, dragTextGhost, fitCheck, fitOverlay, fitReport, intersectPreviewIds, intersectPreviewShape, surfaceTextTool?.editingId, surfaceTextTool?.preview]);
   // A revolve sketch on the base plate is a side view: the bodies are shown from the front, as the profile is drawn (#525).
   // Opened again to edit a body that stands upright, it is the same side view: that body stands at its height, not on the plate's workplane.
   const editedRevolveShape = sketchActive && sketchOperation === "revolve" && editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) : undefined;
@@ -10446,6 +10465,17 @@ export function LayerlingEditor({
     waxStudio?: { flow: "waxup" | "imt"; arches: "upper" | "lower" | "both" };
   };
   const [dentalStudio, setDentalStudio] = useState<DentalStudioState | null>(null);
+  // Build 106: Wax-up Studio and Model Builder in the studio frame (Dental Studio, test builds).
+  const studioShellOn = STUDIO_SHELL && dentalWorkspace && Boolean(dentalStudio);
+  const studioWax = studioShellOn && Boolean(dentalStudio?.waxStudio);
+  useEffect(() => { setWaxTint(studioWax); }, [studioWax]);
+  useEffect(() => { if (!studioShellOn) setStudioHidden([]); }, [studioShellOn]);
+  // The 3D view is sized when the window is: the frame coming or going resizes it too.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+    return () => cancelAnimationFrame(frame);
+  }, [studioShellOn]);
+  useEffect(() => { try { window.localStorage.setItem("pare3d.waxColourful", waxColourful ? "1" : "0"); } catch { /* this visit only */ } }, [waxColourful]);
   // Build 84: the bite contacts & clearance map - on, being worked out, its summary.
   const [biteMap, setBiteMap] = useState<{ on: boolean; busy: boolean; key: string; upper?: BiteContactStats; lower?: BiteContactStats; error?: string; /** Build 96: the two parts (upper first), and whether they are the studio's. */ ids: [string, string]; studio: boolean; /** Build 96: the contacts and overlaps only. */ contactOnly?: boolean; /** Build 97: each arch's opacity in occlusion, 0..1. */ upperOpacity?: number; lowerOpacity?: number; /** Build 97: how far the colours reach, mm. */ range?: number } | null>(null);
   /** Build 96: the last map worked out, kept to colour again (Contact only) without working it out again. */
@@ -10912,7 +10942,7 @@ export function LayerlingEditor({
   // Build 86: Dental Studio opens on Meshmixer's dark background, so scans read as they do there from the
   // start (the switch at the top of the window changes it back).
   const dentalOpen = Boolean(dentalStudio);
-  useEffect(() => { if (dentalOpen && dentalWorkspace) setViewLook("dark"); }, [dentalOpen, dentalWorkspace]);
+  useEffect(() => { if (dentalOpen && dentalWorkspace) setViewLook(STUDIO_SHELL ? "studio" : "dark"); }, [dentalOpen, dentalWorkspace]);
   // A scan in a slot that changes (a trim, Undo, Redo) is looked at again.
   const dentalSlotKey = dentalStudio ? (Object.values(dentalStudio.slots).filter(Boolean) as string[]).map((id) => { const shape = shapes.find((candidate) => candidate.id === id); return shape ? `${id}:${shape.importedMesh?.positions.length ?? 0}:${scanFrameOf(shape.importedMesh) ? `f${shape.importedMesh?.biteLocked ? "L" : ""}` : `${shape.x}:${shape.z}`}` : `${id}:gone`; }).join("|") : "";
   const dentalSlotSeen = useRef("");
@@ -12740,6 +12770,7 @@ export function LayerlingEditor({
     selected: selectedIds.length === 1 ? selectedIds[0] : null,
     confirmed: Object.keys(waxup.locks).map(Number),
     manual: waxup.manual,
+    colourful: studioWax ? waxColourful : undefined,
     // Build 103: the selected tooth's own change, for the exact values in the card.
     selectedAdjust: (() => {
       const shape = selectedIds.length === 1 ? shapes.find((candidate) => candidate.id === selectedIds[0]) : undefined;
@@ -18391,8 +18422,8 @@ export function LayerlingEditor({
   };
 
   return (
-    <div className={`layerling-editor ${historyViewState ? "history-view-active" : ""}${dentalWorkspace ? " studio-dental" : ""}${dentalWorkspace && dentalStudio ? " dental-docked" : ""}`}>
-      {dentalWorkspace ? (
+    <div className={`layerling-editor ${historyViewState ? "history-view-active" : ""}${dentalWorkspace ? " studio-dental" : ""}${dentalWorkspace && dentalStudio ? " dental-docked" : ""}${studioShellOn ? " studio-shell-on" : ""}${STUDIO_SHELL && dentalWorkspace ? " studio-new-look" : ""}`}>
+      {dentalWorkspace && !studioShellOn ? (
         <DentalChrome
           caseName={projectName}
           canUndo={!splitSession && !projectInteractionActive && historyViewIndex === null && (historyIndex > 0 || Boolean(edgeModifier))}
@@ -19484,6 +19515,72 @@ export function LayerlingEditor({
       {dentalStudio?.waxStudio && waxup.stage === "position" && waxup.placed.length && waxup.picking === null && !marksEditing ? (
         <WaxToothDrag teeth={waxDragTeeth} restrict={waxup.restrict} onLibrary={cycleWaxSet} onSelect={(id) => selectShape(id, "replace")} onPreview={previewWaxTooth} onCommit={adjustWaxToothBy} onDouble={(id) => confirmWaxTooth(id, false)} />
       ) : null}
+      {studioShellOn && dentalStudio ? (() => {
+        // Build 106: the studio frame - the case on the left, the steps, views and Back/Next around the panel.
+        const slotNames: Array<[DentalSlot, string]> = [["upper", t("dental.upper")], ["lower", t("dental.lower")], ["bite", t("dental.bite")], ["bite2", t("dental.bite2")]];
+        const waxSlot = waxupRef.current.slot;
+        const waxIds = studioWax ? shapes.filter((shape) => shape.dental === "wax" && shape.waxTooth && shape.waxFor === dentalStudio.slots[waxSlot]).map((shape) => shape.id) : [];
+        const objects = slotNames.filter(([slot]) => dentalStudio.slots[slot]).map(([slot, name]) => {
+          const id = dentalStudio.slots[slot]!;
+          return { id, name, shown: !studioHidden.includes(id), onToggle: () => setStudioHidden((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id])) };
+        });
+        if (studioWax && waxIds.length) {
+          const shown = !waxIds.every((id) => studioHidden.includes(id));
+          objects.push({
+            id: "wax",
+            name: t("studio.waxTeeth", { count: waxIds.length }),
+            shown,
+            onToggle: () => setStudioHidden((current) => (shown ? [...current.filter((entry) => !waxIds.includes(entry)), ...waxIds] : current.filter((entry) => !waxIds.includes(entry)))),
+            ...({ opacity: waxup.ghost, onOpacity: (ghost: number) => setWaxup((current) => ({ ...current, ghost })) }),
+          } as (typeof objects)[number]);
+        }
+        const arches = (["upper", "lower"] as const).filter((slot) => dentalStudio.slots[slot] && (!dentalStudio.waxStudio || dentalStudio.waxStudio.arches === "both" || dentalStudio.waxStudio.arches === slot));
+        const markTeeth = markTeethFor(waxup);
+        const placedHere = waxPlacedNow;
+        const selectedFdi = waxupView.markPick?.fdi ?? placedHere.find((tooth) => tooth.id === waxupView.selected)?.fdi ?? null;
+        return (
+          <StudioShell
+            title={t(dentalStudio.waxStudio ? "waxStudio.title" : "dentalChrome.modelBuilder")}
+            objects={objects}
+            colour={studioWax ? { on: waxColourful, onChange: setWaxColourful } : null}
+            chart={studioWax && arches.length ? {
+              arch: waxSlot,
+              arches: [...arches],
+              onArch: (arch) => {
+                if (arch === waxupRef.current.slot) return;
+                const current = dentalStudioRef.current;
+                if (current?.waxStudio && current.waxStudio.arches === "both") setWaxup((now) => ({ ...now, slot: arch, landmarks: null, guessed: false, placed: [] }));
+              },
+              colours: Object.fromEntries(markTeeth.map((fdi) => [fdi, waxColourful ? WAX_TOOTH_COLOURS[fdi] ?? WAX_BLUE : WAX_BLUE])),
+              selected: selectedFdi,
+              pickable: (fdi) => fdi % 10 <= 5,
+              onPick: (fdi) => {
+                const tooth = placedHere.find((entry) => entry.fdi === fdi);
+                if (tooth) { setSelectedIds([tooth.id]); return; }
+                setWaxup((current) => { const teeth = markTeethFor(current); return { ...current, markTeeth: teeth.includes(fdi) ? teeth.filter((n) => n !== fdi) : [...teeth, fdi].sort((a, b) => archOrder(a) - archOrder(b)) }; });
+              },
+            } : null}
+            onView={(view) => showDentalView(studioWax ? waxSlot : dentalStudio.slots.upper ? "upper" : "lower", view)}
+            contacts={studioWax
+              ? (placedHere.length ? { on: waxup.contacts.on, onToggle: () => { const on = !waxupRef.current.contacts.on; if (on && biteMapRef.current?.on) toggleBiteMap(false); setWaxup((current) => ({ ...current, contacts: { ...current.contacts, on } })); } } : null)
+              : dentalStudio.slots.upper && dentalStudio.slots.lower ? { on: Boolean(biteMap?.on), busy: Boolean(biteMap?.busy), onToggle: () => toggleBiteMap(!biteMap?.on) } : null}
+            canUndo={studioWax ? Boolean(waxupView.canUndo) : !splitSession && !projectInteractionActive && historyViewIndex === null && (historyIndex > 0 || Boolean(edgeModifier))}
+            canRedo={studioWax ? Boolean(waxupView.canRedo) : !splitSession && !projectInteractionActive && historyViewIndex === null && historyIndex < history.length - 1}
+            onUndo={studioWax ? waxUndo : undo}
+            onRedo={studioWax ? waxRedo : redo}
+            onClose={() => {
+              stopDentalTrim();
+              stopWaxPicking();
+              const current = dentalStudioRef.current;
+              if (current?.stage === "making") { stopDentalMaking(); return; }
+              if (current?.stage === "trimming") return;
+              if (current?.editing?.length) leaveDentalEdit(current);
+              setDentalStudio(null);
+            }}
+            helpSection="dentalModel"
+          />
+        );
+      })() : null}
       {dentalStudio ? (
         <DentalStudioPanel
           parts={dentalCandidates().map((shape) => ({ id: shape.id, name: displayShapeName(shape) }))}
@@ -19593,6 +19690,7 @@ export function LayerlingEditor({
               onUndoMarkPoint: undoToothPoint,
               onStopMarks: stopToothMarks,
               onAutoMarks: () => { if (!autoToothMarks()) setNotice(t("waxup.autoMarksNone")); },
+              onMarkTeethSet: (teeth: number[]) => setWaxup((current) => ({ ...current, markTeeth: [...teeth].sort((a, b) => archOrder(a) - archOrder(b)) })),
               onMarkTeethChoose: (fdi: number) => setWaxup((current) => { const teeth = markTeethFor(current); return { ...current, markTeeth: teeth.includes(fdi) ? teeth.filter((n) => n !== fdi) : [...teeth, fdi].sort((a, b) => archOrder(a) - archOrder(b)) }; }),
               onLengthen: (lengthen) => { waxRecord(true); setWaxup((current) => ({ ...current, lengthen })); },
               onCentralRatio: (centralRatio) => { waxRecord(true); setWaxup((current) => ({ ...current, centralRatio })); },
@@ -19677,6 +19775,7 @@ export function LayerlingEditor({
           onEditDesign={() => { const current = dentalStudioRef.current; if (current?.made?.length) editDentalDesign(current.made); }}
           onDone={() => setDentalStudio(null)}
           editing={Boolean(dentalStudio.editing?.length)}
+          shell={studioShellOn}
         />
       ) : null}
       {meshRoundTool ? (
