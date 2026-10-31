@@ -60,16 +60,18 @@ function hitDistance(o: V, d: V, tris: Float32Array): number | null {
   return Number.isFinite(best) ? best : null;
 }
 
-export function WaxToothDrag({ teeth, restrict = "free", onSelect, onPreview, onCommit, onDouble }: {
+export function WaxToothDrag({ teeth, restrict = "free", onSelect, onPreview, onCommit, onDouble, onLibrary }: {
   teeth: DragTooth[];
+  /** Build 105: Ctrl (or ⌘) + wheel over a tooth - the next or previous tooth set (exocad's library switch). */
+  onLibrary?: (step: 1 | -1) => void;
   restrict?: WaxRestrict;
   onSelect: (id: string) => void;
   onPreview: (id: string, change: ToothAdjust | null) => void;
   onCommit: (id: string, change: ToothAdjust) => void;
   onDouble?: (id: string) => void;
 }) {
-  const live = useRef({ teeth, restrict, onSelect, onPreview, onCommit, onDouble });
-  live.current = { teeth, restrict, onSelect, onPreview, onCommit, onDouble };
+  const live = useRef({ teeth, restrict, onSelect, onPreview, onCommit, onDouble, onLibrary });
+  live.current = { teeth, restrict, onSelect, onPreview, onCommit, onDouble, onLibrary };
   useEffect(() => {
     const ray = (x: number, y: number) => window.layerlingScreenRay?.(x, y) ?? null;
     const onCanvas = (event: Event) => {
@@ -205,6 +207,7 @@ export function WaxToothDrag({ teeth, restrict = "free", onSelect, onPreview, on
       event.stopImmediatePropagation();
       const delta = event.deltaY || event.deltaX;
       if (!delta) return;
+      if ((event.ctrlKey || event.metaKey) && live.current.onLibrary) { live.current.onLibrary(delta < 0 ? -1 : 1); return; }
       const key = event.shiftKey ? "torque" : event.altKey ? "tip" : "turn";
       if (!wheel) { live.current.onSelect(hit.tooth.id); wheel = { tooth: hit.tooth, change: {}, timer: 0 }; }
       else window.clearTimeout(wheel.timer);

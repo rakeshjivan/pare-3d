@@ -6,7 +6,7 @@
  * only ever adds; Make joins it to the model.
  */
 import { AlertTriangle, Check, LoaderCircle, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EGGSHELL_MAX_WALL, EGGSHELL_MIN_WALL, EGGSHELL_WALL } from "@/lib/dentalEggshell";
 import type { WaxRestrict } from "@/components/workplane/WaxToothDrag";
 /** Build 103: a confirmed tooth's colour, by FDI (each tooth its own, as Meshmixer shows them). */
@@ -154,6 +154,10 @@ export type WaxupActions = {
   onAutoMarks?: () => void;
   onMarkTeethChoose?: (fdi: number) => void;
   onScanSeeThrough?: (on: boolean) => void;
+  /** Build 105: the Teeth step open (its marks shown and draggable) or closed. */
+  onMarksEditing?: (on: boolean) => void;
+  /** Build 105: the selected tooth's shape mirrored onto its partner across the midline. */
+  onMirrorShape?: () => void;
   onWaxContacts?: (on: boolean) => void;
   onOcclusal?: (mm: number) => void;
   onAdapt?: (what: "bite" | "contacts" | "both") => void;
@@ -322,6 +326,14 @@ function WaxMarksPicture() {
 
 export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, part }: { view: WaxupView; actions: WaxupActions; slots: { upper: boolean; lower: boolean }; busy: boolean; workspace: WorkplaneWorkspaceSettings; imt?: boolean; part?: WaxupPart }) {
   const show = (which: WaxupPart) => !part || part === which;
+  // Build 105: the Teeth step's marks shown and draggable while it is open.
+  const marksEditing = part === "teeth";
+  const onMarksEditing = actions.onMarksEditing;
+  useEffect(() => {
+    if (!marksEditing || !onMarksEditing) return;
+    onMarksEditing(true);
+    return () => onMarksEditing(false);
+  }, [marksEditing]); // eslint-disable-line react-hooks/exhaustive-deps
   const file = useRef<HTMLInputElement>(null);
   const finderFile = useRef<HTMLInputElement>(null);
   const [eggshellWall, setEggshellWall] = useState(EGGSHELL_WALL);
@@ -453,6 +465,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
               </p>
             ) : null}
             {view.autoMarked.some((fdi) => view.markTeeth.includes(fdi)) ? <p className="blend-hint">{t("waxup.markAutoHint")}</p> : null}
+            {view.markedTeeth.length ? <p className="blend-hint">{t("waxup.markDragHint")}</p> : null}
           </>
         )}
       </div>
@@ -720,6 +733,9 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
             ))}
           </div>
           <p className="blend-hint">{t("waxup.sculptHint")}</p>
+          <div className="dental-trim-buttons">
+            <button type="button" className="secondary" disabled={working || !view.selected} title={t("waxup.mirrorShapeHint")} onClick={() => actions.onMirrorShape?.()}>{t("waxup.mirrorShape")}</button>
+          </div>
           <label className="edge-modifier-check">
             <input type="checkbox" checked={view.scanSeeThrough} onChange={(event) => actions.onScanSeeThrough?.(event.currentTarget.checked)} />
             <span>{t("waxup.seeThrough")}</span>
