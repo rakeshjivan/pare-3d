@@ -17885,6 +17885,16 @@ export function LayerlingEditor({
       { key: "viewLeft", label: t("dentalMenu.viewLeft"), onSelect: show([1, 0, 0]) },
       { key: "viewLingual", label: t("dentalMenu.viewLingual"), onSelect: show([0, 0, -1]) },
     );
+    // Build 104: checking the bite - the selected scan see-through, and a cut through the middle (the
+    // incisors' overjet and overbite, side on), or off again.
+    const sectionOn = Boolean(window.layerlingSectionView?.({}).settings.enabled);
+    items.push(sectionOn
+      ? { key: "sectionOff", label: t("dentalMenu.sectionOff"), separated: true, onSelect: () => { window.layerlingSectionView?.({ enabled: false }); } }
+      : { key: "sectionMid", label: t("dentalMenu.sectionMid"), separated: true, onSelect: () => { window.layerlingSectionView?.({ enabled: true, orientation: "world", axis: "x", center: true, cutFace: "fill" }); } });
+    if (onPart) {
+      const seeThrough = selectedShapes.some((shape) => shape.transparent);
+      items.push({ key: "seeThrough", label: t(seeThrough ? "dentalMenu.solidAgain" : "dentalMenu.seeThrough"), shortcut: "T", onSelect: toggleSelectionTransparency });
+    }
     if (onPart) {
       const others = shapes.filter((shape) => !ids.includes(shape.id) && !shape.hidden);
       if (others.length) items.push({ key: "isolate", label: t(ids.length > 1 ? "dentalMenu.isolateMany" : "dentalMenu.isolate"), separated: true, onSelect: () => commitShapes(shapes.map((shape) => (ids.includes(shape.id) ? { ...shape, hidden: false } : { ...shape, hidden: true })), ids, t("dentalMenu.isolated")) });
