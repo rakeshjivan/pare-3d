@@ -5564,6 +5564,7 @@ export const MESSAGES_EN = {
   "dentalChrome.waxup": "Wax-up",
   "modelBuilder.step.articulator": "Articulator",
   "modelBuilder.step.base": "Base",
+  "modelBuilder.step.finish": "Articulator & label",
   "modelBuilder.step.label": "Label",
   "modelBuilder.step.model": "Model",
   "modelBuilder.step.prepare": "Prepare",
