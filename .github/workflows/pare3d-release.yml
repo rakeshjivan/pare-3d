@@ -113,11 +113,15 @@ jobs:
           prerelease: true
           make_latest: false
           name: Pare 3D test build ${{ github.run_number }}
+          # The app files and their manifest too: an installed test build updates itself to the newest
+          # test build from them (mac/serve.mjs). Without them every test build had to be downloaded again.
           files: |
             dist/Pare-3D-Mac.zip
             dist/Pare-3D-Windows.zip
             dist/Pare-3D-Linux.tar.gz
-          body: Test build for checking before release. Installed copies do not update to it.
+            dist/Pare-3D-app.tar.gz
+            dist/pare3d-update.json
+          body: Test build for checking before release. Installed test builds update themselves to it; the public release does not.
       - uses: softprops/action-gh-release@v2
         if: github.ref_name == 'release'
         with:
