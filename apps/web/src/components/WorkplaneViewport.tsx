@@ -12156,6 +12156,25 @@ let beforeFrame: (() => void) | null = null;
 let sculptFrameOnly = false;
 const MESHMIXER_BACKGROUND = "#444240";
 let studioGround: THREE.CanvasTexture | null = null;
+let studioDarkGround: THREE.CanvasTexture | null = null;
+/** Build 106: the dark ground - a deep slate, a little lighter behind the model. */
+function studioDarkBackground() {
+  if (studioDarkGround) return studioDarkGround;
+  const canvas = document.createElement("canvas");
+  canvas.width = 512; canvas.height = 512;
+  const g = canvas.getContext("2d");
+  if (g) {
+    const grad = g.createRadialGradient(256, 225, 20, 256, 256, 400);
+    grad.addColorStop(0, "#4b5059");
+    grad.addColorStop(0.6, "#353a42");
+    grad.addColorStop(1, "#24272d");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 512, 512);
+  }
+  studioDarkGround = new THREE.CanvasTexture(canvas);
+  studioDarkGround.colorSpace = THREE.SRGBColorSpace;
+  return studioDarkGround;
+}
 /** Build 106: a radial grey drawn once; three.js stretches a background texture over the view. */
 function studioBackground() {
   if (studioGround) return studioGround;
@@ -12180,10 +12199,12 @@ function applyViewLook(state: ThreeState | null) {
   const base = baseLight.get(state);
   if (!base) return;
   state.workplaneLayer.visible = viewLook === "plate" && !state.dentalView;
-  const dark = viewLook === "dark";
+  // Build 106: the studio's dark ground takes the dark look's light (from the eye, creases dark).
+  const studioDark = viewLook === "studioDark";
+  const dark = viewLook === "dark" || studioDark;
   // Build 106: the studio frame's ground - a soft light grey, lighter in the middle, as 3Shape's.
   const studio = viewLook === "studio";
-  state.scene.background = studio ? studioBackground() : new THREE.Color(dark ? MESHMIXER_BACKGROUND : base.background);
+  state.scene.background = studio ? studioBackground() : studioDark ? studioDarkBackground() : new THREE.Color(dark ? MESHMIXER_BACKGROUND : base.background);
   // Build 88: Meshmixer's lighting in the dark look - nearly all of it from the camera, so faces turned
   // to you are bright and hollows and creases fall dark, with only a little soft grey all round (the
   // light blue ground light of the workplane look made scans dull and flat).

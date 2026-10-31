@@ -5312,6 +5312,8 @@ export const MESSAGES_EN = {
   "waxStudio.auto": "Placing the teeth for you: finding them, choosing canine to canine, the first library set, placed on the patient's teeth...",
   "waxStudio.autoStop": "Stop",
   "studio.steps": "Steps",
+  "studio.darkView": "Dark view",
+  "studio.darkViewHint": "A dark background behind the model - easier to see a pale scan. The panels stay as they are.",
   "studio.trimTitle": "Trim and tidy the scans",
   "studio.trimArch": "Choose the arch",
   "studio.resetUpper": "Reset upper",

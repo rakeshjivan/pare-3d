@@ -864,3 +864,7 @@
 .studio-tool-slot .sculpt-help-list { display: none; }
 .studio-shell-on .dental-trim-hint { display: none; }
 .studio-framed .dental-fix-link { display: none; }
+
+/* Build 106: the 3D view's dark-ground switch, in the top bar. */
+.studio-top-icons { align-items: center; }
+.studio-dark-toggle { display: flex; align-items: center; gap: 8px; margin-right: 10px; color: #3d4654; font-size: 14px; white-space: nowrap; }

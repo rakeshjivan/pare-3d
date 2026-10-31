@@ -8,7 +8,7 @@
  * panel fills the step bar, Back and Next and the guidance through slots (lib/studioSlots), and every
  * control here calls the same action the studio already has.
  */
-import { ChevronDown, ChevronUp, Eye, EyeOff, Redo2, Undo2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, EyeOff, Moon, Redo2, Undo2, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { t } from "@/lib/i18n";
@@ -57,6 +57,7 @@ export function StudioShell({
   caseTitle,
   objects,
   colour,
+  dark,
   chart,
   onView,
   contacts,
@@ -71,6 +72,8 @@ export function StudioShell({
   caseTitle?: string;
   objects: StudioCaseObject[];
   colour?: { on: boolean; onChange: (on: boolean) => void } | null;
+  /** The 3D view's dark ground (the panels stay light). */
+  dark?: { on: boolean; onChange: (on: boolean) => void } | null;
   chart?: StudioChart | null;
   onView?: (view: DentalView) => void;
   /** legend false: the studio shows its own key (the bite map's, in the case panel). */
@@ -95,6 +98,13 @@ export function StudioShell({
         </div>
         <nav className="studio-steps" aria-label={t("studio.steps")} ref={stepsSlot} />
         <div className="studio-top-icons">
+          {dark ? (
+            <div className="studio-dark-toggle" title={t("studio.darkViewHint")}>
+              <Moon size={17} strokeWidth={1.8} aria-hidden="true" />
+              <span id="studio-dark-label">{t("studio.darkView")}</span>
+              <button type="button" role="switch" aria-checked={dark.on} aria-labelledby="studio-dark-label" className={`studio-switch${dark.on ? " on" : ""}`} onClick={() => dark.onChange(!dark.on)}><i /></button>
+            </div>
+          ) : null}
           <GuideHelpLink section={helpSection} className="studio-icon" iconSize={20} strokeWidth={1.8} />
           <button type="button" className="studio-icon" onClick={onClose} aria-label={t("studio.close")} title={t("studio.close")}><X size={20} strokeWidth={1.8} /></button>
         </div>

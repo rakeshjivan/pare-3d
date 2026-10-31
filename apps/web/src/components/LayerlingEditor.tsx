@@ -250,7 +250,7 @@ import {
 import { displayShapeName, iconTagAsset, qrCodeAsset, libraryShapeAssets, makeShapeFromAsset, nameTagAsset, shapeAssetLabel, toolbarShapeAssets } from "@/lib/shapeCatalog";
 import { PORT_PRESET_ORDER, PORT_PRESETS, type PortPreset } from "@/lib/portGeometry";
 import { importedShapeFromStl, SCAN_GREY } from "@/lib/stlImport";
-import { setViewLook } from "@/lib/viewLook";
+import { readStudioDark, setStudioDark, setViewLook, studioLook } from "@/lib/viewLook";
 import { exportMeshesToStl } from "@/lib/stlExport";
 import { THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
@@ -2079,7 +2079,7 @@ export function LayerlingEditor({
     return () => applyAppTheme(themePreferenceRef.current);
   }, [editorOpen]);
   useEffect(() => {
-    if (editorOpen) setViewLook(dentalWorkspace ? (STUDIO_SHELL ? "studio" : "dark") : "plate");
+    if (editorOpen) setViewLook(dentalWorkspace ? (STUDIO_SHELL ? studioLook() : "dark") : "plate");
   }, [dentalWorkspace, editorOpen]);
   // Build 104: CAD Studio opens with Tinkercad's box handles every time; the gimbal is on the right-click menu.
   useEffect(() => {
@@ -3276,6 +3276,8 @@ export function LayerlingEditor({
   // Build 106: the studio frame's case list - scans set aside on screen only - and the wax teeth drawn in
   // one colour or each in its own (on screen only: the parts keep their own colour).
   const [studioHidden, setStudioHidden] = useState<string[]>([]);
+  // Build 106: the studio's dark ground for the 3D view (the panels stay light).
+  const [studioDark, setStudioDarkState] = useState(() => readStudioDark());
   const [waxColourful, setWaxColourful] = useState(() => { try { return window.localStorage.getItem("pare3d.waxColourful") === "1"; } catch { return false; } });
   const [waxTint, setWaxTint] = useState(false);
   // Build 106: the wax teeth drawn see-through over the scan while its landmarks are checked.
@@ -10954,7 +10956,7 @@ export function LayerlingEditor({
   // Build 86: Dental Studio opens on Meshmixer's dark background, so scans read as they do there from the
   // start (the switch at the top of the window changes it back).
   const dentalOpen = Boolean(dentalStudio);
-  useEffect(() => { if (dentalOpen && dentalWorkspace) setViewLook(STUDIO_SHELL ? "studio" : "dark"); }, [dentalOpen, dentalWorkspace]);
+  useEffect(() => { if (dentalOpen && dentalWorkspace) setViewLook(STUDIO_SHELL ? studioLook() : "dark"); }, [dentalOpen, dentalWorkspace]);
   // A scan in a slot that changes (a trim, Undo, Redo) is looked at again.
   const dentalSlotKey = dentalStudio ? (Object.values(dentalStudio.slots).filter(Boolean) as string[]).map((id) => { const shape = shapes.find((candidate) => candidate.id === id); return shape ? `${id}:${shape.importedMesh?.positions.length ?? 0}:${scanFrameOf(shape.importedMesh) ? `f${shape.importedMesh?.biteLocked ? "L" : ""}` : `${shape.x}:${shape.z}`}` : `${id}:gone`; }).join("|") : "";
   const dentalSlotSeen = useRef("");
@@ -19711,6 +19713,7 @@ export function LayerlingEditor({
             title={t(dentalStudio.waxStudio ? "waxStudio.title" : "dentalChrome.modelBuilder")}
             objects={objects}
             colour={studioWax ? { on: waxColourful, onChange: setWaxColourful } : null}
+            dark={{ on: studioDark, onChange: (on) => { setStudioDarkState(on); setStudioDark(on); } }}
             chart={studioWax && arches.length ? {
               arch: waxSlot,
               arches: [...arches],
