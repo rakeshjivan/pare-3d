@@ -1352,6 +1352,7 @@ export const MESSAGES_EN = {
   "status.importFailedMore": " and {count} more",
   "status.importColoredParts": "{name} has {count} colours and comes in as {count} bodies, each in its place and selected together.",
   "status.importObjectParts": "{name} holds {objects} objects and comes in as {count} bodies, each in its place and selected together.",
+  "status.importStepParts": "{name} holds {count} solids; each comes in as a body under its own name, in its place and selected together.",
   "status.importSvgSkipped": "{count} shape(s) of {name} did not build into a solid and were left out. Join overlapping pieces in the drawing program, close the outlines and save the SVG again.",
   "status.importDxfOpen": "{name}: {count} line(s) in the drawing do not close into an outline and were left out. Join them into closed shapes in the CAD program and save the DXF again.",
   "status.importObjNoMtl": "The material colours for {name} are missing - select the .mtl file with it or import the whole ZIP.",

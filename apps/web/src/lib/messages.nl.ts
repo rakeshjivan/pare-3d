@@ -1333,6 +1333,7 @@ export const MESSAGES_NL: Partial<Record<MessageKey, string>> = {
   "status.importFailedMore": " en nog {count}",
   "status.importColoredParts": "{name} heeft {count} kleuren en komt binnen als {count} lichamen, elk op zijn plek en samen geselecteerd.",
   "status.importObjectParts": "{name} bevat {objects} objecten en komt binnen als {count} lichamen, elk op zijn plek en samen geselecteerd.",
+  "status.importStepParts": "{name} bevat {count} lichamen; elk komt binnen als een eigen lichaam onder zijn eigen naam, op zijn plek en samen geselecteerd.",
   "status.importSvgSkipped": "{count} vorm(en) van {name} konden niet tot een massief lichaam worden opgebouwd en zijn weggelaten. Voeg overlappende stukken samen in het tekenprogramma, sluit de contouren en sla de SVG opnieuw op.",
   "status.importDxfOpen": "{name}: {count} lijn(en) in de tekening sluiten niet tot een omtrek en zijn weggelaten. Verbind ze in het CAD-programma tot gesloten vormen en sla de DXF opnieuw op.",
   "status.importObjNoMtl": "De materiaalkleuren voor {name} ontbreken - selecteer het .mtl-bestand erbij of importeer de hele ZIP.",

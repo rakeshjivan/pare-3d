@@ -1405,6 +1405,7 @@ export const MESSAGES_CS: Partial<Record<MessageKey, string>> = {
   "status.importFailedMore": " a další (počet: {count})",
   "status.importColoredParts": "Soubor {name} má {count} barev a vloží se jako {count} těles na původních místech se společným výběrem.",
   "status.importObjectParts": "Soubor {name} obsahuje {objects} objektů a vloží se jako {count} těles na původních místech se společným výběrem.",
+  "status.importStepParts": "Soubor {name} obsahuje {count} těles; každé se vloží jako samostatné těleso pod vlastním názvem, na původním místě a se společným výběrem.",
   "status.importObjNoMtl": "Chybí barvy materiálů pro {name}. Vyberte spolu s ním soubor .mtl nebo importujte celý ZIP.",
   "status.importObjVertexColors": "{name} má téměř v každém bodě vlastní barvu, barevný přechod jako u skenů a modelů vytvořených umělou inteligencí. Pare 3D ho neumí zobrazit a soubor převzal jako jedno těleso v jedné barvě.",
   "status.importMtlAlone": "Soubor .mtl obsahuje jen barvy. Vyberte jej společně s .obj.",

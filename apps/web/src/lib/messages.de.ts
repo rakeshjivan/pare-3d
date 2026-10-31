@@ -1352,6 +1352,7 @@ export const MESSAGES_DE: Partial<Record<MessageKey, string>> = {
   "status.importFailedMore": " und {count} weitere",
   "status.importColoredParts": "{name} hat {count} Farben und kommt als {count} Körper, alle an ihrem Platz und gemeinsam ausgewählt.",
   "status.importObjectParts": "{name} enthält {objects} Objekte und kommt als {count} Körper, alle an ihrem Platz und gemeinsam ausgewählt.",
+  "status.importStepParts": "{name} enthält {count} Körper; jeder kommt als eigener Körper unter seinem Namen herein, an seinem Platz und gemeinsam ausgewählt.",
   "status.importSvgSkipped": "Aus {name} wurde(n) {count} Form(en) weggelassen, weil sie sich nicht zu einem Körper bauen ließen. Füge überlappende Teile im Zeichenprogramm zusammen, schließe die Umrisse und speichere die SVG neu.",
   "status.importDxfOpen": "{name}: {count} Linie(n) der Zeichnung schließen sich nicht zu einem Umriss und wurden weggelassen. Verbinde sie im CAD-Programm zu geschlossenen Formen und speichere die DXF neu.",
   "status.importObjNoMtl": "Für {name} fehlen die Materialfarben – wähle die .mtl-Datei mit aus oder importiere das ganze ZIP.",
