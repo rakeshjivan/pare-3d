@@ -67,7 +67,7 @@ import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
 import { SaveStatus } from "./SaveStatus";
 import { CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
-import { Brush, ChevronDown, Cookie, Grip, MessageSquareText, Printer } from "lucide-react";
+import { Brush, ChevronDown, Cookie, Grip, MessageSquareText, Printer, Worm } from "lucide-react";
 import { PareBuildBadge } from "./PareVersionStatus";
 import { Signature } from "lucide-react";
 import { CommandPalette, type PaletteCommand } from "./workplane/CommandPalette";
@@ -251,6 +251,8 @@ export function SecondaryToolbar({
   canGroup,
   canIntersect,
   canCookieCutter,
+  canFlexi,
+  flexiActive,
   canLoftSketches,
   canRedo,
   canUngroup,
@@ -325,6 +327,7 @@ export function SecondaryToolbar({
   onBundle,
   onIntersect,
   onCookieCutter,
+  onFlexi,
   onLoftSketches,
   onIntersectPreview,
   intersectPreviewActive,
@@ -405,6 +408,8 @@ export function SecondaryToolbar({
   canGroup: boolean;
   canIntersect: boolean;
   canCookieCutter: boolean;
+  canFlexi: boolean;
+  flexiActive: boolean;
   canLoftSketches: boolean;
   canRedo: boolean;
   canUngroup: boolean;
@@ -480,6 +485,7 @@ export function SecondaryToolbar({
   onBundle: () => void;
   onIntersect: () => void;
   onCookieCutter: () => void;
+  onFlexi: () => void;
   onLoftSketches: () => void;
   onIntersectPreview: () => void;
   intersectPreviewActive: boolean;
@@ -894,6 +900,7 @@ export function SecondaryToolbar({
     { id: "holePattern", label: t("holePattern.title"), icon: ToolbarHolePatternIcon, action: onHolePattern, enabled: canHolePattern, active: holePatternActive },
     { id: "faceTool", label: t("faceTool.title"), icon: ToolbarFaceToolIcon, action: onFaceTool, enabled: canFaceTool, active: faceToolActive },
     { id: "split", label: t("editor.tool.split"), icon: ToolbarSplitIcon, action: onSplit, enabled: splitMode || canSplit, active: splitMode },
+    { id: "flexi", label: t("editor.tool.flexi"), icon: Worm, action: onFlexi, enabled: canFlexi || flexiActive, active: flexiActive },
     { id: "chamfer", label: t("editor.tool.chamfer"), icon: ToolbarChamferIcon, action: onChamfer, enabled: canEdgeModify, active: edgeModifierKind === "chamfer" || edgeModifierKind === "chamfillet" },
     { id: "fillet", label: t("editor.tool.fillet"), icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify, active: edgeModifierKind === "fillet" },
     { id: "hollow", label: t("editor.tool.hollow"), icon: ToolbarHollowIcon, action: onHollow, enabled: canEdgeModify, active: hollowActive },

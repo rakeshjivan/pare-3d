@@ -25,6 +25,7 @@ import { normalizeTextEdge } from "@/lib/textEdge";
 import { DEFAULT_TEXT_LAYERS, layerTextKeyringArgument, placedKeyring, layerTextLayersError, nameTagOffsets, normalizeTextLayers, type NameTagKeyring } from "@/lib/textLayers";
 import { NAME_TAG_LAYERS, NAME_TAG_LETTER_SIZE, textShrinkPatch, textSpacingPatch } from "@/lib/nameTag";
 import { DEFAULT_ICON_TAG_WIDTH, ICON_TAG_LAYERS, MAX_ICON_TAG_WIDTH, MIN_ICON_TAG_WIDTH, isIconLayerBody, normalizeIconTagCount } from "@/lib/iconTag";
+import { automaticFlexiJoints, FLEXI_DEFAULTS, normalizeFlexiOptions, type FlexiOptions } from "@/lib/flexiJoints";
 import { cookieCutterProfiles, normalizeCookieCutterOptions, outlineFromCurves, outlineFromLoops, sampledCurveLoop, unitedFootprint, type CookieCutterOptions, type CurveLoop } from "@/lib/cookieCutter";
 import type { IconLayerPatch, IconTagControls, TextLayerPatch } from "@/components/workplane/ShapeInspector";
 import { IconTagPanel } from "@/components/workplane/IconTagPanel";
@@ -100,6 +101,7 @@ import { DentalStudioPanel, dentalPreset, type DentalAreaTool, type DentalPreset
 import { ShellPanel } from "./workplane/ShellPanel";
 import { OffsetPanel } from "./workplane/OffsetPanel";
 import { CutOutPanel } from "./workplane/CutOutPanel";
+import { FlexiPanel, type FlexiToolSettings } from "./workplane/FlexiPanel";
 import { DeleteFacePanel } from "./workplane/DeleteFacePanel";
 import { MateFacesPanel } from "./workplane/MateFacesPanel";
 import { concentricMotion, mateMotion, type FacePick, type MateMode } from "@/lib/mateFaces";
@@ -287,7 +289,7 @@ import type { AlignAxis, AlignTarget, GridSize, ParametricSource, ProjectAsset, 
 import { type Vec3, type MeshData, type ShapeUpdatePatch, MIN_SHAPE_DIMENSION, resetManifoldRuntime, cleanModelDimension, getManifoldRuntime, meshForShape, meshReachAlong, appendMeshData, formatTriangleCount, boundsForShapes, boundsForCuboids, meshAabb, boundsForPositions } from "@/lib/editorMeshCore";
 import { planCutConnectors, type CutConnectorPlan, cloneAsGroupChild, withClosedHolesNote, splitShapesByPlane, unionOverlappingExportMeshes, exportBodiesWithLooseHoles, formatSectionOffset, SECTION_SEEN_FROM_KEYS, expandBundles, visibleExportShapes, multicolorExportSolids, exportFaceColors, colorSeparatedExportMeshes, canIntersectShapes, buildIntersectionShapeFromSelection, groupedShape, quaternionForShape, rotationFromQuaternion, cleanShapePatch, restoreGroupedChildren, restoreGroupedChildrenForEdges, buildGroupedShapeFromSelection } from "@/lib/editorBooleans";
 import { meshPartCount } from "@/lib/meshPartCount";
-import { buildGroupedShapeOffThread, exportMeshesTo3mfOffThread, exportSolidVolumeOffThread, simplifyTrianglePositionsOffThread, splitShapesByPlaneOffThread, subscribeGeometryBusy, warmGeometryWorker } from "@/lib/geometryWorker";
+import { articulateShapesOffThread, buildGroupedShapeOffThread, exportMeshesTo3mfOffThread, exportSolidVolumeOffThread, simplifyTrianglePositionsOffThread, splitShapesByPlaneOffThread, subscribeGeometryBusy, warmGeometryWorker } from "@/lib/geometryWorker";
 import { buildSketchLoftFromSelection, canSketchLoft } from "@/lib/sketchLoft";
 import { handleViewArrowKey } from "@/lib/viewArrowKeys";
 import { escapeWasHandled } from "@/lib/escapeHandled";
@@ -2453,6 +2455,8 @@ export function LayerlingEditor({
   const [shellTool, setShellTool] = useState<{ mode?: "offset"; shrink?: boolean; keepCopy?: boolean; thickness: number; openings: ShellOpenings; edges: ShellEdges; busy: boolean; error: string | null; replaces?: string; picked?: boolean } | null>(null);
   /** Cut out (#927): `partId` stays, a copy of it grown by `clearance` is cut out of `hostId`. */
   const [cutOutTool, setCutOutTool] = useState<{ partId: string; hostId: string; clearance: number; busy: boolean; error: string | null } | null>(null);
+  /** Flexi joints (Liane's mail, 29.10.2026): the bodies `targetIds` are cut into links with a joint at every cut. */
+  const [flexiTool, setFlexiTool] = useState<(FlexiToolSettings & { targetIds: string[]; busy: boolean; error: string | null }) | null>(null);
   const [simplifyToolId, setSimplifyToolId] = useState<string | null>(null);
   /** The window for fonts of one's own (#customFonts), opened from a text's font select. */
   const [fontManagerOpen, setFontManagerOpen] = useState(false);
@@ -7432,6 +7436,101 @@ export function LayerlingEditor({
   // The panel belongs to the two selected bodies; another selection closes it.
   useEffect(() => {
     setCutOutTool((current) => current && !current.busy && !(selectedIds.length === 2 && selectedIds.includes(current.partId) && selectedIds.includes(current.hostId)) ? null : current);
+  }, [selectedIds]);
+
+  /**
+   * Flexi joints from the selection (Liane's mail, 29.10.2026): the solids joined and the holes among them cut away, then cut
+   * into links with a joint printed in place at every cut, as a bundle in place of what they are made from. The same code
+   * the MCP action uses.
+   */
+  const makeFlexi = useCallback(async (given?: Partial<Record<keyof FlexiOptions, unknown>>, only?: readonly WorkplaneShape[]) => {
+    const fail = (message: string) => {
+      setNotice(message);
+      return { ok: false as const, message };
+    };
+    const targets = (only ?? selectedShapes).filter((shape) => !isNonSolidShape(shape));
+    if (!targets.some((shape) => !shape.hole)) return fail(t("flexi.error.needsBody"));
+    if (targets.some((shape) => shape.locked)) return fail(t("status.objectLocked"));
+    const options = normalizeFlexiOptions(given);
+    const sourceFingerprint = projectShapesFingerprint(shapesRef.current);
+    const sourceProjectId = projectInfoRef.current.projectId;
+    setNotice(t("flexi.working"), true);
+    const result = await articulateShapesOffThread(targets, options);
+    if (!result.links) return fail(result.error);
+    if (projectInfoRef.current.projectId !== sourceProjectId || projectShapesFingerprint(shapesRef.current) !== sourceFingerprint) {
+      return fail(t("flexi.error.changed"));
+    }
+    const group = groupedShape(result.links);
+    if (!group) return fail(t("flexi.error.empty", { link: 1 }));
+    const body = withSelectionPivot(canonicalizeShape({ ...group, name: t("flexi.name", { name: targets.find((shape) => !shape.hole)?.name ?? "" }), groupOperation: "bundle" }), activeRotationPivot);
+    const consumed = new Set(targets.map((shape) => shape.id));
+    commitShapes([...shapesRef.current.filter((shape) => !consumed.has(shape.id)), body], body.id, t("status.flexiMade", { joints: result.joints, links: result.links.length, swing: result.swing }));
+    return { ok: true as const, id: body.id, joints: result.joints, links: result.links.length, swing: result.swing, axis: result.axis };
+  }, [commitShapes, selectedShapes, activeRotationPivot]);
+
+  /** How long the bodies are along x and along z (the depth), as the flexi tool cuts them. */
+  const flexiExtent = useCallback((targets: WorkplaneShape[]) => {
+    const bounds = boundsForShapes(targets);
+    return { x: bounds.maxX - bounds.minX, z: bounds.maxZ - bounds.minZ };
+  }, []);
+
+  const startFlexiTool = useCallback(() => {
+    if (flexiTool) {
+      setFlexiTool(null);
+      return;
+    }
+    if (refuseLockedSelection()) return;
+    const targets = selectedShapes.filter((shape) => !isNonSolidShape(shape));
+    if (!targets.some((shape) => !shape.hole)) {
+      setNotice(t("flexi.error.needsBody"));
+      return;
+    }
+    if (edgeModifier) invalidateCadModifierSession();
+    closeSplit();
+    const extent = flexiExtent(targets);
+    const [length, width] = extent.x >= extent.z ? [extent.x, extent.z] : [extent.z, extent.x];
+    setFlexiTool({
+      targetIds: targets.map((shape) => shape.id),
+      axis: "auto",
+      joints: automaticFlexiJoints(length, width),
+      clearance: FLEXI_DEFAULTS.clearance,
+      swing: FLEXI_DEFAULTS.swing,
+      autoSize: true,
+      size: 12,
+      evenLinks: true,
+      start: Math.round(length / 5),
+      end: Math.round(length / 5),
+      busy: false,
+      error: null,
+    });
+  }, [closeSplit, edgeModifier, flexiExtent, flexiTool, invalidateCadModifierSession, refuseLockedSelection, selectedShapes]);
+
+  const applyFlexiTool = useCallback(() => {
+    if (!flexiTool || flexiTool.busy) return;
+    const targets = shapesRef.current.filter((shape) => flexiTool.targetIds.includes(shape.id));
+    if (!targets.length) {
+      setFlexiTool(null);
+      return;
+    }
+    const { axis, joints, clearance, swing, autoSize, size, evenLinks, start, end } = flexiTool;
+    setFlexiTool((current) => current ? { ...current, busy: true, error: null } : current);
+    void makeFlexi({
+      axis: axis === "auto" ? undefined : axis,
+      joints,
+      clearance,
+      swing,
+      size: autoSize ? undefined : size,
+      start: evenLinks ? undefined : start,
+      end: evenLinks ? undefined : end,
+    }, targets).then((result) => {
+      if (result.ok) setFlexiTool(null);
+      else setFlexiTool((current) => current ? { ...current, busy: false, error: result.message } : current);
+    });
+  }, [flexiTool, makeFlexi]);
+
+  // The panel belongs to the bodies it was opened for; another selection closes it.
+  useEffect(() => {
+    setFlexiTool((current) => current && !current.busy && !(selectedIds.length === current.targetIds.length && current.targetIds.every((id) => selectedIds.includes(id))) ? null : current);
   }, [selectedIds]);
 
   const applyShellTool = useCallback(() => {
@@ -14513,6 +14612,16 @@ export function LayerlingEditor({
         return { object: cutter ? mcpShapeSummary(cutter) : { id: result.id }, ...(result.edgeLeftOut ? { note: "The outline could not take the cutting edge; the wall has a flat top." } : {}) };
       }
 
+      if (command.action === "flexi_joints") {
+        const ids = new Set(mcpStringArray(params.ids));
+        const targets = currentShapes().filter((shape) => ids.has(shape.id));
+        if (!targets.length) throw new Error("Pass the ids of the objects to make flexi links from");
+        const result = await makeFlexi({ axis: params.axis, joints: params.joints, clearance: params.clearance, swing: params.swing, size: params.size, start: params.start, end: params.end }, targets);
+        if (!result.ok) throw new Error(result.message);
+        const made = currentShapes().find((shape) => shape.id === result.id);
+        return { object: made ? mcpShapeSummary(made) : { id: result.id }, joints: result.joints, links: result.links, swing: result.swing, axis: result.axis === "x" ? "X" : "Y" };
+      }
+
       if (command.action === "loft_sketches") {
         const ids = new Set(mcpStringArray(params.ids));
         const targets = currentShapes().filter((shape) => ids.has(shape.id));
@@ -17742,6 +17851,8 @@ export function LayerlingEditor({
         canGroup={!selectionLocked && selectedShapes.length > 1 && selectedShapes.every((shape) => !isNonSolidShapeKind(shape.kind))}
         canIntersect={!selectionLocked && canIntersectShapes(selectedShapes.filter((shape) => !isNonSolidShapeKind(shape.kind)))}
         canCookieCutter={!selectionLocked && selectedShapes.some((shape) => !isNonSolidShape(shape))}
+        canFlexi={!selectionLocked && selectedShapes.some((shape) => !shape.hole && !isNonSolidShape(shape))}
+        flexiActive={Boolean(flexiTool)}
         canLoftSketches={!selectionLocked && canSketchLoft(selectedShapes)}
         canUngroup={!selectionLocked && selectedShapes.some((shape) => Boolean(shape.groupedShapes?.length) || wasGroupBeforeEdgeTreatments(shape))}
         canModifySelection={hasSelection && !selectionLocked}
@@ -17842,6 +17953,7 @@ export function LayerlingEditor({
         onBundle={bundleSelected}
         onIntersect={intersectSelected}
         onCookieCutter={() => void makeCookieCutter()}
+        onFlexi={startFlexiTool}
         onLoftSketches={() => void loftSketches()}
         onIntersectPreview={toggleIntersectPreview}
         intersectPreviewActive={Boolean(intersectPreviewIds)}
@@ -18539,6 +18651,24 @@ export function LayerlingEditor({
           }}
         />
       ) : null}
+      {flexiTool ? (() => {
+        const targets = shapesRef.current.filter((shape) => flexiTool.targetIds.includes(shape.id));
+        const extent = flexiExtent(targets.length ? targets : selectedShapes);
+        const length = flexiTool.axis === "x" ? extent.x : flexiTool.axis === "z" ? extent.z : Math.max(extent.x, extent.z);
+        return (
+          <FlexiPanel
+            targetName={targets.map((shape) => shape.name).join(", ")}
+            settings={flexiTool}
+            length={length}
+            workspace={workspaceSettings}
+            busy={flexiTool.busy}
+            error={flexiTool.error}
+            onChange={(patch) => setFlexiTool((current) => current ? { ...current, ...patch, error: null } : current)}
+            onApply={applyFlexiTool}
+            onCancel={() => setFlexiTool(null)}
+          />
+        );
+      })() : null}
       {cutOutTool ? (
         <CutOutPanel
           partName={shapesRef.current.find((shape) => shape.id === cutOutTool.partId)?.name ?? ""}
