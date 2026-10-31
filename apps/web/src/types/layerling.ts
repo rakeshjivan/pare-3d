@@ -149,6 +149,11 @@ export type ShapeCustomization = {
   /** The chamfer at the bottom end; without it the bottom end has the same chamfer as the top. */
   threadChamferBottom?: number;
   threadHeadChamfer?: number;
+  /** Screw only (#1052): the head diameter (across flats on a hex head), the drive in its free face, and the drive's size and depth. Unset = the standard measure. */
+  threadHeadDiameter?: number;
+  threadDrive?: ThreadDrive;
+  threadDriveSize?: number;
+  threadDriveDepth?: number;
   springTurns?: number;
   springWire?: number;
   springHand?: ThreadHand;
@@ -596,6 +601,8 @@ export type GridfinityOpening = {
 /** Was aus dem Gewinde wird: Stange, Schraube, Mutter oder das Loch dafuer. */
 export type ThreadRole = "rod" | "screw" | "nut" | "bore";
 export type ThreadHead = "cylinder" | "countersunk" | "hex";
+/** What drives a screw: a recess in its free head face (#1052). */
+export type ThreadDrive = "hex" | "torx" | "phillips" | "none";
 export type ThreadHand = "right" | "left";
 /**
  * Die Zahnform: scharfe ISO-Spitze, flache Trapezflanke, rundes Profil oder
@@ -830,6 +837,11 @@ export type WorkplaneShape = {
   /** The chamfer at the bottom end; without it the bottom end has the same chamfer as the top. */
   threadChamferBottom?: number;
   threadHeadChamfer?: number;
+  /** Screw only (#1052): the head diameter (across flats on a hex head), the drive in its free face, and the drive's size and depth. Unset = the standard measure. */
+  threadHeadDiameter?: number;
+  threadDrive?: ThreadDrive;
+  threadDriveSize?: number;
+  threadDriveDepth?: number;
   springTurns?: number;
   springWire?: number;
   springHand?: ThreadHand;

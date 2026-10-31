@@ -558,6 +558,11 @@ export function normalizeShapeCustomizations(value: unknown, fallback: ShapeCust
       entry.threadChamfer = optionalShapeNumber(source.threadChamfer, fallbackEntry?.threadChamfer, 0, 40);
       entry.threadChamferBottom = optionalShapeNumber(source.threadChamferBottom, fallbackEntry?.threadChamferBottom, 0, 40);
       entry.threadHeadChamfer = optionalShapeNumber(source.threadHeadChamfer, fallbackEntry?.threadHeadChamfer, 0, 40);
+      entry.threadDrive = source.threadDrive === undefined
+        ? fallbackEntry?.threadDrive
+        : ["hex", "torx", "phillips", "none"].includes(source.threadDrive)
+          ? source.threadDrive
+          : fallbackEntry?.threadDrive;
     }
     if (kind === "gear") {
       entry.teeth = optionalShapeNumber(source.teeth, fallbackEntry?.teeth, 6, 150, true);

@@ -11,6 +11,7 @@ Choose {{ui:shape.thread}} in the shape library. Under {{ui:inspector.threadRole
 
 - **{{ui:thread.rod}}:** a cylinder with thread, for example a screw without a head.
 - **{{ui:thread.screw}}:** with a head. You choose the {{ui:inspector.threadHead}}: {{ui:thread.headCylinder}}, {{ui:thread.headCountersunk}} or {{ui:thread.headHex}}.
+  Further down you set the head's {{ui:prop.headDiameter}} (on a hex head {{ui:prop.headAcrossFlats}}; a countersunk head's diameter follows its height) and the {{ui:inspector.threadDrive}} in its face: {{ui:thread.driveHex}}, {{ui:thread.driveTorx}}, {{ui:thread.drivePhillips}} or {{ui:thread.driveNone}} for a screw turned by hand or with a spanner. {{ui:prop.driveSize}} is the socket's width across flats, the Torx star's outer diameter or the span of the cross; {{ui:prop.driveDepth}} is how deep it goes, at most nine tenths of the head, and 0 leaves it out. Until you change them they follow the size; a hex head starts without a drive. The drive is part of the exact body, so it also comes out in the STEP export.
 - **{{ui:thread.nut}}:** the matching nut.
 - **{{ui:thread.bore}}:** a tapped hole. It is a hole. Drag it into a part, group both, and the part has an internal thread.
 

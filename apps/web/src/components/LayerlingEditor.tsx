@@ -14156,6 +14156,10 @@ export function LayerlingEditor({
             threadChamfer: threaded.threadChamfer,
             threadChamferBottom: threaded.threadChamferBottom,
             threadHeadChamfer: threaded.threadHeadChamfer,
+            threadHeadDiameter: threaded.threadHeadDiameter,
+            threadDrive: threaded.threadDrive,
+            threadDriveSize: threaded.threadDriveSize,
+            threadDriveDepth: threaded.threadDriveDepth,
             width: threaded.width,
             depth: threaded.depth,
           });

@@ -14,7 +14,7 @@ const SHAPE_DEFAULT_FIELDS = [
   "cornerFillet", "topBottomFillet", "roundedBoxQuality", "steps", "sides", "bevel", "segments", "topRadius", "baseRadius",
   "topWidth", "topDepth", "teeth", "toothSize", "toothWidth", "centerHoleSize", "gearType", "helixAngle", "helixQuality", "gearProfile", "gearPressureAngle", "gearBacklash", "gearRim",
   "threadRole", "threadHead", "threadHand", "threadProfile", "threadDiameter", "threadPitch", "threadClearance",
-  "threadBoltClearance", "threadAxialClearance", "threadDepth", "threadFlankAngle", "threadQuality", "threadHeadHeight", "threadChamfer", "threadChamferBottom", "threadHeadChamfer", "springTurns",
+  "threadBoltClearance", "threadAxialClearance", "threadDepth", "threadFlankAngle", "threadQuality", "threadHeadHeight", "threadChamfer", "threadChamferBottom", "threadHeadChamfer", "threadDrive", "springTurns",
   "springWire", "springHand", "springQuality", "starPoints", "starInnerSize", "starOuterFillet", "starInnerFillet",
   "starQuality", "heartTipFillet", "heartQuality", "crescentThickness", "crescentTipFillet", "crescentQuality",
   "honeycombCellSize", "honeycombWallThickness", "honeycombFrameWidth", "hingeKnuckles", "hingePinDiameter",

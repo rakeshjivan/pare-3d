@@ -643,6 +643,10 @@ function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {
         threadChamfer: shape.threadChamfer,
         threadChamferBottom: shape.threadChamferBottom,
         threadHeadChamfer: shape.threadHeadChamfer,
+        threadHeadDiameter: shape.threadHeadDiameter,
+        threadDrive: shape.threadDrive,
+        threadDriveSize: shape.threadDriveSize,
+        threadDriveDepth: shape.threadDriveDepth,
       });
       break;
     case "spring":

@@ -1092,6 +1092,10 @@ export function tapeShapeTopologyKey(shape: WorkplaneShape): string {
     threadChamfer: shape.threadChamfer,
     threadChamferBottom: shape.threadChamferBottom,
     threadHeadChamfer: shape.threadHeadChamfer,
+    threadHeadDiameter: shape.threadHeadDiameter,
+    threadDrive: shape.threadDrive,
+    threadDriveSize: shape.threadDriveSize,
+    threadDriveDepth: shape.threadDriveDepth,
     springTurns: shape.springTurns,
     springWire: shape.springWire,
     springHand: shape.springHand,
@@ -1409,6 +1413,10 @@ export function shapeGeometrySignature(shape: WorkplaneShape): string {
     threadChamfer: shape.threadChamfer,
     threadChamferBottom: shape.threadChamferBottom,
     threadHeadChamfer: shape.threadHeadChamfer,
+    threadHeadDiameter: shape.threadHeadDiameter,
+    threadDrive: shape.threadDrive,
+    threadDriveSize: shape.threadDriveSize,
+    threadDriveDepth: shape.threadDriveDepth,
     springTurns: shape.springTurns,
     springWire: shape.springWire,
     springHand: shape.springHand,
@@ -15195,6 +15203,10 @@ function createShapeObject(
         threadChamfer: shape.threadChamfer,
         threadChamferBottom: shape.threadChamferBottom,
         threadHeadChamfer: shape.threadHeadChamfer,
+        threadHeadDiameter: shape.threadHeadDiameter,
+        threadDrive: shape.threadDrive,
+        threadDriveSize: shape.threadDriveSize,
+        threadDriveDepth: shape.threadDriveDepth,
       })), material, shape);
       break;
     case "spring":

@@ -1,3 +1,4 @@
+import type { ThreadDriveOutline } from "@/lib/threadGeometry";
 import type { GridfinityCompartmentLabel, GridfinityLabelCorner, GridfinityOpening, GridfinityType, ShellEdges, ShellOpenings } from "@/types/layerling";
 
 export type CadModifierKind = "chamfer" | "chamfillet" | "fillet" | "shell" | "deleteFace" | "draft" | "offset";
@@ -220,8 +221,8 @@ export type CadModifierThreadPart = {
     neckRadius: number;
     /** Radius of the flat faces when both head edges are chamfered, or 0. */
     chamferFaceRadius: number;
-    /** Hex socket across flats and depth, or 0 depth for none. */
-    socketAcrossFlats: number;
+    /** The drive in the free head face (#1052) as its outline in the x/z plane of the shape, and its depth; 0 depth for none. */
+    driveOutline?: ThreadDriveOutline;
     socketDepth: number;
   };
   /** Nut only: its hex across flats, and the face radius of its chamfered rims (0 for sharp). */

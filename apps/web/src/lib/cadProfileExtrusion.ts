@@ -1352,6 +1352,10 @@ export function cadModifierThreadForShape(shape: WorkplaneShape): CadModifierThr
     threadChamfer: shape.threadChamfer,
     threadChamferBottom: shape.threadChamferBottom,
     threadHeadChamfer: shape.threadHeadChamfer,
+    threadHeadDiameter: shape.threadHeadDiameter,
+    threadDrive: shape.threadDrive,
+    threadDriveSize: shape.threadDriveSize,
+    threadDriveDepth: shape.threadDriveDepth,
   });
   const { settings, spec } = plan;
   const part: CadModifierThreadPart = {
@@ -1381,12 +1385,12 @@ export function cadModifierThreadForShape(shape: WorkplaneShape): CadModifierThr
     part.head = {
       kind: settings.head,
       height: plan.headHeight,
-      radius: settings.head === "countersunk" ? plan.headCrown : spec.headDiameter / 2,
-      acrossFlats: spec.acrossFlats,
+      radius: settings.head === "countersunk" ? plan.headCrown : settings.headDiameter / 2,
+      acrossFlats: settings.headDiameter,
       neckRadius: settings.diameter / 2,
       chamferFaceRadius: plan.headBroken ? plan.headFaceRadius : 0,
-      socketAcrossFlats: spec.socket,
-      socketDepth: plan.hasSocket ? plan.socketDepth : 0,
+      ...(plan.driveOutline ? { driveOutline: plan.driveOutline } : {}),
+      socketDepth: plan.driveOutline ? plan.socketDepth : 0,
     };
   }
   if (settings.role === "nut") part.nut = { acrossFlats: spec.acrossFlats, chamferFaceRadius: plan.rimBroken ? plan.rimFaceRadius : 0 };

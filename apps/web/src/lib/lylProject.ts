@@ -1440,6 +1440,14 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
       const threadHeadChamfer = finiteNumber(definition.threadHeadChamfer, `${label}.threadHeadChamfer`);
       if (threadHeadChamfer < 0 || threadHeadChamfer > 480) throw new Error(`${label}.threadHeadChamfer is outside the supported range`);
     }
+    if (definition.threadDrive !== undefined && !["hex", "torx", "phillips", "none"].includes(definition.threadDrive as string)) {
+      throw new Error(`${label}.threadDrive is invalid`);
+    }
+    for (const field of ["threadHeadDiameter", "threadDriveSize", "threadDriveDepth"] as const) {
+      if (definition[field] === undefined) continue;
+      const value = finiteNumber(definition[field], `${label}.${field}`);
+      if (value < 0 || value > 640) throw new Error(`${label}.${field} is outside the supported range`);
+    }
   }
   if (kind === "pyramid") {
     ["topWidth", "topDepth"].forEach((field) => {

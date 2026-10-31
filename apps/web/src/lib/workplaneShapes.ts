@@ -597,6 +597,10 @@ export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
     a.threadChamfer === b.threadChamfer &&
     a.threadChamferBottom === b.threadChamferBottom &&
     a.threadHeadChamfer === b.threadHeadChamfer &&
+    a.threadHeadDiameter === b.threadHeadDiameter &&
+    a.threadDrive === b.threadDrive &&
+    a.threadDriveSize === b.threadDriveSize &&
+    a.threadDriveDepth === b.threadDriveDepth &&
     a.parametricSource?.kind === b.parametricSource?.kind &&
     a.parametricSource?.rotation === b.parametricSource?.rotation &&
     a.parametricSource?.rotationX === b.parametricSource?.rotationX &&

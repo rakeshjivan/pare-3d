@@ -54,6 +54,7 @@ import {
   threadNaturalFootprint,
   threadNaturalHeight,
   threadSettings,
+  threadDriveFields,
 } from "@/lib/threadGeometry";
 import {
   DEFAULT_SPRING_QUALITY,
@@ -666,6 +667,10 @@ export function sceneShape(shape: Partial<WorkplaneShape> & Pick<WorkplaneShape,
     threadChamfer: shape.threadChamfer,
     threadChamferBottom: shape.threadChamferBottom,
     threadHeadChamfer: shape.threadHeadChamfer,
+    threadHeadDiameter: shape.threadHeadDiameter,
+    threadDrive: shape.threadDrive,
+    threadDriveSize: shape.threadDriveSize,
+    threadDriveDepth: shape.threadDriveDepth,
     springTurns: shape.springTurns,
     springWire: shape.springWire,
     springHand: shape.springHand,
@@ -844,6 +849,10 @@ export function makeShapeFromAsset(
     threadChamfer: customization.threadChamfer,
     threadChamferBottom: customization.threadChamferBottom,
     threadHeadChamfer: customization.threadHeadChamfer,
+    threadHeadDiameter: customization.threadHeadDiameter,
+    threadDrive: customization.threadDrive,
+    threadDriveSize: customization.threadDriveSize,
+    threadDriveDepth: customization.threadDriveDepth,
   }) : null;
   const threadFootprint = threadDefaults ? threadNaturalFootprint(threadDefaults) : null;
   // Ein gebogenes Rohr bekommt seinen Rahmen aus Profil und Segmenten. Ein
@@ -991,6 +1000,7 @@ export function makeShapeFromAsset(
     threadChamfer: threadDefaults ? threadDefaults.chamfer : undefined,
     threadChamferBottom: threadDefaults && customization.threadChamferBottom !== undefined ? threadDefaults.chamferLow : undefined,
     threadHeadChamfer: threadDefaults ? threadDefaults.headChamfer : undefined,
+    ...(threadDefaults ? threadDriveFields(customization, threadDefaults) : {}),
     springTurns: asset.kind === "spring" ? normalizeSpringTurns(customization.springTurns ?? DEFAULT_SPRING_TURNS, Math.max(width, depth), height, customization.springWire) : undefined,
     springWire: asset.kind === "spring" ? normalizeSpringWire(customization.springWire ?? DEFAULT_SPRING_WIRE, Math.max(width, depth), height) : undefined,
     springQuality: asset.kind === "spring" ? normalizeSpringQuality(customization.springQuality ?? DEFAULT_SPRING_QUALITY) : undefined,
