@@ -11701,7 +11701,7 @@ export function LayerlingEditor({
       const m = state.toothMarks[fdi];
       if (m) for (const key of TOOTH_MARK_ORDER) points.push(new THREE.Vector3(...m[key]).applyMatrix4(back).toArray() as [number, number, number]);
     }
-    window.layerlingHighlight?.(points.length ? markerTriangles(points, 0.35) : null);
+    window.layerlingHighlight?.(points.length ? markerTriangles(points, 0.6) : null);
   }, [waxArch]); // eslint-disable-line react-hooks/exhaustive-deps
   const startToothMarks = useCallback((only?: number[]) => {
     const arch = waxArch();
