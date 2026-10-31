@@ -356,7 +356,9 @@ export type GimbalView = {
   x: number;
   y: number;
   arrows: Array<{ axis: RotationAxis; x: number; y: number }>;
-  rings: Array<{ axis: RotationAxis; path: string }>;
+  rings: Array<{ axis: RotationAxis; path: string; opacity?: number }>;
+  /** Build 104 (gimbal 2): the radius of the outer ring that turns about the line of sight. */
+  viewRadius?: number;
 };
 
 export type RotationReadout = {

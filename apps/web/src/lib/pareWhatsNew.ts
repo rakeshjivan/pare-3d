@@ -17,6 +17,8 @@ export const WHATS_NEW: ReadonlyArray<{ build: number; items: readonly string[] 
       "STEP files with several solids come in as one body each, in their colours; STEP import and export run off the page. Shading of round bodies is several times faster, the edge tool's preview is about a third quicker, large filleted bodies respond sooner, and the offline copy downloads about 10 MB less. The CAD kernel is updated (occt-wasm 5.11, brepjs 20) and the shared-folder server script has layerling's latest hardening.",
       "Start page: the ⋮ menu is smaller and no longer cut off, and Select lets you tick several designs and delete them together.",
       "Dental Studio no longer asks whether imported scans should be made solid - scans are the work there.",
+      "CAD Studio always opens with Tinkercad's box and handles. The gimbal is on the right-click menu (Use the gimbal).",
+      "A much friendlier gimbal: while holding an arrow or ring, type a number for an exact distance or angle (Enter applies, Esc cancels) - or click an arrow or ring and type. Rings turn in 15° steps close by and freely further out; Shift is finer, Ctrl (Cmd) free. A grey outer ring turns the part as you see it, rings seen edge on fade, and a small bar under the gimbal switches between the part's and the plate's axes, lays the part flat, drops it on the plate and turns it 90°. In Dental Studio the arrows are named as in the mouth: L – R, Front – Back and Occlusal.",
     ],
   },
   {

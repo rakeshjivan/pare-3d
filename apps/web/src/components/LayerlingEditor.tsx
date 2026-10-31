@@ -1872,6 +1872,9 @@ function withSelectionPivot(shape: WorkplaneShape, pivot: PivotPoint | null): Wo
 /** Where the cookie cutter panel keeps its settings for the next cutter (#982). */
 const COOKIE_CUTTER_SETTINGS_STORAGE_KEY = "layerling.cookieCutterSettings";
 
+/** Build 104 (gimbal 2): Dental Studio names the gimbal's directions as the mouth has them (models stand teeth up, front towards you). */
+const DENTAL_GIMBAL_LABELS = { x: "L – R", y: "Occlusal", z: "Front – Back" } as const;
+
 export function LayerlingEditor({
   initialAssets = [],
   initialShapes = [],
@@ -18385,6 +18388,9 @@ export function LayerlingEditor({
           />
         ) : (
           <WorkplaneViewport
+        onGimbalLayFlat={toggleLayFlat}
+        onGimbalDrop={dropSelectedToWorkplane}
+        gimbalAxisLabels={dentalWorkspace ? DENTAL_GIMBAL_LABELS : undefined}
           projectName={projectName}
           projectId={editorOpen ? projectId ?? null : null}
           shapes={heldViewportShapes}

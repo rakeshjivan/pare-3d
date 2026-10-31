@@ -539,6 +539,11 @@ type WorkplaneViewportProps = {
   onSectionContours?: (axis: SectionPlaneAxis, offset: number, frame: SectionFrame | null) => Promise<SectionLoop[]>;
   /** The bodies of the cut with their colours, to fill the cut face of the section view (#516). */
   onSectionBodies?: (axis: SectionPlaneAxis, offset: number, frame: SectionFrame | null) => Promise<SectionBody[]>;
+  /** Build 104 (gimbal 2): the gimbal's own buttons for laying the selection flat and dropping it on the plate. */
+  onGimbalLayFlat?: () => void;
+  onGimbalDrop?: () => void;
+  /** Build 104 (gimbal 2): names for the gimbal's directions - in Dental Studio, the mouth's (left-right, front-back, occlusal). */
+  gimbalAxisLabels?: Partial<Record<RotationAxis, string>>;
 };
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;
@@ -845,6 +850,13 @@ type TransformDragState = {
   liftAxis?: THREE.Vector3;
   /** Build 99: a gimbal arrow - moved along this axis by the snap step, its distance shown (not the elevation). */
   gimbalMove?: boolean;
+  /** Build 104 (gimbal 2): a number typed while a gimbal handle is held - the exact distance or angle. */
+  typed?: string;
+  /** Build 104: a gimbal handle clicked without a drag - the session waits for a typed value. */
+  awaitingType?: boolean;
+  /** Build 104: where the pointer last was, so a typed digit can update the drag without a move. */
+  lastClientX?: number;
+  lastClientY?: number;
   liftPlane?: THREE.Plane;
   liftStartPoint?: THREE.Vector3;
   liftHandlePoint?: THREE.Vector3;
@@ -3521,6 +3533,9 @@ export const SURFACE_TEXT_DRAG_GHOST_ID = "surface-text-drag-ghost";
 
 export function WorkplaneViewport({
   shapes,
+  onGimbalLayFlat,
+  onGimbalDrop,
+  gimbalAxisLabels,
   selectedIds,
   alignMode,
   multiSelect = false,
@@ -6024,7 +6039,7 @@ export function WorkplaneViewport({
   }, [onDuplicateShapesMoved]);
 
   const beginTransform = useCallback(
-    (kind: TransformHandleKind, handleKey: string, event: ReactPointerEvent<Element>, moveAlong?: THREE.Vector3) => {
+    (kind: TransformHandleKind, handleKey: string, event: ReactPointerEvent<Element>, moveAlong?: THREE.Vector3, rotateAbout?: THREE.Vector3) => {
       if (event.button !== 0) {
         return;
       }
@@ -6057,7 +6072,7 @@ export function WorkplaneViewport({
       const rect = state?.renderer.domElement.getBoundingClientRect();
       const localClientX = rect ? event.clientX - rect.left : event.clientX;
       const localClientY = rect ? event.clientY - rect.top : event.clientY;
-      const axisVector = rotationAxisVectorForFrame(handleKey, frame);
+      const axisVector = rotateAbout?.clone().normalize() ?? rotationAxisVectorForFrame(handleKey, frame);
       const pivot = pivotVector(rotationPivotRef.current) ?? frame.center.clone();
       const rotationCenter = kind === "rotate" ? wheel ?? (state ? projectToScreen(pivot, state) : { x: localClientX, y: localClientY }) : undefined;
       const rotationStartPoint = kind === "rotate" && state ? rayPointOnRotationPlane(state, event.clientX, event.clientY, rotationPlaneCenter, axisVector) : null;
@@ -6187,14 +6202,33 @@ export function WorkplaneViewport({
   const beginGimbalMove = useCallback((axis: RotationAxis, event: ReactPointerEvent<Element>) => {
     const frame = selectionFrameForShapes(shapesRef.current, selectedIdsRef.current, placementWorkplaneRef.current);
     if (!frame) return;
-    const along = (axis === "x" ? frame.xAxis : axis === "y" ? frame.yAxis : frame.zAxis).clone().normalize();
+    const along = gimbalAxesFor(frame)[axis].clone().normalize();
     setGimbalActive({ kind: "move", axis });
     beginTransform("lift", `gimbal-move-${axis}`, event, along);
   }, [beginTransform]);
-  const beginGimbalTurn = useCallback((axis: RotationAxis, event: ReactPointerEvent<Element>) => {
-    setGimbalActive({ kind: "turn", axis });
-    beginTransform("rotate", `gimbal-rotate-${axis}`, event);
+  const beginGimbalTurn = useCallback((axis: RotationAxis | "view", event: ReactPointerEvent<Element>) => {
+    const frame = selectionFrameForShapes(shapesRef.current, selectedIdsRef.current, placementWorkplaneRef.current);
+    const state = threeRef.current;
+    if (!frame || !state) return;
+    // Build 104 (gimbal 2): the outer ring turns about the line of sight - the part turns as it is seen.
+    const about = axis === "view"
+      ? frame.center.clone().sub(state.camera.position).normalize()
+      : gimbalAxesFor(frame)[axis].clone().normalize();
+    setGimbalActive({ kind: "turn", axis: axis === "view" ? "y" : axis });
+    setGimbalViewTurn(axis === "view");
+    beginTransform("rotate", `gimbal-rotate-${axis === "view" ? "y" : axis}`, event, undefined, about);
+    if (axis === "view" && transformRef.current) transformRef.current.handleKey = "gimbal-rotate-view";
   }, [beginTransform]);
+  const [gimbalViewTurn, setGimbalViewTurn] = useState(false);
+  const [gimbalSpace, setGimbalSpaceState] = useState<GimbalSpace>(() => gimbalSpaceNow);
+  const toggleGimbalSpace = useCallback(() => {
+    const next: GimbalSpace = gimbalSpaceNow === "local" ? "world" : "local";
+    gimbalSpaceNow = next;
+    try { window.localStorage.setItem(GIMBAL_SPACE_KEY, next); } catch { /* this visit only */ }
+    setGimbalSpaceState(next);
+    const state = threeRef.current;
+    if (state) state.needsRender = true;
+  }, []);
   const gimbalStyle = useHandleStyle();
   useEffect(() => {
     handleStyleNow = gimbalStyle;
@@ -6333,9 +6367,17 @@ export function WorkplaneViewport({
       if (!transform) {
         return false;
       }
+      // Build 104 (gimbal 2): while a clicked handle waits for a typed value, the pointer does not drag it.
+      if (transform.awaitingType && clientX !== transform.lastClientX) {
+        clientX = transform.lastClientX ?? clientX;
+        clientY = transform.lastClientY ?? clientY;
+      }
+      transform.lastClientX = clientX;
+      transform.lastClientY = clientY;
       if (Math.hypot(clientX - transform.startClientX, clientY - transform.startClientY) > 3) {
         transform.hasMoved = true;
       }
+      const typedValue = transform.typed !== undefined && transform.typed !== "" && transform.typed !== "-" ? Number(transform.typed.replace(",", ".")) : NaN;
 
       const step = snapStep(snapRef.current);
       if (transform.kind === "height") {
@@ -6383,8 +6425,12 @@ export function WorkplaneViewport({
           : 0;
         // The bottom lands on the grid of the workplane, not a step from where it stood.
         // Build 99: a gimbal arrow moves by whole snap steps from where the part stood.
-        const delta = transform.gimbalMove
-          ? (step > 0 ? Math.round(rawDelta / step) * step : rawDelta)
+        // Build 104 (gimbal 2): Shift moves in tenths of the snap step, Ctrl (Cmd) freely; a typed number exactly.
+        const gimbalStep = gimbalCtrlHeld ? 0 : shiftKey ? step / 10 : step;
+        const delta = transform.gimbalMove && Number.isFinite(typedValue)
+          ? typedValue
+          : transform.gimbalMove
+          ? (gimbalStep > 0 ? Math.round(rawDelta / gimbalStep) * gimbalStep : rawDelta)
           : liftDeltaOnGrid(liftGeometryForFrame(transform.selectionFrame, placementWorkplaneRef.current).low, rawDelta, step);
         transform.items.forEach((item) => {
           const nextCenter = item.startCenter.clone().addScaledVector(axis, delta);
@@ -6403,7 +6449,9 @@ export function WorkplaneViewport({
           setRotationReadout({
             x: readoutPoint.x + 28,
             y: readoutPoint.y - 30,
-            text: transform.gimbalMove ? `${delta >= 0 ? "+" : "−"}${formatMeasure(Math.abs(delta), workspaceRef.current.accuracy)}` : formatMeasure((transform.liftStartValue ?? 0) + delta, workspaceRef.current.accuracy),
+            text: transform.gimbalMove
+              ? gimbalReadoutText("move", transform, delta, gimbalCtrlHeld ? "free" : shiftKey ? "fine" : "snap", workspaceRef.current.accuracy)
+              : formatMeasure((transform.liftStartValue ?? 0) + delta, workspaceRef.current.accuracy),
           });
         }
         return true;
@@ -6489,7 +6537,16 @@ export function WorkplaneViewport({
         transform.rotationWheelAppliedDelta = undefined;
         transform.rotationWheelAppliedPointerAngle = undefined;
       }
-      const delta = wheelRotation?.delta ?? snappedRotationDelta(rawDelta, false, shiftKey);
+      // Build 104 (gimbal 2): a gimbal ring turns in 15° steps near the ring and freely further out (as
+      // Tinkercad's arc does), Shift in 5° steps; a typed number turns it exactly.
+      const gimbalTurn = transform.handleKey.startsWith("gimbal-rotate");
+      const gimbalFar = gimbalTurn && Math.hypot(localClientX - rotationCenter.x, localClientY - rotationCenter.y) > (transform.handleKey === "gimbal-rotate-view" ? GIMBAL_VIEW_RING * 1.35 : GIMBAL_RING * 1.55);
+      const gimbalSnap: "snap" | "fine" | "free" = gimbalCtrlHeld || gimbalFar ? "free" : shiftKey ? "fine" : "snap";
+      const delta = gimbalTurn && Number.isFinite(typedValue)
+        ? typedValue
+        : gimbalTurn
+        ? Math.round(rawDelta / (gimbalSnap === "free" ? 1 : gimbalSnap === "fine" ? 5 : 15)) * (gimbalSnap === "free" ? 1 : gimbalSnap === "fine" ? 5 : 15)
+        : wheelRotation?.delta ?? snappedRotationDelta(rawDelta, false, shiftKey);
 
       const deltaQuaternion = new THREE.Quaternion().setFromAxisAngle(axisVector, THREE.MathUtils.degToRad(delta));
       const rotationDelta = deltaQuaternion.clone();
@@ -6497,7 +6554,7 @@ export function WorkplaneViewport({
         setRotationReadout({
           x: transform.wheelCenter ? transform.wheelCenter.x : localClientX + 18,
           y: transform.wheelCenter ? transform.wheelCenter.y - 92 : localClientY - 18,
-          text: `${Number(delta.toFixed(1))}°`,
+          text: gimbalTurn ? gimbalReadoutText("turn", transform, delta, gimbalSnap, workspaceRef.current.accuracy) : `${Number(delta.toFixed(1))}°`,
           angle: delta,
           pointerAngle: wheelRotation?.pointerAngle ?? rawPointerAngle,
           fine: shiftKey && insideSnapWheel,
@@ -6598,6 +6655,102 @@ export function WorkplaneViewport({
     onInteractionActiveChange?.(false);
     bakeRotatedShapes.forEach((id) => onUpdateShape(id, { bakeTransform: true }));
   }, [onDuplicateShapesMoved, onInteractionActiveChange, onUpdateShape, suppressCornerEditAfterDrag, suppressLiftEditAfterDrag]);
+
+  // Build 104 (gimbal 2): the end of a gimbal drag - or, for a handle clicked without a drag, the start of
+  // typing an exact value (Enter applies it, Esc or a click elsewhere leaves the part as it was).
+  const releasePointerOnly = useMemo(() => ({ hasPointerCapture: () => false, releasePointerCapture: () => undefined }), []);
+  const endGimbal = useCallback((event?: ReactPointerEvent<Element>) => {
+    const transform = transformRef.current;
+    if (event && transform && !transform.hasMoved && transform.typed === undefined && !transform.awaitingType) {
+      if (event.currentTarget.hasPointerCapture(transform.pointerId)) event.currentTarget.releasePointerCapture(transform.pointerId);
+      transform.awaitingType = true;
+      transform.typed = "";
+      updateTransform(transform.lastClientX ?? transform.startClientX, transform.lastClientY ?? transform.startClientY);
+      return;
+    }
+    setGimbalActive(null);
+    setGimbalViewTurn(false);
+    finishTransform((event ?? { currentTarget: releasePointerOnly }) as ReactPointerEvent<Element>);
+  }, [finishTransform, releasePointerOnly, updateTransform]);
+  const cancelGimbal = useCallback(() => {
+    const transform = transformRef.current;
+    if (!transform) return;
+    transform.typed = "0";
+    updateTransform(transform.lastClientX ?? transform.startClientX, transform.lastClientY ?? transform.startClientY);
+    transform.hasMoved = false;
+    setGimbalActive(null);
+    setGimbalViewTurn(false);
+    finishTransform({ currentTarget: releasePointerOnly } as unknown as ReactPointerEvent<Element>);
+  }, [finishTransform, releasePointerOnly, updateTransform]);
+  // Typing while a gimbal handle is held (or after it was clicked): digits, a point or comma, minus, Backspace,
+  // Enter to apply, Esc to cancel. Ctrl (Cmd) held moves and turns freely.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Control" || event.key === "Meta") gimbalCtrlHeld = event.type === "keydown";
+      if (event.type !== "keydown") return;
+      const transform = transformRef.current;
+      if (!transform || !transform.handleKey.startsWith("gimbal-")) return;
+      const typed = transform.typed ?? "";
+      let next: string | null = null;
+      if (/^[0-9]$/.test(event.key)) next = typed + event.key;
+      else if ((event.key === "." || event.key === ",") && !typed.includes(".")) next = (typed || "0") + ".";
+      else if (event.key === "-") next = typed.startsWith("-") ? typed.slice(1) : `-${typed}`;
+      else if (event.key === "Backspace") next = typed.slice(0, -1);
+      else if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        transform.hasMoved = true;
+        endGimbal();
+        return;
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        cancelGimbal();
+        return;
+      }
+      if (next === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      transform.typed = next;
+      transform.hasMoved = true;
+      updateTransform(transform.lastClientX ?? transform.startClientX, transform.lastClientY ?? transform.startClientY);
+    };
+    const onBlur = () => { gimbalCtrlHeld = false; };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("keyup", onKey, true);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("keyup", onKey, true);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [cancelGimbal, endGimbal, updateTransform]);
+  // A click anywhere else while a clicked handle waits for a number: the part stays as it was.
+  useEffect(() => {
+    const onDown = (event: PointerEvent) => {
+      const transform = transformRef.current;
+      if (!transform?.awaitingType) return;
+      if ((event.target as HTMLElement | null)?.closest?.(".gimbal-hit, .gimbal-chips")) return;
+      cancelGimbal();
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    return () => window.removeEventListener("pointerdown", onDown, true);
+  }, [cancelGimbal]);
+  /** Build 104 (gimbal 2): a quarter turn about the vertical, about the pivot or the selection's middle. */
+  const turnSelectionQuarter = useCallback((direction: 1 | -1) => {
+    const ids = selectedIdsRef.current;
+    const frame = selectionFrameForShapes(shapesRef.current, ids, placementWorkplaneRef.current);
+    if (!frame || ids.some((id) => shapesRef.current.find((entry) => entry.id === id)?.locked)) return;
+    const pivot = pivotVector(rotationPivotRef.current) ?? frame.center.clone();
+    const delta = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (direction * Math.PI) / 2);
+    onInteractionActiveChange?.(true);
+    frame.ids.forEach((id) => {
+      const shape = shapesRef.current.find((entry) => entry.id === id);
+      if (!shape) return;
+      onUpdateShape(id, { ...rotatedGeometryShapePatch(shape, delta, pivot), bakeTransform: true });
+    });
+    onInteractionActiveChange?.(false);
+  }, [onInteractionActiveChange, onUpdateShape]);
 
   // The calculation a box was last set from (#180), while it still gives the body's size; the
   // box then opens on the formula instead of the number, as the Properties field does.
@@ -10844,12 +10997,19 @@ export function WorkplaneViewport({
               width={transformOverlay.width}
               height={transformOverlay.height}
               active={gimbalActive}
+              viewTurn={gimbalViewTurn}
               readout={rotationReadout}
               locked={selectionLocked}
               onMove={beginGimbalMove}
               onTurn={beginGimbalTurn}
               onDrag={updateTransform}
-              onEnd={(event) => { setGimbalActive(null); finishTransform(event); }}
+              onEnd={endGimbal}
+              space={gimbalSpace}
+              onToggleSpace={toggleGimbalSpace}
+              onQuarterTurn={turnSelectionQuarter}
+              onLayFlat={onGimbalLayFlat}
+              onDrop={onGimbalDrop}
+              axisLabels={gimbalAxisLabels}
               onBeginCameraDrag={beginCameraDragFromOverlay}
               onCameraWheel={forwardCameraWheelFromOverlay}
             />
@@ -13508,6 +13668,44 @@ function updateTransformOverlayDom(state: ThreeState, next: TransformOverlayStat
  */
 const GIMBAL_ARROW = 86;
 const GIMBAL_RING = 66;
+/** Build 104 (gimbal 2): the outer ring that turns a part about the line of sight. */
+const GIMBAL_VIEW_RING = 104;
+
+/** Build 104 (gimbal 2): Ctrl (Cmd) held - a gimbal moves and turns freely, without snapping. */
+let gimbalCtrlHeld = false;
+/** Build 104 (gimbal 2): the gimbal's axes - the part's own (local) or the plate's (world); remembered. */
+type GimbalSpace = "local" | "world";
+const GIMBAL_SPACE_KEY = "pare3d.gimbalSpace";
+let gimbalSpaceNow: GimbalSpace = (() => {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(GIMBAL_SPACE_KEY) === "world" ? "world" : "local";
+  } catch {
+    return "local";
+  }
+})();
+const WORLD_GIMBAL_AXES: Record<RotationAxis, THREE.Vector3> = {
+  x: new THREE.Vector3(1, 0, 0),
+  y: new THREE.Vector3(0, 1, 0),
+  z: new THREE.Vector3(0, 0, 1),
+};
+function gimbalAxesFor(frame: { xAxis: THREE.Vector3; yAxis: THREE.Vector3; zAxis: THREE.Vector3 }): Record<RotationAxis, THREE.Vector3> {
+  return gimbalSpaceNow === "world" ? WORLD_GIMBAL_AXES : { x: frame.xAxis, y: frame.yAxis, z: frame.zAxis };
+}
+
+/** Build 104 (gimbal 2): what the readout says while a gimbal handle is held or waits for a number. */
+function gimbalReadoutText(kind: "move" | "turn", transform: { typed?: string; awaitingType?: boolean }, delta: number, snap: "snap" | "fine" | "free", accuracy: MeasurementAccuracy) {
+  const unit = kind === "move" ? " mm" : "°";
+  if (transform.typed !== undefined && (transform.typed !== "" || transform.awaitingType)) {
+    const shown = transform.typed === "" ? "…" : transform.typed;
+    return `${t(kind === "move" ? "gimbal.typeDistance" : "gimbal.typeAngle")}: ${shown}${unit}  ·  ${t("gimbal.enterToApply")}`;
+  }
+  const value = kind === "move"
+    ? `${delta >= 0 ? "+" : "−"}${formatMeasure(Math.abs(delta), accuracy)}`
+    : `${delta >= 0 ? "+" : "−"}${Number(Math.abs(delta).toFixed(1))}°`;
+  const hint = snap === "free" ? t("gimbal.free") : snap === "fine" ? t("gimbal.fine") : t(kind === "move" ? "gimbal.snapMove" : "gimbal.snapTurn");
+  return `${value}  ·  ${hint}`;
+}
+
 function gimbalGeometry(
   project: (point: THREE.Vector3) => { x: number; y: number; visible: boolean },
   center: THREE.Vector3,
@@ -13542,10 +13740,13 @@ function gimbalGeometry(
       points.push(`${k ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`);
       minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
     }
-    // Seen edge on, a ring is a line: no ring to take hold of.
-    if (Math.min(maxX - minX, maxY - minY) > 10) rings.push({ axis, path: points.join(" ") });
+    // Seen edge on, a ring is a line: no ring to take hold of. Build 104: one seen nearly edge on fades,
+    // so the rings that are easy to take hold of stand out.
+    const narrow = Math.min(maxX - minX, maxY - minY);
+    const wide = Math.max(maxX - minX, maxY - minY, 1);
+    if (narrow > 10) rings.push({ axis, path: points.join(" "), opacity: Math.max(0.3, Math.min(1, (narrow / wide) * 2.2)) });
   });
-  return { x: c.x, y: c.y, arrows, rings };
+  return { x: c.x, y: c.y, arrows, rings, viewRadius: GIMBAL_VIEW_RING };
 }
 
 function syncTransformOverlay(
@@ -13835,7 +14036,7 @@ function syncTransformOverlay(
     z: makePlaneView(ringCenter ?? zFaceCenter, xFootAxis, yFootAxis, zFootAxis),
   };
   const gimbal = gimbalStyle && centerPoint.visible && !cameraInsideSelection
-    ? gimbalGeometry(project, ringCenter ?? frame.center, { x: xFootAxis, y: yFootAxis, z: zFootAxis }, cameraDistance)
+    ? gimbalGeometry(project, ringCenter ?? frame.center, gimbalSpaceNow === "world" ? WORLD_GIMBAL_AXES : { x: xFootAxis, y: yFootAxis, z: zFootAxis }, cameraDistance)
     : null;
 
   const handles = [
