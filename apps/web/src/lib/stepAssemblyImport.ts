@@ -1,6 +1,7 @@
 import type { WorkplaneShape } from "@/types/layerling";
 import { loadBrepWithOcct, occtKernel } from "@/lib/brepKernel";
 import { normalizeHexColor, placeColoredParts, type ColoredPart } from "@/lib/coloredImport";
+import { stepBodyColors } from "@/lib/stepColors";
 import { importedShapeFromTriangleSoup } from "@/lib/stlImport";
 
 /**
@@ -53,7 +54,9 @@ export async function importedShapesFromStepAssembly(fileName: string, buffer: A
   await loadBrepWithOcct();
   const kernel = occtKernel();
   if (!kernel || typeof kernel.importXCAFFromSTEP !== "function") return null;
-  const doc = kernel.importXCAFFromSTEP(new TextDecoder().decode(buffer));
+  const text = new TextDecoder().decode(buffer);
+  const doc = kernel.importXCAFFromSTEP(text);
+  const bodyColors = stepBodyColors(text);
   type Leaf = { name: string; group: string; shape: NonNullable<ReturnType<typeof doc.getLabelInfo>["shapeHandle"]>; matrix: Matrix; color?: string };
   const leaves: Leaf[] = [];
   const handles: Array<Leaf["shape"]> = [];
@@ -75,7 +78,26 @@ export async function importedShapesFromStepAssembly(fileName: string, buffer: A
       }
       if (!targetInfo.shapeHandle) return;
       const color = info.hasColor ? hexColor(info.color) : targetInfo.hasColor ? hexColor(targetInfo.color) : undefined;
-      leaves.push({ name, group, shape: targetInfo.shapeHandle, matrix, color });
+      const pieces = bodiesOf(targetInfo.shapeHandle);
+      // The colours the file gives the bodies themselves, which the document leaves out; one per body, in their order.
+      const colors = bodyColors.get(targetInfo.name || info.name);
+      const bodyColor = (index: number) =>
+        colors?.length === pieces.length ? colors[index] : colors && new Set(colors).size === 1 ? colors[0] : undefined;
+      pieces.forEach((shape, index) =>
+        leaves.push({ name: pieces.length > 1 && name ? `${name} ${index + 1}` : name, group, shape, matrix, color: color ?? bodyColor(index) }));
+    };
+    // One entry of the tree can hold several bodies: several solids, or several shells where the file writes its bodies
+    // as surface models (#830: 85 entries holding 390 bodies, the screws of a part under one entry). Each becomes a part.
+    const bodiesOf = (shape: Leaf["shape"]): Array<Leaf["shape"]> => {
+      const solids = kernel.getSubShapes(shape, "solid");
+      handles.push(...solids);
+      if (solids.length > 1) return solids;
+      if (solids.length === 0) {
+        const shells = kernel.getSubShapes(shape, "shell");
+        handles.push(...shells);
+        if (shells.length > 1) return shells;
+      }
+      return [shape];
     };
     doc.getRoots().forEach((root) => walk(root, Z_UP_TO_Y_UP, ""));
     if (leaves.length < 2 || leaves.length > MAX_STEP_ASSEMBLY_PARTS) return null;

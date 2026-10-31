@@ -41,8 +41,8 @@ const shape = (overrides: Partial<WorkplaneShape>) => ({ id: Math.random().toStr
 describe("a STEP file with several solids", () => {
   it("comes in as a body each, with the names of the file and their places to one another", async () => {
     const { blob } = await exportShapesToStep([
-      shape({ kind: "box", name: "Left post", x: -30, width: 10, depth: 6, height: 4 }),
-      shape({ kind: "cylinder", name: "Round rod", x: 0, width: 8, depth: 8, height: 12 }),
+      shape({ kind: "box", name: "Left post", color: "#d12a2a", x: -30, width: 10, depth: 6, height: 4 }),
+      shape({ kind: "cylinder", name: "Round rod", color: "#2a8f3c", x: 0, width: 8, depth: 8, height: 12 }),
       shape({ kind: "box", name: "Right post", x: 30, z: 12, elevation: 5, width: 10, depth: 6, height: 4 }),
     ]);
     const result = await importedShapesFromStepAssembly("stand.step", await blob.arrayBuffer());
@@ -52,6 +52,9 @@ describe("a STEP file with several solids", () => {
     const byName = Object.fromEntries(parts.map((part) => [part.name, part]));
     expect(byName["Left post"].width).toBeCloseTo(10, 3);
     expect(byName["Left post"].height).toBeCloseTo(4, 3);
+    // Each in its own colour, through the file and back unchanged.
+    expect(byName["Left post"].color).toBe("#d12a2a");
+    expect(byName["Round rod"].color).toBe("#2a8f3c");
     // Their places: 30 mm either side of the middle one, the right post 12 mm back and 5 mm up.
     expect(byName["Round rod"].x - byName["Left post"].x).toBeCloseTo(30, 2);
     expect(byName["Right post"].x - byName["Round rod"].x).toBeCloseTo(30, 2);
@@ -62,6 +65,18 @@ describe("a STEP file with several solids", () => {
       expect(part.importedMesh?.sourceFormat).toBe("json");
       expect(part.importedMesh?.brepStep).toContain("MANIFOLD_SOLID_BREP");
     }
+  }, 60000);
+
+  it("makes a part of each body when one entry of the file holds several", async () => {
+    const { occtKernel } = await import("@/lib/brepKernel");
+    const kernel = occtKernel()!;
+    const screws = kernel.makeCompound([0, 20, 40].map((x) => kernel.translate(kernel.makeBox(4, 4, 10), x, 0, 0)));
+    const result = await importedShapesFromStepAssembly("screws.step", new TextEncoder().encode(kernel.exportStep(screws)).buffer);
+    expect(result).not.toBeNull();
+    expect(result!.shapes).toHaveLength(3);
+    const xs = result!.shapes.map((part) => part.x).sort((a, b) => a - b);
+    expect(xs[1] - xs[0]).toBeCloseTo(20, 2);
+    expect(xs[2] - xs[1]).toBeCloseTo(20, 2);
   }, 60000);
 
   it("stays one body when it holds one solid", async () => {
