@@ -549,6 +549,8 @@ type WorkplaneViewportProps = {
   /** Build 104: Meshmixer's free rotate - the view turns freely about the screen's axes (Dental Studio). */
   freeRotate?: boolean;
   dentalView?: boolean;
+  /** Build 104: Model Builder shows no shape panel (size, rotation, taper ... are CAD Studio's). */
+  hideInspector?: boolean;
 };
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;
@@ -3544,6 +3546,7 @@ export function WorkplaneViewport({
   gimbalFree = false,
   freeRotate = false,
   dentalView = false,
+  hideInspector = false,
   selectedIds,
   alignMode,
   multiSelect = false,
@@ -11259,7 +11262,7 @@ export function WorkplaneViewport({
         </div>
       </section>
 
-      {selectedShape && !splitActive && !modifierActive && !tapeMode && !tapeDeleteMode && !tapeMoveMode ? (
+      {selectedShape && !hideInspector && !splitActive && !modifierActive && !tapeMode && !tapeDeleteMode && !tapeMoveMode ? (
         <ShapeInspector
           shape={shapeWithParametricSource(selectedShape)}
           snap={snap}
@@ -11302,7 +11305,7 @@ export function WorkplaneViewport({
         />
       ) : null}
 
-      {selectedIds.length > 1 && !splitActive && !modifierActive && !tapeMode && !tapeDeleteMode && !tapeMoveMode && onSelectionHole && onSelectionColor && onSelectionLock ? (
+      {selectedIds.length > 1 && !hideInspector && !splitActive && !modifierActive && !tapeMode && !tapeDeleteMode && !tapeMoveMode && onSelectionHole && onSelectionColor && onSelectionLock ? (
         <SelectionInspector
           shapes={shapes.filter((shape) => selectedIds.includes(shape.id))}
           onSetHole={onSelectionHole}

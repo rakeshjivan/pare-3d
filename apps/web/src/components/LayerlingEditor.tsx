@@ -18473,6 +18473,7 @@ export function LayerlingEditor({
         gimbalFree={dentalWorkspace}
         freeRotate={dentalWorkspace && freeRotateOn}
         dentalView={dentalWorkspace}
+        hideInspector={dentalWorkspace && !dentalStudio?.waxStudio}
           projectName={projectName}
           projectId={editorOpen ? projectId ?? null : null}
           shapes={heldViewportShapes}
