@@ -2238,3 +2238,10 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .dental-picture .glide { transform-box: view-box; transform-origin: 0 0; transition: transform 0.35s ease; }
 .dental-picture.articulator .measure-bar { fill: #1662b3; stroke: none; }
 @media (prefers-reduced-motion: reduce) { .dental-picture .glide { transition: none; } }
+
+/* Build 105: where the four marks go on a tooth. */
+.dental-picture.wax-marks { max-width: 260px; margin: 4px 0 6px; }
+.dental-picture.wax-marks .gum { fill: #e9a3a8; }
+.dental-picture.wax-marks .mark { fill: #1662b3; stroke: #fff; stroke-width: 1.2; }
+.dental-picture.wax-marks .mark-n { font-size: 9px; font-weight: 700; fill: #fff; }
+.dental-picture.wax-marks .label { font-size: 9px; font-weight: 600; fill: #1662b3; }

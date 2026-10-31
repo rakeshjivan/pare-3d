@@ -66,7 +66,7 @@ export type DentalAreaTool = "paint" | "erase" | "lassoAdd" | "lassoRemove";
 
 /** Fork (build 47): Dental Studio - raw intraoral scans to printable models, one arch or a pair with its bite. */
 type ModelStepId = "scans" | "prepare" | "model" | "base" | "articulator" | "label";
-type WaxStepId = "scans" | "trim" | "find" | "choose" | "set" | "place" | "adjust" | "occlusion" | "sculpt" | "make";
+type WaxStepId = "scans" | "trim" | "teeth" | "find" | "choose" | "set" | "place" | "adjust" | "occlusion" | "sculpt" | "make";
 
 export function DentalStudioPanel({
   parts,
@@ -268,16 +268,19 @@ export function DentalStudioPanel({
    * first library set for the arch, placed on the teeth): you adjust from there.
    */
   // Build 103: as Meshmixer (manual) - the teeth positioned, then sculpted, then the model made; nothing fitted for you.
-  const waxSteps: WaxStepId[] | null = waxStudio && waxup ? (waxup.view.manual ? ["scans", "trim", "find", "choose", "set", "place", "sculpt", "make"] : ["scans", "trim", "find", "choose", "set", "place", "adjust", ...(waxup.view.occlusion.ready ? ["occlusion" as const] : []), "make"]) : null;
+  const waxSteps: WaxStepId[] | null = waxStudio && waxup ? (waxup.view.manual ? ["scans", "trim", "teeth", "set", "place", "sculpt", "make"] : ["scans", "trim", "teeth", "set", "place", "adjust", ...(waxup.view.occlusion.ready ? ["occlusion" as const] : []), "make"]) : null;
   const [waxStepId, setWaxStepId] = useState<WaxStepId>("scans");
   const waxStep = waxSteps ? (waxSteps.includes(waxStepId) ? waxStepId : "make") : null;
   const wv = waxup?.view;
   const waxSetsHere = wv ? wv.builtIn.filter((set) => !set.arch || set.arch === wv.slot) : [];
-  const waxPlaceable = Boolean(wv?.setName) && (wv?.fit === "teeth" && wv?.found?.length ? (wv?.chosen.length ?? 0) > 0 : wv?.marked === 3);
+  // Build 105: Wax-up Studio fits the library teeth to the four marks on each tooth.
+  const waxPlaceable = Boolean(wv?.setName) && (wv?.markedTeeth.length ?? 0) > 0;
   const waxStepDone = (id: WaxStepId): boolean => {
     if (!wv) return false;
     switch (id) {
       case "scans": return scansDone;
+      // Build 105: the teeth to wax up chosen, each with its four marks.
+      case "teeth": return wv.markedTeeth.length > 0 && !wv.markPick;
       case "find": return Boolean(wv.found?.length);
       case "choose": return wv.chosen.length > 0;
       // Build 103: and made for this arch (an upper set is no set for the lower teeth).
@@ -303,21 +306,21 @@ export function DentalStudioPanel({
   useEffect(() => {
     if (!waxStep || !wv || !waxup) return;
     // The other arch chosen further on, with nothing placed on it yet: back to Find teeth for it.
-    const past = ["choose", "set", "place", "adjust", "occlusion", "sculpt", "make"].includes(waxStep);
-    if (past && !wv.placed.length && !waxAutoDone.current.has(wv.slot)) { setWaxStepId("find"); return; }
-    if (waxStep === "find" && !waxAutoDone.current.has(wv.slot)) { waxAutoDone.current.add(wv.slot); setWaxAuto(true); }
+    const past = ["set", "place", "adjust", "occlusion", "sculpt", "make"].includes(waxStep);
+    if (past && !wv.placed.length && !waxAutoDone.current.has(wv.slot)) { setWaxStepId("teeth"); return; }
+    if (waxStep === "teeth" && !waxAutoDone.current.has(wv.slot)) { waxAutoDone.current.add(wv.slot); setWaxAuto(true); }
   }, [waxStep, wv?.slot]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!waxAuto || !waxStep || !wv || !waxup || busy || wv.busy || wv.finder.busy) return;
     const once = (what: string, run: () => void) => { const key = `${wv.slot}:${what}`; if (waxAutoTried.current.has(key)) return false; waxAutoTried.current.add(key); run(); return true; };
     const next = () => { const i = waxSteps!.indexOf(waxStep); if (i >= 0 && i + 1 < waxSteps!.length) setWaxStepId(waxSteps![i + 1]); };
-    if (waxStep === "find") { if (waxStepDone("find")) next(); else if (!once("find", waxup.actions.onFindTeeth)) setWaxAuto(false); return; }
-    if (waxStep === "choose") { if (waxStepDone("choose")) next(); else if (!once("choose", () => waxup.actions.onChooseGroup("front"))) setWaxAuto(false); return; }
+    // Build 105: the teeth found and marked for the dentist; without the finder (or nothing found) the dentist marks them.
+    if (waxStep === "teeth") { if (waxStepDone("teeth")) next(); else if (wv.found && !once("marks", () => waxup.actions.onAutoMarks?.())) setWaxAuto(false); else if (!wv.found && (!wv.finder.name || !once("find", waxup.actions.onFindTeeth))) setWaxAuto(false); return; }
     if (waxStep === "set") { if (waxStepDone("set")) next(); else if (!waxSetsHere.length || !once("set", () => waxup.actions.onBuiltIn(waxSetsHere[0].id))) setWaxAuto(false); return; }
     // Build 103: the run stops at Position - the dentist confirms the teeth before they are fitted.
     if (waxStep === "place") { if (waxStepDone("place")) setWaxAuto(false); else if (!waxPlaceable || !once("place", waxup.actions.onPlace)) setWaxAuto(false); return; }
     setWaxAuto(false);
-  }, [waxAuto, waxStep, busy, wv?.busy, wv?.finder.busy, wv?.found?.length, wv?.chosen.length, wv?.setName, wv?.placed.length, wv?.slot]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [waxAuto, waxStep, busy, wv?.busy, wv?.finder.busy, wv?.found?.length, wv?.chosen.length, wv?.markedTeeth.length, wv?.setName, wv?.placed.length, wv?.slot]); // eslint-disable-line react-hooks/exhaustive-deps
   const waxStepper = waxSteps && waxStep && wv && waxup ? (
     <div className="wax-stepper">
       <ol className="wax-steps" aria-label={t("waxStudio.steps")}>
@@ -394,7 +397,7 @@ export function DentalStudioPanel({
       ) : null}
     </div>
   ) : null;
-  const waxPart: WaxupPart | null = waxStep && ["find", "choose", "set", "place", "adjust", "occlusion", "sculpt"].includes(waxStep) ? waxStep as WaxupPart : null;
+  const waxPart: WaxupPart | null = waxStep && ["teeth", "find", "choose", "set", "place", "adjust", "occlusion", "sculpt"].includes(waxStep) ? waxStep as WaxupPart : null;
   const card = (number: number, label: string, done: boolean, hint: string | null, summary: string | null, body: ReactNode) => {
     const isFolded = !waxSteps && !mbSteps && Boolean(folded[number]);
     return (

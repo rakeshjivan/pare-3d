@@ -11,7 +11,7 @@ import type { WaxLandmarks, WaxupOptions, WaxupPlan } from "@/lib/dentalWaxup";
 import type { ScanTeeth } from "@/lib/toothSegment";
 import type { OcclusionInput, OcclusionResult } from "@/lib/waxOcclusion";
 /** Build 94: fit the set tooth by tooth to the teeth found: each scan triangle's FDI, the teeth chosen. */
-export type WaxTeethFit = { fdi: Uint8Array; chosen: number[]; arch: "upper" | "lower"; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number; adjust?: Record<number, import("@/lib/dentalWaxup").ToothAdjust>; /** Build 103: false - the whole library teeth (Position); true - fitted to the patient's (Adapt). */ blend?: boolean };
+export type WaxTeethFit = { fdi: Uint8Array; chosen: number[]; arch: "upper" | "lower"; ideal?: number; red?: number; centralRatio?: number; arcDepth?: number; adjust?: Record<number, import("@/lib/dentalWaxup").ToothAdjust>; /** Build 103: false - the whole library teeth (Position); true - fitted to the patient's (Adapt). */ blend?: boolean; /** Build 105: each library tooth fitted to the dentist's four marks (FDI to marks, scan coordinates). */ marks?: Record<number, import("@/lib/dentalWaxup").ToothMarks> };
 import type { WorkplaneShape } from "@/types/layerling";
 import type { SurfaceTextureOptions, SurfaceTextureResult } from "@/lib/surfaceTexture";
 import type { RemeshOptions, RemeshResult } from "@/lib/meshRemesh";
@@ -396,7 +396,8 @@ export function waxupInBackground(scan: Float32Array, shells: Float32Array[], la
 export function waxupInBackground(scan: Float32Array, shells: null): Promise<WaxLandmarks | null>;
 export async function waxupInBackground(scan: Float32Array, shells: Float32Array[] | null, landmarks: WaxLandmarks | null = null, options: Omit<WaxupOptions, "landmarks"> = {}, teeth?: WaxTeethFit): Promise<WaxupPlan | WaxLandmarks | null> {
   const here = async () => {
-    const { guessLandmarks, planWaxup, planWaxupOnTeeth } = await import("@/lib/dentalWaxup");
+    const { guessLandmarks, planWaxup, planWaxupOnTeeth, planWaxupOnMarks } = await import("@/lib/dentalWaxup");
+    if (shells && teeth?.marks) return planWaxupOnMarks(scan, shells, teeth.marks, teeth.arch, { lengthen: options.lengthen, centralRatio: teeth.centralRatio, arcDepth: teeth.arcDepth, adjust: teeth.adjust, blend: teeth.blend });
     if (shells && teeth) return planWaxupOnTeeth(scan, shells, teeth.fdi, teeth.chosen, teeth.arch, { lengthen: options.lengthen, ideal: teeth.ideal, red: teeth.red, centralRatio: teeth.centralRatio, arcDepth: teeth.arcDepth, adjust: teeth.adjust, blend: teeth.blend });
     return shells ? planWaxup(scan, shells, landmarks, options) : guessLandmarks(scan);
   };

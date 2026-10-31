@@ -10,6 +10,15 @@ import { useRef, useState } from "react";
 import { EGGSHELL_MAX_WALL, EGGSHELL_MIN_WALL, EGGSHELL_WALL } from "@/lib/dentalEggshell";
 import type { WaxRestrict } from "@/components/workplane/WaxToothDrag";
 /** Build 103: a confirmed tooth's colour, by FDI (each tooth its own, as Meshmixer shows them). */
+/** Build 105: each library tooth in its own colour while it is being positioned (light; a confirmed tooth takes the stronger colour below). */
+export const WAX_TOOTH_COLOURS: Record<number, string> = {
+  13: "#9ad8a8", 12: "#9cc8ef", 11: "#f2aaa4", 21: "#f3cf86", 22: "#c8b0ec", 23: "#8fd8d0",
+  14: "#e6b3d9", 15: "#d7d38e", 24: "#a9b8f0", 25: "#f0bb90",
+  43: "#9ad8a8", 42: "#9cc8ef", 41: "#f2aaa4", 31: "#f3cf86", 32: "#c8b0ec", 33: "#8fd8d0",
+  44: "#e6b3d9", 45: "#d7d38e", 34: "#a9b8f0", 35: "#f0bb90",
+};
+/** Build 105: the teeth marked and waxed up unless the dentist chooses others: canine to canine. */
+export const defaultMarkTeeth = (slot: "upper" | "lower") => (slot === "upper" ? [13, 12, 11, 21, 22, 23] : [43, 42, 41, 31, 32, 33]);
 export const WAX_CONFIRMED_COLOURS: Record<number, string> = { 11: "#e0605a", 21: "#e0605a", 12: "#4f9fd8", 22: "#4f9fd8", 13: "#5bb878", 23: "#5bb878", 31: "#e0605a", 41: "#e0605a", 32: "#4f9fd8", 42: "#4f9fd8", 33: "#5bb878", 43: "#5bb878", 14: "#c98ad6", 24: "#c98ad6", 15: "#e3b04b", 25: "#e3b04b", 34: "#c98ad6", 44: "#c98ad6", 35: "#e3b04b", 45: "#e3b04b" };
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
 import { t } from "@/lib/i18n";
@@ -68,6 +77,13 @@ export type WaxupView = {
   /** Build 94: the teeth found on this arch (FDI; agreed = the network's own number), and those chosen for the wax-up. */
   found: Array<{ fdi: number; agreed: boolean }> | null;
   chosen: number[];
+  /** Build 105: the teeth to mark and wax up, those marked, those the finder marked (to check), and the point being clicked. */
+  markTeeth: number[];
+  markedTeeth: number[];
+  autoMarked: number[];
+  markPick: { fdi: number; point: number } | null;
+  /** Build 105: the scan being waxed drawn see-through. */
+  scanSeeThrough: boolean;
   /** Build 101: the wax-up's own Undo and Redo. */
   canUndo?: boolean;
   canRedo?: boolean;
@@ -127,6 +143,14 @@ export type WaxupActions = {
   onAlternate: (on: boolean) => void;
   onLoadFinder: (file: File) => void;
   onFindTeeth: () => void;
+  /** Build 105: the four marks on each tooth - start (all open teeth, or these), take back a point, skip a tooth, stop; the finder's marks; a tooth in or out. */
+  onMarkTeeth?: (only?: number[]) => void;
+  onUndoMarkPoint?: () => void;
+  onSkipTooth?: () => void;
+  onStopMarks?: () => void;
+  onAutoMarks?: () => void;
+  onMarkTeethChoose?: (fdi: number) => void;
+  onScanSeeThrough?: (on: boolean) => void;
   onChoose: (fdi: number) => void;
   onChooseGroup: (group: "front" | "front-premolars" | "none") => void;
   onTeethShown: (shown: boolean) => void;
@@ -159,7 +183,7 @@ export const archOrder = (fdi: number) => { const q = Math.floor(fdi / 10), n = 
 /** Build 101: Wax-up Studio's steps that live in this card (shown one at a time; all of them without a step). */
 /** Build 103: the whole set's move - intercanine width, forward/back, midline (to the patient's left), edges longer. */
 export type WaxSetMove = { width: number; depth: number; midline: number; height: number };
-export type WaxupPart = "find" | "choose" | "set" | "place" | "adjust" | "occlusion" | "sculpt";
+export type WaxupPart = "teeth" | "find" | "choose" | "set" | "place" | "adjust" | "occlusion" | "sculpt";
 
 /** Build 102: reductions shown from this, mm (less is within a scan's own noise). */
 const WAX_REDUCE_SHOWN = 0.2;
@@ -236,6 +260,26 @@ function ToothValues({ tooth, adjust, disabled, onAdjust }: { tooth: { width: nu
   );
 }
 
+/** Build 105: where the four marks go on a tooth - a front view of a central incisor, the marks numbered in the order they are clicked. */
+function WaxMarksPicture() {
+  return (
+    <svg className="dental-picture wax-marks" viewBox="0 0 220 120" role="img" aria-label={t("waxup.marksPicture")}>
+      <path className="gum" d="M10 34 Q110 6 210 34 L210 0 L10 0 Z" />
+      <path className="tooth" d="M70 30 Q110 14 150 30 Q158 70 150 104 Q110 116 70 104 Q62 70 70 30 Z" />
+      {[[152, 66, "1"], [68, 66, "2"], [110, 22, "3"], [110, 110, "4"]].map(([x, y, n]) => (
+        <g key={n as string}>
+          <circle className="mark" cx={x as number} cy={y as number} r={7} />
+          <text className="mark-n" x={x as number} y={(y as number) + 3.5} textAnchor="middle">{n}</text>
+        </g>
+      ))}
+      <text className="label" x={176} y={70}>{t("waxup.markShort.mesial")}</text>
+      <text className="label" x={44} y={70} textAnchor="end">{t("waxup.markShort.distal")}</text>
+      <text className="label" x={124} y={46}>{t("waxup.markShort.cervical")}</text>
+      <text className="label" x={124} y={98}>{t("waxup.markShort.incisal")}</text>
+    </svg>
+  );
+}
+
 export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, part }: { view: WaxupView; actions: WaxupActions; slots: { upper: boolean; lower: boolean }; busy: boolean; workspace: WorkplaneWorkspaceSettings; imt?: boolean; part?: WaxupPart }) {
   const show = (which: WaxupPart) => !part || part === which;
   const file = useRef<HTMLInputElement>(null);
@@ -246,7 +290,11 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
   const sets = view.builtIn.filter((set) => !set.arch || set.arch === view.slot);
   // Build 94: fitted to the teeth found needs teeth chosen; set out by smile design, the three landmarks.
   const fitTeeth = view.fit === "teeth" && Boolean(view.found?.length);
-  const placeable = Boolean(view.setName) && (fitTeeth ? view.chosen.length > 0 : view.marked === 3);
+  // Build 105: in Wax-up Studio (a step shown) the teeth are fitted to the dentist's marks.
+  const byMarks = Boolean(part);
+  const placeable = Boolean(view.setName) && (byMarks ? view.markedTeeth.length > 0 : fitTeeth ? view.chosen.length > 0 : view.marked === 3);
+  const marking = view.markPick !== null;
+  const allTeeth = view.slot === "upper" ? [15, 14, 13, 12, 11, 21, 22, 23, 24, 25] : [45, 44, 43, 42, 41, 31, 32, 33, 34, 35];
   const thin = view.placed.filter((tooth) => tooth.clearance !== null && tooth.clearance < WAX_THIN);
   const selectedTooth = view.placed.find((tooth) => tooth.id === view.selected) ?? null;
   const lengthening = [...view.placed].filter((tooth) => tooth.lengthening > 0).sort((a, b) => a.fdi - b.fdi);
@@ -317,6 +365,59 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
       </div>
       ) : null}
 
+      {/* Build 105: the teeth to wax up and the four marks on each. */}
+      {part === "teeth" ? (
+      <div className="dental-substep">
+        <p className="blend-hint">{t("waxup.marksHint")}</p>
+        <WaxMarksPicture />
+        <div className="waxup-teeth waxup-found" role="group" aria-label={t("waxup.chooseTeeth")}>
+          {allTeeth.map((fdi) => {
+            const on = view.markTeeth.includes(fdi);
+            const marked = view.markedTeeth.includes(fdi);
+            const auto = view.autoMarked.includes(fdi);
+            return (
+              <button key={fdi} type="button" aria-pressed={on} className={`waxup-tooth${on ? " active" : ""}${auto ? " unsure" : ""}`} style={on ? { background: WAX_TOOTH_COLOURS[fdi], color: "#1d1d1f" } : undefined} title={t(marked ? (auto ? "waxup.markAuto" : "waxup.markDone") : "waxup.markNone", { fdi })} disabled={working || marking} onClick={() => actions.onMarkTeethChoose?.(fdi)}>
+                {marked ? <Check size={12} aria-hidden="true" /> : null}{fdi}
+              </button>
+            );
+          })}
+        </div>
+        {marking ? (
+          <>
+            <p className="blend-hint" role="status">{t("waxup.markPoint", { fdi: view.markPick!.fdi, point: t(`waxup.markPoint.${(["mesial", "distal", "cervical", "incisal"] as const)[view.markPick!.point]}`), n: view.markPick!.point + 1, left: 0 })}</p>
+            <div className="dental-trim-buttons">
+              <button type="button" className="secondary" disabled={view.markPick!.point === 0} onClick={() => actions.onUndoMarkPoint?.()}>{t("waxup.markUndo")}</button>
+              <button type="button" className="secondary" onClick={() => actions.onSkipTooth?.()}>{t("waxup.markSkip")}</button>
+              <button type="button" className="secondary" onClick={() => actions.onStopMarks?.()}>{t("waxup.markStop")}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="dental-trim-buttons">
+              <button type="button" className={view.markedTeeth.length < view.markTeeth.length || view.autoMarked.length ? "active" : ""} disabled={working || !view.markTeeth.length} onClick={() => actions.onMarkTeeth?.()}>
+                {t(view.autoMarked.some((fdi) => view.markTeeth.includes(fdi)) ? "waxup.markCheck" : view.markedTeeth.length >= view.markTeeth.length ? "waxup.markAllAgain" : "waxup.markTeeth")}
+              </button>
+              {view.finder.name ? (
+                <button type="button" className="secondary" disabled={working || view.finder.busy} onClick={() => (view.found ? actions.onAutoMarks?.() : actions.onFindTeeth())}>
+                  {view.finder.busy ? <LoaderCircle className="edge-modifier-spinner" size={15} /> : null} {t("waxup.markForMe")}
+                </button>
+              ) : null}
+            </div>
+            {view.finder.busy && view.finder.progress !== null ? <p className="blend-hint" role="status">{t("waxup.finding", { share: Math.round(view.finder.progress * 100) })}</p> : null}
+            {view.markedTeeth.length ? (
+              <p className="blend-hint">
+                {t("waxup.markAgainOne")}{" "}
+                {view.markedTeeth.map((fdi) => (
+                  <button key={fdi} type="button" className="link-button" disabled={working} onClick={() => actions.onMarkTeeth?.([fdi])}>{fdi}</button>
+                )).reduce<React.ReactNode[]>((all, node, i) => (i ? [...all, " ", node] : [node]), [])}
+              </p>
+            ) : null}
+            {view.autoMarked.some((fdi) => view.markTeeth.includes(fdi)) ? <p className="blend-hint">{t("waxup.markAutoHint")}</p> : null}
+          </>
+        )}
+      </div>
+      ) : null}
+
       {show("set") ? (
       <div className="dental-substep">
         {part ? null : <h4 className="dental-substep-title">{t("waxup.setStep")}</h4>}
@@ -356,7 +457,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
       </div>
       ) : null}
 
-      {!part || (part === "place" && !fitTeeth) ? (
+      {!part ? (
       <div className="dental-substep">
         <h4 className="dental-substep-title">{t("waxup.markStep")}</h4>
         <p className="blend-hint">{view.picking !== null ? t(WAXUP_LANDMARKS[view.picking]) : view.marked === 3 ? t(view.found ? "waxup.markedFound" : "waxup.marked") : t("waxup.markHint")}</p>
@@ -370,15 +471,15 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
       <div className="dental-substep">
         {part ? null : <h4 className="dental-substep-title">{t("waxup.placeStep")}</h4>}
         {show("place") ? (<>
-        {view.found?.length ? (
+        {view.found?.length && !byMarks ? (
           <div className="dental-trim-mode" role="radiogroup" aria-label={t("waxup.fit")}>
             {(["teeth", "smile"] as const).map((value) => (
               <button key={value} type="button" role="radio" aria-checked={view.fit === value} className={view.fit === value ? "active" : ""} disabled={working} onClick={() => actions.onFit(value)}>{t(value === "teeth" ? "waxup.fitTeeth" : "waxup.fitSmile")}</button>
             ))}
           </div>
         ) : null}
-        <p className="blend-hint">{t(fitTeeth ? "waxup.fitTeethHint" : "waxup.designHint")}</p>
-        {fitTeeth ? (
+        <p className="blend-hint">{t(byMarks ? "waxup.fitMarksHint" : fitTeeth ? "waxup.fitTeethHint" : "waxup.designHint")}</p>
+        {fitTeeth && !byMarks ? (
           <>
             <EdgeModifierSlider label={t("waxup.ideal")} value={Math.round(view.ideal * 100)} min={0} max={100} step={5} unit="%" workspace={workspace} disabled={working} onChange={(value) => actions.onIdeal(Math.max(0, Math.min(1, Math.round(value) / 100)))} />
             <p className="blend-hint">{t("waxup.idealHint")}</p>
@@ -396,17 +497,17 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
             ) : null}
           </>
         ) : null}
-        {fitTeeth ? null : (<>
+        {fitTeeth && !byMarks ? null : (<>
         <EdgeModifierSlider label={t("waxup.centralRatio")} value={Math.round(view.centralRatio * 100)} min={70} max={90} step={1} unit="%" workspace={workspace} disabled={working} onChange={(value) => actions.onCentralRatio(Math.max(0.7, Math.min(0.9, Math.round(value) / 100)))} />
         <EdgeModifierSlider label={t("waxup.arcDepth")} value={view.arcDepth ?? view.arcUsed ?? 1} min={0} max={3} step={0.25} workspace={workspace} length disabled={working} onChange={(value) => actions.onArcDepth(Math.max(0, Math.min(3, Math.round(value / 0.25) * 0.25)))} />
         <p className="blend-hint">{view.arcDepth === null ? t("waxup.arcAuto") : <>{t("waxup.arcSet")}{" "}<button type="button" className="link-button" disabled={working} onClick={() => actions.onArcDepth(null)}>{t("waxup.arcBack")}</button></>}</p>
-        <div className="dental-trim-mode" role="radiogroup" aria-label={t("waxup.proportions")}>
+        {byMarks ? null : <div className="dental-trim-mode" role="radiogroup" aria-label={t("waxup.proportions")}>
           {(["natural", "library"] as const).map((value) => (
             <button key={value} type="button" role="radio" aria-checked={view.proportions === value} className={view.proportions === value ? "active" : ""} disabled={working} onClick={() => actions.onProportions(value)}>
               {t(value === "natural" ? "waxup.propNatural" : "waxup.propLibrary")}
             </button>
           ))}
-        </div>
+        </div>}
         </>)}
         <EdgeModifierSlider label={t("waxup.lengthen")} value={view.lengthen} min={WAX_LENGTHEN.min} max={WAX_LENGTHEN.max} step={WAX_LENGTHEN.step} workspace={workspace} length disabled={working} onChange={(value) => actions.onLengthen(Math.max(WAX_LENGTHEN.min, Math.min(WAX_LENGTHEN.max, Math.round(value / WAX_LENGTHEN.step) * WAX_LENGTHEN.step)))} />
         <div className="dental-trim-buttons">
@@ -434,7 +535,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
                     className={`waxup-tooth${view.selected === tooth.id ? " active" : ""}${low ? " warn" : ""}`}
                     title={t("waxup.toothInfo", { fdi: tooth.fdi, width: tooth.width.toFixed(1), length: tooth.length.toFixed(1), ratio: Math.round((tooth.width / Math.max(0.1, tooth.length)) * 100), wax: tooth.clearance === null ? "-" : tooth.clearance.toFixed(2) })}
                     onClick={() => actions.onSelect(tooth.id)}
-                    style={view.confirmed.includes(tooth.fdi) ? { background: WAX_CONFIRMED_COLOURS[tooth.fdi] ?? "#9aa0a6", color: "#fff" } : undefined}
+                    style={view.confirmed.includes(tooth.fdi) ? { background: WAX_CONFIRMED_COLOURS[tooth.fdi] ?? "#9aa0a6", color: "#fff" } : view.stage === "position" && WAX_TOOTH_COLOURS[tooth.fdi] ? { background: WAX_TOOTH_COLOURS[tooth.fdi], color: "#1d1d1f" } : undefined}
                   >
                     {low ? <AlertTriangle size={12} aria-hidden="true" /> : null}{view.confirmed.includes(tooth.fdi) ? <Check size={12} aria-hidden="true" /> : null}{tooth.fdi}
                   </button>
@@ -443,6 +544,10 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
             </div>
             <EdgeModifierSlider label={t("waxup.ghost")} value={Math.round(view.ghost * 100)} min={10} max={100} step={5} unit="%" workspace={workspace} onChange={(value) => actions.onGhost(Math.max(0.1, Math.min(1, Math.round(value) / 100)))} />
             <p className="blend-hint">{t("waxup.ghostHint")}</p>
+            <label className="edge-modifier-check">
+              <input type="checkbox" checked={view.scanSeeThrough} onChange={(event) => actions.onScanSeeThrough?.(event.currentTarget.checked)} />
+              <span>{t("waxup.seeThrough")}</span>
+            </label>
             <div className="dental-trim-mode" role="radiogroup" aria-label={t("waxup.moveMode")}>
               {([true, false] as const).map((chain) => (
                 <button key={String(chain)} type="button" role="radio" aria-checked={view.chain === chain} className={view.chain === chain ? "active" : ""} disabled={working} onClick={() => actions.onChain(chain)}>{t(chain ? "waxup.chain" : "waxup.single")}</button>
@@ -574,6 +679,10 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
             ))}
           </div>
           <p className="blend-hint">{t("waxup.sculptHint")}</p>
+          <label className="edge-modifier-check">
+            <input type="checkbox" checked={view.scanSeeThrough} onChange={(event) => actions.onScanSeeThrough?.(event.currentTarget.checked)} />
+            <span>{t("waxup.seeThrough")}</span>
+          </label>
         </div>
       ) : null}
       {view.occlusion.ready && show("occlusion") ? (
