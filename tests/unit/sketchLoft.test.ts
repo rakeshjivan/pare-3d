@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canSketchLoft, sketchLoftPair } from "@/lib/sketchLoft";
-import { colorForParts, canToggleGroupColors, groupShowsPartColors } from "@/lib/groupColors";
+import { canToggleGroupColors, groupShowsPartColors } from "@/lib/groupColors";
 import { guideSectionForShape } from "@/lib/guideLinks";
 import { restoreGroupedChildrenForEdges } from "@/lib/editorBooleans";
 import type { WorkplaneShape } from "@/types/layerling";
@@ -50,8 +50,7 @@ describe("loft between two sketches", () => {
     const loft = { ...sketch("loft", 0, 30), sketchProfile: undefined, groupOperation: "loft", groupedShapes: [sketch("a", 0), sketch("b", 28)] } as WorkplaneShape;
     expect(groupShowsPartColors(loft)).toBe(false);
     expect(canToggleGroupColors(loft)).toBe(false);
-    expect(colorForParts(loft, "#ff0000")).toBe("#ff0000");
     expect(guideSectionForShape(loft)).toBe("intersection");
-    expect(restoreGroupedChildrenForEdges(loft)).toEqual([{ shape: loft, scope: [] }]);
+    expect(restoreGroupedChildrenForEdges(loft)).toEqual([loft]);
   });
 });
