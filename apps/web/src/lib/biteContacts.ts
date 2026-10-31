@@ -129,7 +129,8 @@ export function closedOrientation(soup: ArrayLike<number>): 1 | -1 | null {
 /** A surface whose area vectors sum to less than this share of its area is closed. */
 const CLOSED_TOLERANCE = 1e-4;
 
-export function signedDistances(from: ArrayLike<number>, to: ArrayLike<number>, reachAll = CONTACT_REACH): Float32Array {
+/** Build 105: `asWound` - the target's faces are known to face out (its triangles' winding is trusted, never voted on). */
+export function signedDistances(from: ArrayLike<number>, to: ArrayLike<number>, reachAll = CONTACT_REACH, asWound = false): Float32Array {
   // Build 96: near the other arch (where contacts are read) the nearest triangle, exactly; further out
   // (the scale's broad colours) the nearest corner of the other scan, below.
   const reach = Math.min(reachAll, EXACT_REACH);
@@ -190,7 +191,7 @@ export function signedDistances(from: ArrayLike<number>, to: ArrayLike<number>, 
   // Manifold's, always outward) is never voted on - a large true overlap (wax into the other arch)
   // outnumbered the rest and flipped every sign, overlap read as clearance. Its volume says which way it runs.
   const closed = closedOrientation(to);
-  const flip = closed === null ? negative > positive : closed < 0;
+  const flip = asWound ? false : closed === null ? negative > positive : closed < 0;
   if (flip) for (let c = 0; c < corners; c += 1) if (!grazing[c]) out[c] = -out[c];
   if (reachAll > reach) farDistances(from, to, reachAll, out, flip);
   return out;

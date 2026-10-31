@@ -29,7 +29,9 @@ export type MeshJobRequest =
   | { id: number; base: string; kind: "remesh"; positions: Float32Array; options: RemeshOptions }
   | { id: number; base: string; kind: "biteContacts"; upper: Float32Array; lower: Float32Array }
   | { id: number; base: string; kind: "findTeeth"; scan: Float32Array; arch: "upper" | "lower"; weights: ArrayBuffer | null }
-  | { id: number; base: string; kind: "occlusion"; input: OcclusionInput };
+  | { id: number; base: string; kind: "occlusion"; input: OcclusionInput }
+  | { id: number; base: string; kind: "waxContacts"; teeth: Float32Array[]; antagonist: Float32Array | null }
+  | { id: number; base: string; kind: "waxAdapt"; teeth: Array<{ fdi: number; positions: Float32Array }>; antagonist: Float32Array | null; options: { occlusal?: number; approximal?: number; bite?: boolean; contacts?: boolean } };
 export type MeshJobResponse =
   | { id: number; ok: true; kind?: "round"; result: { positions: Float32Array; voxel: number; coarse: boolean } }
   | { id: number; ok: true; kind: "fit"; report: FitReport }
@@ -45,6 +47,8 @@ export type MeshJobResponse =
   | { id: number; ok: true; kind: "findTeeth"; teeth: ScanTeeth }
   | { id: number; ok: true; kind: "progress"; share: number }
   | { id: number; ok: true; kind: "occlusion"; result: OcclusionResult }
+  | { id: number; ok: true; kind: "waxContacts"; distances: Float32Array[] }
+  | { id: number; ok: true; kind: "waxAdapt"; result: import("@/lib/waxAdapt").AdaptResult }
   | { id: number; ok: false; error: string };
 
 let worker: Worker | null = null;
@@ -75,6 +79,8 @@ function meshWorker(): Worker | null {
       else if (reply.kind === "waxup") waiting.resolve(reply.plan ?? reply.landmarks);
       else if (reply.kind === "texture") waiting.resolve(reply.texture);
       else if (reply.kind === "biteContacts") waiting.resolve(reply.map);
+      else if (reply.kind === "waxContacts") waiting.resolve(reply.distances);
+      else if (reply.kind === "waxAdapt") waiting.resolve(reply.result);
       else if (reply.kind === "findTeeth") waiting.resolve(reply.teeth);
       else if (reply.kind === "occlusion") waiting.resolve(reply.result);
       else if (reply.kind === "remesh") waiting.resolve({ ...reply.remesh, positions: Array.from(reply.remesh.positions) });
@@ -360,6 +366,42 @@ export async function biteContactsInBackground(upper: Float32Array, lower: Float
     return await new Promise<BiteContactMap>((resolve, reject) => {
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
       target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "biteContacts", upper: a, lower: b } satisfies MeshJobRequest, [a.buffer, b.buffer]);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "worker-unavailable") return here();
+    throw error;
+  }
+}
+
+/** Build 105: each wax tooth's distance to the opposing arch and its neighbours (studio input frame), off the page. */
+export async function waxContactsInBackground(teeth: Float32Array[], antagonist: Float32Array | null): Promise<Float32Array[]> {
+  const here = async () => (await import("@/lib/waxAdapt")).waxContactDistances(teeth, antagonist);
+  const target = meshWorker();
+  if (!target) return here();
+  const id = nextId;
+  nextId += 1;
+  try {
+    return await new Promise<Float32Array[]>((resolve, reject) => {
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "waxContacts", teeth, antagonist } satisfies MeshJobRequest);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "worker-unavailable") return here();
+    throw error;
+  }
+}
+
+/** Build 105: the wax teeth set back from the bite and cut where they run into each other, off the page. */
+export async function adaptWaxInBackground(teeth: Array<{ fdi: number; positions: Float32Array }>, antagonist: Float32Array | null, options: { occlusal?: number; approximal?: number; bite?: boolean; contacts?: boolean }): Promise<import("@/lib/waxAdapt").AdaptResult> {
+  const here = async () => (await import("@/lib/waxAdapt")).adaptWax(teeth, antagonist, options);
+  const target = meshWorker();
+  if (!target) return here();
+  const id = nextId;
+  nextId += 1;
+  try {
+    return await new Promise((resolve, reject) => {
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      target.postMessage({ id, base: new URL(".", window.location.href).href, kind: "waxAdapt", teeth, antagonist, options } satisfies MeshJobRequest);
     });
   } catch (error) {
     if (error instanceof Error && error.message === "worker-unavailable") return here();

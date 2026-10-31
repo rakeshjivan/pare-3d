@@ -8,6 +8,8 @@ export class NearestSurface {
   private cells = new Map<number, number[]>();
   private readonly cell: number;
   private readonly q = new Float64Array(3);
+  /** Build 105: the triangle the last nearest() found (its index in the soup), -1 for none. */
+  lastTriangle = -1;
   constructor(private readonly soup: Float32Array, readonly reach: number) {
     this.cell = Math.max(0.25, reach);
     const c = this.cell;
@@ -28,12 +30,13 @@ export class NearestSurface {
   nearest(x: number, y: number, z: number, out: Float64Array | number[]): number {
     const c = this.cell, cx = Math.floor(x / c), cy = Math.floor(y / c), cz = Math.floor(z / c);
     let best = this.reach * this.reach, found = false;
+    this.lastTriangle = -1;
     for (let ox = -1; ox <= 1; ox += 1) for (let oy = -1; oy <= 1; oy += 1) for (let oz = -1; oz <= 1; oz += 1) {
       const list = this.cells.get(key(cx + ox, cy + oy, cz + oz));
       if (!list) continue;
       for (let i = 0; i < list.length; i += 1) {
         const d2 = closest(x, y, z, this.soup, list[i] * 9, this.q);
-        if (d2 < best) { best = d2; found = true; out[0] = this.q[0]; out[1] = this.q[1]; out[2] = this.q[2]; }
+        if (d2 < best) { best = d2; found = true; this.lastTriangle = list[i]; out[0] = this.q[0]; out[1] = this.q[1]; out[2] = this.q[2]; }
       }
     }
     return found ? Math.sqrt(best) : Infinity;

@@ -97,6 +97,16 @@ scope.onmessage = async (event: MessageEvent<MeshJobRequest | { archPartFor: num
       const map = biteContactMap(job.upper, job.lower);
       const reply: MeshJobResponse = { id: job.id, ok: true, kind: "biteContacts", map };
       scope.postMessage(reply, [map.upper.buffer as ArrayBuffer, map.lower.buffer as ArrayBuffer]);
+    } else if (job.kind === "waxContacts") {
+      const { waxContactDistances } = await import("@/lib/waxAdapt");
+      const distances = waxContactDistances(job.teeth, job.antagonist);
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "waxContacts", distances };
+      scope.postMessage(reply, distances.map((d) => d.buffer as ArrayBuffer));
+    } else if (job.kind === "waxAdapt") {
+      const { adaptWax } = await import("@/lib/waxAdapt");
+      const result = adaptWax(job.teeth, job.antagonist, job.options);
+      const reply: MeshJobResponse = { id: job.id, ok: true, kind: "waxAdapt", result };
+      scope.postMessage(reply, result.teeth.map((t) => t.positions.buffer as ArrayBuffer));
     } else if (job.kind === "remesh") {
       const { remeshPositions } = await import("@/lib/meshRemesh");
       const result = await remeshPositions(job.positions, job.options);

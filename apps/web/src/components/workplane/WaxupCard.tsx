@@ -21,6 +21,7 @@ export const WAX_TOOTH_COLOURS: Record<number, string> = {
 export const defaultMarkTeeth = (slot: "upper" | "lower") => (slot === "upper" ? [13, 12, 11, 21, 22, 23] : [43, 42, 41, 31, 32, 33]);
 export const WAX_CONFIRMED_COLOURS: Record<number, string> = { 11: "#e0605a", 21: "#e0605a", 12: "#4f9fd8", 22: "#4f9fd8", 13: "#5bb878", 23: "#5bb878", 31: "#e0605a", 41: "#e0605a", 32: "#4f9fd8", 42: "#4f9fd8", 33: "#5bb878", 43: "#5bb878", 14: "#c98ad6", 24: "#c98ad6", 15: "#e3b04b", 25: "#e3b04b", 34: "#c98ad6", 44: "#c98ad6", 35: "#e3b04b", 45: "#e3b04b" };
 import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
+import { CONTACT_STOPS, contactGradient } from "@/lib/biteContacts";
 import { t } from "@/lib/i18n";
 import type { MessageKey } from "@/lib/messages.en";
 import { IMT_REDUCE, IMT_UNSUPPORTED, imtFirstInjection, type SmileCheck, type ToothAdjust, type ToothNudge } from "@/lib/dentalWaxup";
@@ -84,6 +85,8 @@ export type WaxupView = {
   markPick: { fdi: number; point: number } | null;
   /** Build 105: the scan being waxed drawn see-through. */
   scanSeeThrough: boolean;
+  /** Build 105: the wax teeth's contacts with the opposing arch and each other, as a colour map, and Adapt (exocad's static occlusion clearance). */
+  contacts: { on: boolean; busy: boolean; occlusal: number; adapting: boolean; note: string | null; opposing: boolean };
   /** Build 101: the wax-up's own Undo and Redo. */
   canUndo?: boolean;
   canRedo?: boolean;
@@ -151,6 +154,9 @@ export type WaxupActions = {
   onAutoMarks?: () => void;
   onMarkTeethChoose?: (fdi: number) => void;
   onScanSeeThrough?: (on: boolean) => void;
+  onWaxContacts?: (on: boolean) => void;
+  onOcclusal?: (mm: number) => void;
+  onAdapt?: (what: "bite" | "contacts" | "both") => void;
   onChoose: (fdi: number) => void;
   onChooseGroup: (group: "front" | "front-premolars" | "none") => void;
   onTeethShown: (shown: boolean) => void;
@@ -256,6 +262,40 @@ function ToothValues({ tooth, adjust, disabled, onAdjust }: { tooth: { width: nu
         );
       })}
       <p className="blend-hint">{t("waxup.valuesHint")}</p>
+    </div>
+  );
+}
+
+/** Build 105: the wax teeth's contacts (colour map) and Adapt, as exocad's Free-Forming Adapt and Cut all intersections. */
+function WaxContacts({ view, actions, workspace, adapt }: { view: WaxupView; actions: WaxupActions; workspace: WorkplaneWorkspaceSettings; adapt: boolean }) {
+  const c = view.contacts;
+  const busy = view.busy || c.adapting;
+  return (
+    <div className="dental-substep waxup-contacts">
+      <h5 className="waxup-subhead">{t("waxup.contactsTitle")}</h5>
+      <label className="edge-modifier-check">
+        <input type="checkbox" checked={c.on} disabled={!view.placed.length} onChange={(event) => actions.onWaxContacts?.(event.currentTarget.checked)} />
+        <span>{t("waxup.contactsShow")}</span>
+        {c.busy ? <LoaderCircle className="edge-modifier-spinner" size={13} aria-label={t("waxup.contactsWorking")} /> : null}
+      </label>
+      {c.on ? (
+        <>
+          <div className="waxup-contact-scale" aria-hidden="true" style={{ background: contactGradient(1, CONTACT_STOPS[0].at, 1) }} />
+          <p className="blend-hint">{t("waxup.contactsHint")}</p>
+        </>
+      ) : null}
+      {adapt ? (
+        <>
+          <EdgeModifierSlider label={t("waxup.occlusal")} value={c.occlusal} min={-0.2} max={0.5} step={0.05} workspace={workspace} length disabled={busy || !c.opposing} onChange={(value) => actions.onOcclusal?.(Math.max(-0.2, Math.min(0.5, Math.round(value / 0.05) * 0.05)))} />
+          <div className="dental-trim-buttons">
+            <button type="button" className="active" disabled={busy || !view.placed.length || !c.opposing} onClick={() => actions.onAdapt?.("both")}>
+              {c.adapting ? <LoaderCircle className="edge-modifier-spinner" size={15} /> : null} {t("waxup.adaptBite")}
+            </button>
+            <button type="button" className="secondary" disabled={busy || view.placed.length < 2} onClick={() => actions.onAdapt?.("contacts")}>{t("waxup.adaptContacts")}</button>
+          </div>
+          <p className="blend-hint">{c.note ?? t(c.opposing ? "waxup.adaptBiteHint" : "waxup.adaptNoOpposing")}</p>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -548,6 +588,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
               <input type="checkbox" checked={view.scanSeeThrough} onChange={(event) => actions.onScanSeeThrough?.(event.currentTarget.checked)} />
               <span>{t("waxup.seeThrough")}</span>
             </label>
+            <WaxContacts view={view} actions={actions} workspace={workspace} adapt={false} />
             <div className="dental-trim-mode" role="radiogroup" aria-label={t("waxup.moveMode")}>
               {([true, false] as const).map((chain) => (
                 <button key={String(chain)} type="button" role="radio" aria-checked={view.chain === chain} className={view.chain === chain ? "active" : ""} disabled={working} onClick={() => actions.onChain(chain)}>{t(chain ? "waxup.chain" : "waxup.single")}</button>
@@ -684,6 +725,9 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
             <span>{t("waxup.seeThrough")}</span>
           </label>
         </div>
+      ) : null}
+      {(part === "sculpt" || part === "adjust") && view.placed.length ? (
+        <WaxContacts view={view} actions={actions} workspace={workspace} adapt />
       ) : null}
       {view.occlusion.ready && show("occlusion") ? (
         <div className="dental-substep">
