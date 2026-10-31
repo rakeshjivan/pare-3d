@@ -1051,8 +1051,32 @@ export class LiveMesh {
         const q = this.attractPoint;
         const d = target.nearest(x, y, z, q);
         if (!(d < Infinity) || d < 1e-4) continue;
-        const k = Math.min(1, w * 0.45);
-        dx = (q[0] - x) * k; dy = (q[1] - y) * k; dz = (q[2] - z) * k;
+        if (this.classicAttract) {
+          const k = Math.min(1, w * 0.45);
+          dx = (q[0] - x) * k; dy = (q[1] - y) * k; dz = (q[2] - z) * k;
+        } else {
+          // Build 105: only onto what the surface faces - the point in front of it (not behind, through
+          // the tooth), on a face turned towards it (not a side wall it would slide along) - and to
+          // `attractGap` short of it (the clearance, as exocad's static occlusion), never more than
+          // ATTRACT_DAB a dab nor ATTRACT_STROKE a stroke.
+          this.vertexNormal(v, n);
+          const ux = (q[0] - x) / d, uy = (q[1] - y) / d, uz = (q[2] - z) / d;
+          if (ux * n.x + uy * n.y + uz * n.z < ATTRACT_FACING) continue;
+          const tri = target.lastTriangle ?? -1;
+          if (tri >= 0 && target.triangleNormal) {
+            target.triangleNormal(tri, this.attractNormal);
+            const tn = this.attractNormal;
+            if (Math.abs(tn[0] * n.x + tn[1] * n.y + tn[2] * n.z) < ATTRACT_FACING) continue;
+          }
+          const room = d - this.attractGap;
+          if (room <= 1e-4) continue;
+          let start = this.attractStart.get(v);
+          if (!start) { start = [x, y, z]; this.attractStart.set(v, start); }
+          const travelled = Math.hypot(x - start[0], y - start[1], z - start[2]);
+          const move = Math.min(room * Math.min(1, w * 0.45), ATTRACT_DAB, Math.max(0, ATTRACT_STROKE - travelled));
+          if (move <= 1e-5) continue;
+          dx = ux * move; dy = uy * move; dz = uz * move;
+        }
       } else if (brush === "drag") {
         // Along the stroke: the corners under the brush follow the brush's move since the last dab.
         const prev = this.dragPrev;
@@ -1199,12 +1223,19 @@ export class LiveMesh {
   }
   flattenDepth = 0;
   /** Build 92: the surface Attract pulls towards (another part), set by the editor for the stroke. */
-  attractTarget: { nearest: (x: number, y: number, z: number, out: Float64Array) => number } | null = null;
+  attractTarget: { nearest: (x: number, y: number, z: number, out: Float64Array) => number; lastTriangle?: number; triangleNormal?: (t: number, out: Float64Array) => void } | null = null;
   private attractPoint = new Float64Array(3);
   private layerBase = new Map<number, [number, number, number, number, number, number]>();
   private dragPrev: Vec3 | null = null;
   /** Starts a stroke for the brushes that remember it (Draw2, Drag). beginPatch does this too. */
-  beginStroke() { this.layerBase.clear(); this.dragPrev = null; }
+  beginStroke() { this.layerBase.clear(); this.dragPrev = null; this.attractStart.clear(); }
+  /** Build 105: where each corner Attract moved stood when the stroke began. */
+  private attractStart = new Map<number, [number, number, number]>();
+  private attractNormal = new Float64Array(3);
+  /** Build 105: Attract stops this short of the target, mm (the clearance; 0: onto it). */
+  attractGap = 0;
+  /** Build 105: Attract as before (onto the nearest point of anything within reach, no facing test or limits). */
+  classicAttract = false;
 
   // ---------------------------------------------------------------------------------------------
   // Build 90: Freeze (Meshmixer's mask)
@@ -1963,6 +1994,11 @@ export function brushResponse(brush: LiveBrush, strength: number): { strength: n
   return { strength: s, step: 0.06, passes: 1 };
 }
 
+/** Build 105: Attract pulls only where the target lies in front of the surface and faces it (cosine). */
+export const ATTRACT_FACING = 0.3;
+/** Build 105: the most Attract moves a corner in one dab, and in one stroke, mm. */
+export const ATTRACT_DAB = 0.15;
+export const ATTRACT_STROKE = 1.5;
 /** Build 105: the edge length the smoothing brushes were set against Meshmixer on (build 82's test plate, about this), mm. */
 export const SMOOTH_EDGE_REF = 0.29;
 /** Build 105: the most passes one dab of a smoothing brush makes (very fine patches take their time over several dabs). */

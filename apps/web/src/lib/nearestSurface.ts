@@ -26,6 +26,15 @@ export class NearestSurface {
       }
     }
   }
+  /** Build 105: triangle t's normal (unit; as wound) into `out`. */
+  triangleNormal(t: number, out: Float64Array | number[]) {
+    const s = this.soup, o = t * 9;
+    const ux = s[o + 3] - s[o], uy = s[o + 4] - s[o + 1], uz = s[o + 5] - s[o + 2];
+    const vx = s[o + 6] - s[o], vy = s[o + 7] - s[o + 1], vz = s[o + 8] - s[o + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    out[0] = nx / len; out[1] = ny / len; out[2] = nz / len;
+  }
   /** The nearest point on the surface to (x, y, z) within reach, written to `out`; its distance, or Infinity. */
   nearest(x: number, y: number, z: number, out: Float64Array | number[]): number {
     const c = this.cell, cx = Math.floor(x / c), cy = Math.floor(y / c), cz = Math.floor(z / c);

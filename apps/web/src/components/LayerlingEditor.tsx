@@ -9829,6 +9829,9 @@ export function LayerlingEditor({
     state.live.falloff = options.falloff;
     state.live.holdBoundary = options.hold;
     state.live.classicSmooth = Boolean(options.classic);
+    state.live.classicAttract = Boolean(options.classic);
+    // Build 105: on a wax tooth, Attract stops at the clearance set for the bite (exocad's static occlusion).
+    state.live.attractGap = shape.dental === "wax" ? Math.max(0, waxupRef.current.contacts.occlusal) : 0;
     state.live.flattenDepth = options.depth;
     // Build 92: room for what a refining stroke adds, made now rather than mid-stroke.
     if (stroke.refine !== "off") state.live.reserve(stroke.refine === "fine" ? 120000 : 40000);
