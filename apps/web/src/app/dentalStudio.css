@@ -716,3 +716,73 @@
   box-sizing: border-box;
   width: calc(100% + 24px);
 }
+
+/* Build 104: softer corners throughout the frame - Meshmixer's colours, a little less industrial. */
+.studio-dental .dental-studio-panel .dental-card,
+.studio-dental .dental-chrome-flyout,
+.studio-dental .outliner-panel,
+.studio-dental .bite-contacts-card,
+.studio-dental .editor-status {
+  border-radius: 10px !important;
+}
+
+.studio-dental .dental-studio-panel .dental-card-head {
+  border-radius: 10px 10px 0 0;
+}
+
+.studio-dental .dental-studio-panel select,
+.studio-dental .dental-studio-panel .dental-label-field input,
+.studio-dental .dental-studio-panel input[type="text"],
+.studio-dental .dental-studio-panel input[type="number"],
+.studio-dental .dental-studio-panel .dental-import,
+.studio-dental .dental-studio-panel .dental-trim-mode button,
+.studio-dental .dental-studio-panel .dental-trim-buttons button,
+.studio-dental .dental-studio-panel .shell-opening-options button,
+.studio-dental .dental-studio-panel .dental-swap,
+.studio-dental .dental-studio-panel .dental-views button,
+.studio-dental .dental-studio-panel .dental-more,
+.studio-dental .dental-studio-panel .wax-step-nav button,
+.studio-dental .dental-studio-panel .edge-modifier-footer button,
+.studio-dental .bite-contacts-card .bite-contacts-open {
+  border-radius: 7px !important;
+}
+
+.studio-dental .dental-studio-panel .dental-presets button,
+.studio-dental .dental-studio-panel .dental-picture-tiles button,
+.studio-dental .dental-studio-panel .dental-height-box {
+  border-radius: 9px !important;
+}
+
+/* Text that fits: choices wrap onto two lines rather than being cut, and value boxes are wide
+   enough for "10.00". */
+.studio-dental .dental-studio-panel .shell-opening-options button,
+.studio-dental .dental-studio-panel .dental-trim-mode button,
+.studio-dental .dental-studio-panel .dental-trim-buttons button,
+.studio-dental .dental-studio-panel .dental-picture-tiles button span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.studio-dental .dental-studio-panel .dental-picture-tiles button {
+  padding: 8px 6px;
+  font-size: 12.5px;
+}
+
+.studio-dental .dental-studio-panel .dental-more {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.studio-dental .dental-studio-panel .range-value-control input {
+  width: 4.6em !important;
+  min-width: 4.6em;
+  height: 26px;
+  padding: 0 4px !important;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-dental .dental-studio-panel .range-value-control {
+  border-radius: 7px;
+}

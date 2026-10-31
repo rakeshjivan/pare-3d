@@ -10276,7 +10276,11 @@ export function LayerlingEditor({
     const lowerAxes = analysis.arches.find((arch) => arch.role === "lower")?.axes;
     const placed = arches.map((arch) => {
       const axes = mode === "occlusion" && lowerAxes ? lowerAxes : arch.axes;
-      return { arch, shape: shapeOf(arch.id)!, place: standUpright(axes.up, axes.front).multiply(dentalLocalToInput.current.get(arch.id)!) };
+      const upright = standUpright(axes.up, axes.front).multiply(dentalLocalToInput.current.get(arch.id)!);
+      // Build 104: side by side, the upper turns teeth down - as it sits in the mouth and as a dentist holds
+      // it - the lower teeth up; turned about the view axis, so each still faces you, patient's right on your left.
+      const place = mode === "side" && arch.role === "upper" ? new THREE.Matrix4().makeRotationZ(Math.PI).multiply(upright) : upright;
+      return { arch, shape: shapeOf(arch.id)!, place };
     });
     const boxes = placed.map(({ shape, place }) => placedBounds(shape, place));
     const shift = (box: THREE.Box3, role: DentalRole) => {
