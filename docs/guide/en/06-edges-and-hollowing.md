@@ -102,7 +102,7 @@ Every face of a body can be moved by the same distance, out or in. That is what 
 
 1. Select one body and click {{ui:editor.tool.offset}}, or right-click the body and choose it there.
 2. Choose {{ui:offset.grow}} or {{ui:offset.shrink}} and set the {{ui:offset.distance}}.
-3. The {{ui:shell.edges}} decide the outer corners: rounded keeps the offset surface round there, sharp lets the faces run on until they meet.
+3. The {{ui:offset.edges}} decide the outer corners: rounded keeps the offset surface round there, sharp lets the faces run on until they meet.
 4. Tick {{ui:offset.copy}} to keep the part as it is and get the grown body as a copy that already is a hole. Group that hole with the mating part and it cuts exactly the clearance you chose.
 5. Click {{ui:offset.apply}}.
 

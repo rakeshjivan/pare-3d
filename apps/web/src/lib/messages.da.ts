@@ -638,6 +638,7 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "offset.grow": "Forstør",
   "offset.shrink": "Formindsk",
   "offset.distance": "Afstand",
+  "offset.edges": "Ydre hjørner",
   "offset.edgesHint": "Afrundet holder den forskudte flade rund i ydre hjørner; skarp lader fladerne løbe videre, til de mødes.",
   "offset.copy": "Behold originalen og tilføj det forskudte legeme som hul",
   "offset.apply": "Forskyd",

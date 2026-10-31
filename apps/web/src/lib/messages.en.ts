@@ -718,6 +718,7 @@ export const MESSAGES_EN = {
   "offset.grow": "Grow",
   "offset.shrink": "Shrink",
   "offset.distance": "Distance",
+  "offset.edges": "Outer corners",
   "offset.edgesHint": "Rounded keeps the offset surface round at outer corners; sharp lets the faces run on until they meet.",
   "offset.copy": "Keep the original and add the offset body as a hole",
   "offset.apply": "Offset",

@@ -627,6 +627,7 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "offset.grow": "Büyüt",
   "offset.shrink": "Küçült",
   "offset.distance": "Mesafe",
+  "offset.edges": "Dış köşeler",
   "offset.edgesHint": "Yuvarlak, dış köşelerde ötelenen yüzeyi yuvarlak tutar; keskin, yüzlerin buluşana kadar devam etmesini sağlar.",
   "offset.copy": "Aslı sakla ve ötelenen gövdeyi delik olarak ekle",
   "offset.apply": "Ötele",

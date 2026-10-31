@@ -781,6 +781,7 @@ export const MESSAGES_CS: Partial<Record<MessageKey, string>> = {
   "offset.grow": "Zvětšit",
   "offset.shrink": "Zmenšit",
   "offset.distance": "Vzdálenost",
+  "offset.edges": "Vnější rohy",
   "offset.edgesHint": "Zaoblené drží odsazený povrch na vnějších rozích kulatý; ostré nechá plochy pokračovat, dokud se nepotkají.",
   "offset.copy": "Ponechat originál a přidat odsazené těleso jako díru",
   "offset.apply": "Odsadit",

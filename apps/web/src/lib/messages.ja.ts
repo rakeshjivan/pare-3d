@@ -644,6 +644,7 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "offset.grow": "拡大",
   "offset.shrink": "縮小",
   "offset.distance": "距離",
+  "offset.edges": "外側の角",
   "offset.edgesHint": "「丸め」は外側の角でオフセット面を丸く保ち、「シャープ」は面が交わるまで延長します。",
   "offset.copy": "元を残し、オフセットしたボディを穴として追加",
   "offset.apply": "オフセット",

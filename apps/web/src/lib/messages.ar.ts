@@ -662,6 +662,7 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "offset.grow": "تكبير",
   "offset.shrink": "تصغير",
   "offset.distance": "المسافة",
+  "offset.edges": "الزوايا الخارجية",
   "offset.edgesHint": "«مستدير» يُبقي السطح المُزاح مستديرًا عند الزوايا الخارجية؛ «حاد» يمدّ الأوجه حتى تلتقي.",
   "offset.copy": "الاحتفاظ بالأصل وإضافة الجسم المُزاح كثقب",
   "offset.apply": "إزاحة",

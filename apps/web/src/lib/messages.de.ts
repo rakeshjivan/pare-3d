@@ -718,6 +718,7 @@ export const MESSAGES_DE: Partial<Record<MessageKey, string>> = {
   "offset.grow": "Vergrößern",
   "offset.shrink": "Verkleinern",
   "offset.distance": "Abstand",
+  "offset.edges": "Außenecken",
   "offset.edgesHint": "Gerundet hält die versetzte Fläche an Außenecken rund; scharf lässt die Flächen weiterlaufen, bis sie sich treffen.",
   "offset.copy": "Original behalten und den versetzten Körper als Loch hinzufügen",
   "offset.apply": "Versetzen",

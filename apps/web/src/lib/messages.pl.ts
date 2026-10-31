@@ -645,6 +645,7 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "offset.grow": "Powiększ",
   "offset.shrink": "Zmniejsz",
   "offset.distance": "Odległość",
+  "offset.edges": "Narożniki zewnętrzne",
   "offset.edgesHint": "Zaokrąglone utrzymuje odsuniętą powierzchnię okrągłą na zewnętrznych narożach; ostre pozwala ścianom biec dalej, aż się spotkają.",
   "offset.copy": "Zachowaj oryginał i dodaj odsuniętą bryłę jako otwór",
   "offset.apply": "Odsuń",

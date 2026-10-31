@@ -3454,6 +3454,18 @@ html[data-theme="dark"] .shell-openings-summary {
   color: #a8957f;
 }
 
+.offset-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.offset-copy input {
+  flex: none;
+  margin-top: 2px;
+}
+
 .edge-modifier-history-actions {
   display: grid;
   gap: 6px;

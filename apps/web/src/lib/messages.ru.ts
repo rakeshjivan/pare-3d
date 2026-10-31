@@ -698,6 +698,7 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "offset.grow": "Увеличить",
   "offset.shrink": "Уменьшить",
   "offset.distance": "Расстояние",
+  "offset.edges": "Внешние углы",
   "offset.edgesHint": "«Скруглённо» оставляет смещённую поверхность круглой на внешних углах; «остро» продлевает грани, пока они не сойдутся.",
   "offset.copy": "Оставить оригинал и добавить смещённое тело как отверстие",
   "offset.apply": "Сместить",

@@ -617,6 +617,7 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "offset.grow": "Nagyítás",
   "offset.shrink": "Kicsinyítés",
   "offset.distance": "Távolság",
+  "offset.edges": "Külső sarkok",
   "offset.edgesHint": "A lekerekített kerekre hagyja az eltolt felületet a külső sarkoknál; az éles tovább viszi a lapokat, míg találkoznak.",
   "offset.copy": "Az eredeti marad, az eltolt testet lyukként adja hozzá",
   "offset.apply": "Eltolás",

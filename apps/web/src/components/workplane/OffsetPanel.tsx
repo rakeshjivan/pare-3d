@@ -120,8 +120,8 @@ export function OffsetPanel({
         onChange={onDistanceChange}
       />
 
-      <div className="edge-modifier-field shell-openings" role="radiogroup" aria-label={t("shell.edges")}>
-        <span>{t("shell.edges")}</span>
+      <div className="edge-modifier-field shell-openings" role="radiogroup" aria-label={t("offset.edges")}>
+        <span>{t("offset.edges")}</span>
         <div className="shell-opening-options">
           {OFFSET_EDGES.map((option) => (
             <button

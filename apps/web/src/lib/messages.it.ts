@@ -617,6 +617,7 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "offset.grow": "Ingrandisci",
   "offset.shrink": "Riduci",
   "offset.distance": "Distanza",
+  "offset.edges": "Angoli esterni",
   "offset.edgesHint": "Arrotondato mantiene tonda la superficie negli spigoli esterni; netto lascia proseguire le facce finché non si incontrano.",
   "offset.copy": "Tieni l'originale e aggiungi il corpo con offset come vuoto",
   "offset.apply": "Applica offset",

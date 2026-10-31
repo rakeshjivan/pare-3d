@@ -690,6 +690,7 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "offset.grow": "Agrandir",
   "offset.shrink": "Réduire",
   "offset.distance": "Distance",
+  "offset.edges": "Coins extérieurs",
   "offset.edgesHint": "Arrondi garde la surface décalée ronde aux coins extérieurs ; vif laisse les faces se prolonger jusqu'à ce qu'elles se rencontrent.",
   "offset.copy": "Garder l'original et ajouter le corps décalé comme trou",
   "offset.apply": "Décaler",

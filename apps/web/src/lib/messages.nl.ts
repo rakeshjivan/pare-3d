@@ -699,6 +699,7 @@ export const MESSAGES_NL: Partial<Record<MessageKey, string>> = {
   "offset.grow": "Vergroten",
   "offset.shrink": "Verkleinen",
   "offset.distance": "Afstand",
+  "offset.edges": "Buitenhoeken",
   "offset.edgesHint": "Afgerond houdt het verschoven oppervlak rond bij buitenhoeken; scherp laat de vlakken doorlopen tot ze elkaar raken.",
   "offset.copy": "Het origineel houden en het verschoven lichaam als gat toevoegen",
   "offset.apply": "Verschuiven",
