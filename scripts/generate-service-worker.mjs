@@ -53,10 +53,12 @@ export function precachePaths(relativeFiles) {
     // Build 101 (Pare 3D): the tooth finder's network (27 MB) is fetched when teeth are first found and kept by the page itself.
     if (path.startsWith("/models/")) continue;
     // The guide's pages are small text and worth having offline; its pictures
-    // are not, and would triple the download for a page few people open.
-    if (/^\/(anleitung|guide|handleiding)\/img\//.test(path)) continue;
-    // The page with every chapter in a row is for printing: a quarter of a megabyte per language, opened by few.
-    if (/^\/(anleitung|guide|handleiding)\/print-all\.html$/.test(path)) continue;
+    // are not, and would triple the download for a page few people open. Every
+    // language has its own folder (guideDir in languages.ts), so any top folder
+    // counts: only three were named here, and 16 more went into the cache.
+    if (/^\/[^/]+\/img\//.test(path)) continue;
+    // The page with every chapter in a row is for printing: about 400 KB per language, opened by few.
+    if (/^\/[^/]+\/print-all\.html$/.test(path)) continue;
     paths.push(path === "/index.html" ? "/" : path);
   }
   return paths.sort();
