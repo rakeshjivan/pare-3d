@@ -75,4 +75,14 @@ describe("a cutting edge on a stroked wall with the real OCCT kernel (#982)", ()
     expect(thin).not.toBeNull();
     expect(kernel.getBoundingBox(thin!, false).xmin).toBeCloseTo(-21.17194, 3);
   });
+
+  it("chamfers the two rims of a drawn letter one after the other where they meet in a tight bend", () => {
+    // An "R" and a "b" drawn with curves, as an SVG brings them: chamfering both rims at once fails at the R's tight bends.
+    const outline = silhouetteSketchProfile(JSON.parse(readFileSync("tests/fixtures/rb-svg-outline-982.json", "utf8")) as SketchProfile);
+    const solid = buildStrokedSketchSolid(kernel, outline, wall, 15)!;
+    const chamfered = chamferTopEdges(kernel, solid, 15, 0.4);
+    expect(chamfered).not.toBeNull();
+    expect(kernel.getVolume(chamfered!)).toBeLessThan(kernel.getVolume(solid));
+    expect(kernel.getBoundingBox(chamfered!, false).ymax).toBeCloseTo(15, 6);
+  });
 });

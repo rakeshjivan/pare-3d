@@ -124,33 +124,70 @@ const TOP_TOLERANCE = 1e-4;
 const LARGE_TOP_EDGES = 750;
 
 /**
- * A wall with a cutting edge (#982): every edge along the very top of the solid - the wall's outer and inner rim - gets a 45°
- * chamfer reaching `amount` in, so the top runs in to a narrow edge. The solid stands from 0 to `height` (y up). A cut or a
- * fuse leaves a compound, which the kernel does not chamfer: each solid in it is chamfered on its own. Null when no solid has
- * an edge up there or the kernel cannot chamfer one (outlines with steps shorter than the chamfer).
+ * The rims along the very top of a solid standing from 0 to `height` (y up), split by the top faces' wires: `outer` the outer
+ * wire of each top face - the wall's outside - and `inner` the rest, the outline the wall stands round.
+ */
+function topRims(cad: OcctKernel, solid: ShapeHandle, height: number) {
+  const outer: ShapeHandle[] = [];
+  const inner: ShapeHandle[] = [];
+  const spread = (edges: ShapeHandle[]) => {
+    const box = cad.getBoundingBox(cad.makeCompound(edges), false);
+    return (box.xmax - box.xmin) * (box.zmax - box.zmin);
+  };
+  for (const face of cad.getSubShapes(solid, "face")) {
+    const box = cad.getBoundingBox(face, false);
+    if (Math.abs(box.ymin - height) > TOP_TOLERANCE || Math.abs(box.ymax - height) > TOP_TOLERANCE) continue;
+    // The outer wire of a flat face reaches furthest; the holes in it lie inside.
+    const wires = cad.getSubShapes(face, "wire").map((wire) => cad.getSubShapes(wire, "edge")).filter((edges) => edges.length);
+    wires.sort((a, b) => spread(b) - spread(a));
+    if (wires.length) outer.push(...wires[0]);
+    wires.slice(1).forEach((edges) => inner.push(...edges));
+  }
+  return { outer, inner };
+}
+
+/**
+ * A wall with a cutting edge (#982): the rims along the very top of the solid get a 45° chamfer reaching `amount` in from
+ * each side, so the top runs in to a narrow edge. The solid stands from 0 to `height` (y up). A cut or a fuse leaves a
+ * compound, which the kernel does not chamfer: each solid in it is chamfered on its own. Where the kernel cannot chamfer both
+ * rims at once - a tight bend of a letter, where the two chamfers meet - it chamfers them one after the other, and failing
+ * that one rim by twice as much, which leaves the same edge on top. Null when no solid has an edge up there or none of this
+ * works (outlines with steps shorter than the chamfer, like a body's outline cut from its triangles).
  */
 export function chamferTopEdges(cad: OcctKernel, shape: ShapeHandle, height: number, amount: number): ShapeHandle | null {
-  const atTop = (edge: ShapeHandle) => {
-    const { first, last } = cad.curveParameters(edge);
-    for (let step = 0; step <= 4; step += 1) {
-      if (Math.abs(cad.curvePointAtParam(edge, first + ((last - first) * step) / 4).y - height) > TOP_TOLERANCE) return false;
+  let edgeCount = 0;
+  const attempt = (build: () => ShapeHandle) => {
+    try {
+      const result = build();
+      // The validity check grows steeply with the edges (#461): a traced outline is checked by its volume alone.
+      if (edgeCount <= LARGE_TOP_EDGES && !cad.isValid(result)) return null;
+      return cad.getVolume(result) > 1e-9 ? result : null;
+    } catch (error) {
+      if (/memory|WebAssembly|abort/i.test(error instanceof Error ? error.message : String(error))) throw error;
+      return null;
     }
-    return true;
   };
-  try {
-    let edgeCount = 0;
-    const chamfered = cad.getSubShapes(shape, "solid").map((solid) => {
-      const edges = cad.getSubShapes(solid, "edge").filter(atTop);
-      edgeCount += edges.length;
-      return edges.length ? cad.chamfer(solid, edges, amount) : solid;
-    });
-    if (!chamfered.length || !edgeCount) return null;
-    const result = chamfered.length === 1 ? chamfered[0] : cad.makeCompound(chamfered);
-    // The validity check grows steeply with the edges (#461): a traced outline is checked by its volume alone.
-    if (edgeCount <= LARGE_TOP_EDGES && !cad.isValid(result)) return null;
-    return cad.getVolume(result) > 1e-9 ? result : null;
-  } catch (error) {
-    if (/memory|WebAssembly|abort/i.test(error instanceof Error ? error.message : String(error))) throw error;
-    return null;
+  const chamferSolid = (solid: ShapeHandle): ShapeHandle | null => {
+    const { outer, inner } = topRims(cad, solid, height);
+    edgeCount += outer.length + inner.length;
+    if (!outer.length && !inner.length) return solid;
+    return attempt(() => cad.chamfer(solid, [...outer, ...inner], amount))
+      ?? (outer.length && inner.length
+        ? attempt(() => {
+          const first = cad.chamfer(solid, outer, amount);
+          return cad.chamfer(first, topRims(cad, first, height).inner, amount);
+        })
+        : null)
+      ?? (outer.length ? attempt(() => cad.chamfer(solid, outer, amount * 2)) : null)
+      ?? (inner.length ? attempt(() => cad.chamfer(solid, inner, amount * 2)) : null);
+  };
+  const solids = cad.getSubShapes(shape, "solid");
+  const chamfered: ShapeHandle[] = [];
+  for (const solid of solids) {
+    const result = chamferSolid(solid);
+    if (!result) return null;
+    chamfered.push(result);
   }
+  if (!chamfered.length || !edgeCount) return null;
+  return chamfered.length === 1 ? chamfered[0] : cad.makeCompound(chamfered);
 }
