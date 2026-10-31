@@ -37,9 +37,11 @@ describe("where the joints go", () => {
     expect(flexiJointPositions(0, 100, 1, undefined, 25)).toEqual([75]);
   });
 
-  it("suggests fewer joints for a short or wide body", () => {
-    expect(automaticFlexiJoints(100, 20)).toBe(4);
+  it("suggests as many joints as leave room between them, more for a narrow body", () => {
+    expect(automaticFlexiJoints(100, 20)).toBe(3);
+    expect(automaticFlexiJoints(90, 18)).toBe(2);
     expect(automaticFlexiJoints(30, 20)).toBe(1);
+    expect(automaticFlexiJoints(200, 12)).toBeGreaterThan(automaticFlexiJoints(200, 20));
     expect(automaticFlexiJoints(400, 10)).toBe(15);
   });
 });

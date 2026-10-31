@@ -1,7 +1,7 @@
 import type { ManifoldToplevel, Mat4 } from "manifold-3d";
 import { shapeToManifoldSolid, disposeManifold } from "@/lib/editorBooleans";
 import { getManifoldRuntime, type ManifoldSolid } from "@/lib/editorMeshCore";
-import { t } from "@/lib/i18n";
+import { numberLocale, t } from "@/lib/i18n";
 import { createLocalId } from "@/lib/localIds";
 import { splitShapeFromWorldPositions } from "@/lib/modelSplit";
 import { canonicalizeShape, isNonSolidShape } from "@/lib/workplaneShapes";
@@ -342,9 +342,15 @@ function jointSides(runtime: ManifoldToplevel, plan: FlexiJointPlan, clearance: 
 
 export type FlexiResult = { links: ManifoldSolid[]; plans: FlexiJointPlan[] } | { error: FlexiError };
 
-/** How many joints a body `length` long and `width` wide gets when none are asked for. */
-export function automaticFlexiJoints(length: number, width: number) {
-  return clamp(Math.floor(length / Math.max(12, 0.9 * width)) - 1, 1, 15);
+/**
+ * How many joints a body `length` long and `width` wide gets when none are asked for: as many as leave links long enough
+ * for the spacing two joints of the automatic size need (flexiMinimumSpacing, the body straight).
+ */
+export function automaticFlexiJoints(length: number, width: number, clearance = FLEXI_DEFAULTS.clearance, swing = FLEXI_DEFAULTS.swing) {
+  const knuckle = Math.max(MIN_KNUCKLE, Math.min(AUTO_KNUCKLE, flexiKnuckleForHalfWidth(width / 2, clearance)));
+  const ring = flexiRingRadius(knuckle, clearance);
+  const spacing = 2 * ring + 2 * clearance + 0.5 + 2 * ring * Math.tan((swing * Math.PI) / 360);
+  return clamp(Math.floor(length / spacing) - 1, 1, 15);
 }
 
 /**
@@ -367,7 +373,7 @@ export function articulateSolid(runtime: ManifoldToplevel, body: ManifoldSolid, 
     const low = bounds.min[2] - 1;
     const high = bounds.max[2] + 1;
     const far = 4 * Math.hypot(length, width, high - low) + 20;
-    let count = options.joints ?? automaticFlexiJoints(length, width);
+    let count = options.joints ?? automaticFlexiJoints(length, width, options.clearance, options.swing);
     let plans: FlexiJointPlan[] | FlexiError;
     for (;;) {
       const positions = flexiJointPositions(bounds.min[0], bounds.max[0], count, options.start, options.end);
@@ -403,6 +409,11 @@ export function articulateSolid(runtime: ManifoldToplevel, body: ManifoldSolid, 
   }
 }
 
+/** A size in mm as the interface's language writes it, to one decimal. */
+function millimetres(value = 0) {
+  return value.toLocaleString(numberLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
 /** The message for why the joints could not be made. */
 export function flexiErrorMessage(error: FlexiError) {
   switch (error.code) {
@@ -411,11 +422,11 @@ export function flexiErrorMessage(error: FlexiError) {
     case "tooShort":
       return t("flexi.error.tooShort");
     case "tooThin":
-      return t("flexi.error.tooThin", { joint: error.joint, size: (error.value ?? 0).toFixed(1) });
+      return t("flexi.error.tooThin", { joint: error.joint, size: millimetres(error.value) });
     case "tooFlat":
-      return t("flexi.error.tooFlat", { joint: error.joint, size: (error.value ?? 0).toFixed(1) });
+      return t("flexi.error.tooFlat", { joint: error.joint, size: millimetres(error.value) });
     case "tooClose":
-      return t("flexi.error.tooClose", { joint: error.joint, size: (error.value ?? 0).toFixed(1) });
+      return t("flexi.error.tooClose", { joint: error.joint, size: millimetres(error.value) });
     case "empty":
       return t("flexi.error.empty", { link: error.joint });
     default:

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Module from "manifold-3d";
-import { articulateSolid, normalizeFlexiOptions } from "@/lib/flexiJoints";
+import { articulateSolid, automaticFlexiJoints, normalizeFlexiOptions } from "@/lib/flexiJoints";
 
 type Solid = { delete?: () => void };
 
@@ -118,6 +118,21 @@ describe("flexi joints (real Manifold kernel)", () => {
       }
     } finally {
       dispose([fish, ...result.links]);
+    }
+  });
+
+  it("makes as many joints as the panel suggests for bars of usual sizes", async () => {
+    const kernel = await runtime();
+    for (const [length, width, height] of [[90, 18, 7], [60, 12, 6], [150, 25, 10], [120, 40, 8]]) {
+      const bar = kernel.Manifold.cube([length, height, width], true).translate([0, height / 2, 0]);
+      const joints = automaticFlexiJoints(length, width);
+      const result = articulateSolid(kernel, bar, normalizeFlexiOptions({ joints }));
+      try {
+        if ("error" in result) throw new Error(`${length} x ${width}: ${JSON.stringify(result.error)}`);
+        expect(result.links).toHaveLength(joints + 1);
+      } finally {
+        dispose([bar, ...("links" in result ? result.links : [])]);
+      }
     }
   });
 
