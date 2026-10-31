@@ -263,19 +263,19 @@ function ToothValues({ tooth, adjust, disabled, onAdjust }: { tooth: { width: nu
 /** Build 105: where the four marks go on a tooth - a front view of a central incisor, the marks numbered in the order they are clicked. */
 function WaxMarksPicture() {
   return (
-    <svg className="dental-picture wax-marks" viewBox="0 0 220 120" role="img" aria-label={t("waxup.marksPicture")}>
-      <path className="gum" d="M10 34 Q110 6 210 34 L210 0 L10 0 Z" />
-      <path className="tooth" d="M70 30 Q110 14 150 30 Q158 70 150 104 Q110 116 70 104 Q62 70 70 30 Z" />
-      {[[152, 66, "1"], [68, 66, "2"], [110, 22, "3"], [110, 110, "4"]].map(([x, y, n]) => (
+    <svg className="dental-picture wax-marks" viewBox="0 0 240 130" role="img" aria-label={t("waxup.marksPicture")}>
+      <path className="gum" d="M40 30 Q120 4 200 30 L200 0 L40 0 Z" />
+      <path className="tooth" d="M86 30 Q120 16 154 30 Q161 70 154 106 Q120 118 86 106 Q79 70 86 30 Z" />
+      {[[156, 64, "1"], [84, 64, "2"], [120, 22, "3"], [120, 112, "4"]].map(([x, y, n]) => (
         <g key={n as string}>
           <circle className="mark" cx={x as number} cy={y as number} r={7} />
           <text className="mark-n" x={x as number} y={(y as number) + 3.5} textAnchor="middle">{n}</text>
         </g>
       ))}
-      <text className="label" x={176} y={70}>{t("waxup.markShort.mesial")}</text>
-      <text className="label" x={44} y={70} textAnchor="end">{t("waxup.markShort.distal")}</text>
-      <text className="label" x={124} y={46}>{t("waxup.markShort.cervical")}</text>
-      <text className="label" x={124} y={98}>{t("waxup.markShort.incisal")}</text>
+      <text className="label" x={168} y={67}>{t("waxup.markShort.mesial")}</text>
+      <text className="label" x={72} y={67} textAnchor="end">{t("waxup.markShort.distal")}</text>
+      <text className="label" x={132} y={13}>{t("waxup.markShort.cervical")}</text>
+      <text className="label" x={132} y={127}>{t("waxup.markShort.incisal")}</text>
     </svg>
   );
 }
@@ -370,6 +370,7 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
       <div className="dental-substep">
         <p className="blend-hint">{t("waxup.marksHint")}</p>
         <WaxMarksPicture />
+        {marking ? <p className="blend-hint waxup-mark-now" role="status">{t("waxup.markPoint", { fdi: view.markPick!.fdi, point: t(`waxup.markPoint.${(["mesial", "distal", "cervical", "incisal"] as const)[view.markPick!.point]}`), n: view.markPick!.point + 1, left: 0 })}</p> : null}
         <div className="waxup-teeth waxup-found" role="group" aria-label={t("waxup.chooseTeeth")}>
           {allTeeth.map((fdi) => {
             const on = view.markTeeth.includes(fdi);
@@ -384,7 +385,6 @@ export function WaxupCard({ view, actions, slots, busy, workspace, imt = false, 
         </div>
         {marking ? (
           <>
-            <p className="blend-hint" role="status">{t("waxup.markPoint", { fdi: view.markPick!.fdi, point: t(`waxup.markPoint.${(["mesial", "distal", "cervical", "incisal"] as const)[view.markPick!.point]}`), n: view.markPick!.point + 1, left: 0 })}</p>
             <div className="dental-trim-buttons">
               <button type="button" className="secondary" disabled={view.markPick!.point === 0} onClick={() => actions.onUndoMarkPoint?.()}>{t("waxup.markUndo")}</button>
               <button type="button" className="secondary" onClick={() => actions.onSkipTooth?.()}>{t("waxup.markSkip")}</button>

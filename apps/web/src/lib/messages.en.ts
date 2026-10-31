@@ -5322,6 +5322,7 @@ export const MESSAGES_EN = {
   "waxStudio.step.sculpt": "Sculpt",
   "waxStudio.stepHint.scans": "Bring in the upper and lower scans (and a bite scan if you have one), and choose a wax-up only or the IMT workflow, on one arch or both.",
   "waxStudio.stepHint.trim": "Optional: cut away tags, flaps and excess gum, or fill a bubble. Next when the scans look clean.",
+  "waxStudio.stepHint.teeth": "The teeth to wax up, and four marks on each that the library teeth are fitted to. The first time, the teeth are found and marked for you and it carries on by itself to the teeth placed - you check and adjust from there.",
   "waxStudio.stepHint.find": "The tooth finder marks and numbers every tooth. The first time, it carries on by itself to the teeth placed - you adjust from there.",
   "waxStudio.stepHint.choose": "The teeth to wax up: canine to canine is chosen for you; add or take away teeth by number.",
   "waxStudio.stepHint.set": "The library teeth to use: the first set for this arch is chosen for you.",

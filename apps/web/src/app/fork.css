@@ -2245,3 +2245,5 @@ html[data-theme="dark"] .dental-studio-panel .dental-picture-tiles button { back
 .dental-picture.wax-marks .mark { fill: #1662b3; stroke: #fff; stroke-width: 1.2; }
 .dental-picture.wax-marks .mark-n { font-size: 9px; font-weight: 700; fill: #fff; }
 .dental-picture.wax-marks .label { font-size: 9px; font-weight: 600; fill: #1662b3; }
+.dental-studio-panel .waxup-found { margin-bottom: 8px; }
+.dental-studio-panel .waxup-mark-now { font-weight: 600; color: #1662b3; }

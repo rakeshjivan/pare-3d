@@ -11715,7 +11715,8 @@ export function LayerlingEditor({
     if (!queue.length) return;
     const next = { ...current, slot: arch.slot, picking: null, toothPick: { queue, points: [] }, error: null };
     setWaxup(next);
-    setDentalHidden(Object.values(state.slots).filter((id) => id && id !== arch.shape.id) as string[]);
+    // Only the arch being marked shows - no other scan, no wax teeth over it - looked at from the front.
+    setDentalHidden([...(Object.values(state.slots).filter((id) => id && id !== arch.shape.id) as string[]), ...waxTeethOf(arch.shape.id).map((shape) => shape.id)]);
     setSelectedIds([]);
     showDentalView(arch.slot, "front");
     showToothMarks(next);
@@ -11834,6 +11835,8 @@ export function LayerlingEditor({
       const old = new Set(waxTeethOf(arch.shape.id).map((shape) => shape.id));
       const kept = selectedIdsRef.current.filter((id) => teeth.some((tooth) => tooth.shape.id === id));
       commitShapes([...shapesRef.current.filter((shape) => !old.has(shape.id)), ...teeth.map((tooth) => tooth.shape)], kept, t("waxup.placed", { count: teeth.length }));
+      // Build 105: the first time, the teeth looked at from the front.
+      if (!old.size && onMarks) window.setTimeout(() => showDentalView(arch.slot, "front"), 50);
       setWaxup((latest) => ({
         ...latest,
         busy: false,
