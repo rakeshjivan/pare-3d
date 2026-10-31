@@ -1732,6 +1732,9 @@ function cadModifierSourceParts(shape: WorkplaneShape) {
  * counted it again at every step and stalled the drag.
  */
 const importedPartCounts = new WeakMap<object, number>();
+// The same for a shape built from its settings: moving, turning or picking a vase counted its 200,000
+// triangles again (0.2 s at every step of a drag), and a spring or a gear the same way.
+const builtPartCounts: Array<{ shape: WorkplaneShape; count: number }> = [];
 
 /** Stand-ins for "no edges", the same arrays at every render, so the workplane does not draw the edge lines again for nothing. */
 const NO_MODIFIER_EDGES: CadModifierEdge[] = [];

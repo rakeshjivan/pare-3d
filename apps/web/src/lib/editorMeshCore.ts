@@ -17,7 +17,7 @@ import { createLoftGeometry } from "@/lib/loftGeometry";
 import { createHingeGeometry } from "@/lib/hingeGeometry";
 import { createGridfinityGeometry } from "@/lib/gridfinityGeometry";
 import { createKnurlGeometry } from "@/lib/knurlGeometry";
-import { createVaseGeometry } from "@/lib/vaseShape";
+import { fittedVaseMesh } from "@/lib/vaseShape";
 import { createTeardropGeometry } from "@/lib/teardropGeometry";
 import { createPortGeometry } from "@/lib/portGeometry";
 import { createScrewHoleGeometry } from "@/lib/screwHoleGeometry";
@@ -483,9 +483,18 @@ function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {
     case "knurl":
       geometry = createKnurlGeometry({ width, height, knurlPattern: shape.knurlPattern, knurlCount: shape.knurlCount, knurlDepth: shape.knurlDepth, knurlAngle: shape.knurlAngle, knurlChamfer: shape.knurlChamfer });
       break;
-    case "vase":
-      geometry = createVaseGeometry({ width, depth, height, vase: shape.vase });
-      break;
+    case "vase": {
+      // The triangles as they are: the shaded geometry's normals cost twice the vase itself here, for nothing.
+      const { positions } = fittedVaseMesh({ width, depth, height, vase: shape.vase });
+      const vertices: Vec3[] = [];
+      const faces: [number, number, number][] = [];
+      for (let i = 0; i + 8 < positions.length; i += 9) {
+        const base = vertices.length;
+        vertices.push([positions[i], positions[i + 1], positions[i + 2]], [positions[i + 3], positions[i + 4], positions[i + 5]], [positions[i + 6], positions[i + 7], positions[i + 8]]);
+        faces.push([base, base + 1, base + 2]);
+      }
+      return { name: sanitizeName(shape.name), vertices, faces };
+    }
     case "hinge":
       geometry = createHingeGeometry({
         width,
@@ -746,7 +755,8 @@ const MAX_UNPLACED_MESHES = 24;
 const MAX_UNPLACED_MESH_VERTICES = 1_500_000;
 const unplacedMeshCache: Array<{ shape: WorkplaneShape; mesh: MeshData }> = [];
 
-function sameShapeApartFromPlacement(a: WorkplaneShape, b: WorkplaneShape) {
+/** Whether two shapes differ only in where they stand and how they are turned, named and coloured. */
+export function sameShapeApartFromPlacement(a: WorkplaneShape, b: WorkplaneShape) {
   if (a === b) return true;
   const left = a as unknown as Record<string, unknown>;
   const right = b as unknown as Record<string, unknown>;

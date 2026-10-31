@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { WorkplaneShape } from "@/types/layerling";
 import { clearUnplacedMeshCache, meshForShape } from "@/lib/editorMeshCore";
+import { createVaseGeometry } from "@/lib/vaseShape";
 
 function shape(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
   return {
@@ -67,5 +68,19 @@ describe("meshForShape keeps the mesh of a shape that only moved or turned", () 
     const first = meshForShape(changing);
     changing.springTurns = 8;
     expect(meshForShape(changing).vertices.length).not.toBe(first.vertices.length);
+  });
+});
+
+describe("meshForShape of a vase", () => {
+  it("has the triangles of the shaded vase", () => {
+    const vase = shape({ kind: "vase", width: 60, depth: 60, size: 60, height: 90, vase: { body: "hohl", cutout: "voronoi", quality: "entwurf" } } as Partial<WorkplaneShape>);
+    const mesh = fresh(vase);
+    const shaded = createVaseGeometry({ width: 60, depth: 60, height: 90, vase: vase.vase }).getAttribute("position");
+    expect(mesh.vertices.length).toBe(shaded.count);
+    for (let i = 0; i < shaded.count; i += 97) {
+      expect(mesh.vertices[i][0]).toBeCloseTo(shaded.getX(i), 5);
+      expect(mesh.vertices[i][1]).toBeCloseTo(shaded.getY(i), 5);
+      expect(mesh.vertices[i][2]).toBeCloseTo(shaded.getZ(i), 5);
+    }
   });
 });

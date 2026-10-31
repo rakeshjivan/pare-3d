@@ -174,7 +174,7 @@ import { displayShapeName, makeShapeFromAsset, renamedShapeName } from "@/lib/sh
 import { cylinderToEllipsePatch } from "@/lib/cylinderToEllipse";
 import { LIMITS as VASE_LIMITS, MATERIALS as VASE_MATERIALS, type VaseChoiceKey, type VaseNumberKey } from "@/lib/vase/vase-geometry.mjs";
 import { normalizeVaseSettings, type VaseSettings } from "@/lib/vaseSettings";
-import { vaseShapePatch } from "@/lib/vaseShape";
+import { vaseShapePatchOffThread } from "@/lib/vaseShape";
 import { VaseDrawingWindow } from "@/components/workplane/VaseDrawingWindow";
 import { VasePrintReport } from "@/components/workplane/VasePrintReport";
 import { shapeDefaultsAsset, shapeDefaultsFromShape } from "@/lib/shapeDefaults";
@@ -1063,7 +1063,8 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
   if (shape.kind === "vase") {
     const vase = normalizeVaseSettings(shape.vase);
     // A new choice can change the outline (a hexagon is narrower across its flats): the frame follows it.
-    const setVase = (patch: Partial<VaseSettings>) => onUpdate(vaseShapePatch({ width, depth, height: shape.height }, normalizeVaseSettings({ ...vase, ...patch })));
+    // The body is built on a worker, and the change comes once it is there.
+    const setVase = (patch: Partial<VaseSettings>) => vaseShapePatchOffThread({ id: shape.id, width, depth, height: shape.height }, normalizeVaseSettings({ ...vase, ...patch }), (vasePatch) => onUpdate(vasePatch));
     const limits = (key: VaseNumberKey): [number, number] => VASE_LIMITS[key] ?? [0, 100];
     const range = (key: VaseNumberKey, label: MessageKey, step: number, hint?: MessageKey): ShapePropertyConfig => {
       const [min, max] = limits(key);
