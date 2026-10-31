@@ -434,7 +434,8 @@ export const FORK_SHORT_LABELS_EN: Readonly<Record<string, string>> = {
  * them on the row (the Mesh group is one button), so none are hidden; the button shows only if a
  * tool is listed here again.
  */
-export const FORK_OVERFLOW_TOOLS: ReadonlySet<string> = new Set<string>();
+// Build 104: the tools ported from layerling 1.112-1.125 sit under Modify's "More", so the row stays as it was.
+export const FORK_OVERFLOW_TOOLS: ReadonlySet<string> = new Set<string>(["offset", "cutOut", "cookieCutter", "loftSketches", "flexi", "lid"]);
 
 /** The advanced tools shown in the toolbar's "More" menu rather than on the row itself. */
 export const FORK_MORE_TOOLS: ReadonlySet<string> = new Set([
@@ -472,6 +473,12 @@ export const FORK_TOOL_HINTS_EN: Readonly<Record<string, string>> = {
   ungroup: "take a group apart again",
   intersect: "keep only where the parts overlap",
   "intersect-preview": "see where the parts overlap, without changing them",
+  offset: "grow or shrink a body by one distance, e.g. for a press-fit clearance",
+  cutOut: "cut one body out of another, with a clearance",
+  cookieCutter: "turn a shape or sketch into a cookie cutter",
+  loftSketches: "join two sketches into one body",
+  flexi: "cut a flat body into links with joints printed in place",
+  lid: "make a lid for a body that is open at the top",
   mirror: "flip the selection",
   pivot: "choose the point a part turns around",
   array: "repeat a part in a row, grid or circle",
