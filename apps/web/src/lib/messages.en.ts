@@ -656,7 +656,7 @@ export const MESSAGES_EN = {
   "cookieCutter.support": "Inner walls held by",
   "cookieCutter.support.bridges": "Bridges",
   "cookieCutter.support.plate": "Plate",
-  "cookieCutter.supportBridgesHint": "Bars on the side you press hold the inner walls to the outer wall.",
+  "cookieCutter.supportBridgesHint": "Bars on the side you press hold the inner walls to the outer wall and to each other.",
   "cookieCutter.supportPlateHint": "A thin plate fills the whole outline on the side you press: steadier and it sticks better to the print bed, but the dough cannot be pushed out from behind.",
   "cookieCutter.plate": "Plate thickness",
   "cookieCutter.fillet": "Fillets",

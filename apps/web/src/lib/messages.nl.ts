@@ -637,7 +637,7 @@ export const MESSAGES_NL: Partial<Record<MessageKey, string>> = {
   "cookieCutter.support": "Binnenwanden vastgehouden door",
   "cookieCutter.support.bridges": "Bruggen",
   "cookieCutter.support.plate": "Plaat",
-  "cookieCutter.supportBridgesHint": "Staven aan de kant waar je drukt houden de binnenwanden vast aan de buitenwand.",
+  "cookieCutter.supportBridgesHint": "Staven aan de kant waar je drukt houden de binnenwanden vast aan de buitenwand en aan elkaar.",
   "cookieCutter.supportPlateHint": "Een dunne plaat vult de hele omtrek aan de kant waar je drukt: steviger en hecht beter op het printbed, maar het deeg kan er van achteren niet uit worden gedrukt.",
   "cookieCutter.plate": "Plaatdikte",
   "cookieCutter.fillet": "Hollingen",

@@ -655,7 +655,7 @@ export const MESSAGES_DE: Partial<Record<MessageKey, string>> = {
   "cookieCutter.support": "Innenwände gehalten von",
   "cookieCutter.support.bridges": "Stegen",
   "cookieCutter.support.plate": "Platte",
-  "cookieCutter.supportBridgesHint": "Stege auf der Seite, auf die du drückst, halten die Innenwände an der äußeren Wand.",
+  "cookieCutter.supportBridgesHint": "Stege auf der Seite, auf die du drückst, halten die Innenwände an der äußeren Wand und aneinander.",
   "cookieCutter.supportPlateHint": "Eine dünne Platte füllt den ganzen Umriss auf der Seite, auf die du drückst: stabiler und haftet besser auf der Druckplatte, aber der Teig lässt sich hinten nicht herausdrücken.",
   "cookieCutter.plate": "Plattendicke",
   "cookieCutter.fillet": "Kehlen",

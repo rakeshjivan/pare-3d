@@ -719,7 +719,7 @@ export const MESSAGES_CS: Partial<Record<MessageKey, string>> = {
   "cookieCutter.support": "Vnitřní stěny drží",
   "cookieCutter.support.bridges": "Můstky",
   "cookieCutter.support.plate": "Deska",
-  "cookieCutter.supportBridgesHint": "Můstky na straně, na kterou tlačíš, drží vnitřní stěny u vnější stěny.",
+  "cookieCutter.supportBridgesHint": "Můstky na straně, na kterou tlačíš, drží vnitřní stěny u vnější stěny a navzájem.",
   "cookieCutter.supportPlateHint": "Tenká deska vyplní celý obrys na straně, na kterou tlačíš: pevnější a lépe drží na podložce, ale těsto nejde zezadu vytlačit.",
   "cookieCutter.plate": "Tloušťka desky",
   "cookieCutter.fillet": "Výplně koutů",

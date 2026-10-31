@@ -635,7 +635,7 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "cookieCutter.support": "Внутренние стенки держат",
   "cookieCutter.support.bridges": "Перемычки",
   "cookieCutter.support.plate": "Пластина",
-  "cookieCutter.supportBridgesHint": "Перемычки со стороны, на которую вы давите, соединяют внутренние стенки с внешней.",
+  "cookieCutter.supportBridgesHint": "Перемычки со стороны, на которую вы давите, соединяют внутренние стенки с внешней и друг с другом.",
   "cookieCutter.supportPlateHint": "Тонкая пластина заполняет весь контур со стороны, на которую вы давите: прочнее и лучше держится на столе, но тесто нельзя выдавить сзади.",
   "cookieCutter.plate": "Толщина пластины",
   "cookieCutter.fillet": "Галтели",

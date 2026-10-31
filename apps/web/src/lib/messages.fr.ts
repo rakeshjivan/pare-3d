@@ -626,7 +626,7 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "cookieCutter.support": "Parois intérieures tenues par",
   "cookieCutter.support.bridges": "Ponts",
   "cookieCutter.support.plate": "Plaque",
-  "cookieCutter.supportBridgesHint": "Des barres du côté où vous appuyez relient les parois intérieures à la paroi extérieure.",
+  "cookieCutter.supportBridgesHint": "Des barres du côté où vous appuyez relient les parois intérieures à la paroi extérieure et entre elles.",
   "cookieCutter.supportPlateHint": "Une plaque fine remplit tout le contour du côté où vous appuyez : plus stable et adhère mieux au plateau, mais la pâte ne peut plus être poussée par l'arrière.",
   "cookieCutter.plate": "Épaisseur de la plaque",
   "cookieCutter.fillet": "Congés",

@@ -521,7 +521,7 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "cookieCutter.support": "Notranje stene držijo",
   "cookieCutter.support.bridges": "Mostički",
   "cookieCutter.support.plate": "Plošča",
-  "cookieCutter.supportBridgesHint": "Mostički na strani, na katero pritiskaš, držijo notranje stene na zunanji steni.",
+  "cookieCutter.supportBridgesHint": "Mostički na strani, na katero pritiskaš, držijo notranje stene na zunanji steni in med seboj.",
   "cookieCutter.supportPlateHint": "Tanka plošča zapolni ves obris na strani, na katero pritiskaš: trdnejše in se bolje prime podlage, vendar testa ni mogoče iztisniti od zadaj.",
   "cookieCutter.plate": "Debelina plošče",
   "cookieCutter.fillet": "Zaokrožitve",
