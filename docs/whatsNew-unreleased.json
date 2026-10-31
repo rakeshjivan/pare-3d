@@ -400,5 +400,15 @@
       "de": "Bei Teilen, die zusammenpassen müssen, wählst du beide Körper und klickst im Bereich Kombinieren auf „Passend ausschneiden“. Das Teil bleibt, der andere Körper bekommt seine Form als Aussparung, auf Wunsch mit Spiel ringsum, etwa 0,2 mm für eine gedruckte Passung. Das Kopieren, Zum-Loch-Machen und Ausrichten entfällt.",
       "en": "For parts that have to fit, select both bodies and click Cut out in the Combine area. The part stays and the other body gets its shape as a cavity, with a clearance all round if you want one, 0.2 mm for a printed fit, say. No more copying, making a hole and aligning it."
     }
+  },
+  {
+    "title": {
+      "de": "Neu: Deckel für Kisten und Töpfe",
+      "en": "New: lids for boxes and pots"
+    },
+    "body": {
+      "de": "Unter Bearbeiten macht „Deckel“ den passenden Deckel für einen Körper, der oben offen ist, etwa eine Kiste, die du mit offener Oberseite ausgehöhlt hast. Wähle eingesteckt, übergestülpt oder flach und die Passung: stramm, normal oder locker. Der Deckel folgt dem Umriss, auch einem runden, und liegt danach umgedreht neben dem Körper, fertig zum Drucken.",
+      "en": "Under Modify, \"Lid\" makes the matching lid for a body that is open at the top, such as a box you hollowed with its top open. Choose push in, over the top or flat, and the fit: tight, normal or loose. The lid follows the outline, a round one too, and lies turned over beside the body, ready to print."
+    }
   }
 ]

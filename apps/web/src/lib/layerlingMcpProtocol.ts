@@ -108,6 +108,7 @@ export type LayerlingMcpCommandName =
   | "intersect_objects"
   | "cookie_cutter"
   | "flexi_joints"
+  | "make_lid"
   | "loft_sketches"
   | "boolean_cut"
   | "separate_parts"

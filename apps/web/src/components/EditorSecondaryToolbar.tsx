@@ -67,7 +67,7 @@ import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
 import { SaveStatus } from "./SaveStatus";
 import { CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
-import { Brush, ChevronDown, Cookie, Grip, MessageSquareText, Printer, Worm } from "lucide-react";
+import { Brush, ChevronDown, Cookie, Grip, MessageSquareText, PackageOpen, Printer, Worm } from "lucide-react";
 import { PareBuildBadge } from "./PareVersionStatus";
 import { Signature } from "lucide-react";
 import { CommandPalette, type PaletteCommand } from "./workplane/CommandPalette";
@@ -253,6 +253,8 @@ export function SecondaryToolbar({
   canCookieCutter,
   canFlexi,
   flexiActive,
+  canLid,
+  lidActive,
   canLoftSketches,
   canRedo,
   canUngroup,
@@ -328,6 +330,7 @@ export function SecondaryToolbar({
   onIntersect,
   onCookieCutter,
   onFlexi,
+  onLid,
   onLoftSketches,
   onIntersectPreview,
   intersectPreviewActive,
@@ -410,6 +413,8 @@ export function SecondaryToolbar({
   canCookieCutter: boolean;
   canFlexi: boolean;
   flexiActive: boolean;
+  canLid: boolean;
+  lidActive: boolean;
   canLoftSketches: boolean;
   canRedo: boolean;
   canUngroup: boolean;
@@ -486,6 +491,7 @@ export function SecondaryToolbar({
   onIntersect: () => void;
   onCookieCutter: () => void;
   onFlexi: () => void;
+  onLid: () => void;
   onLoftSketches: () => void;
   onIntersectPreview: () => void;
   intersectPreviewActive: boolean;
@@ -904,6 +910,7 @@ export function SecondaryToolbar({
     { id: "chamfer", label: t("editor.tool.chamfer"), icon: ToolbarChamferIcon, action: onChamfer, enabled: canEdgeModify, active: edgeModifierKind === "chamfer" || edgeModifierKind === "chamfillet" },
     { id: "fillet", label: t("editor.tool.fillet"), icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify, active: edgeModifierKind === "fillet" },
     { id: "hollow", label: t("editor.tool.hollow"), icon: ToolbarHollowIcon, action: onHollow, enabled: canEdgeModify, active: hollowActive },
+    { id: "lid", label: t("editor.tool.lid"), icon: PackageOpen, action: onLid, enabled: canLid || lidActive, active: lidActive },
     { id: "offset", label: t("editor.tool.offset"), icon: ToolbarOffsetIcon, action: onOffset, enabled: canEdgeModify, active: offsetActive },
     { id: "deleteFace", label: t("editor.tool.deleteFace"), icon: ToolbarDeleteFaceIcon, action: onDeleteFace, enabled: canEdgeModify, active: deleteFaceActive && !build33.draftActive },
     { id: "draft", label: t("draft.title"), icon: ForkDraftIcon, action: build33.onDraft, enabled: canEdgeModify, active: build33.draftActive },

@@ -29,6 +29,7 @@ export const COMMAND_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
   intersect: ["intersect", "intersection", "schnittmenge", "verschneiden", "gemeinsam"],
   cookieCutter: ["cookie cutter", "cookie", "cutter", "biscuit", "pastry", "stencil", "christmas", "ausstechform", "ausstecher", "plaetzchen", "plätzchen", "keks", "keksform", "backform", "weihnachten"],
   flexi: ["flexi", "flexi toy", "articulated", "print in place", "joint", "joints", "links", "snake", "dragon", "fish", "gelenk", "gelenke", "beweglich", "glieder", "drache", "schlange", "fisch"],
+  lid: ["lid", "cover", "cap", "box lid", "plug", "deckel", "kistendeckel", "dose", "abdeckung", "verschluss", "stuelpdeckel", "stülpdeckel"],
   loftSketches: ["loft", "transition", "two sketches", "two svgs", "blend", "uebergang", "übergang", "zwei skizzen", "skizzen verbinden", "trichter", "funnel"],
   "intersect-preview": ["preview", "common", "overlap", "venn", "vorschau", "gemeinsam", "gemeinsames", "ueberlappung", "schnittmenge"],
   align: ["align", "ausrichten", "buendig", "bündig", "mitte", "center"],
