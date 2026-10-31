@@ -2004,6 +2004,7 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "shape.nameTag": "Badge nominatif",
   "shape.roundRoof": "Demi-cylindre",
   "shape.halfSphere": "Demi-sphère",
+  "shape.paraboloid": "Paraboloïde",
   "shape.torus": "Anneau",
   "shape.tube": "Tube",
   "shape.bentTube": "Tube cintré",

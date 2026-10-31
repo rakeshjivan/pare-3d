@@ -216,7 +216,7 @@ function pointInsideHoleShape(point: Vec3, shape: WorkplaneShape, strictInterior
       return false;
     }
 
-    if (shape.kind === "cylinder" || shape.kind === "ellipse" || shape.kind === "sphere" || shape.kind === "halfSphere" || shape.kind === "cone" || shape.kind === "torus" || shape.kind === "tube" || shape.kind === "ring") {
+    if (shape.kind === "cylinder" || shape.kind === "ellipse" || shape.kind === "sphere" || shape.kind === "halfSphere" || shape.kind === "paraboloid" || shape.kind === "cone" || shape.kind === "torus" || shape.kind === "tube" || shape.kind === "ring") {
       const nx = local.x / Math.max(POINT_TOLERANCE, innerHalfWidth);
       const nz = local.z / Math.max(POINT_TOLERANCE, innerHalfDepth);
       return nx * nx + nz * nz < 1;
@@ -230,7 +230,7 @@ function pointInsideHoleShape(point: Vec3, shape: WorkplaneShape, strictInterior
     return false;
   }
 
-  if (shape.kind === "cylinder" || shape.kind === "ellipse" || shape.kind === "sphere" || shape.kind === "halfSphere" || shape.kind === "cone" || shape.kind === "torus" || shape.kind === "tube" || shape.kind === "ring") {
+  if (shape.kind === "cylinder" || shape.kind === "ellipse" || shape.kind === "sphere" || shape.kind === "halfSphere" || shape.kind === "paraboloid" || shape.kind === "cone" || shape.kind === "torus" || shape.kind === "tube" || shape.kind === "ring") {
     const nx = local.x / Math.max(POINT_TOLERANCE, halfWidth);
     const nz = local.z / Math.max(POINT_TOLERANCE, halfDepth);
     return nx * nx + nz * nz <= 1.0001;

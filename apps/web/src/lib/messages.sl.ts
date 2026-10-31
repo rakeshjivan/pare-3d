@@ -1651,6 +1651,7 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "shape.text": "Besedilo",
   "shape.roundRoof": "Okrogla streha",
   "shape.halfSphere": "Polkrogla",
+  "shape.paraboloid": "Paraboloid",
   "shape.torus": "Torus",
   "shape.tube": "Cev",
   "shape.bentTube": "Ukrivljena cev",

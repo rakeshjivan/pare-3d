@@ -22,7 +22,7 @@ import { createHoneycombGeometry } from "@/lib/honeycombGeometry";
 import { createRoundedBoxGeometry } from "@/lib/roundedBoxGeometry";
 import { createBentTubeGeometry } from "@/lib/bentTubeGeometry";
 import { createPrismGeometry } from "@/lib/prismGeometry";
-import { createBooleanHalfSphereGeometry, createBooleanHollowCylinderGeometry, createBooleanRoundRoofGeometry } from "@/lib/roundBodyGeometry";
+import { createBooleanHalfSphereGeometry, createBooleanHollowCylinderGeometry, createBooleanRoundRoofGeometry, createParaboloidGeometry } from "@/lib/roundBodyGeometry";
 import { createPyramidGeometry } from "@/lib/pyramidGeometry";
 import { roundSideCount } from "@/lib/roundSideCount";
 import { createThreadGeometry } from "@/lib/threadGeometry";
@@ -415,6 +415,9 @@ function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {
       break;
     case "halfSphere":
       geometry = createBooleanHalfSphereGeometry(width, height, depth, shape.steps ?? 32);
+      break;
+    case "paraboloid":
+      geometry = createParaboloidGeometry(width, height, depth, shape.steps ?? 32);
       break;
     case "torus":
       geometry = createBooleanTorusGeometry(width, height, depth, shape);

@@ -2072,6 +2072,7 @@ export const MESSAGES_EN = {
   "shape.doubleCountersink": "Double Countersink",
   "shape.thread": "Thread",
   "shape.spring": "Spring",
+  "shape.paraboloid": "Paraboloid",
   "shape.gridfinity": "Gridfinity",
   "shape.polygon": "Polygon",
   "shape.ruler": "Ruler",

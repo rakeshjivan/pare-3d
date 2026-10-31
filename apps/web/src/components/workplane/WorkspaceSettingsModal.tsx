@@ -224,7 +224,7 @@ function specialFieldsForShape(
       step: 1,
     }];
   }
-  if (kind === "sphere" || kind === "halfSphere") return [{ type: "number", key: "steps", label: t("prop.steps"), defaultValue: defaults.steps ?? (kind === "halfSphere" ? 32 : 24), min: 6, max: MAX_HIGH_RESOLUTION_STEPS, step: 1 }];
+  if (kind === "sphere" || kind === "halfSphere" || kind === "paraboloid") return [{ type: "number", key: "steps", label: t("prop.steps"), defaultValue: defaults.steps ?? (kind === "halfSphere" || kind === "paraboloid" ? 32 : 24), min: 6, max: MAX_HIGH_RESOLUTION_STEPS, step: 1 }];
   if (kind === "torus") {
     const effective = torusTessellation({ sides: defaults.sides, steps: defaults.steps }, dimensions.width, dimensions.depth, dimensions.height);
     return [

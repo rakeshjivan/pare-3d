@@ -269,7 +269,7 @@ export function snapGridForUnits(units: string, snap: GridSize): GridSize {
 }
 const customizableShapeKinds: ShapeKind[] = [
   "box", "roundedBox", "cylinder", "slot", "ellipse", "sphere", "sketch", "scribble", "cone", "pyramid", "roof", "text", "roundRoof",
-  "halfSphere", "torus", "tube", "bentTube", "star", "heart", "crescent", "gear", "honeycomb", "hinge", "knurl", "dovetail", "counterbore", "countersink", "doubleCountersink", "teardrop", "loft", "thread", "spring", "gridfinity", "ring", "wedge", "polygon", "icosahedron", "ruler", "mesh",
+  "halfSphere", "paraboloid", "torus", "tube", "bentTube", "star", "heart", "crescent", "gear", "honeycomb", "hinge", "knurl", "dovetail", "counterbore", "countersink", "doubleCountersink", "teardrop", "loft", "thread", "spring", "gridfinity", "ring", "wedge", "polygon", "icosahedron", "ruler", "mesh",
 ];
 
 function numberOrDefault(value: unknown, fallback: number) {
@@ -336,7 +336,7 @@ export function normalizeShapeCustomizations(value: unknown, fallback: ShapeCust
       maxDimension: optionalShapeDimension(source.maxDimension, fallbackEntry?.maxDimension),
       color: normalizeHexColor(typeof source.color === "string" ? source.color : undefined) ?? fallbackEntry?.color,
     };
-    if (kind === "sphere" || kind === "halfSphere" || kind === "torus") {
+    if (kind === "sphere" || kind === "halfSphere" || kind === "paraboloid" || kind === "torus") {
       entry.steps = optionalShapeNumber(source.steps, fallbackEntry?.steps, 6, MAX_HIGH_RESOLUTION_STEPS, true);
     }
     if (kind === "torus") {

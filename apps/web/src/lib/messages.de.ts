@@ -2066,6 +2066,7 @@ export const MESSAGES_DE: Partial<Record<MessageKey, string>> = {
   "shape.doubleCountersink": "Doppelsenkung",
   "shape.thread": "Gewinde",
   "shape.spring": "Feder",
+  "shape.paraboloid": "Paraboloid",
   "shape.gridfinity": "Gridfinity",
   "shape.polygon": "Mehrkant",
   "shape.ruler": "Lineal",

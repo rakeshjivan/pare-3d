@@ -211,6 +211,7 @@ const SHAPE_LABEL_KEYS: Record<string, MessageKey> = {
   qrCode: "shape.qrCode",
   "round-roof": "shape.roundRoof",
   "half-sphere": "shape.halfSphere",
+  paraboloid: "shape.paraboloid",
   torus: "shape.torus",
   tube: "shape.tube",
   bentTube: "shape.bentTube",
@@ -249,6 +250,7 @@ export const toolbarShapeAssets: ToolbarShapeAsset[] = [
   { id: "wedge", name: "Wedge", src: "assets/editor/shape-icons-gray/wedge.png", menuIcon: "assets/editor/shape-icons-gray/wedge.png", kind: "wedge", color: "#33983d" },
   { id: "round-roof", name: "Round Roof", src: "assets/editor/shape-icons-gray/round-roof.png", menuIcon: "assets/editor/shape-icons-gray/round-roof.png", kind: "roundRoof", color: "#67c4ce" },
   { id: "half-sphere", name: "Half Sphere", src: "assets/editor/shape-icons-gray/half-sphere.png", menuIcon: "assets/editor/shape-icons-gray/half-sphere.png", kind: "halfSphere", color: "#c9009a" },
+  { id: "paraboloid", name: "Paraboloid", src: "assets/editor/shape-icons-gray/paraboloid.png", menuIcon: "assets/editor/shape-icons-gray/paraboloid.png", kind: "paraboloid", color: "#8fdc5a" },
   { id: "torus", name: "Torus", src: "assets/editor/shape-icons-gray/torus.png", menuIcon: "assets/editor/shape-icons-gray/torus.png", kind: "torus", color: "#0098c7" },
   { id: "loft", name: "Loft", src: "assets/editor/shape-icons-gray/loft.png", menuIcon: "assets/editor/shape-icons-gray/loft.png", kind: "loft", color: "#c0703a" },
   { id: "tube", name: "Tube", src: "assets/editor/shape-icons-gray/tube.png", menuIcon: "assets/editor/shape-icons-gray/tube.png", kind: "tube", color: "#ce7013" },
@@ -435,14 +437,14 @@ export function shapeAssetDefaultDimensions(kind: ShapeKind) {
     // vom kreisrunden Zylinder unterscheidet.
     return { width: 26, depth: 16, height: 20 };
   }
-  const roundProfile = kind === "sphere" || kind === "torus" || kind === "ring" || kind === "halfSphere";
+  const roundProfile = kind === "sphere" || kind === "torus" || kind === "ring" || kind === "halfSphere" || kind === "paraboloid";
   const flatProfile = kind === "torus" || kind === "ring" || kind === "text" || kind === "gear";
   // A gear starts as 12 involute teeth of module 2 (#201).
   const size = kind === "gear" ? involuteGearDiameter(DEFAULT_GEAR_MODULE, DEFAULT_GEAR_TEETH) : roundProfile ? 22 : 20;
   return {
     width: kind === "text" ? 86 : size,
     depth: kind === "text" ? 28 : size,
-    height: kind === "sphere" ? size : kind === "gear" ? 6 : kind === "text" ? 10 : kind === "roundRoof" ? 10 : kind === "halfSphere" ? 11 : flatProfile ? 5 : 20,
+    height: kind === "sphere" ? size : kind === "gear" ? 6 : kind === "text" ? 10 : kind === "roundRoof" ? 10 : kind === "halfSphere" ? 11 : kind === "paraboloid" ? 20 : flatProfile ? 5 : 20,
   };
 }
 
@@ -466,7 +468,7 @@ export function shapeAssetSpecialDefaults(kind: ShapeKind, dimensions = shapeAss
     };
   }
   if (kind === "sphere") return { steps: 24 };
-  if (kind === "halfSphere") return { steps: 32 };
+  if (kind === "halfSphere" || kind === "paraboloid") return { steps: 32 };
   if (kind === "cone") return { topRadius: 0, baseRadius: dimensions.width / 2 };
   if (kind === "pyramid") return { sides: 4, topWidth: 0, topDepth: 0 };
   if (kind === "polygon") return { sides: 6 };
@@ -919,7 +921,7 @@ export function makeShapeFromAsset(
     textSize: asset.kind === "text" ? customization.textSize : undefined,
     textInward: asset.kind === "text" ? customization.textInward : undefined,
     textFlipped: asset.kind === "text" ? customization.textFlipped : undefined,
-    steps: asset.kind === "box" ? 10 : asset.kind === "sphere" ? customization.steps ?? 24 : asset.kind === "halfSphere" ? customization.steps ?? 32 : asset.kind === "torus" ? customization.steps : undefined,
+    steps: asset.kind === "box" ? 10 : asset.kind === "sphere" ? customization.steps ?? 24 : asset.kind === "halfSphere" || asset.kind === "paraboloid" ? customization.steps ?? 32 : asset.kind === "torus" ? customization.steps : undefined,
     sides: asset.kind === "cylinder" || asset.kind === "ellipse" || asset.kind === "slot" || asset.kind === "cone" || asset.kind === "tube" || asset.kind === "ring" || asset.kind === "counterbore" || asset.kind === "countersink" || asset.kind === "teardrop" || asset.kind === "torus" ? customization.sides : asset.kind === "roundRoof" ? customization.sides ?? 64 : asset.kind === "pyramid" ? customization.sides ?? 4 : asset.kind === "polygon" ? customization.sides ?? 6 : undefined,
     bevel: asset.kind === "cylinder" || asset.kind === "ellipse" || asset.kind === "slot" ? 0 : asset.kind === "tube" || asset.kind === "ring" ? customization.bevel ?? 4 : asset.kind === "text" ? customization.bevel : undefined,
     segments: asset.kind === "cylinder" || asset.kind === "ellipse" || asset.kind === "slot" ? 1 : asset.kind === "text" ? customization.segments : undefined,

@@ -13,6 +13,7 @@ export type ShapeKind =
   | "text"
   | "roundRoof"
   | "halfSphere"
+  | "paraboloid"
   | "torus"
   | "tube"
   | "bentTube"
