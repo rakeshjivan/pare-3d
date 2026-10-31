@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { enableLazyMeshPicking, TREATED_BVH_TRIANGLE_THRESHOLD } from "@/components/workplane/viewportShapeObjects";
+import { enableLazyMeshPicking, TREATED_BVH_TRIANGLE_THRESHOLD } from "@/lib/lazyMeshPicking";
 
 type TreeGeometry = THREE.BufferGeometry & { boundsTree?: unknown };
 

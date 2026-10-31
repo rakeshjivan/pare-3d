@@ -159,6 +159,27 @@ A shape that is wrapped already is a mesh of the wrapped thing and cannot be wra
 The result is a mesh like an imported model. Undo lays the shape flat again; for another diameter, undo first and wrap again. It cannot go further than once around the cylinder; then Pare 3D names the smallest diameter that fits.
 
 
+## A vase
+
+The {{ui:shape.vase}} is a body of its own for vases, pots and lampshades. Its measures are under {{ui:inspector.properties}}, its form and pattern on the card {{ui:inspector.vaseForm}}; all of it can be changed at any time, also after saving:
+
+- {{ui:prop.vaseProfile}}: bottle, bellied, bowl with neck, barrel, cylinder or funnel. The height and the widest diameter are the shape's own measures: drag the handles, or type {{ui:prop.vaseDiameter}} and {{ui:prop.height}}.
+- {{ui:prop.vaseSection}}: a circle, a polygon with rounded corners or a wave (soft, pointed, arches or fins). {{ui:prop.vaseTwist}} turns it up the height, {{ui:prop.vaseSway}} lets it swing back and forth.
+- {{ui:prop.vaseBody}}: {{ui:vase.bodySolid}} is for the slicer's vase mode (also called spiralize): the slicer prints one wall in a spiral and leaves out the top and the infill, so the body is drawn solid. {{ui:vase.bodyHollow}} gives a real wall and bottom for a normal print.
+- {{ui:prop.vaseEffect}}: a new vase is plain. To choose from are grooves, stripes, Voronoi cells or facets (low poly) on the outside, in a band of the height if you like; they belong to the vase and stay editable with it.
+
+{{ui:prop.vaseSection2}} blends the cross-section into a second one up the height, say from a circle at the bottom to a hexagon at the top.
+
+{{ui:inspector.vaseDraw}}, high up in the vase's settings, opens a large window of its own over the work area: in it you draw the vase yourself, in real millimetres. You move it by its title bar and make it larger from its corner; the vase in the view follows every change. {{ui:vaseDraw.tabProfile}} shows it from the side: drag the points, the top one sets the height, the widest one the diameter; {{ui:vaseDraw.handle}} gives a point an angle, {{ui:vaseDraw.corner}} a kink. {{ui:vaseDraw.tabSection}} shows the cross-section from above, and the {{ui:prop.vaseDrawSymmetry}} mirrors or repeats what you draw. {{ui:vaseDraw.tabTwist}} draws the twist as a curve up the height. An SVG file from a drawing program becomes the cross-section or the body form, the mesh of a model vase (STL, 3MF, OBJ) the body form. A photo of a vase can go behind the drawing to trace, or {{ui:vaseDraw.takeOutline}} takes its outline. One drag of the mouse is one step of undo; while you drag, the view shows the vase roughly.
+
+The card {{ui:inspector.vaseFloor}} holds what the body needs besides its form. On a hollow vase: drain holes with a slope towards them, a hollow foot, an open wall ({{ui:prop.vaseCutout}}: Voronoi, honeycomb, diamonds or circles, for lanterns and baskets) and a {{ui:prop.vaseLamp}}, hanging, standing on a socket or over an LED puck. On a solid vase, {{ui:prop.vaseReinforce}} cuts fine slits through which the slicer prints ribs inside or a double wall in its vase mode, in one go. Recesses for rubber feet go with either. {{ui:prop.vaseWatertight}} raises the wall and bottom of a hollow vase to at least 1.6 mm.
+
+On the card {{ui:inspector.vaseParts}} the vase gets its accessories. {{ui:prop.vaseLegs}} can be moulded on, so they are part of the vase, or made to plug in, with sockets in the bottom; a stand holds the vase from below. A {{ui:prop.vaseSaucer}} catches the water, or hides in the foot. A hollow vase can take an {{ui:prop.vaseInsert}}: a plant insert, one with a water store for a pot that waters itself, a holder for stems or water tubes. A {{ui:prop.vaseLid}} slips over the rim, snaps into a groove or screws onto a thread in the wall. {{ui:inspector.vasePartsMake}} lays the parts out beside the vase as objects of their own, ready to print, upside down where that prints better. The vase already has the sockets, groove or thread. After changing a setting, lay them out again: the parts from before are replaced. If a part does not fit this vase, the editor says so, for example when an insert would not get through a narrow neck.
+
+The card {{ui:inspector.vasePrint}} tells what the vase takes to print: its weight in the chosen {{ui:prop.vaseMaterial}} and the length of filament – for a solid vase worked out for the slicer's vase mode, one line along the wall. Below are notes on printing it: an overhang of more than 45° and where it is, a wall that is too thin, what a lid, a lamp or legs need, and the slicer settings for ribs and a double wall.
+
+{{ui:prop.vaseQuality}} sets how finely the vase is divided into triangles: finer looks smoother, but makes the editor slower with large vases.
+
 ## Ready-made parts
 
 **{{ui:readyParts.title}}** in the toolbar opens a window of its own beside the Shapes panel - the same button closes it again. It holds parts designed for 3D printing that you would otherwise build by hand, in groups: {{ui:readyParts.cat.fixings}}, {{ui:readyParts.cat.containers}}, {{ui:readyParts.cat.moving}}, {{ui:readyParts.cat.pictures}} and {{ui:readyParts.cat.helpers}}. Some go in with {{ui:readyParts.add}}; the bigger ones have {{ui:readyParts.setUp}}, which opens their settings in the window first. Then click on the plate (or on a face) to put the part there.
