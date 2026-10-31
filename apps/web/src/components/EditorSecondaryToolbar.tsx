@@ -259,6 +259,9 @@ export function SecondaryToolbar({
   canRedo,
   canUngroup,
   canUndo,
+  undoHint,
+  redoHint,
+  onUndoRedoHover,
   canHistoryView,
   historyViewActive,
   onHistoryView,
@@ -419,6 +422,12 @@ export function SecondaryToolbar({
   canRedo: boolean;
   canUngroup: boolean;
   canUndo: boolean;
+  /** What undo would take back, with its measure ("Rounded the edges of Box (5 mm)"), named on its button (#1023). */
+  undoHint?: string | null;
+  /** What redo would bring again. */
+  redoHint?: string | null;
+  /** The pointer or the focus came onto undo or redo: time to work out their hints. */
+  onUndoRedoHover?: () => void;
   canHistoryView: boolean;
   historyViewActive: boolean;
   onHistoryView: () => void;
@@ -858,8 +867,8 @@ export function SecondaryToolbar({
     { id: "paste", label: t("editor.tool.paste"), icon: ToolbarPasteIcon, action: onPaste, enabled: hasClipboard },
     { id: "duplicate", label: t("editor.tool.duplicate"), icon: ToolbarDuplicateIcon, action: onDuplicate, enabled: hasSelection },
     { id: "delete", label: t("editor.tool.delete"), icon: ToolbarTrashIcon, action: onDelete, enabled: canModifySelection },
-    { id: "undo", label: t("editor.tool.undo"), icon: ToolbarUndoIcon, action: onUndo, enabled: canUndo },
-    { id: "redo", label: t("editor.tool.redo"), icon: ToolbarRedoIcon, action: onRedo, enabled: canRedo },
+    { id: "undo", label: t("editor.tool.undo"), icon: ToolbarUndoIcon, action: onUndo, enabled: canUndo, hint: canUndo ? undoHint : null, onHover: onUndoRedoHover },
+    { id: "redo", label: t("editor.tool.redo"), icon: ToolbarRedoIcon, action: onRedo, enabled: canRedo, hint: canRedo ? redoHint : null, onHover: onUndoRedoHover },
     { id: "history", label: t("editor.tool.history"), icon: ToolbarHistoryIcon, action: onHistoryView, enabled: canHistoryView, active: historyViewActive },
   ];
   const visibilityTools = [
@@ -1029,6 +1038,8 @@ export function SecondaryToolbar({
     // kein Loeschen freischalten, waehrend die Flaeche etwas anderes zeigt.
     const enabled = tool.enabled && (!historyViewActive || id === "history");
     const active = "active" in tool && Boolean(tool.active);
+    const hint = "hint" in tool && tool.hint ? tool.hint : null;
+    const onHover = "onHover" in tool ? tool.onHover : undefined;
     return (
       <button
         className={`toolbar-icon ${enabled ? "" : "disabled"} ${active ? "active" : ""}`}
@@ -1036,7 +1047,10 @@ export function SecondaryToolbar({
         data-layerling-tool={id}
         aria-label={label}
         // Fork (build 16): the name and shortcut show at once on hover (fork.css), even on a greyed-out tool.
-        data-tip={`${label}${getLanguage() === "en" && FORK_TOOL_HINTS_EN[id] ? ` – ${FORK_TOOL_HINTS_EN[id]}` : ""}${COMMAND_SHORTCUTS[id] ? ` (${COMMAND_SHORTCUTS[id]})` : ""}`}
+        // Ported from layerling 1.122: Undo and Redo name the step they take back.
+        data-tip={`${label}${hint ? `: ${hint}` : getLanguage() === "en" && FORK_TOOL_HINTS_EN[id] ? ` – ${FORK_TOOL_HINTS_EN[id]}` : ""}${COMMAND_SHORTCUTS[id] ? ` (${COMMAND_SHORTCUTS[id]})` : ""}`}
+        onPointerEnter={onHover}
+        onFocus={onHover}
         onClick={action}
         disabled={!enabled}
       >

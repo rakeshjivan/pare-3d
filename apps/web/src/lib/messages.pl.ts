@@ -1239,6 +1239,8 @@ export const MESSAGES_PL: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "Nie ma nic do cofnięcia",
   "status.undo": "Cofnij",
   "status.redo": "Ponów",
+  "status.undoneStep": "Cofnięto: {step}",
+  "status.redoneStep": "Ponowiono: {step}",
   "status.undoWorkplaneBase": "Cofnij - płaszczyzna robocza wróciła na płytę bazową",
   "status.undoWorkplaneFace": "Cofnij - płaszczyzna robocza wróciła na ścianę",
   "status.redoWorkplaneBase": "Ponów - płaszczyzna robocza wróciła na płytę bazową",

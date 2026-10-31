@@ -1214,6 +1214,8 @@ export const MESSAGES_TR: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "Geri alınacak bir şey yok",
   "status.undo": "Geri al",
   "status.redo": "Yinele",
+  "status.undoneStep": "Geri alındı: {step}",
+  "status.redoneStep": "Yinelendi: {step}",
   "status.undoWorkplaneBase": "Geri al - çalışma düzlemi taban tablasına döndü",
   "status.undoWorkplaneFace": "Geri al - çalışma düzlemi bir yüzeye döndü",
   "status.redoWorkplaneBase": "Yinele - çalışma düzlemi taban tablasına döndü",

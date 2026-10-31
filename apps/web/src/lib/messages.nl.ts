@@ -1413,6 +1413,8 @@ export const MESSAGES_NL: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "Niets om ongedaan te maken",
   "status.undo": "Ongedaan maken",
   "status.redo": "Opnieuw",
+  "status.undoneStep": "Ongedaan gemaakt: {step}",
+  "status.redoneStep": "Opnieuw gedaan: {step}",
   "status.undoWorkplaneBase": "Ongedaan maken - het werkvlak ligt weer op de grondplaat",
   "status.undoWorkplaneFace": "Ongedaan maken - het werkvlak ligt weer op een vlak",
   "status.redoWorkplaneBase": "Opnieuw - het werkvlak ligt weer op de grondplaat",

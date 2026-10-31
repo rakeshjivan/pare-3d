@@ -1256,6 +1256,8 @@ export const MESSAGES_AR: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "لا يوجد شيء للتراجع عنه",
   "status.undo": "تراجع",
   "status.redo": "إعادة",
+  "status.undoneStep": "تم التراجع: {step}",
+  "status.redoneStep": "تمت الإعادة: {step}",
   "status.undoWorkplaneBase": "تراجع - سطح العمل عاد إلى اللوحة الأساسية",
   "status.undoWorkplaneFace": "تراجع - سطح العمل عاد إلى وجه",
   "status.redoWorkplaneBase": "إعادة - سطح العمل عاد إلى اللوحة الأساسية",

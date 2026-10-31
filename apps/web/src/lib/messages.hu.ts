@@ -1206,6 +1206,8 @@ export const MESSAGES_HU: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "Nincs mit visszavonni",
   "status.undo": "Visszavonás",
   "status.redo": "Mégis",
+  "status.undoneStep": "Visszavonva: {step}",
+  "status.redoneStep": "Újra végrehajtva: {step}",
   "status.undoWorkplaneBase": "Visszavonás – a munkasík újra az alaplapon van",
   "status.undoWorkplaneFace": "Visszavonás – a munkasík újra egy lapon van",
   "status.redoWorkplaneBase": "Mégis – a munkasík újra az alaplapon van",

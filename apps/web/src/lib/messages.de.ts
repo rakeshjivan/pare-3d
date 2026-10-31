@@ -1432,6 +1432,8 @@ export const MESSAGES_DE: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "Nichts rückgängig zu machen",
   "status.undo": "Rückgängig",
   "status.redo": "Wiederhergestellt",
+  "status.undoneStep": "Rückgängig gemacht: {step}",
+  "status.redoneStep": "Wiederhergestellt: {step}",
   "status.undoWorkplaneBase": "Rückgängig - die Arbeitsebene liegt wieder auf der Grundplatte",
   "status.undoWorkplaneFace": "Rückgängig - die Arbeitsebene liegt wieder auf einer Fläche",
   "status.redoWorkplaneBase": "Wiederhergestellt - die Arbeitsebene liegt wieder auf der Grundplatte",

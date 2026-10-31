@@ -4,6 +4,7 @@ import { ArchiveRestore, ChevronLeft, ChevronRight, CornerLeftUp, Download, File
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import type { HistoryStepDescription } from "@/lib/historyStepDescription";
+import { historyStepText } from "@/lib/historyStepText";
 import { historyKeyTarget, historyWheelSteps } from "@/lib/historyStepping";
 import { t } from "@/lib/i18n";
 import { useLanguage } from "@/lib/useLanguage";
@@ -59,6 +60,7 @@ export function HistoryViewOverlay({
   objectCount,
   lastStep,
   nextStep,
+  accuracy = 2,
   creating,
   canCreateProject,
   pickedCount,
@@ -84,6 +86,8 @@ export function HistoryViewOverlay({
   lastStep: HistoryStepDescription | null;
   /** What the right arrow would redo: the step after the state shown; null at the newest state. */
   nextStep: HistoryStepDescription | null;
+  /** Decimal places for the measures of the steps, as the workspace shows them. */
+  accuracy?: number;
   creating: boolean;
   canCreateProject: boolean;
   /** How many objects of the shown state are picked to bring back. */
@@ -115,8 +119,8 @@ export function HistoryViewOverlay({
   const max = Math.max(0, count - 1);
   const position = max > 0 ? `${(index / max) * 100}%` : "100%";
   const time = formatHistoryStateTime(recordedAt, language);
-  const lastText = lastStep ? t(lastStep.key, lastStep.values) : t("historyView.lastStepNone");
-  const nextText = nextStep ? t(nextStep.key, nextStep.values) : t("historyView.nextStepNone");
+  const lastText = lastStep ? historyStepText(lastStep, accuracy) : t("historyView.lastStepNone");
+  const nextText = nextStep ? historyStepText(nextStep, accuracy) : t("historyView.nextStepNone");
   const distance = index - liveIndex;
 
   // The mouse wheel over the slider steps through the states, one per notch, up to an

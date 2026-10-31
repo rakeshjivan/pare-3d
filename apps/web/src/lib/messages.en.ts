@@ -1432,6 +1432,8 @@ export const MESSAGES_EN = {
   "status.nothingToUndo": "Nothing to undo",
   "status.undo": "Undo",
   "status.redo": "Redo",
+  "status.undoneStep": "Undone: {step}",
+  "status.redoneStep": "Redone: {step}",
   "status.undoWorkplaneBase": "Undo - the workplane is back on the base plate",
   "status.undoWorkplaneFace": "Undo - the workplane is back on a face",
   "status.redoWorkplaneBase": "Redo - the workplane is back on the base plate",

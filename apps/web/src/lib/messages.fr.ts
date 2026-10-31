@@ -1394,6 +1394,8 @@ export const MESSAGES_FR: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "Rien à défaire",
   "status.undo": "Annuler",
   "status.redo": "Refaire",
+  "status.undoneStep": "Annulé : {step}",
+  "status.redoneStep": "Rétabli : {step}",
   "status.undoWorkplaneBase": "Annuler - le plan de travail est de nouveau sur la plaque de base",
   "status.undoWorkplaneFace": "Annuler - le plan de travail est de retour sur une face",
   "status.redoWorkplaneBase": "Refaire - le plan de travail est de nouveau sur la plaque de base",

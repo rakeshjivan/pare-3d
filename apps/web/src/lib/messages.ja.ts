@@ -1240,6 +1240,8 @@ export const MESSAGES_JA: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "元に戻す操作がありません",
   "status.undo": "元に戻す",
   "status.redo": "やり直す",
+  "status.undoneStep": "元に戻しました: {step}",
+  "status.redoneStep": "やり直しました: {step}",
   "status.undoWorkplaneBase": "元に戻す - 作業平面はベースプレートに戻りました",
   "status.undoWorkplaneFace": "元に戻す - 作業平面は面に戻りました",
   "status.redoWorkplaneBase": "やり直す - 作業平面はベースプレートに戻りました",

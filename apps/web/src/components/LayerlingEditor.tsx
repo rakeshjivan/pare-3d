@@ -191,7 +191,8 @@ import { DEFAULT_INFILL_PERCENT, DEFAULT_WALLS, PRINT_MATERIAL_DENSITY, PRINT_MA
 import { CAD_MODIFIER_MAX_SHARP_ANGLE, CAD_MODIFIER_REQUEST_TIMEOUT_MS, CAD_MODIFIER_PREPARE_TRIANGLE_LIMIT, cadModifierPrepareTimeoutMs, cadModifierTimeoutMessage, cadModifierUserErrorMessage, cadModifierWorkerFailureMessage, cadModifierCandidateEdge, defaultCadModifierTangentChain, rescueSharpAngleForEdges, selectableCadModifierEdge, type CadModifierRequestPhase } from "@/lib/cadModifierRuntime";
 import { createCadPreviewQueue } from "@/lib/cadPreviewQueue";
 import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, groupBeforeEdgeTreatments, restoreShapeBeforeEdgeTreatment, wasGroupBeforeEdgeTreatments } from "@/lib/edgeTreatmentHistory";
-import { historyStepsAround } from "@/lib/historyStepDescription";
+import { describeHistoryStep, historyStepsAround } from "@/lib/historyStepDescription";
+import { historyStepText } from "@/lib/historyStepText";
 import { historyViewMcpCommand } from "./workplane/historyViewMcp";
 import { appendEditorHistorySnapshot, boundedEditorHistoryState, continuesKeyRun, type KeyRun, editorHistoryBranch, editorHistoryEntry, editorHistoryForExport, historyStateAt, hydrateEditorHistoryState, notesForHistoryIndex, projectSceneFingerprint, projectShapesFingerprint, workplaneForHistoryIndex, type EditorHistoryEntry, type EditorHistoryState } from "@/lib/editorHistory";
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
@@ -2411,6 +2412,16 @@ export function LayerlingEditor({
   const projectInfoRef = useRef({ projectId: projectId ?? null, projectName, projectCreatedAt });
   const historyIndexRef = useRef(historyIndex);
   const historyRef = useRef(history);
+  // What undo and redo would take back or bring again, named on their buttons (#1023). Worked out when the
+  // pointer comes onto them, not at every step: reading a step compares the two states.
+  const [undoRedoHints, setUndoRedoHints] = useState<{ history: EditorHistoryEntry[]; index: number; undo: string | null; redo: string | null } | null>(null);
+  const refreshUndoRedoHints = useCallback(() => {
+    const entries = historyRef.current;
+    const index = historyIndexRef.current;
+    const steps = historyStepsAround(entries, index, openGroupCount);
+    const accuracy = workspaceSettingsRef.current.accuracy;
+    setUndoRedoHints({ history: entries, index, undo: steps.last ? historyStepText(steps.last, accuracy) : null, redo: steps.next ? historyStepText(steps.next, accuracy) : null });
+  }, [openGroupCount]);
   const historyLimitRef = useRef(workspaceSettings.historyLimit);
   const interactionHistoryStartRef = useRef("");
   const interactionHistoryChangedRef = useRef(false);
@@ -5994,6 +6005,7 @@ export function LayerlingEditor({
     }
     const nextIndex = currentIndex - 1;
     const entry = currentHistory[nextIndex];
+    const undoneStep = modifierCancelled ? null : describeHistoryStep(entry, currentHistory[currentIndex], openGroupCount);
     const nextShapes = (entry?.shapes ?? []).map(canonicalizeShape);
     const nextSelection = (entry?.selectedIds ?? []).filter((id) => nextShapes.some((shape) => shape.id === id));
     const nextNotes = normalizeNotes(entry?.notes);
@@ -6021,8 +6033,9 @@ export function LayerlingEditor({
     syncProjectShapes(nextShapes);
     setNotice(modifierCancelled
       ? t("status.edgeCancelledUndo")
-      : workplaneChanged ? t(placementWorkplaneIsBase(nextWorkplane) ? "status.undoWorkplaneBase" : "status.undoWorkplaneFace") : t("status.undo"));
-  }, [invalidateCadModifierSession, setOpenGroupLevels, syncProjectShapes]);
+      : workplaneChanged ? t(placementWorkplaneIsBase(nextWorkplane) ? "status.undoWorkplaneBase" : "status.undoWorkplaneFace")
+        : undoneStep ? t("status.undoneStep", { step: historyStepText(undoneStep, workspaceSettingsRef.current.accuracy) }) : t("status.undo"));
+  }, [invalidateCadModifierSession, openGroupCount, setOpenGroupLevels, syncProjectShapes]);
 
   const redo = useCallback(() => {
     if (projectInteractionActiveRef.current) {
@@ -6038,6 +6051,7 @@ export function LayerlingEditor({
     const modifierCancelled = invalidateCadModifierSession();
     const nextIndex = currentIndex + 1;
     const entry = currentHistory[nextIndex];
+    const redoneStep = modifierCancelled ? null : describeHistoryStep(currentHistory[currentIndex], entry, openGroupCount);
     const nextShapes = (entry?.shapes ?? []).map(canonicalizeShape);
     const nextSelection = (entry?.selectedIds ?? []).filter((id) => nextShapes.some((shape) => shape.id === id));
     const nextNotes = normalizeNotes(entry?.notes);
@@ -6065,8 +6079,9 @@ export function LayerlingEditor({
     syncProjectShapes(nextShapes);
     setNotice(modifierCancelled
       ? t("status.edgeCancelledRedo")
-      : workplaneChanged ? t(placementWorkplaneIsBase(nextWorkplane) ? "status.redoWorkplaneBase" : "status.redoWorkplaneFace") : t("status.redo"));
-  }, [invalidateCadModifierSession, setOpenGroupLevels, syncProjectShapes]);
+      : workplaneChanged ? t(placementWorkplaneIsBase(nextWorkplane) ? "status.redoWorkplaneBase" : "status.redoWorkplaneFace")
+        : redoneStep ? t("status.redoneStep", { step: historyStepText(redoneStep, workspaceSettingsRef.current.accuracy) }) : t("status.redo"));
+  }, [invalidateCadModifierSession, openGroupCount, setOpenGroupLevels, syncProjectShapes]);
   // Build 101: for Wax-up Studio's Undo, which walks the history to where a wax-up step began.
   const undoRef = useRef(undo);
   undoRef.current = undo;
@@ -18050,6 +18065,9 @@ export function LayerlingEditor({
         onToggleOutliner={toggleOutliner}
         canUndo={!splitSession && !projectInteractionActive && historyViewIndex === null && (historyIndex > 0 || Boolean(edgeModifier))}
         canRedo={!splitSession && !projectInteractionActive && historyViewIndex === null && historyIndex < history.length - 1}
+        undoHint={!edgeModifier && undoRedoHints?.history === history && undoRedoHints.index === historyIndex ? undoRedoHints.undo : null}
+        redoHint={!edgeModifier && undoRedoHints?.history === history && undoRedoHints.index === historyIndex ? undoRedoHints.redo : null}
+        onUndoRedoHover={refreshUndoRedoHints}
         canHistoryView={historyViewIndex !== null || (!splitSession && !projectInteractionActive && !edgeModifier && !deleteFaceTool && !openGroup && history.length > 1)}
         historyViewActive={historyViewIndex !== null}
         onHistoryView={historyViewIndex === null ? openHistoryView : closeHistoryView}
@@ -18690,6 +18708,7 @@ export function LayerlingEditor({
           objectCount={historyViewState.shapes.length}
           lastStep={historyViewSteps?.last ?? null}
           nextStep={historyViewSteps?.next ?? null}
+          accuracy={workspaceSettings.accuracy}
           creating={historyProjectCreating}
           canCreateProject={Boolean(onCreateProjectFromState)}
           pickedCount={historyView.picked.length}

@@ -1132,6 +1132,8 @@ export const MESSAGES_SL: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "Ni ničesar za razveljavitev",
   "status.undo": "Razveljavi",
   "status.redo": "Uveljavi",
+  "status.undoneStep": "Razveljavljeno: {step}",
+  "status.redoneStep": "Uveljavljeno: {step}",
   "status.historyViewOpened": "Ogled preteklosti. Povleci na prejšnje stanje; nič se ne spremeni, dokler ne zapreš pogleda.",
   "status.historyViewClosed": "Nazaj v trenutnem stanju",
   "status.historyViewBlocksEdits": "Pred spreminjanjem projekta zapri pogled zgodovine",

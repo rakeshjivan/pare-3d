@@ -1175,6 +1175,8 @@ export const MESSAGES_IT: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "Nessuna operazione da annullare",
   "status.undo": "Annulla",
   "status.redo": "Ripeti",
+  "status.undoneStep": "Annullato: {step}",
+  "status.redoneStep": "Ripetuto: {step}",
   "status.undoWorkplaneBase": "Annullamento: il piano di lavoro è tornato sulla piastra di base",
   "status.undoWorkplaneFace": "Annullamento: il piano di lavoro è tornato su una faccia",
   "status.redoWorkplaneBase": "Ripetizione: il piano di lavoro è tornato sulla piastra di base",

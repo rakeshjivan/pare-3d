@@ -1189,6 +1189,8 @@ export const MESSAGES_DA: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "Intet at fortryde",
   "status.undo": "Fortryd",
   "status.redo": "Gendan",
+  "status.undoneStep": "Fortrudt: {step}",
+  "status.redoneStep": "Gendannet: {step}",
   "status.undoWorkplaneBase": "Fortryd – arbejdsplanet er tilbage på grundpladen",
   "status.undoWorkplaneFace": "Fortryd – arbejdsplanet er tilbage på en flade",
   "status.redoWorkplaneBase": "Gendan – arbejdsplanet er tilbage på grundpladen",

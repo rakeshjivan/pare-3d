@@ -1402,6 +1402,8 @@ export const MESSAGES_RU: Partial<Record<MessageKey, string>> = {
   "status.nothingToUndo": "Нечего отменять",
   "status.undo": "Отменить",
   "status.redo": "Вернуть",
+  "status.undoneStep": "Отменено: {step}",
+  "status.redoneStep": "Возвращено: {step}",
   "status.undoWorkplaneBase": "Отмена — рабочая плоскость снова на основании",
   "status.undoWorkplaneFace": "Отмена — рабочая плоскость снова на грани",
   "status.redoWorkplaneBase": "Возврат — рабочая плоскость снова на основании",
