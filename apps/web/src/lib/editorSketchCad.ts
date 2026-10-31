@@ -10,7 +10,7 @@ import { buildSketchRevolveMesh, normalizeSketchRevolveSettings } from "@/lib/sk
 import { placementWorkplaneCoordinates, type PlacementWorkplane } from "@/lib/placementWorkplane";
 import { silhouetteSketchProfile } from "@/lib/sketchCadProfile";
 import { sweepPlan } from "@/lib/cadSketchSweep";
-import { filledGrowPockets, strokeEdgeChamfer, strokedSketchProfile } from "@/lib/sketchStroke";
+import { filledGrowPockets, steppedEdgeWall, strokeEdgeChamfer, strokedSketchProfile } from "@/lib/sketchStroke";
 import { keyringSketchProfile } from "@/lib/sketchKeyring";
 import type { ManifoldToplevel } from "manifold-3d";
 import type { CadModifierDeflection } from "@/lib/cadModifierTypes";
@@ -119,7 +119,15 @@ export async function cadShapeFromSketchProfile(profile: SketchProfile, height: 
   } else {
     response = await buildOnWorker(buildProfile);
   }
-  if (response.type === "error") throw new Error(response.message === SKETCH_EDGE_FAILED ? t("sketch.edgeFailed") : response.message);
+  // Where the kernel cannot chamfer the cutting edge (a logo's sharp points), the wall is built with the edge in fine steps,
+  // from polygon offsets, as a mesh instead of an exact body (#982).
+  let stepped: ReturnType<typeof steppedEdgeWall> = null;
+  if (response.type === "error" && response.message === SKETCH_EDGE_FAILED) {
+    stepped = steppedEdgeWall(await getManifoldRuntime(), { ...buildProfile, stroke: profile.stroke }, safeHeight, topChamfer);
+    if (!stepped) throw new Error(t("sketch.edgeFailed"));
+  } else if (response.type === "error") {
+    throw new Error(response.message);
+  }
   const source = canonicalizeShape({
     ...(existing ?? {
       id: createLocalId("sketch-extrusion"),
@@ -141,6 +149,12 @@ export async function cadShapeFromSketchProfile(profile: SketchProfile, height: 
     cadDisplayEdges: undefined,
     cadDisplayEdgesVersion: undefined,
   });
+  if (stepped) {
+    const mesh = shapeFromCadMesh(source, stepped.positions, new Float32Array(0), stepped.indices, "");
+    if (!mesh) throw new Error(t("sketch.edgeFailed"));
+    return { ...mesh, cadBrep: undefined, cadBrepFrame: undefined, cadMeshDeflection: undefined, sketchProfile: cloneSketchProfile(profile), sketchOperation: "extrude" as const };
+  }
+  if (response.type === "error") throw new Error(response.message);
   const shape = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.deflection ?? SKETCH_CAD_DEFLECTION);
   if (!shape) throw new Error("OpenCascade returned an empty sketch solid");
   return { ...shape, sketchProfile: cloneSketchProfile(profile), sketchOperation: "extrude" as const };
