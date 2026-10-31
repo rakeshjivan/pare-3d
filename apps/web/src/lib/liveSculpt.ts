@@ -1067,8 +1067,8 @@ export class LiveMesh {
       corners[count] = v; cornerW[count] = w; moves[count * 3] = dx; moves[count * 3 + 1] = dy; moves[count * 3 + 2] = dz;
       count += 1;
     }
-    if (brush === "bubbleSmooth" && count) {
-      // BubbleSmooth: whatever the smoothing took in along the brush's facing is given back evenly, so the
+    if (brush === "bubbleSmooth" && count && this.classicSmooth) {
+      // BubbleSmooth (build 89): whatever the smoothing took in along the brush's facing is given back evenly, so the
       // patch keeps its volume - a bump rounds off instead of sinking.
       let sunk = 0, spread = 0;
       for (let i = 0; i < count; i += 1) {
@@ -1081,6 +1081,30 @@ export class LiveMesh {
         for (let i = 0; i < count; i += 1) {
           const w = cornerW[i];
           moves[i * 3] += area.x * back * w; moves[i * 3 + 1] += area.y * back * w; moves[i * 3 + 2] += area.z * back * w;
+        }
+      }
+    } else if (brush === "bubbleSmooth" && count) {
+      // Build 105: BubbleSmooth keeping the volume to first order. The volume a move sweeps is each
+      // corner's area times its move along its own normal (dV = sum A_i (m_i . n_i)); what the smoothing
+      // took in is given back along each corner's normal in proportion to the brush's weight there, so
+      // the sum comes to nought however unevenly the corners are spaced - a bump rounds off, nothing sinks.
+      if (this.dabNormals.length < count * 3) { this.dabNormals = new Float64Array(count * 6); this.dabAreas = new Float64Array(count * 2); }
+      const nrm = this.dabNormals, areas = this.dabAreas;
+      let sunk = 0, spread = 0;
+      for (let i = 0; i < count; i += 1) {
+        const v = corners[i];
+        this.vertexNormal(v, n);
+        nrm[i * 3] = n.x; nrm[i * 3 + 1] = n.y; nrm[i * 3 + 2] = n.z;
+        const a = this.vertexArea(v);
+        areas[i] = a;
+        sunk += a * (moves[i * 3] * n.x + moves[i * 3 + 1] * n.y + moves[i * 3 + 2] * n.z);
+        spread += a * cornerW[i];
+      }
+      if (spread > 0) {
+        const back = -sunk / spread;
+        for (let i = 0; i < count; i += 1) {
+          const k = back * cornerW[i];
+          moves[i * 3] += nrm[i * 3] * k; moves[i * 3 + 1] += nrm[i * 3 + 1] * k; moves[i * 3 + 2] += nrm[i * 3 + 2] * k;
         }
       }
     }
@@ -1145,6 +1169,34 @@ export class LiveMesh {
   /** Build 92: the brushes' options - falloff shape, a scan's open edge held, Flatten's plane offset (mm). */
   falloff: "smooth" | "sharp" | "flat" = "smooth";
   holdBoundary = false;
+  /** Build 105: the smoothing brushes as before build 105 (no allowance for triangle size; Bubble smooth's give-back along the brush's facing). */
+  classicSmooth = false;
+  private dabNormals = new Float64Array(0);
+  private dabAreas = new Float64Array(0);
+  /** A third of the area of the triangles round v (its share of the surface). */
+  vertexArea(v: number) {
+    const p = this.pos, tri = this.tri;
+    let total = 0;
+    for (const t of this.vTris[v]) {
+      const a = tri[t * 3] * 3, b = tri[t * 3 + 1] * 3, c = tri[t * 3 + 2] * 3;
+      const ux = p[b] - p[a], uy = p[b + 1] - p[a + 1], uz = p[b + 2] - p[a + 2];
+      const vx = p[c] - p[a], vy = p[c + 1] - p[a + 1], vz = p[c + 2] - p[a + 2];
+      total += Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+    }
+    return total / 6;
+  }
+  /** Build 105: the average edge under the brush now (from the corners the last gather() found, at most 48 of them). */
+  brushEdge() {
+    const size = this.brushCount;
+    if (!size) return 0;
+    const step = Math.max(1, Math.floor(size / 48));
+    let total = 0, count = 0;
+    for (let i = 0; i < size; i += step) {
+      const v = this.brushList[i];
+      for (const w of this.neighbours(v)) { total += this.dist(v, w); count += 1; }
+    }
+    return count ? total / count : 0;
+  }
   flattenDepth = 0;
   /** Build 92: the surface Attract pulls towards (another part), set by the editor for the stroke. */
   attractTarget: { nearest: (x: number, y: number, z: number, out: Float64Array) => number } | null = null;
@@ -1911,17 +1963,38 @@ export function brushResponse(brush: LiveBrush, strength: number): { strength: n
   return { strength: s, step: 0.06, passes: 1 };
 }
 
+/** Build 105: the edge length the smoothing brushes were set against Meshmixer on (build 82's test plate, about this), mm. */
+export const SMOOTH_EDGE_REF = 0.29;
+/** Build 105: the most passes one dab of a smoothing brush makes (very fine patches take their time over several dabs). */
+export const SMOOTH_MAX_PASSES = 24;
+/** Build 105: a smoothing brush's weight and passes at a strength, for the edge length under it (mm; 0: as calibrated). */
+export function smoothResponse(strength: number, edge: number): { strength: number; passes: number } {
+  const s = Math.max(0, Math.min(1, strength));
+  const scale = edge > 0 ? Math.max(0.25, Math.min(16, (SMOOTH_EDGE_REF / edge) ** 2)) : 1;
+  const work = Math.min(3.4, BRUSH_PACE * 2.26 * Math.pow(s, 1.6)) * scale;
+  const passes = Math.max(1, Math.min(SMOOTH_MAX_PASSES, Math.ceil(work / 0.8)));
+  return { strength: Math.pow(Math.min(0.8, work / passes), 1 / 0.73), passes };
+}
+
 /** Build 82: one dab of a brush at a point, as brushResponse sets it (Ctrl: Draw and Crease dig in). */
 export function stampBrush(mesh: LiveMesh, brush: Exclude<LiveBrush, "move">, centre: Vec3, normal: Vec3, radius: number, triangle: number, strength: number, dig = false) {
   const response = brushResponse(brush, strength);
   // Build 91: the corners gathered into the mesh's own arrays, no Map per dab.
   if (brush === "mask") { mesh.gather(centre, radius, triangle); mesh.paintMask(null, radius, response.strength, dig); return; }
   const step = radius * response.step * (dig ? -1 : 1);
-  for (let k = 0; k < response.passes; k += 1) {
-    // Build 92: the corners under the brush gathered once for all of a dab's passes (a smooth makes up to
-    // five); between passes they move a fraction of their spacing, so the same ones are under it.
-    if (k === 0) mesh.gather(centre, radius, triangle);
-    mesh.dab(brush, centre, normal, radius, null, response.strength, step);
+  mesh.gather(centre, radius, triangle);
+  // Build 105: a smoothing brush does the same in millimetres whatever the triangles' size. One pass of
+  // averaging spreads a corner over its neighbours, so a feature n edges across takes about n^2 passes to
+  // smooth away: the work is scaled by (calibration edge / edge under the brush)^2.
+  let { strength: weight, passes } = response;
+  if (!mesh.classicSmooth && (brush === "smooth" || brush === "shrinkSmooth" || brush === "bubbleSmooth")) {
+    const scaled = smoothResponse(strength, mesh.brushEdge());
+    weight = scaled.strength; passes = scaled.passes;
+  }
+  for (let k = 0; k < passes; k += 1) {
+    // Build 92: the corners under the brush gathered once for all of a dab's passes; between passes they
+    // move a fraction of their spacing, so the same ones are under it.
+    mesh.dab(brush, centre, normal, radius, null, weight, step);
   }
 }
 

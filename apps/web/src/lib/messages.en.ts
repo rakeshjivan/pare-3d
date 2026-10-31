@@ -4413,6 +4413,8 @@ export const MESSAGES_EN = {
   "sculpt.options.falloff.flatHint": "Full strength over most of the brush with a short soft edge - for even, broad changes.",
   "sculpt.options.lazy": "Lazy mouse",
   "sculpt.options.depth": "Flatten depth",
+  "sculpt.options.classic": "Smoothing as before build 105",
+  "sculpt.options.classicHint": "The smoothing brushes as they were: the same strength smooths less on a finely triangulated scan, and Bubble smooth gives back volume along the brush's facing. Off: they smooth the same in millimetres on any scan and Bubble smooth keeps the volume.",
   "sculpt.options.hold": "Hold boundary",
   "sculpt.options.holdHint": "A scan's open edge stays where it is while you sculpt near it.",
   "sculpt.tool.attract": "Attract",

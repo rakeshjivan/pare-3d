@@ -9828,6 +9828,7 @@ export function LayerlingEditor({
     const options = tool.brushOptions ?? BRUSH_OPTIONS_DEFAULT;
     state.live.falloff = options.falloff;
     state.live.holdBoundary = options.hold;
+    state.live.classicSmooth = Boolean(options.classic);
     state.live.flattenDepth = options.depth;
     // Build 92: room for what a refining stroke adds, made now rather than mid-stroke.
     if (stroke.refine !== "off") state.live.reserve(stroke.refine === "fine" ? 120000 : 40000);
@@ -20063,6 +20064,7 @@ function readBrushOptions(): SculptBrushOptions {
       lazy: Math.max(0, Math.min(60, Number(stored.lazy) || 0)),
       hold: Boolean(stored.hold),
       depth: 0,
+      classic: Boolean(stored.classic),
     };
   } catch {
     return BRUSH_OPTIONS_DEFAULT;

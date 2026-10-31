@@ -25,7 +25,7 @@ const SOFT_MOVES = [["x", "sculpt.soft.x"], ["y", "sculpt.soft.y"], ["z", "sculp
 const SOFT_TURNS = [["tilt", "sculpt.soft.tilt"], ["turn", "sculpt.soft.turn"], ["roll", "sculpt.soft.roll"]] as const;
 
 /** Build 92: the brushes' options, as Meshmixer's brush properties. */
-export type SculptBrushOptions = { falloff: "smooth" | "sharp" | "flat"; lazy: number; hold: boolean; depth: number };
+export type SculptBrushOptions = { falloff: "smooth" | "sharp" | "flat"; lazy: number; hold: boolean; depth: number; /** Build 105: the smoothing brushes as before (no allowance for triangle size). */ classic?: boolean };
 
 /** Build 90: Freeze (Meshmixer's mask) - from the selection, turned the other way round, or cleared. */
 export type SculptFreezeAction = "selection" | "invert" | "clear";
@@ -226,6 +226,10 @@ export function MeshSculptPanel({
           <label className="edge-modifier-check" title={t("sculpt.options.holdHint")}>
             <input type="checkbox" checked={brushOptions.hold} disabled={busy} onChange={(event) => onBrushOptions({ ...brushOptions, hold: event.currentTarget.checked })} />
             <span>{t("sculpt.options.hold")}</span>
+          </label>
+          <label className="edge-modifier-check" title={t("sculpt.options.classicHint")}>
+            <input type="checkbox" checked={Boolean(brushOptions.classic)} disabled={busy} onChange={(event) => onBrushOptions({ ...brushOptions, classic: event.currentTarget.checked })} />
+            <span>{t("sculpt.options.classic")}</span>
           </label>
         </details>
   ) : null;
@@ -428,6 +432,10 @@ export function MeshSculptPanel({
           <label className="edge-modifier-check" title={t("sculpt.options.holdHint")}>
             <input type="checkbox" checked={brushOptions.hold} disabled={busy} onChange={(event) => onBrushOptions({ ...brushOptions, hold: event.currentTarget.checked })} />
             <span>{t("sculpt.options.hold")}</span>
+          </label>
+          <label className="edge-modifier-check" title={t("sculpt.options.classicHint")}>
+            <input type="checkbox" checked={Boolean(brushOptions.classic)} disabled={busy} onChange={(event) => onBrushOptions({ ...brushOptions, classic: event.currentTarget.checked })} />
+            <span>{t("sculpt.options.classic")}</span>
           </label>
         </details>
       ) : null}
