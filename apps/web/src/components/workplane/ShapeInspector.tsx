@@ -192,6 +192,7 @@ import { iconKeyringAlongLimit } from "@/lib/sketchKeyring";
 import { DEFAULT_KEYRING_DIAMETER, MAX_TEXT_SPACING, MIN_KEYRING_DIAMETER, MIN_TEXT_SPACING, TEXT_KEYRING_SIDES } from "@/lib/textGeometry";
 import { addTextLayer, MIN_LETTER_SIZE, MIN_NAME_TAG_LAYERS, NAME_TAG_GAP, NAME_TAG_LAYERS, NAME_TAG_LETTER_SIZE, removeTextLayer, textLetterSize, textLetterSizePatch, textSpacingPatch, type NameTagStack } from "@/lib/nameTag";
 import { FONT_MANAGER_OPTION, requestFontManager } from "@/lib/fontManagerEvents";
+import { FontPicker } from "@/components/workplane/FontPicker";
 import { QR_BYTE_CAPACITY, qrByteLength, qrTextFits, type QrCodeSettings } from "@/lib/qrCode";
 import { ICON_TAG_LAYERS, iconTagFitCount, MAX_ICON_TAG_WIDTH, MAX_ICON_TAGS, MIN_ICON_TAG_WIDTH, normalizeIconTagCount, type IconLayerStack } from "@/lib/iconTag";
 import { PICTURE_FILE_ACCEPT } from "@/lib/pictureIcon";
@@ -473,6 +474,8 @@ type SelectPropertyConfig = {
   options: SelectPropertyOption[];
   /** Eine Zeile unter dem Feld, die die getroffene Wahl erklaert. */
   hint?: string;
+  /** The words a font picker draws every font with (#930): set, the entries are fonts and the field is a picker, not a plain select. */
+  fontSample?: string;
   onChange: (value: string) => void;
 };
 
@@ -2796,6 +2799,8 @@ function sketchFillProperties(profile: SketchProfile, onUpdate: ShapeInspectorUp
  */
 function textFontProperty(shape: WorkplaneShape, onUpdate: ShapeInspectorUpdate): ShapePropertyConfig {
   const current = shape.font ?? "Multilanguage";
+  // The words of the text itself, so the list shows how they will look (#930).
+  const sample = typeof shape.text === "string" ? shape.text : "";
   const builtIn = t("font.builtInGroup");
   const own = t("font.customGroup");
   const options: SelectPropertyOption[] = [
@@ -2810,6 +2815,7 @@ function textFontProperty(shape: WorkplaneShape, onUpdate: ShapeInspectorUpdate)
     label: t("prop.font"),
     value: current,
     options,
+    fontSample: sample,
     onChange: (font) => {
       if (font === FONT_MANAGER_OPTION) requestFontManager();
       else onUpdate({ font });
@@ -5297,7 +5303,8 @@ function TextProperty({ label, value, disabled, onChange, onInteractionActiveCha
   );
 }
 
-function SelectProperty({ label, value, options, hint, disabled, onChange, onReset }: Omit<SelectPropertyConfig, "id"> & { id?: string } & { disabled?: boolean; onReset?: () => void }) {
+function SelectProperty({ label, value, options, hint, fontSample, disabled, onChange, onReset }: Omit<SelectPropertyConfig, "id"> & { id?: string } & { disabled?: boolean; onReset?: () => void }) {
+  if (fontSample !== undefined) return <FontPicker label={label} value={value} options={options} sample={fontSample} disabled={disabled} onChange={onChange} />;
   // Aufeinanderfolgende Eintraege mit derselben Ueberschrift werden zu einem
   // Block; ohne Ueberschrift stehen sie fuer sich.
   const blocks: Array<{ group?: string; items: SelectPropertyOption[] }> = [];

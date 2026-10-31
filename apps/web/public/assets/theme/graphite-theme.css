@@ -4448,6 +4448,79 @@ html[data-theme="dark"]:where([data-palette="graphite"]) .shape-inspector .name-
   color: #6c6c6c;
 }
 
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-picker-button {
+  color: #575757;
+  background: #fff;
+  border: 1px solid #cccccc;
+  outline: 0;
+  box-shadow: inset 0 1px 1px rgba(49, 49, 49, 0.04);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-picker-button:focus-visible {
+  border-color: #ea953d;
+  box-shadow: 0 0 0 3px rgba(161, 83, 0, 0.14);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-picker-current small,
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-picker-option small {
+  color: #777777;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-preview-line {
+  color: #494949;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-picker-list {
+  color: #494949;
+  background: #fff;
+  border: 1px solid #cccccc;
+  box-shadow: 0 10px 28px rgba(49, 49, 49, 0.22);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-picker-group {
+  color: #777777;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-picker-option.active {
+  background: #e6e6e6;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-picker-option.selected {
+  box-shadow: inset 3px 0 0 #ea953d;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-picker-option.action {
+  color: #8a5a1c;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .font-picker-option.action small {
+  color: inherit;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .font-picker-button {
+  color: #d6d6d6;
+  background: #1f1f1f;
+  border-color: #4c4c4c;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .font-picker-list {
+  color: #d6d6d6;
+  background: #262626;
+  border-color: #4c4c4c;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .font-preview-line {
+  color: #e1e1e1;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .font-picker-option.active {
+  background: #313131;
+}
+
+html[data-theme="dark"]:where([data-palette="graphite"]) .font-picker-option.action {
+  color: #f0b36a;
+}
+
 :where(html[data-theme="dark"][data-palette="graphite"]) .text-property input:focus,
 :where(html[data-theme="dark"][data-palette="graphite"]) .select-property select:focus {
   border-color: #ea953d;

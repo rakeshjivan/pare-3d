@@ -10016,7 +10016,8 @@ html[data-theme="dark"] .property-defaults-actions button {
 
 .select-property {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  /* A long label (German "Buchstabenkanten") takes the room it needs instead of running under the field. */
+  grid-template-columns: minmax(92px, max-content) minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   color: #867563;
@@ -10808,6 +10809,147 @@ html[data-theme="dark"] .shape-inspector .name-tag-start .name-tag-start-button:
   font-size: 12px;
   font-weight: 500;
   line-height: 1.35;
+}
+
+/* The font picker (#930): a field that draws the chosen font, and a list that draws every font. */
+.font-picker-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 3px 12px;
+  color: #746352;
+  font: 600 15px/1 var(--font-ui);
+  text-align: left;
+  background: #fff;
+  border: 1px solid #daccbe;
+  border-radius: 999px;
+  outline: 0;
+  cursor: pointer;
+  box-shadow: inset 0 1px 1px rgba(65, 46, 25, 0.04);
+}
+
+.font-picker-button:focus-visible {
+  border-color: #ea953d;
+  box-shadow: 0 0 0 3px rgba(161, 83, 0, 0.14);
+}
+
+.font-picker-button:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.font-picker-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.font-picker-current small,
+.font-picker-option small {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  color: #9a8874;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.font-preview-line {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: #5d4731;
+}
+
+.font-preview-line.empty {
+  display: inline-block;
+  width: 0;
+}
+
+.font-picker-list {
+  position: fixed;
+  z-index: 1000;
+  display: grid;
+  align-content: start;
+  padding: 4px;
+  overflow-y: auto;
+  color: #5d4731;
+  background: #fff;
+  border: 1px solid #daccbe;
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(65, 46, 25, 0.22);
+}
+
+.font-picker-group {
+  padding: 8px 10px 3px;
+  color: #9a8874;
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.font-picker-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 36px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.font-picker-option.active {
+  background: #f6e8d6;
+}
+
+.font-picker-option.selected {
+  box-shadow: inset 3px 0 0 #ea953d;
+}
+
+.font-picker-option.action {
+  color: #8a5a1c;
+  font: 600 14px/1.2 var(--font-ui);
+}
+
+.font-picker-option.action small {
+  max-width: none;
+  color: inherit;
+  font-size: 14px;
+}
+
+html[data-theme="dark"] .font-picker-button {
+  color: #e6d8c6;
+  background: #21180f;
+  border-color: #5c4b3a;
+}
+
+html[data-theme="dark"] .font-picker-list {
+  color: #e6d8c6;
+  background: #2b2016;
+  border-color: #5c4b3a;
+}
+
+html[data-theme="dark"] .font-preview-line {
+  color: #f1e4d1;
+}
+
+html[data-theme="dark"] .font-picker-option.active {
+  background: #3b2c1d;
+}
+
+html[data-theme="dark"] .font-picker-option.action {
+  color: #f0b36a;
+}
+
+.font-manager-row .font-preview-line {
+  margin-top: 2px;
 }
 
 .text-property input:focus,
