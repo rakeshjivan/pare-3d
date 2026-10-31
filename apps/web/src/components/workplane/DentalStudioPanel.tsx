@@ -1,7 +1,7 @@
 "use client";
 
 import type { BiteContactStats } from "@/lib/biteContacts";
-import { PIN_MAX, PIN_STEP, PIN_WARN, articulatorPinPatch } from "@/lib/dentalArticulator";
+import { PIN_CLEAR, PIN_GAP_MAX, PIN_MAX, PIN_STEP, PIN_WARN, articulatorPinPatch } from "@/lib/dentalArticulator";
 
 /** Build 78: a bite scan further than this from the scanner's bite (mm RMS) is pointed out. */
 /** Build 79: the bite scan's own error is often 0.2-0.3 mm; only well beyond that is the kept bite questioned. */
@@ -725,6 +725,8 @@ export function DentalStudioPanel({
                     front teeth clear; the default with a wax-up. */}
                 {choice(t("dental.pinPlace"), options.pinPlace ?? (waxup?.view.placed.length ? "sides" : "midline"), [["midline", t("dental.pinMidline")], ["sides", t("dental.pinSides")]], (pinPlace) => onOptionsChange({ pinPlace }))}
                 <p className="blend-hint">{t((options.pinPlace ?? (waxup?.view.placed.length ? "sides" : "midline")) === "sides" ? "dental.pinSidesHint" : "dental.pinMidlineHint")}</p>
+                {/* Build 104: the pin (or the side posts) can stand further from the teeth than the least. */}
+                <EdgeModifierSlider label={t("dental.pinGap")} value={options.pinGap ?? PIN_CLEAR} min={PIN_CLEAR} max={PIN_GAP_MAX} step={0.5} workspace={workspace} length disabled={busy} onChange={(value) => onOptionsChange({ pinGap: Math.max(PIN_CLEAR, Math.min(PIN_GAP_MAX, Math.round(value * 2) / 2)) })} />
                 </>)}
               </div>
             ) : null}

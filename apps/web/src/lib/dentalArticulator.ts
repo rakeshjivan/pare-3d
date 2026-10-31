@@ -72,6 +72,8 @@ const BOSS_TOP = 6;
 const PIN_AHEAD = 6;
 /** Build 79: the cup's block and the pin's boss stand at least this far in front of any tooth, mm. */
 export const PIN_CLEAR = 2;
+/** Build 104: the furthest the pin may be set from the teeth, mm. */
+export const PIN_GAP_MAX = 10;
 /** Build 79: across this half-width of the pin's line (mm) the teeth are looked at for the pin's place - wider than the cup's block and the boss. */
 export const PIN_BAND = 8;
 /** Raises the removable pin set offers, mm: the scanned bite and whole millimetres to 6. */
@@ -88,7 +90,7 @@ export type ArticulatorHeel = { x: number; y: number };
  * (build 79) `teethY`, the furthest-forward point of either model - teeth, wax-up and all - across
  * the pin's band, so the pin and its cup stand clear of proclined incisors that overhang the base.
  */
-export type ArticulatorFront = { x: number; upperY: number; lowerY: number; teethY?: number; sides?: ArticulatorSides };
+export type ArticulatorFront = { x: number; upperY: number; lowerY: number; teethY?: number; sides?: ArticulatorSides; /** Build 104: mm further out than the least clearance. */ extra?: number };
 /**
  * Build 79: the incisal pin's two posts either side, in the premolar region, instead of one in front of
  * the incisors: their y, each post's x (already clear of the teeth and bases), and where each side's
@@ -260,13 +262,15 @@ export function articulatorParts(
   // The cup's place: in front of the further-forward model, on the midline of the models.
   const pinX = front ? front.x : cx;
   // Build 79: never on the teeth - clear of the furthest-forward tooth across the pin's band, as well as the bases.
-  let pinY = front ? Math.min(Math.min(front.upperY, front.lowerY) - PIN_AHEAD, (front.teethY ?? Infinity) - PIN_HALF - PIN_CLEAR) : NaN;
+  // Build 104: and as much further out as asked.
+  const extra = Math.max(0, front?.extra ?? 0);
+  let pinY = front ? Math.min(Math.min(front.upperY, front.lowerY) - PIN_AHEAD, (front.teethY ?? Infinity) - PIN_HALF - PIN_CLEAR) - extra : NaN;
   // Build 84: raised, the upper turns and the lower half stands a little behind the upper's: both clear.
   if (front && !front.sides && raise > 0) {
     for (let k = 0; k < 3; k += 1) {
       const rest = restAngle(raise, ay, pinY), dy = pinY - ay;
       const restY = ay + dy * Math.cos(rest) + ((PIN_DOME + dy * Math.sin(rest)) / Math.cos(rest)) * Math.sin(rest);
-      const limit = Math.min(Math.min(front.upperY, front.lowerY) - PIN_AHEAD, (front.teethY ?? Infinity) - PIN_HALF - PIN_CLEAR);
+      const limit = Math.min(Math.min(front.upperY, front.lowerY) - PIN_AHEAD, (front.teethY ?? Infinity) - PIN_HALF - PIN_CLEAR) - extra;
       pinY = Math.min(pinY, limit - Math.max(0, restY - pinY));
     }
   }

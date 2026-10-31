@@ -131,6 +131,8 @@ export type DentalStudioOptions = {
   bevel?: boolean;
   /** Build 60: the incisal pin raised this much, mm, at the pin (build 71: 0 to PIN_MAX); the occlusion view stands on it and the pin set includes it. 0 when left out. */
   pinRaise?: number;
+  /** Build 104: how far the pin (or the side posts) stands clear of the teeth, mm - PIN_CLEAR at least. */
+  pinGap?: number;
   /** A pair only: laid out base-down for printing, or upper on lower in occlusion. */
   layout: "print" | "occlusion";
   /** Engraved on the base; U or L goes in front for a pair. Empty for none. */
@@ -1139,7 +1141,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     let sides: ArticulatorSides | undefined;
     if (options.pinPlace === "sides" && Number.isFinite(teethY)) {
       const y = teethY + POST_BACK;
-      const reach = PIN_HALF + PIN_CLEAR;
+      const reach = PIN_HALF + Math.max(PIN_CLEAR, options.pinGap ?? PIN_CLEAR);
       let left = Infinity, right = -Infinity;
       everything.forEach((p) => {
         for (let i = 0; i < p.length; i += 3) if (Math.abs(p[i + 1] - y) <= reach + 2) { left = Math.min(left, p[i]); right = Math.max(right, p[i]); }
@@ -1166,7 +1168,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     }
     // Build 78: the incisal pin is one of the articulator's three supports, so it is always there.
     // Build 82: unless it is left out - then the condyles alone, a true hinge, closing on the teeth.
-    const stop = options.incisalPin !== false && Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY, ...(Number.isFinite(teethY) ? { teethY } : {}), ...(sides ? { sides } : {}) } : null;
+    const stop = options.incisalPin !== false && Number.isFinite(upperY) && Number.isFinite(lowerY) ? { x: stopX, upperY, lowerY, ...(Number.isFinite(teethY) ? { teethY } : {}), ...(sides ? { sides } : {}), extra: Math.max(0, (options.pinGap ?? PIN_CLEAR) - PIN_CLEAR) } : null;
     // Build 65: each model's heels - its rearmost point either side of the middle - so the hinge's
     // bar reaches both, however unevenly a horseshoe's two ends stop.
     const mid = (xMin + xMax) / 2;
