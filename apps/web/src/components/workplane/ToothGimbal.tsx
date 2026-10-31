@@ -91,7 +91,10 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
   onCommit: (change: ToothAdjust) => void;
 }) {
   const [, setTick] = useState(0);
-  const drag = useRef<{ handle: GimbalHandle; start: [number, number]; along: [number, number]; sign: number; gain: number; base: ToothAdjust } | null>(null);
+  const drag = useRef<{ handle: GimbalHandle; start: [number, number]; along: [number, number]; sign: number; gain: number; base: ToothAdjust; typed?: string; last?: [number, number]; target?: Element; pointerId?: number } | null>(null);
+  /** Build 104: set each render - shows a typed value at once, and ends a drag from the keyboard. */
+  const typedPreview = useRef<(() => void) | null>(null);
+  const finishDrag = useRef<((keep: boolean) => void) | null>(null);
   /** Steps from the wheel and keys, waiting to be kept. */
   const pending = useRef<ToothAdjust>({});
   const settle = useRef<number | null>(null);
@@ -170,13 +173,42 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
-      if (event.metaKey || event.ctrlKey) return;
+      // Build 104: typing while a handle is held - an exact value (Enter keeps it, Esc lets the tooth go back).
+      if (drag.current) {
+        const d = drag.current;
+        const typedNow = d.typed ?? "";
+        let next: string | null = null;
+        if (/^[0-9]$/.test(event.key)) next = typedNow + event.key;
+        else if ((event.key === "." || event.key === ",") && !typedNow.includes(".")) next = (typedNow || "0") + ".";
+        else if (event.key === "-") next = typedNow.startsWith("-") ? typedNow.slice(1) : `-${typedNow}`;
+        else if (event.key === "Backspace") next = typedNow.slice(0, -1);
+        else if (event.key === "Enter" || event.key === "Escape") {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          finishDrag.current?.(event.key === "Enter");
+          return;
+        }
+        if (next !== null) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          d.typed = next;
+          typedPreview.current?.();
+        }
+        return;
+      }
+      if (event.altKey && (event.metaKey || event.ctrlKey)) return;
       const k = gainOf(event);
       // Left and right along the arch as it shows on the screen.
       const rightIsMesial = (geometry.current?.mesialOnScreen?.[0] ?? 1) >= 0;
+      const { width, length } = live.current.tooth;
       let handle: GimbalHandle | null = null, change: ToothAdjust = {};
-      if (event.key === "ArrowLeft" || event.key === "ArrowRight") { handle = "mesial"; change = { mesial: GIMBAL_KEY.mm * k * ((event.key === "ArrowRight") === rightIsMesial ? 1 : -1) }; }
-      else if (event.key === "ArrowUp" || event.key === "ArrowDown") { handle = "out"; change = { out: GIMBAL_KEY.mm * k * (event.key === "ArrowUp" ? 1 : -1) }; }
+      const moveKeys = event.metaKey || event.ctrlKey;
+      // Build 104: the arrow keys size the tooth - up and down its height (incisal length), left and right
+      // its width; with Ctrl (Cmd) they move it, along the arch and in or out, as before.
+      if (!moveKeys && (event.key === "ArrowUp" || event.key === "ArrowDown")) { handle = "longer"; change = { longer: (length + GIMBAL_KEY.mm * k * (event.key === "ArrowUp" ? 1 : -1)) / Math.max(0.5, length) }; }
+      else if (!moveKeys && (event.key === "ArrowLeft" || event.key === "ArrowRight")) { handle = "wider"; change = { wider: (width + GIMBAL_KEY.mm * k * (event.key === "ArrowRight" ? 1 : -1)) / Math.max(0.5, width) }; }
+      else if (moveKeys && (event.key === "ArrowLeft" || event.key === "ArrowRight")) { handle = "mesial"; change = { mesial: GIMBAL_KEY.mm * k * ((event.key === "ArrowRight") === rightIsMesial ? 1 : -1) }; }
+      else if (moveKeys && (event.key === "ArrowUp" || event.key === "ArrowDown")) { handle = "out"; change = { out: GIMBAL_KEY.mm * k * (event.key === "ArrowUp" ? 1 : -1) }; }
       else if (event.key === "PageUp" || event.key === "PageDown") { handle = "up"; change = { up: GIMBAL_KEY.mm * k * (event.key === "PageUp" ? 1 : -1) }; }
       else if (event.code === "BracketLeft" || event.code === "BracketRight") { handle = "turn"; change = { turn: GIMBAL_KEY.deg * k * (event.code === "BracketRight" ? 1 : -1) }; }
       if (!handle) return;
@@ -239,6 +271,8 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
     return (Math.sign(dot(axis, toCamera)) || 1) * handed;
   };
   const current = (d: NonNullable<typeof drag.current>, x: number, y: number): ToothAdjust => {
+    const typedValue = d.typed !== undefined && d.typed !== "" && d.typed !== "-" ? Number(d.typed) : NaN;
+    if (Number.isFinite(typedValue)) return amountFor(d.handle, typedValue, typedValue);
     const px = (x - d.start[0]) * d.along[0] + (y - d.start[1]) * d.along[1];
     const mm = px * GIMBAL_MM_PER_PX * d.gain, deg = px * GIMBAL_DEG_PER_PX * d.gain * d.sign;
     // The distal square widens the tooth about its middle: twice what its side moves.
@@ -260,7 +294,7 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
       const index = handle === "mesial" ? 1 : handle === "out" ? 2 : handle === "up" ? 3 : handle === "wider" ? 4 : handle === "longer" ? 5 : handle === "thicker" ? 6 : 7;
       along = towards(index) ?? [0, -1];
     }
-    drag.current = { handle, start: [event.clientX, event.clientY], along, sign: ANGLES.includes(handle) ? ringSign(handle) : 1, gain: gainOf(event), base: {} };
+    drag.current = { handle, start: [event.clientX, event.clientY], along, sign: ANGLES.includes(handle) ? ringSign(handle) : 1, gain: gainOf(event), base: {}, last: [event.clientX, event.clientY], target: event.currentTarget as Element, pointerId: event.pointerId };
     lastHandle.current = handle;
     setActive(handle);
   };
@@ -268,6 +302,8 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
     const d = drag.current;
     if (!d) return;
     event.preventDefault();
+    d.last = [event.clientX, event.clientY];
+    if (d.typed !== undefined && d.typed !== "") return;
     // Shift or Alt pressed or let go mid-drag: from here on at the new rate.
     const gain = gainOf(event);
     if (gain !== d.gain) { d.base = composeAdjust(d.base, current(d, event.clientX, event.clientY)); d.start = [event.clientX, event.clientY]; d.gain = gain; }
@@ -295,6 +331,26 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
     const k = gainOf(event) * (delta < 0 ? 1 : -1);
     step(handle, amountFor(handle, GIMBAL_WHEEL.mm * k, GIMBAL_WHEEL.deg * k * (ANGLES.includes(handle) ? ringSign(handle) : 1)));
   };
+  typedPreview.current = () => {
+    const d = drag.current;
+    if (!d) return;
+    const [x, y] = d.last ?? d.start;
+    const change = clampAdjustChange(composeAdjust(d.base, current(d, x, y)));
+    setReadout(`${describe(d.handle, change)}  ·  ${t("toothGimbal.typedEnter")}`);
+    onPreview(change);
+  };
+  finishDrag.current = (keep: boolean) => {
+    const d = drag.current;
+    if (!d) return;
+    drag.current = null;
+    setActive(null);
+    setReadout(null);
+    try { if (d.target && d.pointerId !== undefined) d.target.releasePointerCapture(d.pointerId); } catch { /* already released */ }
+    const [x, y] = d.last ?? d.start;
+    const change = clampAdjustChange(composeAdjust(d.base, current(d, x, y)));
+    if (keep && !isEmpty(change)) onCommit(change);
+    onPreview(null);
+  };
   const handlers = (handle: GimbalHandle) => ({
     "data-handle": handle,
     onPointerDown: (event: React.PointerEvent) => begin(handle, event),
@@ -311,9 +367,11 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
     return (
       <g key={handle} className={`tooth-gimbal-handle${active === handle ? " active" : ""}`} opacity={dim ? 0.35 : 1} {...handlers(handle)}>
         <title>{t(`toothGimbal.${handle}`)}</title>
-        <line x1={c[0]} y1={c[1]} x2={tip[0]} y2={tip[1]} stroke="transparent" strokeWidth={18} />
+        {/* Build 104: a filled band to take hold of - a line seen straight up or across has no width, and could not be taken. */}
+        <polygon points={`${c[0] - uy * 10 + ux * 10},${c[1] + ux * 10 + uy * 10} ${tip[0] - uy * 10 + ux * 12},${tip[1] + ux * 10 + uy * 12} ${tip[0] + uy * 10 + ux * 12},${tip[1] - ux * 10 + uy * 12} ${c[0] + uy * 10 + ux * 10},${c[1] - ux * 10 + uy * 10}`} fill="transparent" />
         <line x1={c[0]} y1={c[1]} x2={tip[0]} y2={tip[1]} stroke={COLOURS[handle]} strokeWidth={2.5} />
         <path d={head} fill={COLOURS[handle]} />
+        <text className="tooth-gimbal-label" x={tip[0] + ux * 26} y={tip[1] + uy * 26} textAnchor="middle" dominantBaseline="middle" fill={COLOURS[handle]}>{t(`toothGimbal.axis.${handle}`)}</text>
       </g>
     );
   };
@@ -378,6 +436,9 @@ export function ToothGimbal({ tooth, disabled, totals, handles = true, onPreview
           <button type="button" className="tooth-gimbal-readout" title={t("toothGimbal.typeHint")} disabled={disabled} onClick={() => setTyping({ handle: lastHandle.current, value: "" })}>
             {label ?? t("toothGimbal.type")}
           </button>
+        )}
+        {typing ? null : (
+          <span className="tooth-gimbal-keys">{t("toothGimbal.keys")}</span>
         )}
       </div>
     </>

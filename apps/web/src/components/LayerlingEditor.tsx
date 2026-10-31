@@ -73,7 +73,7 @@ import { smoothOpenEdges } from "@/lib/edgeSmooth";
 import { solidPositions, toManifold, transformSoup, weld, type ManifoldSolid } from "@/lib/dentalMesh";
 import { BUILT_IN_LIBRARIES, loadToothLibrary, loadToothSet, type ToothLibraryManifest } from "@/lib/toothLibrary";
 import { exocadSets } from "@/lib/exocadLibrary";
-import { composeAdjust } from "@/components/workplane/ToothGimbal";
+import { composeAdjust, ToothGimbal } from "@/components/workplane/ToothGimbal";
 import { WaxToothDrag, type DragTooth, type WaxRestrict } from "@/components/workplane/WaxToothDrag";
 import { contactColors, type BiteContactStats } from "@/lib/biteContacts";
 import { alignToPlate, bridgeChoice, expandConnected, extrudeChoice, invertConnected, optimizeBoundary, shrinkChoice, smoothChoice } from "@/lib/meshEditTools";
@@ -19043,8 +19043,17 @@ export function LayerlingEditor({
       {dentalStudio && waxup.picking !== null ? (
         <WaxupPointOverlay hint={t(WAXUP_LANDMARKS[waxup.picking])} onPick={pickWaxPoint} onCancel={stopWaxPicking} />
       ) : null}
+      {/* Build 104: the gimbal over the selected wax tooth again (arrows, rings and size squares, typed values),
+          with the arrow keys sizing it - the tooth itself can still be dragged as before. */}
       {waxGimbal && waxup.stage === "position" ? (
-        null
+        <ToothGimbal
+          key={waxGimbal.id}
+          tooth={waxGimbal.tooth}
+          totals={waxGimbal.totals}
+          disabled={waxup.busy || Boolean(shapes.find((shape) => shape.id === waxGimbal.id)?.waxTooth && waxup.locks[shapes.find((shape) => shape.id === waxGimbal.id)!.waxTooth!.fdi])}
+          onPreview={(change) => previewWaxTooth(waxGimbal.id, change)}
+          onCommit={(change) => adjustWaxToothBy(waxGimbal.id, change)}
+        />
       ) : null}
       {dentalStudio?.waxStudio && waxup.stage === "position" && waxup.placed.length && waxup.picking === null ? (
         <WaxToothDrag teeth={waxDragTeeth} restrict={waxup.restrict} onSelect={(id) => selectShape(id, "replace")} onPreview={previewWaxTooth} onCommit={adjustWaxToothBy} onDouble={(id) => confirmWaxTooth(id, false)} />
