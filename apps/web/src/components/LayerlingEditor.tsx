@@ -20079,6 +20079,7 @@ export function LayerlingEditor({
           onRemesh={applyRemesh}
           onClose={() => { flushSculptRef.current(); setSculptTool(null); }}
           besideDental={Boolean(dentalStudio)}
+          studioTrim={studioShellOn && Boolean(sculptTool.trim)}
         />,
       ) : null}
       {sculptTool?.tool && !sculptTool.busy && sculptTool.selectShape === "lasso" && (sculptTool.tool === "select" || sculptTool.tool === "unselect") ? (

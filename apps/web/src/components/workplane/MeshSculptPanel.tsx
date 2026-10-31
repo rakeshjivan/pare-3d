@@ -40,6 +40,8 @@ export const SCULPT_TOOLS: SculptTool[] = ["drag", "draw", "draw2", "attract", "
 export const TRIM_TOOLS: SculptTool[] = ["select", "unselect"];
 /** Build 76: Erase & Fill (fill) sits beside Delete in Trim and Sculpt. */
 const TRIM_ACTIONS = ["delete", "fill", "grow", "connected", "invert", "clear"] as const;
+/** Build 106: the studio frame's Trim and tidy - only what trimming a scan needs. */
+const STUDIO_TRIM_ACTIONS = ["delete", "invert", "clear"] as const;
 /** Build 83: Connected and Tidy edge (Meshmixer's Expand to Connected and Optimize Boundary). */
 const SCULPT_ACTIONS = ["fill", "delete", "smooth", "flatten", "grow", "shrink", "smoothEdge", "tidy", "connected", "invert", "clear"] as const;
 /**
@@ -99,6 +101,7 @@ export function MeshSculptPanel({
   onSpeed,
   speedShown = false,
   besideDental = false,
+  studioTrim = false,
   editAmount = 1,
   onEditAmount,
   selectShape = "brush",
@@ -163,6 +166,8 @@ export function MeshSculptPanel({
   speedShown?: boolean;
   /** Build 71: opened from Dental Studio - stands beside its panel instead of over it. */
   besideDental?: boolean;
+  /** Build 106: docked in the studio frame - Delete, Invert and Clear only. */
+  studioTrim?: boolean;
   /** Build 82: the Select tool paints (brush) or draws a loop (lasso). */
   selectShape?: "brush" | "lasso" | "group";
   onSelectShape?: (shape: "brush" | "lasso" | "group") => void;
@@ -509,7 +514,7 @@ export function MeshSculptPanel({
       ) : null}
       {teethWarning > 0 ? <p className="dental-status warn sculpt-teeth-warning" role="status" aria-live="assertive">{t("sculpt.trimTeeth", { count: teethWarning.toLocaleString() })}</p> : null}
       <div className="dental-trim-buttons sculpt-selection" role="group" aria-label={t("sculpt.selection")}>
-        {(trim ? TRIM_ACTIONS : SCULPT_ACTIONS).map((action) => (
+        {(trim ? (studioTrim ? STUDIO_TRIM_ACTIONS : TRIM_ACTIONS) : SCULPT_ACTIONS).map((action) => (
           <button key={action} type="button" className={trim && (action === "delete" || action === "fill") ? "danger" : undefined} title={t(`sculpt.selection.${action}Hint` as "sculpt.selection.fillHint")} disabled={busy || (!chosen && action !== "invert")} onClick={() => onSelection(action)}>
             {teethWarning > 0 && action === warnedAction ? t(action === "fill" ? "sculpt.fillAnyway" : "sculpt.deleteAnyway") : t(`sculpt.selection.${action}`)}
           </button>
