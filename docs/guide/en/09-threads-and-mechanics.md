@@ -180,6 +180,12 @@ Make the teardrop a hole and group it with the part. Its length runs along the d
 
 A **tapped hole** on its side sags at the top in the same way. Give it a teardrop of its own: add a {{ui:shape.teardrop}} hole whose {{ui:prop.teardropDiameter}} is the core of the thread, the diameter its teeth leave free (about 8.4 mm for M10), the same length as the tapped hole, and select both. Click {{ui:editor.tool.align}} and bring them into line in the middle - the middle of the teardrop is the middle of its round part, not of its box with the tip, so the two circles lie on each other - and group both with the part. The thread is cut as usual and the tip opens the top of the hole, so it prints without supports.
 
+## Port openings
+
+A box for electronics needs an opening for the cable. The {{ui:shape.port}} is that opening: a hole lying on its side, with rounded corners. Pick the socket under {{ui:prop.portPreset}} - {{ui:port.usbC}}, {{ui:port.microUsb}} or {{ui:port.usbA}} - and it gets the socket's size plus about 0.25 mm of room on every side. {{ui:port.usbCPlug}} is for a socket that sits behind the wall, where the plug's housing has to reach in. The width, the height and the {{ui:prop.portCorner}} can be changed by hand; the list then shows {{ui:port.custom}}.
+
+It comes as a hole, facing front. Set the {{ui:prop.portDepth}} a little more than the wall is thick, move it to where the socket sits on the board and group it with the box. For a side wall, turn it by 90° around the vertical axis.
+
 ## Counterbore and countersink
 
 A screw head often should not stand proud. The {{ui:shape.counterbore}} cuts a round pocket for a socket-head screw (DIN 912), the {{ui:shape.countersink}} a cone for a countersunk screw (DIN 7991). Both stand with the head end up: the {{ui:prop.screwHoleHead}} is the diameter of the pocket or the cone, the {{ui:prop.screwHoleShaft}} the bore below it, the {{ui:prop.screwHoleLength}} the whole length. On the counterbore you set the {{ui:prop.screwHoleHeadDepth}}, on the countersink the {{ui:prop.screwHoleAngle}} (90° suits countersunk screws). The defaults fit an M3 screw.

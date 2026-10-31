@@ -30,6 +30,7 @@ export type ShapeKind =
   | "countersink"
   | "doubleCountersink"
   | "teardrop"
+  | "port"
   | "loft"
   | "vase"
   | "thread"

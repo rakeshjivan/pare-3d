@@ -270,7 +270,7 @@ export function snapGridForUnits(units: string, snap: GridSize): GridSize {
 }
 const customizableShapeKinds: ShapeKind[] = [
   "box", "roundedBox", "cylinder", "slot", "ellipse", "sphere", "sketch", "scribble", "cone", "pyramid", "roof", "text", "roundRoof",
-  "halfSphere", "paraboloid", "torus", "tube", "bentTube", "star", "heart", "crescent", "gear", "hirth", "honeycomb", "hinge", "knurl", "dovetail", "counterbore", "countersink", "doubleCountersink", "teardrop", "loft", "vase", "thread", "spring", "gridfinity", "ring", "wedge", "polygon", "icosahedron", "ruler", "mesh",
+  "halfSphere", "paraboloid", "torus", "tube", "bentTube", "star", "heart", "crescent", "gear", "hirth", "honeycomb", "hinge", "knurl", "dovetail", "counterbore", "countersink", "doubleCountersink", "teardrop", "port", "loft", "vase", "thread", "spring", "gridfinity", "ring", "wedge", "polygon", "icosahedron", "ruler", "mesh",
 ];
 
 function numberOrDefault(value: unknown, fallback: number) {
@@ -472,6 +472,9 @@ export function normalizeShapeCustomizations(value: unknown, fallback: ShapeCust
     if (kind === "dovetail") {
       entry.dovetailNeckWidth = optionalShapeNumber(source.dovetailNeckWidth, fallbackEntry?.dovetailNeckWidth, 0.1, MAX_CUSTOM_SHAPE_DIMENSION);
       entry.dovetailClearance = optionalShapeNumber(source.dovetailClearance, fallbackEntry?.dovetailClearance, 0, 2);
+    }
+    if (kind === "port") {
+      entry.cornerFillet = optionalShapeNumber(source.cornerFillet, fallbackEntry?.cornerFillet, 0, MAX_CUSTOM_SHAPE_DIMENSION / 2);
     }
     if (kind === "roundedBox") {
       entry.cornerFillet = optionalShapeNumber(source.cornerFillet, fallbackEntry?.cornerFillet, 0, MAX_CUSTOM_SHAPE_DIMENSION / 2);

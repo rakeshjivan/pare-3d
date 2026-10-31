@@ -9,9 +9,10 @@ import { cadProfileSolidMismatch, profileExtrusionSolid } from "@/lib/cadProfile
 import type { CadModifierProfilePart } from "@/lib/cadModifierTypes";
 import { createTeardropGeometry } from "@/lib/teardropGeometry";
 import { createScrewHoleGeometry } from "@/lib/screwHoleGeometry";
+import { createPortGeometry } from "@/lib/portGeometry";
 
 /*
- * The teardrop and the two screw holes as exact bodies against the real
+ * The teardrop, the port opening and the two screw holes as exact bodies against the real
  * kernel: valid solids with the faces their outline predicts, in the place
  * and turn their display mesh has, and with fillets that work on them.
  */
@@ -26,6 +27,8 @@ function worldMesh(source: WorkplaneShape) {
   const { width, depth, height } = source;
   const geometry = source.kind === "teardrop"
     ? createTeardropGeometry({ width, depth, height })
+    : source.kind === "port"
+    ? createPortGeometry({ width, depth, height, cornerFillet: source.cornerFillet })
     : createScrewHoleGeometry({ kind: source.kind as "counterbore" | "countersink" | "doubleCountersink", width, depth, height, screwHoleShaft: source.screwHoleShaft, screwHoleHeadDepth: source.screwHoleHeadDepth, screwHoleAngle: source.screwHoleAngle });
   const position = geometry.getAttribute("position");
   const index = geometry.getIndex();
@@ -109,6 +112,31 @@ describe("exact bodies for the bore shapes with the real OCCT kernel", () => {
 
   it("teardrop: with no room for a tip it stays a mesh", () => {
     expect(cadModifierProfileForShape(shape("teardrop", { width: 6, depth: 20, height: 4 }))).toBeNull();
+  });
+
+  it("port opening: USB-C with round ends, laid along the depth, standing on its elevation (#1049)", () => {
+    const source = shape("port", { x: 4, z: -2, elevation: 6, width: 9.4, depth: 10, height: 3.7, cornerFillet: 1.85 });
+    const { solid } = exact(source);
+    // two round ends, top and bottom, two end caps
+    expect(surfaceTypes(solid)).toEqual(["cylinder", "cylinder", "plane", "plane", "plane", "plane"]);
+    const box = cad.getBoundingBox(solid);
+    expect(box.xmin).toBeCloseTo(4 - 4.7, 3);
+    expect(box.xmax).toBeCloseTo(4 + 4.7, 3);
+    expect(box.ymin).toBeCloseTo(6, 3);
+    expect(box.ymax).toBeCloseTo(9.7, 3);
+    expect(box.zmin).toBeCloseTo(-7, 3);
+    expect(box.zmax).toBeCloseTo(3, 3);
+    const r = 1.85;
+    expect(cad.getVolume(solid)).toBeCloseTo(((9.4 - 2 * r) * 3.7 + Math.PI * r * r) * 10, 2);
+  });
+
+  it("port opening: square corners give a plain block, small ones four rounded edges", () => {
+    expect(surfaceTypes(exact(shape("port", { width: 13, depth: 10, height: 5.6, cornerFillet: 0 })).solid)).toEqual(Array(6).fill("plane"));
+    const { solid } = exact(shape("port", { width: 13, depth: 10, height: 5.6, cornerFillet: 0.5, rotation: 90 }));
+    expect(surfaceTypes(solid).filter((type) => type === "cylinder")).toHaveLength(4);
+    // Standing upright the round ends are top and bottom; as wide as high it is one round hole.
+    expect(surfaceTypes(exact(shape("port", { width: 3.7, depth: 10, height: 9.4, cornerFillet: 1.85 })).solid)).toEqual(["cylinder", "cylinder", "plane", "plane", "plane", "plane"]);
+    expect(surfaceTypes(exact(shape("port", { width: 6, depth: 10, height: 6, cornerFillet: 3 })).solid)).toEqual(["cylinder", "plane", "plane"]);
   });
 
   it("counterbore: five faces, plane and cylinder only, head end on top", () => {

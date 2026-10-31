@@ -20,7 +20,7 @@ export const editorTargetSchema = {
 export const creatableShapeKinds = [
   "box", "roundedBox", "cube", "cylinder", "slot", "ellipse", "polygon", "sphere", "cone", "pyramid", "wedge",
   "roundRoof", "halfSphere", "paraboloid", "torus", "loft", "vase", "tube", "bentTube", "star", "heart", "crescent", "text", "thread", "spring", "gridfinity", "gear", "hirth",
-  "hinge", "knurl", "dovetail", "counterbore", "countersink", "doubleCountersink", "teardrop", "ruler", "sketch",
+  "hinge", "knurl", "dovetail", "counterbore", "countersink", "doubleCountersink", "teardrop", "port", "ruler", "sketch",
 ];
 
 /**
@@ -238,7 +238,7 @@ export const shapeSettingSchema = {
   loftTiltZ: { type: "number", description: "Loft only: degrees the top end tilts about the z axis, -45 to 45: positive raises its right (+x) side. Same as loftTiltX otherwise." },
   slotEndRatio: { type: "number", description: "Capsule (slot) only: the small end's diameter as a share of the large one, 0.1 to 1 (default 1, two equal ends). The large end sits at the start of the long axis, the small one at its end, the sides run as tangents to both - a belt guard. The large diameter is the capsule's short side; the centre distance is the long side less both radii." },
   dovetailClearance: { type: "number", description: "Dovetail only: gap in mm (0 to 2, default 0.2) added on every side while the dovetail is a hole - a copy of the tail set to hole cuts a socket the tail fits into." },
-  cornerFillet: { type: "number", description: "Rounded box only: fillet radius of vertical corners in mm." },
+  cornerFillet: { type: "number", description: "Rounded box and port opening only. Rounded box: fillet radius of vertical corners in mm. Port opening: radius of the opening's four corners in mm, at most half its width or height (half the height gives fully round ends, as on USB-C)." },
   topBottomFillet: { type: "number", description: "Rounded box only: fillet radius of top and bottom edges in mm." },
   roundedBoxQuality: { type: "number", description: "Rounded box only: quality / segment count for fillet rounding (1 to 32; 1 gives chamfered corners)." },
   bentTubeProfile: { type: "string", enum: ["round", "square", "hexagon", "octagon"], description: "Bent tube only: outer cross-section." },
@@ -327,7 +327,7 @@ export const tools = [
   },
   {
     name: "layerling_create_shape",
-    description: "Create any of Layerling's shapes: boxes, cylinders, slots, polygons, spheres, cones, pyramids, wedges, roofs, tori, tubes, stars, hearts, crescents, print-in-place hinges, Gridfinity bins and baseplates, knurled grips, raised text, threads (rod, screw, nut, tapped hole), springs, gears, Hirth joints (face teeth that lock two parts at any multiple of one tooth), or a simple extruded sketch. Width, depth and height default to what the editor uses for that shape; everything a shape has beyond its size is optional and falls back to the same defaults as a shape placed by hand. With a workplane set on a face (layerling_set_workplane), the shape stands on that face and x and z count on it (0, 0 is where the workplane sits) - unless elevation or a rotation is given, which mean the base plate.",
+    description: "Create any of Layerling's shapes: boxes, cylinders, slots, polygons, spheres, cones, pyramids, wedges, roofs, tori, tubes, stars, hearts, crescents, print-in-place hinges, Gridfinity bins and baseplates, knurled grips, raised text, threads (rod, screw, nut, tapped hole), springs, gears, Hirth joints (face teeth that lock two parts at any multiple of one tooth), port openings for USB sockets, or a simple extruded sketch. Width, depth and height default to what the editor uses for that shape; everything a shape has beyond its size is optional and falls back to the same defaults as a shape placed by hand. With a workplane set on a face (layerling_set_workplane), the shape stands on that face and x and z count on it (0, 0 is where the workplane sits) - unless elevation or a rotation is given, which mean the base plate.",
     inputSchema: {
       ...editorTargetSchema,
       required: ["kind"],
@@ -359,6 +359,7 @@ export const tools = [
         },
         silhouette: { type: "boolean", description: "For kind sketch and kind text: leave out every outline inside another - holes, and islands in them; on a text the counters of O, A and e - so only the outermost outlines count, as Tinkercad's Silhouette." },
         ...shapeSettingSchema,
+        portPreset: { type: "string", enum: ["usbC", "usbCPlug", "microUsb", "usbA"], description: "Port opening (kind port) only, when creating: the socket whose opening it gets, with about 0.25 mm of room on every side - usbC 9.4 x 3.7 mm with round ends, usbCPlug 12.8 x 7 mm for a USB-C socket behind the wall, microUsb 8 x 3.1 mm, usbA 13 x 5.6 mm. width, height or cornerFillet given as well win. A port opening is a hole lying on its side: width and height are the opening seen from the front, depth how far it reaches into the wall along its own Z axis, so turn it with rotation to face the wall it goes through." },
         vaseParts: { type: "boolean", description: "Vase only: true also lays out the vase's accessories (legs to plug in, a stand, a saucer, an insert, a lid, as its settings ask for) as objects of their own beside it, ready to print; the ones laid out for this vase before are replaced. Returns them as parts; accessories this vase does not allow (an insert through a narrow neck) are listed as notPossible." },
         ...threadSizeSetting,
       },

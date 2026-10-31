@@ -74,6 +74,7 @@ import { createGridfinityGeometry, gridfinityFootprintPatch } from "@/lib/gridfi
 import { createKnurlGeometry } from "@/lib/knurlGeometry";
 import { createVaseGeometry, fittedVaseMesh } from "@/lib/vaseShape";
 import { createTeardropGeometry } from "@/lib/teardropGeometry";
+import { createPortGeometry } from "@/lib/portGeometry";
 import { createScrewHoleGeometry } from "@/lib/screwHoleGeometry";
 import { createHoneycombGeometry } from "@/lib/honeycombGeometry";
 import { createRoundedBoxGeometry } from "@/lib/roundedBoxGeometry";
@@ -14948,6 +14949,9 @@ function createShapeObject(
     case "teardrop":
       addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createTeardropGeometry({ width, depth, height, sides: roundSideCount(shape.sides, width, depth) })), material, shape);
       break;
+    case "port":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createPortGeometry({ width, depth, height, cornerFillet: shape.cornerFillet })), material, shape);
+      break;
     case "knurl":
       addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createKnurlGeometry({ width, height, knurlPattern: shape.knurlPattern, knurlCount: shape.knurlCount, knurlDepth: shape.knurlDepth, knurlAngle: shape.knurlAngle, knurlChamfer: shape.knurlChamfer })), material, shape);
       break;
@@ -15511,7 +15515,7 @@ function addShapeEdgeDecorations(group: THREE.Group, mesh: THREE.Mesh, prepared:
   const complexEdges =
     shape.kind === "mesh" ||
     Boolean(shape.importedMesh) ||
-    ["cone", "pyramid", "roof", "roundRoof", "halfSphere", "paraboloid", "torus", "tube", "ring", "star", "gear", "hirth", "wedge", "polygon", "heart", "crescent", "slot", "dovetail", "hinge", "gridfinity", "knurl", "teardrop", "counterbore", "countersink", "doubleCountersink", "honeycomb", "loft"].includes(shape.kind);
+    ["cone", "pyramid", "roof", "roundRoof", "halfSphere", "paraboloid", "torus", "tube", "ring", "star", "gear", "hirth", "wedge", "polygon", "heart", "crescent", "slot", "dovetail", "hinge", "gridfinity", "knurl", "teardrop", "port", "counterbore", "countersink", "doubleCountersink", "honeycomb", "loft"].includes(shape.kind);
   const importedTriangleCount = shape.importedMesh?.triangleCount ?? 0;
   // A vase's relief has an edge at every rib: drawn like a heavy imported mesh, without the lines.
   const skipHeavyImportedEdges = (Boolean(shape.importedMesh) && importedTriangleCount > IMPORTED_SELECTED_EDGE_TRIANGLE_LIMIT)

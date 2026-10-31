@@ -52,7 +52,7 @@ export const LYL_LIMITS = {
 
 const SHAPE_KINDS = new Set([
   "box", "roundedBox", "cylinder", "slot", "ellipse", "sphere", "sketch", "scribble", "cone", "pyramid", "roof", "text", "roundRoof",
-  "halfSphere", "paraboloid", "torus", "tube", "bentTube", "star", "heart", "crescent", "gear", "hirth", "honeycomb", "hinge", "knurl", "dovetail", "counterbore", "countersink", "doubleCountersink", "teardrop", "loft", "vase", "thread", "spring", "gridfinity", "ring", "wedge", "polygon", "icosahedron", "ruler", "mesh",
+  "halfSphere", "paraboloid", "torus", "tube", "bentTube", "star", "heart", "crescent", "gear", "hirth", "honeycomb", "hinge", "knurl", "dovetail", "counterbore", "countersink", "doubleCountersink", "teardrop", "port", "loft", "vase", "thread", "spring", "gridfinity", "ring", "wedge", "polygon", "icosahedron", "ruler", "mesh",
 ]);
 
 const FEATURE_TYPES = new Set([
@@ -1705,6 +1705,10 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
     : undefined;
   if (kind === "bentTube" || parametricKind === "bentTube") {
     validateBentTubeDefinition(definition, label);
+  }
+  if (kind === "port" && definition.cornerFillet !== undefined) {
+    const cornerFillet = finiteNumber(definition.cornerFillet, `${label}.cornerFillet`);
+    if (cornerFillet < 0 || cornerFillet > 1e6) throw new Error(`${label}.cornerFillet is outside the supported range`);
   }
   if (kind === "roundedBox") {
     if (definition.cornerFillet !== undefined) {

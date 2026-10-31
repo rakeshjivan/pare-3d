@@ -123,6 +123,7 @@ import {
   DEFAULT_TEARDROP_WIDTH,
   teardropHeightForTipAngle,
 } from "@/lib/teardropGeometry";
+import { DEFAULT_PORT_DEPTH, DEFAULT_PORT_PRESET, normalizePortCorner, PORT_PRESETS } from "@/lib/portGeometry";
 import { DEFAULT_LOFT, loftFieldsFromMeasures, loftFrameSize, normalizeLoftMeasures } from "@/lib/loftGeometry";
 import { DEFAULT_VASE_SIZE, normalizeVaseSettings } from "@/lib/vaseSettings";
 import {
@@ -227,6 +228,7 @@ const SHAPE_LABEL_KEYS: Record<string, MessageKey> = {
   knurl: "shape.knurl",
   dovetail: "shape.dovetail",
   teardrop: "shape.teardrop",
+  port: "shape.port",
   loft: "shape.loft",
   vase: "shape.vase",
   counterbore: "shape.counterbore",
@@ -264,6 +266,7 @@ export const toolbarShapeAssets: ToolbarShapeAsset[] = [
   { id: "countersink", name: "Countersink", src: "assets/editor/shape-icons-gray/countersink.png", menuIcon: "assets/editor/shape-icons-gray/countersink.png", kind: "countersink", color: "#6b8a7a" },
   { id: "doubleCountersink", name: "Double Countersink", src: "assets/editor/shape-icons-gray/doubleCountersink.png", menuIcon: "assets/editor/shape-icons-gray/doubleCountersink.png", kind: "doubleCountersink", color: "#6b8a8a" },
   { id: "teardrop", name: "Teardrop", src: "assets/editor/shape-icons-gray/teardrop.png", menuIcon: "assets/editor/shape-icons-gray/teardrop.png", kind: "teardrop", color: "#7d6a9c" },
+  { id: "port", name: "Port opening", src: "assets/editor/shape-icons-gray/port.png", menuIcon: "assets/editor/shape-icons-gray/port.png", kind: "port", color: "#5b7d99", hole: true },
   { id: "text", name: "Text", src: "assets/editor/shape-icons-gray/text.png", menuIcon: "assets/editor/shape-icons-gray/text.png", kind: "text", color: "#cf101b" },
   { id: "thread", name: "Thread", src: "assets/editor/shape-icons-gray/thread.png", menuIcon: "assets/editor/shape-icons-gray/thread.png", kind: "thread", color: "#8a98a6" },
   { id: "spring", name: "Spring", src: "assets/editor/shape-icons-gray/spring.png", menuIcon: "assets/editor/shape-icons-gray/spring.png", kind: "spring", color: "#18b99a" },
@@ -410,6 +413,10 @@ export function shapeAssetDefaultDimensions(kind: ShapeKind) {
   }
   if (kind === "teardrop") {
     return { width: DEFAULT_TEARDROP_WIDTH, depth: DEFAULT_TEARDROP_DEPTH, height: Math.round(teardropHeightForTipAngle(DEFAULT_TEARDROP_WIDTH, DEFAULT_TEARDROP_TIP_ANGLE) * 100) / 100 };
+  }
+  if (kind === "port") {
+    const preset = PORT_PRESETS[DEFAULT_PORT_PRESET];
+    return { width: preset.width, depth: DEFAULT_PORT_DEPTH, height: preset.height };
   }
   if (kind === "dovetail") {
     return { width: DEFAULT_DOVETAIL_WIDTH, depth: DEFAULT_DOVETAIL_DEPTH, height: DEFAULT_DOVETAIL_HEIGHT };
@@ -1067,7 +1074,8 @@ export function makeShapeFromAsset(
     screwHoleShaft: asset.kind === "counterbore" || asset.kind === "countersink" || asset.kind === "doubleCountersink" ? normalizeScrewHoleShaft(customization.screwHoleShaft ?? DEFAULT_SCREW_HOLE_SHAFT, width) : undefined,
     screwHoleHeadDepth: asset.kind === "counterbore" ? normalizeScrewHoleHeadDepth(customization.screwHoleHeadDepth ?? DEFAULT_SCREW_HOLE_HEAD_DEPTH, height) : undefined,
     screwHoleAngle: asset.kind === "countersink" || asset.kind === "doubleCountersink" ? normalizeScrewHoleAngle(customization.screwHoleAngle ?? DEFAULT_SCREW_HOLE_ANGLE) : undefined,
-    cornerFillet: asset.kind === "roundedBox" ? normalizeCornerFillet(customization.cornerFillet ?? DEFAULT_ROUNDED_BOX_CORNER_FILLET, Math.min(width, depth) / 2) : undefined,
+    cornerFillet: asset.kind === "roundedBox" ? normalizeCornerFillet(customization.cornerFillet ?? DEFAULT_ROUNDED_BOX_CORNER_FILLET, Math.min(width, depth) / 2)
+      : asset.kind === "port" ? normalizePortCorner(customization.cornerFillet, width, height) : undefined,
     topBottomFillet: asset.kind === "roundedBox" ? normalizeTopBottomFillet(customization.topBottomFillet ?? DEFAULT_ROUNDED_BOX_TOP_BOTTOM_FILLET, height / 2) : undefined,
     roundedBoxQuality: asset.kind === "roundedBox" ? normalizeRoundedBoxQuality(customization.roundedBoxQuality ?? DEFAULT_ROUNDED_BOX_QUALITY) : undefined,
     ...(bentTube ?? {}),

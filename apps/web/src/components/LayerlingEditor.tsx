@@ -241,6 +241,7 @@ import {
   type LylFileHandle,
 } from "@/lib/lylFileAccess";
 import { displayShapeName, iconTagAsset, qrCodeAsset, libraryShapeAssets, makeShapeFromAsset, nameTagAsset, shapeAssetLabel, toolbarShapeAssets } from "@/lib/shapeCatalog";
+import { PORT_PRESET_ORDER, PORT_PRESETS, type PortPreset } from "@/lib/portGeometry";
 import { importedShapeFromStl, SCAN_GREY } from "@/lib/stlImport";
 import { setViewLook } from "@/lib/viewLook";
 import { exportMeshesToStl } from "@/lib/stlExport";
@@ -13896,9 +13897,12 @@ export function LayerlingEditor({
         const name = mcpString(params.name, kind === "sketch" ? "Sketch extrusion" : rawKind === "cube" ? "Cube" : asset?.name ?? "Box");
         // Nur was ausdruecklich verlangt wurde: sonst gilt das Mass, mit dem der
         // Katalog diese Form auch von Hand auf die Ebene legt.
-        const requestedWidth = mcpOptionalNumber(params.width ?? params.size);
+        // A port opening named by its socket takes that socket's opening, unless a size is given as well (#1049).
+        const portPreset = kind === "port" && typeof params.portPreset === "string" ? PORT_PRESETS[params.portPreset as PortPreset] : undefined;
+        if (kind === "port" && params.portPreset !== undefined && !portPreset) throw new Error(`portPreset must be one of ${PORT_PRESET_ORDER.join(", ")}`);
+        const requestedWidth = mcpOptionalNumber(params.width ?? params.size) ?? portPreset?.width;
         const requestedDepth = mcpOptionalNumber(params.depth ?? params.size) ?? (rawKind === "cube" ? requestedWidth : undefined);
-        const requestedHeight = mcpOptionalNumber(params.height ?? params.size) ?? (rawKind === "cube" ? requestedWidth : undefined);
+        const requestedHeight = mcpOptionalNumber(params.height ?? params.size) ?? (rawKind === "cube" ? requestedWidth : undefined) ?? portPreset?.height;
         // A body of no size cannot be built, and a design holding one would not open again.
         ([["width", requestedWidth], ["depth", requestedDepth], ["height", requestedHeight]] as const).forEach(([key, value]) => {
           if (value !== undefined && value <= 0) throw new Error(`${key} must be greater than 0`);
@@ -13934,7 +13938,7 @@ export function LayerlingEditor({
             { ...asset, name, color },
             { x, z, elevation },
             {
-              ...mcpShapeCustomization(asset.kind, shapeParams),
+              ...mcpShapeCustomization(asset.kind, portPreset && shapeParams.cornerFillet === undefined ? { ...shapeParams, cornerFillet: portPreset.corner } : shapeParams),
               width: requestedWidth,
               depth: requestedDepth,
               height: requestedHeight,
@@ -13945,8 +13949,8 @@ export function LayerlingEditor({
             rotation: mcpNumber(params.rotation, 0),
             rotationX: mcpNumber(params.rotationX, 0),
             rotationZ: mcpNumber(params.rotationZ, 0),
-            // Ein Gewindeloch ist zum Abziehen da, alles andere ist Material.
-            hole: typeof params.hole === "boolean" ? params.hole : shape.threadRole === "bore",
+            // Ein Gewindeloch ist zum Abziehen da, eine Anschlussoeffnung auch, alles andere ist Material.
+            hole: typeof params.hole === "boolean" ? params.hole : shape.threadRole === "bore" || Boolean(asset.hole),
           };
           if (shape.kind === "thread") {
             shape = applyMcpThreadSettings(shape, shapeParams, true);
