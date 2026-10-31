@@ -66,7 +66,7 @@ import { HelpMenu } from "./HelpMenu";
 import { InstantTips } from "./InstantTips";
 import { SaveStatus } from "./SaveStatus";
 import { CUT_BELOW_BED_EVENT, PRINT_CHECK_EVENT, SPLIT_TO_FIT_EVENT } from "./PrintCheckPanel";
-import { Brush, ChevronDown, Grip, MessageSquareText, Printer } from "lucide-react";
+import { Brush, ChevronDown, Cookie, Grip, MessageSquareText, Printer } from "lucide-react";
 import { PareBuildBadge } from "./PareVersionStatus";
 import { Signature } from "lucide-react";
 import { CommandPalette, type PaletteCommand } from "./workplane/CommandPalette";
@@ -249,6 +249,7 @@ export function SecondaryToolbar({
   edgeModifierKind,
   canGroup,
   canIntersect,
+  canCookieCutter,
   canRedo,
   canUngroup,
   canUndo,
@@ -321,6 +322,7 @@ export function SecondaryToolbar({
   onGroup,
   onBundle,
   onIntersect,
+  onCookieCutter,
   onIntersectPreview,
   intersectPreviewActive,
   onFillet,
@@ -399,6 +401,7 @@ export function SecondaryToolbar({
   edgeModifierKind: CadModifierKind | null;
   canGroup: boolean;
   canIntersect: boolean;
+  canCookieCutter: boolean;
   canRedo: boolean;
   canUngroup: boolean;
   canUndo: boolean;
@@ -472,6 +475,7 @@ export function SecondaryToolbar({
   onGroup: () => void;
   onBundle: () => void;
   onIntersect: () => void;
+  onCookieCutter: () => void;
   onIntersectPreview: () => void;
   intersectPreviewActive: boolean;
   onFillet: () => void;
@@ -875,6 +879,7 @@ export function SecondaryToolbar({
     { id: "blendBodies", label: t("blend.title"), icon: ForkBlendIcon, action: onBlendBodies, enabled: canBlendBodies || blendBodiesActive, active: blendBodiesActive },
     // Fork (build 33).
     { id: "hull", label: t("hull.title"), icon: Spline, action: build33.onHull, enabled: build33.canHull },
+    { id: "cookieCutter", label: t("editor.tool.cookieCutter"), icon: Cookie, action: onCookieCutter, enabled: canCookieCutter },
   ];
   const modifyTools = [
     { id: "mirror", label: t("editor.tool.mirror"), icon: ToolbarMirrorIcon, action: onMirror, enabled: canModifySelection, active: mirrorMode },
