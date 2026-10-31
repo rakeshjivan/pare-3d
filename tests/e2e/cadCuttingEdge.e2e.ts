@@ -85,4 +85,19 @@ describe("a cutting edge on a stroked wall with the real OCCT kernel (#982)", ()
     expect(kernel.getVolume(chamfered!)).toBeLessThan(kernel.getVolume(solid));
     expect(kernel.getBoundingBox(chamfered!, false).ymax).toBeCloseTo(15, 6);
   });
+
+  it("gives up at once on an outline of many short straight pieces instead of trying for minutes", () => {
+    // What a body's outline cut from its triangles looks like: a circle of 400 pieces. One try of the kernel at chamfering
+    // the 1 670 pieces of a text body "Wera" ran 159 s, past the sketch worker's 30 s.
+    const ring: SketchProfile = { points: [], segments: [] };
+    for (let index = 0; index < 400; index += 1) {
+      const angle = (index / 400) * Math.PI * 2;
+      ring.points.push({ id: `c${index}`, x: Math.cos(angle) * 20, z: Math.sin(angle) * 20, mode: "corner" });
+      ring.segments.push({ id: `d${index}`, startId: `c${index}`, endId: `c${(index + 1) % 400}`, kind: "line" });
+    }
+    const solid = buildStrokedSketchSolid(kernel, ring, wall, 15)!;
+    const started = performance.now();
+    expect(chamferTopEdges(kernel, solid, 15, 0.4)).toBeNull();
+    expect(performance.now() - started).toBeLessThan(3000);
+  });
 });

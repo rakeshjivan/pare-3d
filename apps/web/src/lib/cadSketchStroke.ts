@@ -120,8 +120,14 @@ export function buildStrokedSketchSolid(cad: OcctKernel, profile: SketchProfile,
 
 /** Closer than this to the top, in mm, a point of an edge lies on it. */
 const TOP_TOLERANCE = 1e-4;
-/** Past this many chamfered edges the kernel's validity check is skipped, as for a large sketch. */
-const LARGE_TOP_EDGES = 750;
+/**
+ * More rim pieces than this take no cutting edge: an outline cut from a body's triangles has hundreds of short straight
+ * pieces, and one try of the kernel at chamfering 1 670 of them ran 159 s before it failed - the sketch worker stops at 30 s
+ * and the cookie cutter failed with it (#982, a text body "Wera"). A drawn letter has a few dozen.
+ */
+const MAX_EDGE_PIECES = 200;
+/** After this many milliseconds no further try is started; the one running cannot be stopped. */
+const EDGE_BUDGET_MS = 8000;
 
 /**
  * The rims along the very top of a solid standing from 0 to `height` (y up), split by the top faces' wires: `outer` the outer
@@ -151,27 +157,31 @@ function topRims(cad: OcctKernel, solid: ShapeHandle, height: number) {
  * each side, so the top runs in to a narrow edge. The solid stands from 0 to `height` (y up). A cut or a fuse leaves a
  * compound, which the kernel does not chamfer: each solid in it is chamfered on its own. Where the kernel cannot chamfer both
  * rims at once - a tight bend of a letter, where the two chamfers meet - it chamfers them one after the other, and failing
- * that one rim by twice as much, which leaves the same edge on top. Null when no solid has an edge up there or none of this
- * works (outlines with steps shorter than the chamfer, like a body's outline cut from its triangles).
+ * that one rim by twice as much, which leaves the same edge on top. Null when no solid has an edge up there, when the rims
+ * are too many pieces to try (an outline cut from a body's triangles), or when none of this works in time.
  */
 export function chamferTopEdges(cad: OcctKernel, shape: ShapeHandle, height: number, amount: number): ShapeHandle | null {
-  let edgeCount = 0;
+  const solids = cad.getSubShapes(shape, "solid").map((solid) => ({ solid, ...topRims(cad, solid, height) }));
+  const pieces = solids.reduce((sum, { outer, inner }) => sum + outer.length + inner.length, 0);
+  if (!pieces || pieces > MAX_EDGE_PIECES) return null;
+  const started = performance.now();
   const attempt = (build: () => ShapeHandle) => {
+    if (performance.now() - started > EDGE_BUDGET_MS) return null;
     try {
       const result = build();
-      // The validity check grows steeply with the edges (#461): a traced outline is checked by its volume alone.
-      if (edgeCount <= LARGE_TOP_EDGES && !cad.isValid(result)) return null;
-      return cad.getVolume(result) > 1e-9 ? result : null;
+      return cad.isValid(result) && cad.getVolume(result) > 1e-9 ? result : null;
     } catch (error) {
       if (/memory|WebAssembly|abort/i.test(error instanceof Error ? error.message : String(error))) throw error;
       return null;
     }
   };
-  const chamferSolid = (solid: ShapeHandle): ShapeHandle | null => {
-    const { outer, inner } = topRims(cad, solid, height);
-    edgeCount += outer.length + inner.length;
-    if (!outer.length && !inner.length) return solid;
-    return attempt(() => cad.chamfer(solid, [...outer, ...inner], amount))
+  const chamfered: ShapeHandle[] = [];
+  for (const { solid, outer, inner } of solids) {
+    if (!outer.length && !inner.length) {
+      chamfered.push(solid);
+      continue;
+    }
+    const result = attempt(() => cad.chamfer(solid, [...outer, ...inner], amount))
       ?? (outer.length && inner.length
         ? attempt(() => {
           const first = cad.chamfer(solid, outer, amount);
@@ -180,14 +190,8 @@ export function chamferTopEdges(cad: OcctKernel, shape: ShapeHandle, height: num
         : null)
       ?? (outer.length ? attempt(() => cad.chamfer(solid, outer, amount * 2)) : null)
       ?? (inner.length ? attempt(() => cad.chamfer(solid, inner, amount * 2)) : null);
-  };
-  const solids = cad.getSubShapes(shape, "solid");
-  const chamfered: ShapeHandle[] = [];
-  for (const solid of solids) {
-    const result = chamferSolid(solid);
     if (!result) return null;
     chamfered.push(result);
   }
-  if (!chamfered.length || !edgeCount) return null;
   return chamfered.length === 1 ? chamfered[0] : cad.makeCompound(chamfered);
 }
