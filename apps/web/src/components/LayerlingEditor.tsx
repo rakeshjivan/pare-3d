@@ -324,6 +324,9 @@ import { SHARED_CLIPBOARD_STORAGE_KEY, readSharedClipboard, readSystemClipboard,
 import { downloadBlobFile, downloadTextFile, footprintSvg, imagePlateDimensions, prepareImportedImage, toSvg } from "@/lib/editorFiles";
 import { alignedShapesForSelection, alignmentLabel, alignmentStatuses, centringMoves, effectiveAlignmentAnchorId, frameAabb, mirrorAxisLabel, mirroredShapesForSelection } from "@/lib/editorAlignMirror";
 import { MCP_BENT_TUBE_KEYS, applyMcpThreadSettings, mcpBentTubePatch, mcpExtrudeDeformPatch, mcpFiniteNumberArray, mcpLoftChange, mcpNumber, mcpNumberArray, mcpOptionalNumber, mcpPointInfo, mcpShapeCustomization, mcpString, mcpStringArray, mcpTaperPatch, readMcpEditorIdentity } from "@/lib/editorMcpParams";
+
+/** Build 104: Dental Studio's free rotate choice ("on" / "off"). */
+const FREE_ROTATE_KEY = "pare3d.freeRotate";
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
 
@@ -17831,8 +17834,20 @@ export function LayerlingEditor({
   // Build 100: the Box / Gimbal switch in the right-click menu too - beside Snap Grid it was out of sight
   // while Dental Studio covered the right of the window.
   const handleStyleChoice = useHandleStyle();
+  // Build 104: Meshmixer's free rotate is a choice in Dental Studio's right-click menu, off at first -
+  // the usual orbit (the up kept) proved easier for moving the scans about.
+  const [freeRotateOn, setFreeRotateOn] = useState(() => { try { return window.localStorage.getItem(FREE_ROTATE_KEY) === "on"; } catch { return false; } });
   const handleStyleItem = (): ShapeContextMenuItem => ({ key: "handleStyle", label: t(handleStyleChoice === "gimbal" ? "contextMenu.useBox" : "contextMenu.useGimbal"), onSelect: () => setHandleStyle(handleStyleChoice === "gimbal" ? "box" : "gimbal") });
   /** Build 104: the right-click menu in Dental Studio. */
+  const freeRotateItem = (): ShapeContextMenuItem => ({
+    key: "freeRotate",
+    label: t(freeRotateOn ? "dentalMenu.freeRotateOff" : "dentalMenu.freeRotateOn"),
+    onSelect: () => {
+      const next = !freeRotateOn;
+      setFreeRotateOn(next);
+      try { window.localStorage.setItem(FREE_ROTATE_KEY, next ? "on" : "off"); } catch { /* private window */ }
+    },
+  });
   const dentalContextMenuItems = (selectOther: ShapeContextMenuItem[]): ShapeContextMenuItem[] => {
     const onPart = Boolean(shapeContextMenu?.onShape) && hasSelection;
     const parts = onPart ? selectedShapes : shapes.filter((shape) => !shape.hidden && !shape.hole);
@@ -17882,7 +17897,7 @@ export function LayerlingEditor({
       if (offersMeshSimplify(single)) items.push({ key: "reduce", label: t("dentalChrome.reduce"), onSelect: startSimplifyTool });
     }
     if (biteMap?.on || biteCandidate) items.push({ key: "bite", label: t(biteMap?.on ? "dentalMenu.biteOff" : "dentalChrome.biteContacts"), separated: true, onSelect: () => toggleBiteMap(!biteMap?.on) });
-    items.push({ ...handleStyleItem(), separated: true });
+    items.push({ ...handleStyleItem(), separated: true }, freeRotateItem());
     if (onPart) {
       items.push(
         { key: "hide", label: t("contextMenu.hide"), shortcut: "Ctrl+H", separated: true, onSelect: toggleHidden },
@@ -18456,7 +18471,8 @@ export function LayerlingEditor({
         onGimbalDrop={dropSelectedToWorkplane}
         gimbalAxisLabels={dentalWorkspace ? DENTAL_GIMBAL_LABELS : undefined}
         gimbalFree={dentalWorkspace}
-        freeRotate={dentalWorkspace}
+        freeRotate={dentalWorkspace && freeRotateOn}
+        dentalView={dentalWorkspace}
           projectName={projectName}
           projectId={editorOpen ? projectId ?? null : null}
           shapes={heldViewportShapes}

@@ -66,11 +66,12 @@ describe("hiding the workplane from the camera bar", () => {
   });
 
   it("hides the whole workplane layer, also on a scene built while it is hidden", () => {
+    // Build 104: Dental Studio never shows it.
     // On a change: the layer that holds plate, grid, labels and face workplane.
-    expect(viewport).toMatch(/state\.workplaneLayer\.visible = !workplaneLayerHidden;\s*state\.needsRender = true;\s*\}, \[workplaneLayerHidden\]\);/);
+    expect(viewport).toMatch(/state\.workplaneLayer\.visible = !workplaneLayerHidden && !dentalViewRef\.current;\s*state\.needsRender = true;\s*\}, \[workplaneLayerHidden\]\);/);
     // On a new scene: read through the ref. The effect above runs before the
     // scene exists on mount, so this is what hides a plate built while hidden.
-    expect(viewport).toMatch(/threeRef\.current = state;\s*rebuildWorkplane\([^\n]*\);\s*state\.workplaneLayer\.visible = !workplaneLayerHiddenRef\.current;/);
+    expect(viewport).toMatch(/threeRef\.current = state;\s*rebuildWorkplane\([^\n]*\);\s*state\.workplaneLayer\.visible = !workplaneLayerHiddenRef\.current && !dentalViewRef\.current;/);
     expect(viewport).toContain("workplaneLayerHiddenRef.current = workplaneLayerHidden;");
   });
 

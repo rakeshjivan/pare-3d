@@ -548,6 +548,7 @@ type WorkplaneViewportProps = {
   gimbalFree?: boolean;
   /** Build 104: Meshmixer's free rotate - the view turns freely about the screen's axes (Dental Studio). */
   freeRotate?: boolean;
+  dentalView?: boolean;
 };
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;
@@ -3542,6 +3543,7 @@ export function WorkplaneViewport({
   gimbalAxisLabels,
   gimbalFree = false,
   freeRotate = false,
+  dentalView = false,
   selectedIds,
   alignMode,
   multiSelect = false,
@@ -3832,6 +3834,8 @@ export function WorkplaneViewport({
   const hostRef = useRef<HTMLDivElement | null>(null);
   /** Build 104: free rotate wanted (Dental Studio) - read when the scene is made. */
   const freeRotateRef = useRef(freeRotate);
+  const dentalViewRef = useRef(dentalView);
+  dentalViewRef.current = dentalView;
   const threeRef = useRef<ThreeState | null>(null);
   // Build 104: a tool's panel open over the right of the view shifts the picture left by half of what
   // it covers (see applyViewShift); closing it brings the picture back.
@@ -4872,7 +4876,8 @@ export function WorkplaneViewport({
   useEffect(() => {
     const state = threeRef.current;
     if (!state) return;
-    state.workplaneLayer.visible = !workplaneLayerHidden;
+    // Build 104: Dental Studio never shows the plate (the blue box under the scans).
+    state.workplaneLayer.visible = !workplaneLayerHidden && !dentalViewRef.current;
     state.needsRender = true;
   }, [workplaneLayerHidden]);
 
@@ -4902,9 +4907,10 @@ export function WorkplaneViewport({
     const state = createThreeScene(host);
     state.palette = themePaletteRef.current;
     state.freeRotate = freeRotateRef.current;
+    state.dentalView = dentalViewRef.current;
     threeRef.current = state;
     rebuildWorkplane(state, workspaceRef.current, resolvedThemeRef.current, drawnWorkplane(), projectNameRef.current);
-    state.workplaneLayer.visible = !workplaneLayerHiddenRef.current;
+    state.workplaneLayer.visible = !workplaneLayerHiddenRef.current && !dentalViewRef.current;
     window.layerlingCaptureCanvas = () => {
       state.camera.updateMatrixWorld();
       renderFrame(state);
@@ -6255,6 +6261,7 @@ export function WorkplaneViewport({
       });
       state.needsRender = true;
     }
+    state.needsRender = true;
     // Back to CAD Studio: the view stands up again (no roll left over from a free turn).
     if (!freeRotate && Math.abs(state.camera.up.y - 1) > 1e-6) {
       state.camera.up.set(0, 1, 0);
@@ -6263,6 +6270,14 @@ export function WorkplaneViewport({
       state.needsRender = true;
     }
   }, [freeRotate]);
+  useEffect(() => {
+    const state = threeRef.current;
+    if (!state) return;
+    state.dentalView = dentalView;
+    state.workplaneLayer.visible = !workplaneLayerHiddenRef.current && !dentalView;
+    if (dentalView) disposeChildren(state.helperLayer);
+    state.needsRender = true;
+  }, [dentalView]);
   useEffect(() => {
     handleStyleNow = gimbalStyle;
     const state = threeRef.current;
@@ -11579,7 +11594,20 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
    * axes - across about its vertical, up and down about its horizontal - with no up held, so a scan can be
    * turned over and rolled freely. OrbitControls keeps panning and zoom; its own rotation sits out the drag.
    */
-  let freeTurn: { pointerId: number; x: number; y: number } | null = null;
+  let freeTurn: { pointerId: number; x: number; y: number; pivot: THREE.Vector3 } | null = null;
+  /** The middle of what is shown (the models), so a free turn spins them in place rather than about a spot beside them. */
+  const freeTurnPivot = () => {
+    const box = new THREE.Box3();
+    const part = new THREE.Box3();
+    state.shapeLayer.traverseVisible((object) => {
+      if (!(object instanceof THREE.Mesh) || !object.geometry) return;
+      if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+      if (!object.geometry.boundingBox) return;
+      part.copy(object.geometry.boundingBox).applyMatrix4(object.matrixWorld);
+      box.union(part);
+    });
+    return box.isEmpty() ? controls.target.clone() : box.getCenter(new THREE.Vector3());
+  };
   const freeTurnMove = (event: PointerEvent) => {
     if (!freeTurn || event.pointerId !== freeTurn.pointerId) return;
     const dx = event.clientX - freeTurn.x;
@@ -11588,18 +11616,19 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     freeTurn.y = event.clientY;
     if (!dx && !dy) return;
     const height = Math.max(1, renderer.domElement.clientHeight);
-    // A drag across the whole view height turns it about 1.4 turns, as Meshmixer.
-    const speed = (Math.PI * 2.8) / height;
-    const offset = camera.position.clone().sub(controls.target);
+    // A drag across the whole view height turns it about two thirds of a turn: fine enough to place a scan.
+    const speed = (Math.PI * 1.3) / height;
+    const pivot = freeTurn.pivot;
     const up = camera.up.clone().normalize();
-    const right = new THREE.Vector3().crossVectors(offset, up).normalize();
+    const right = new THREE.Vector3().crossVectors(camera.position.clone().sub(controls.target), up).normalize();
     // Dragging right brings the far side round to the right; dragging down tips the top towards you.
     const turn = new THREE.Quaternion()
       .setFromAxisAngle(up, -dx * speed)
       .multiply(new THREE.Quaternion().setFromAxisAngle(right, -dy * speed));
-    offset.applyQuaternion(turn);
+    // The camera and its target both swing about the models' middle, so the models turn in place on screen.
+    camera.position.sub(pivot).applyQuaternion(turn).add(pivot);
+    controls.target.sub(pivot).applyQuaternion(turn).add(pivot);
     camera.up.copy(up.applyQuaternion(turn)).normalize();
-    camera.position.copy(controls.target).add(offset);
     camera.lookAt(controls.target);
     state.cameraTurn = null;
     state.needsRender = true;
@@ -11623,7 +11652,7 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
     const rotates = event.pointerType !== "touch" && (event.button === 2 || (event.button === 0 && controls.mouseButtons.LEFT === THREE.MOUSE.ROTATE));
     if (state.freeRotate && rotates && !freeTurn) {
-      freeTurn = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+      freeTurn = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, pivot: freeTurnPivot() };
       controls.enableRotate = false;
       const view = renderer.domElement.ownerDocument.defaultView;
       view?.addEventListener("pointermove", freeTurnMove, true);
@@ -12100,7 +12129,7 @@ function applyViewLook(state: ThreeState | null) {
   if (!state) return;
   const base = baseLight.get(state);
   if (!base) return;
-  state.workplaneLayer.visible = viewLook === "plate";
+  state.workplaneLayer.visible = viewLook === "plate" && !state.dentalView;
   const dark = viewLook === "dark";
   state.scene.background = new THREE.Color(dark ? MESHMIXER_BACKGROUND : base.background);
   // Build 88: Meshmixer's lighting in the dark look - nearly all of it from the camera, so faces turned
@@ -13605,6 +13634,9 @@ function rebuildSelectionHelpers(
   }
 
   disposeChildren(state.helperLayer);
+  // Build 104: no footprint boxes on the ground under selected scans in Dental Studio - the scans float
+  // well above the plate there, so the boxes only cluttered the view.
+  if (state.dentalView) return;
   selectedIds.forEach((id) => {
     const shape = shapes.find((entry) => entry.id === id && !entry.hidden);
     if (!shape) {
