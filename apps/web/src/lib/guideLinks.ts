@@ -66,6 +66,7 @@ export const GUIDE_SECTIONS = {
   cutOut: { chapter: "solids", en: "cutting-one-body-out-of-another" },
   flexi: { chapter: "threads", en: "flexi-joints" },
   lid: { chapter: "edges", en: "a-lid-for-an-open-body" },
+  vase: { chapter: "shapes", en: "a-vase" },
   deleteFace: { chapter: "edges", de: "flaechen-loeschen", en: "deleting-faces", nl: "vlakken-verwijderen", fr: "supprimer-des-faces", ru: "udalenie-graney", cs: "mazani-ploch", sl: "brisanje-ploskev" },
   threads: { chapter: "threads", de: "gewinde", en: "threads", nl: "schroefdraad", ru: "rezba", cs: "zavity", sl: "navoj", hu: "menetek" },
   gears: { chapter: "threads", de: "zahnraeder", en: "gears", nl: "tandwielen", ru: "shesterni", cs: "ozubena-kola", sl: "zobniki", hu: "fogaskerekek" },
@@ -192,6 +193,8 @@ export function guideSectionForShape(shape: GuideShape): GuideSection | undefine
       return "bentTubes";
     case "loft":
       return "loft";
+    case "vase":
+      return "vase";
     case "honeycomb":
       // No longer a shape of its own: the hole pattern tool took its place (#223).
       return "holePattern";

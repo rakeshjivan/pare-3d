@@ -30,6 +30,7 @@ export type ShapeKind =
   | "doubleCountersink"
   | "teardrop"
   | "loft"
+  | "vase"
   | "thread"
   | "spring"
   | "gridfinity"
@@ -1097,6 +1098,10 @@ export type WorkplaneShape = {
     /** Fork (build 39): three of the part's mesh points when it was laid - how the part moved or turned since. */
     targetAnchors?: { index: number; at: { x: number; y: number; z: number } }[];
   };
+  /** Only for "vase": the vase tool's settings; the frame gives its height and widest diameter. */
+  vase?: import("@/lib/vase/vase-geometry.mjs").VaseSettings;
+  /** An accessory laid out for a vase (its id): laying them out again replaces it. */
+  vasePartOf?: string;
   importedMesh?: {
     positions: number[];
     normals?: number[];

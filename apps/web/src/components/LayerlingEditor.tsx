@@ -283,6 +283,8 @@ import { useRememberedFlag } from "@/lib/useRememberedFlag";
 import { BUG_REPORT_FILE, bugReportText, rememberBugReportEvent, type BugReportEvent } from "@/lib/bugReport";
 import { formatLengthMm, lengthDisplayUnit } from "@/lib/measurementUnits";
 import { wrapMeshAroundCylinder, type CylinderWrapError } from "@/lib/cylinderWrap";
+import { normalizeVaseSettings, parseVaseSettingsInput } from "@/lib/vaseSettings";
+import { sceneWithVaseAccessories, vaseAccessoryKindName, vaseAccessoryName, vaseShapePatch } from "@/lib/vaseShape";
 import { screenAlignedNudge } from "@/lib/keyboardNudge";
 import { LAYERLING_MCP_HEARTBEAT_MS, LAYERLING_MCP_POLL_RETRY_MS, LAYERLING_MCP_ROUTE, type LayerlingMcpCommand, type LayerlingMcpSceneSummary, type LayerlingMcpViewFace } from "@/lib/layerlingMcpProtocol";
 import type { CadFaceInfo, CadModifierComponentMesh, CadModifierDeflection, CadModifierDisplayEdge, CadModifierEdge, CadModifierFaces, CadModifierGridfinityPart, CadModifierHelicalGearPart, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierProfilePart, CadModifierQuality, CadModifierSpringPart, CadModifierThreadPart, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
@@ -13358,6 +13360,23 @@ export function LayerlingEditor({
     );
   }, [commitShapes, cylinderWrapErrorText, selectedShape, selectedShapes.length, shapes]);
 
+  /**
+   * A vase's accessories (legs to plug in, a stand, a saucer, an insert, a lid), laid out beside it ready to
+   * print; the ones laid out for it before give way, so changed settings come out new. Returns the new parts
+   * and the kinds asked for that this vase does not allow.
+   */
+  const layOutVaseAccessories = useCallback((vaseId: string) => {
+    const { shapes, parts, missing } = sceneWithVaseAccessories(shapesRef.current, vaseId, (vase, accessory) => `${displayShapeName(vase)} – ${vaseAccessoryName(accessory)}`);
+    // Asked for but not possible with this vase (an insert through a narrow neck): said, not left out silently.
+    const missingText = missing.length ? t("status.vaseAccessoriesMissing", { parts: missing.map(vaseAccessoryKindName).join(", ") }) : "";
+    if (!parts.length) {
+      setNotice(missingText || t("status.vaseNoAccessories"));
+      return { parts, missing };
+    }
+    commitShapes(shapes, parts.map((part) => part.id), [t("status.vaseAccessoriesMade", { count: parts.length }), missingText].filter(Boolean).join(" "));
+    return { parts, missing };
+  }, [commitShapes]);
+
   /** The selected name tag as its panel shows it: words, font and layers read from its layers as they stand (#215). */
   const selectedNameTag = useMemo(
     () => (selectedShapes.length === 1 && selectedShape && selectedShape.kind !== "text" && offersTextLayers(selectedShape) ? textLayerStack(selectedShape) : null),
@@ -13920,6 +13939,11 @@ export function LayerlingEditor({
           if (shape.kind === "bentTube") {
             shape = { ...shape, ...mcpBentTubePatch(shape, params) };
           }
+          if (shape.kind === "vase") {
+            const requested = parseVaseSettingsInput(params.vase);
+            if (params.vase !== undefined && !requested) throw new Error("vase must be an object of vase settings, or its JSON text");
+            shape = { ...shape, ...vaseShapePatch(shape, normalizeVaseSettings({ ...shape.vase, ...requested })) };
+          }
           if (shape.kind === "gridfinity") {
             shape = { ...shape, ...gridfinityListPatch(mcpGridfinityListParams(params)) };
           }
@@ -13942,6 +13966,10 @@ export function LayerlingEditor({
         if (ownFont && isCustomFontId(ownFont)) shape = canonicalizeShape({ ...shape, font: ownFont });
         const committedShape = canonicalizeShape(bakeShapeTransformIntoMesh(shape));
         commitShapes([...currentShapes(), committedShape], committedShape.id, t("status.shapeAddedMcp", { name: displayShapeName(committedShape) }));
+        if (committedShape.kind === "vase" && params.vaseParts === true) {
+          const { parts, missing } = layOutVaseAccessories(committedShape.id);
+          return { object: mcpShapeSummary(committedShape), parts: parts.map(mcpShapeSummary), ...(missing.length ? { notPossible: missing } : {}) };
+        }
         return { object: mcpShapeSummary(committedShape) };
       }
 
@@ -14060,6 +14088,12 @@ export function LayerlingEditor({
           // The stored ends were set above as they came; the frame and the place follow from them here.
           const change = mcpLoftChange(params);
           if (Object.keys(change).length) Object.assign(patch, loftShapePatch(target, change));
+        }
+        if (target.kind === "vase" && params.vase !== undefined) {
+          const requested = parseVaseSettingsInput(params.vase);
+          if (!requested) throw new Error("vase must be an object of vase settings, or its JSON text");
+          const withSettings = { ...target, ...patch };
+          Object.assign(patch, vaseShapePatch({ width: shapeWidth(withSettings), depth: shapeDepth(withSettings), height: withSettings.height }, normalizeVaseSettings({ ...target.vase, ...requested })));
         }
         if (target.kind === "gridfinity" && MCP_GRIDFINITY_LIST_KEYS.some((key) => params[key] !== undefined)) {
           Object.assign(patch, gridfinityListPatch(mcpGridfinityListParams(params)));
@@ -14181,6 +14215,10 @@ export function LayerlingEditor({
             updated = rebuilt;
             commitShapes(currentShapes().map((shape) => shape.id === target.id ? rebuilt : shape), target.id, t("status.sketchUpdated"));
           }
+        }
+        if (updated.kind === "vase" && params.vaseParts === true) {
+          const { parts, missing } = layOutVaseAccessories(updated.id);
+          return { object: mcpShapeSummary(updated), parts: parts.map(mcpShapeSummary), ...(missing.length ? { notPossible: missing } : {}) };
         }
         return { object: mcpShapeSummary(updated) };
       }
@@ -15638,6 +15676,7 @@ export function LayerlingEditor({
     closeHistoryView,
     openHistoryView,
     runCustomShapeMcp,
+    layOutVaseAccessories,
   ]);
 
   useEffect(() => {
@@ -18417,6 +18456,7 @@ export function LayerlingEditor({
           onSelectionLock={toggleLocked}
           onSelectionHide={toggleHidden}
           onWrapAroundCylinder={selectedShapes.length === 1 && offersCylinderWrap(selectedShape) ? wrapSelectionAroundCylinder : undefined}
+          onVaseAccessories={selectedShapes.length === 1 && selectedShape?.kind === "vase" && !selectedShape.locked ? () => layOutVaseAccessories(selectedShape.id) : undefined}
           onLayerText={selectedShapes.length === 1 && offersTextLayers(selectedShape) ? layerSelectedText : undefined}
           onTextTags={selectedShapes.length === 1 && offersTextLayers(selectedShape) ? makeTextTags : undefined}
           onFixKeyringTab={selectedShapes.length === 1 && selectedShape?.keyringTab && !historyViewState ? () => void fixKeyringTab() : undefined}

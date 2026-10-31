@@ -10377,6 +10377,75 @@ html[data-theme="dark"] .mesh-compare-actions .secondary {
   line-height: 1.4;
 }
 
+/* The vase's drawing boards (card Draw): the vase tool's boards, in the editor's colours. */
+.vase-drawing {
+  --accent: var(--primary);
+  --surface: #fffdf9;
+  --grid: #e6d6b0;
+  --grid-major: #c9a45a;
+  --label: #8a7a66;
+  --field-edge: var(--border-strong);
+  --vz-height: 300px;
+}
+
+.vase-drawing-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+}
+
+.vase-drawing-tabs button {
+  min-height: 32px;
+  padding: 4px 6px;
+  color: var(--muted-strong);
+  background: transparent;
+  font: 700 12.5px/1.2 var(--font-ui);
+  cursor: pointer;
+}
+
+.vase-drawing-tabs button + button {
+  border-left: 1px solid var(--border-strong);
+}
+
+.vase-drawing-tabs button[aria-pressed="true"] {
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.vase-drawing-host .vz-hint {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.vase-drawing-host[inert] {
+  opacity: 0.55;
+}
+
+/* The vase's print card: weight and filament, then the core's notes on printing it. */
+.vase-print-report {
+  display: grid;
+  gap: 8px;
+}
+
+.vase-print-weight {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.vase-print-notes {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: #8d6a3b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* Layered text (#215): the names list and the layer colour in the layers card. */
 .text-layers-body .text-layers-names {
   display: grid;
@@ -13158,6 +13227,17 @@ html[data-theme="dark"] .select-property-hint {
   color: #a08a72;
 }
 
+html[data-theme="dark"] .vase-print-notes {
+  color: #d1a96f;
+}
+
+html[data-theme="dark"] .vase-drawing {
+  --surface: #2a2017;
+  --grid: #43362a;
+  --grid-major: #6e5638;
+  --label: #b39d84;
+}
+
 html[data-theme="dark"] .gear-type-options button {
   color: #bea892;
   background: #21180f;
@@ -15207,6 +15287,120 @@ html[data-theme="dark"] .color-recent {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* The window to draw a vase in: large, over the editor area, moved by its title bar and made larger or
+   smaller from its corner. It opens below the status messages, which appear in the top left corner. The
+   drawing board takes the whole height; its buttons and fields stand beside it - a vase is tall. */
+.edge-modifier-panel.vase-drawing-window {
+  top: calc(var(--editor-toolbar-height) + 62px);
+  left: 84px;
+  right: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(980px, calc(100vw - 84px - 360px));
+  min-width: min(520px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  height: calc(100dvh - var(--editor-toolbar-height) - var(--editor-footer-height) - 76px);
+  min-height: 380px;
+  max-height: calc(100dvh - var(--editor-toolbar-height) - 16px);
+  overflow: hidden;
+  resize: both;
+  z-index: 47;
+}
+
+.vase-drawing-window:focus {
+  outline: none;
+}
+
+.vase-drawing-window-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.vase-drawing-window-body > .cylinder-wrap-hint {
+  margin: 0;
+}
+
+.vase-drawing-window .vase-drawing-tabs {
+  max-width: 520px;
+}
+
+.vase-drawing-window .vase-drawing-tabs button {
+  min-height: 36px;
+  font-size: 13.5px;
+}
+
+.vase-drawing-window .vase-drawing-host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.vase-drawing-window .vz {
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.vase-drawing-window .vz-board {
+  min-height: 0;
+}
+
+.vase-drawing-window .vz svg {
+  height: 100%;
+  min-height: 220px;
+}
+
+@media (min-width: 901px) {
+  .vase-drawing-window .vz {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 270px);
+    grid-template-rows: repeat(5, min-content) minmax(0, 1fr);
+    column-gap: 14px;
+  }
+
+  .vase-drawing-window .vz > .vz-board {
+    grid-row: 1 / -1;
+    grid-column: 1;
+  }
+
+  .vase-drawing-window .vz > :not(.vz-board) {
+    grid-column: 2;
+  }
+}
+
+/* Narrow screens: the toolbar alone takes half of a phone, so the window covers the whole screen, the board
+   at a fixed height, and it scrolls. */
+@media (max-width: 900px) {
+  .edge-modifier-panel.vase-drawing-window {
+    top: 8px;
+    left: 8px;
+    z-index: 60;
+    width: calc(100vw - 16px);
+    min-width: 0;
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    resize: none;
+  }
+
+  .vase-drawing-window-body,
+  .vase-drawing-window .vase-drawing-host {
+    flex: none;
+  }
+
+  .vase-drawing-window .vz {
+    grid-template-rows: none;
+  }
+
+  .vase-drawing-window .vz svg {
+    height: min(62dvh, 520px);
+  }
 }
 
 .edge-modifier-panel > .edge-modifier-footer {

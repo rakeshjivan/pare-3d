@@ -164,6 +164,11 @@ import { setHandleStyle, useHandleStyle } from "@/lib/handleStyle";
 import { localizedError } from "@/lib/userErrors";
 import { displayShapeName, makeShapeFromAsset, renamedShapeName } from "@/lib/shapeCatalog";
 import { cylinderToEllipsePatch } from "@/lib/cylinderToEllipse";
+import { LIMITS as VASE_LIMITS, MATERIALS as VASE_MATERIALS, type VaseChoiceKey, type VaseNumberKey } from "@/lib/vase/vase-geometry.mjs";
+import { normalizeVaseSettings, type VaseSettings } from "@/lib/vaseSettings";
+import { vaseShapePatch } from "@/lib/vaseShape";
+import { VaseDrawingWindow } from "@/components/workplane/VaseDrawingWindow";
+import { VasePrintReport } from "@/components/workplane/VasePrintReport";
 import { shapeDefaultsAsset, shapeDefaultsFromShape } from "@/lib/shapeDefaults";
 import { MAX_SCREW_HOLE_ANGLE, MIN_SCREW_HOLE_ANGLE, normalizeScrewHoleAngle, normalizeScrewHoleHeadDepth, normalizeScrewHoleShaft } from "@/lib/screwHoleGeometry";
 import { MAX_TEARDROP_TIP_ANGLE, MIN_TEARDROP_TIP_ANGLE, normalizeTeardropTipAngle, teardropHeightForTipAngle, teardropTipAngle } from "@/lib/teardropGeometry";
@@ -339,6 +344,33 @@ const GEAR_TYPE_OPTIONS: Array<{ value: GearType; label: MessageKey }> = [
   { value: "internal", label: "gear.internal" },
   { value: "rack", label: "gear.rack" },
 ];
+/** The vase's choices, by the core's names for them. */
+const VASE_CHOICES: Partial<Record<VaseChoiceKey, Record<string, MessageKey>>> = {
+  profile: { flasche: "vase.profileBottle", bauchig: "vase.profileBellied", schale: "vase.profileBowl", fass: "vase.profileBarrel", zylinder: "vase.profileCylinder", trichter: "vase.profileFunnel", gezeichnet: "vase.profileDrawn" },
+  section: { kreis: "vase.sectionCircle", vieleck: "vase.sectionPolygon", welle: "vase.sectionWave", gezeichnet: "vase.sectionDrawn" },
+  sectionWaveStyle: { weich: "vase.waveSoft", spitz: "vase.wavePointed", bogen: "vase.waveArches", lamellen: "vase.waveFins" },
+  body: { voll: "vase.bodySolid", hohl: "vase.bodyHollow" },
+  innerShape: { folgt: "vase.innerFollows", rund: "vase.innerRound" },
+  effect: { keine: "vase.effectNone", rillen: "vase.effectGrooves", streifen: "vase.effectStripes", voronoi: "vase.effectVoronoi", lowpoly: "vase.effectFacets" },
+  ribShape: { rund: "vase.grooveRound", v: "vase.groovePointed", flach: "vase.grooveFlat" },
+  stripeStyle: { einfach: "vase.stripesOneWay", doppelt: "vase.stripesCrossed" },
+  quality: { entwurf: "vase.qualityDraft", standard: "vase.qualityStandard", fein: "vase.qualityFine" },
+  section2: { keiner: "vase.section2None", kreis: "vase.sectionCircle", vieleck: "vase.sectionPolygon", welle: "vase.sectionWave", gezeichnet: "vase.sectionDrawn" },
+  drawSymmetry: { halb: "vase.symHalf", viertel: "vase.symQuarter", windmuehle: "vase.symWindmill", frei: "vase.symFree" },
+  twistMode: { gleichmaessig: "vase.twistEven", kurve: "vase.twistCurve" },
+  section2WaveStyle: { weich: "vase.waveSoft", spitz: "vase.wavePointed", bogen: "vase.waveArches", lamellen: "vase.waveFins" },
+  twistAlong: { hoehe: "vase.twistAlongHeight", kontur: "vase.twistAlongContour" },
+  cutout: { keine: "vase.cutoutNone", voronoi: "vase.effectVoronoi", waben: "vase.cutoutHoneycomb", rauten: "vase.cutoutDiamonds", kreise: "vase.cutoutCircles" },
+  cutoutEdge: { anschneiden: "vase.cutoutCut", ganz: "vase.cutoutWhole" },
+  reinforce: { keine: "vase.reinforceNone", rippen: "vase.reinforceRibs", doppelwand: "vase.reinforceDouble" },
+  lamp: { keine: "vase.lampNone", haengend: "vase.lampHanging", stehend: "vase.lampStanding", puck: "vase.lampPuck" },
+  lampSocket: { e27: "vase.socketE27", e14: "vase.socketE14", eigen: "vase.socketCustom" },
+  legMode: { keine: "vase.legsNone", stecken: "vase.legsPlugIn", angeformt: "vase.legsMoulded", staender: "vase.legsStand" },
+  legShape: { kegel: "vase.legCone", zylinder: "vase.legCylinder", kantig: "vase.legSquare" },
+  saucerMode: { keine: "vase.saucerNone", schale: "vase.saucerBowl", versteckt: "vase.saucerHidden" },
+  insertMode: { keine: "vase.insertNone", pflanze: "vase.insertPlant", bewaesserung: "vase.insertWatering", stecker: "vase.insertFrog", roehrchen: "vase.insertTube" },
+  lidMode: { keiner: "vase.lidNone", stuelp: "vase.lidSlip", schnapp: "vase.lidSnap", schraube: "vase.lidScrew" },
+};
 const BENT_TUBE_PROFILE_OPTIONS: Array<{ value: BentTubeProfile; label: MessageKey }> = [
   { value: "round", label: "bentTube.profileRound" },
   { value: "square", label: "bentTube.profileSquare" },
@@ -440,7 +472,7 @@ const RELATIVE_SIZE_PROPERTY_IDS = new Set(["width", "height", "length", "diamet
 const ROTATION_PROPERTY_IDS = new Set(["rotateX", "rotateY", "rotateZ"]);
 
 function propertyUsesLengthUnit(key: string) {
-  return ["textLineWidth", "textEdgeSize", "letterSize", "iconWidth", "keyringDiameter", "keyringAlong", "positionX", "positionY", "positionZ", "pivotX", "pivotY", "pivotZ", "radius", "length", "width", "height", "sketchCuttingEdge", "bevel", "topRadius", "baseRadius", "thickness", "outerDiameter", "innerDiameter", "textRadius", "extrudeTopOffsetX", "extrudeTopOffsetZ", "toothSize", "toothWidth", "gearBacklash", "centerHole", "slotSmallEnd", "slotCentreDistance", "sketchLineWidth", "topLength", "topWidth", "bottomLength", "bottomWidth", "diameter", "pitch", "clearance", "axialClearance", "boltClearance", "threadDepth", "threadCoreDiameter", "threadLength", "headHeight", "chamfer", "chamferBottom", "headChamfer", "wire", "starOuterSize", "starInnerSize", "starOuterFillet", "starInnerFillet", "heartTipFillet", "crescentThickness", "crescentTipFillet", "honeycombCellSize", "honeycombWallThickness", "honeycombFrameWidth", "cornerFillet", "topBottomFillet", "bentTubeSize", "bentTubeWall", "bentTubeSegmentLength", "bentTubeBendRadius", "dovetailNeckWidth", "dovetailClearance", "hingePinDiameter", "hingeLeafThickness", "hingeClearance", "screwHoleShaft", "screwHoleHeadDepth", "knurlDepth", "knurlChamfer", "loftBottomWidth", "loftBottomDepth", "loftTopWidth", "loftTopDepth", "loftBottomCorner", "loftTopCorner", "loftOffsetX", "loftOffsetZ", "loftWall", "gridfinityLabelBackLength", "gridfinityLabelBackOffset", "gridfinityLabelBackWidth", "gridfinityLabelCornerSize", "gridfinityLabelFrontLength", "gridfinityLabelFrontOffset", "gridfinityLabelFrontWidth", "gridfinityLabelLeftLength", "gridfinityLabelLeftOffset", "gridfinityLabelLeftWidth", "gridfinityLabelRightLength", "gridfinityLabelRightOffset", "gridfinityLabelRightWidth", "gridfinityScoopRadius", "gridfinityFloorHeight", "gridfinityLipChamfer", "gridfinityWallThickness", "gridfinityDrawerWidth", "gridfinityDrawerDepth", "gridfinityPaddingBack", "gridfinityPaddingFront", "gridfinityPaddingLeft", "gridfinityPaddingRight", "gridfinityCornerRadius", "gridfinityDividerThickness", "gridfinityDividerPositionX", "gridfinityDividerPositionZ", "gridfinityCompartmentLabelWidth", "gridfinityOpeningCornerSize", "gridfinityOpeningDepthBack", "gridfinityOpeningDepthFront", "gridfinityOpeningDepthLeft", "gridfinityOpeningDepthRight", "gridfinityOpeningWidthBack", "gridfinityOpeningWidthFront", "gridfinityOpeningWidthLeft", "gridfinityOpeningWidthRight", "gridfinityOpeningDistanceBack", "gridfinityOpeningDistanceFront", "gridfinityOpeningDistanceLeft", "gridfinityOpeningDistanceRight"].includes(key);
+  return ["vase.wall", "vase.bottom", "vase.ribDepth", "vase.stripeDepth", "vase.voronoiCell", "vase.voronoiGap", "vase.voronoiDepth", "vase.waveAmplitude", "vaseFloor.drainDiameter", "vaseFloor.floorSlope", "vaseFloor.footHeight", "vaseFloor.rubberFootDiameter", "vaseFloor.rubberFootDepth", "vaseFloor.cutoutSize", "vaseFloor.cutoutWeb", "vaseFloor.lampHole", "vaseFloor.puckDiameter", "vaseFloor.lampNotch", "vaseFloor.lampNotchHeight", "vaseFloor.reinforceDepth", "vaseFloor.slitWidth", "vaseFloor.lineWidth", "vasePrint.lineWidth", "vaseParts.legHeight", "vaseParts.legDiameter", "vaseParts.saucerHeight", "vaseParts.saucerGap", "vaseParts.saucerWall", "vaseParts.insertWall", "vaseParts.insertStandoff", "vaseParts.reservoirHeight", "vaseParts.frogHole", "vaseParts.tubeDiameter", "vaseParts.lidClearance", "vaseParts.lidThickness", "vaseParts.lidDepth", "vaseParts.threadPitch", "vaseParts.fitClearance", "textLineWidth", "textEdgeSize", "letterSize", "iconWidth", "keyringDiameter", "keyringAlong", "positionX", "positionY", "positionZ", "pivotX", "pivotY", "pivotZ", "radius", "length", "width", "height", "sketchCuttingEdge", "bevel", "topRadius", "baseRadius", "thickness", "outerDiameter", "innerDiameter", "textRadius", "extrudeTopOffsetX", "extrudeTopOffsetZ", "toothSize", "toothWidth", "gearBacklash", "centerHole", "slotSmallEnd", "slotCentreDistance", "sketchLineWidth", "topLength", "topWidth", "bottomLength", "bottomWidth", "diameter", "pitch", "clearance", "axialClearance", "boltClearance", "threadDepth", "threadCoreDiameter", "threadLength", "headHeight", "chamfer", "chamferBottom", "headChamfer", "wire", "starOuterSize", "starInnerSize", "starOuterFillet", "starInnerFillet", "heartTipFillet", "crescentThickness", "crescentTipFillet", "honeycombCellSize", "honeycombWallThickness", "honeycombFrameWidth", "cornerFillet", "topBottomFillet", "bentTubeSize", "bentTubeWall", "bentTubeSegmentLength", "bentTubeBendRadius", "dovetailNeckWidth", "dovetailClearance", "hingePinDiameter", "hingeLeafThickness", "hingeClearance", "screwHoleShaft", "screwHoleHeadDepth", "knurlDepth", "knurlChamfer", "loftBottomWidth", "loftBottomDepth", "loftTopWidth", "loftTopDepth", "loftBottomCorner", "loftTopCorner", "loftOffsetX", "loftOffsetZ", "loftWall", "gridfinityLabelBackLength", "gridfinityLabelBackOffset", "gridfinityLabelBackWidth", "gridfinityLabelCornerSize", "gridfinityLabelFrontLength", "gridfinityLabelFrontOffset", "gridfinityLabelFrontWidth", "gridfinityLabelLeftLength", "gridfinityLabelLeftOffset", "gridfinityLabelLeftWidth", "gridfinityLabelRightLength", "gridfinityLabelRightOffset", "gridfinityLabelRightWidth", "gridfinityScoopRadius", "gridfinityFloorHeight", "gridfinityLipChamfer", "gridfinityWallThickness", "gridfinityDrawerWidth", "gridfinityDrawerDepth", "gridfinityPaddingBack", "gridfinityPaddingFront", "gridfinityPaddingLeft", "gridfinityPaddingRight", "gridfinityCornerRadius", "gridfinityDividerThickness", "gridfinityDividerPositionX", "gridfinityDividerPositionZ", "gridfinityCompartmentLabelWidth", "gridfinityOpeningCornerSize", "gridfinityOpeningDepthBack", "gridfinityOpeningDepthFront", "gridfinityOpeningDepthLeft", "gridfinityOpeningDepthRight", "gridfinityOpeningWidthBack", "gridfinityOpeningWidthFront", "gridfinityOpeningWidthLeft", "gridfinityOpeningWidthRight", "gridfinityOpeningDistanceBack", "gridfinityOpeningDistanceFront", "gridfinityOpeningDistanceLeft", "gridfinityOpeningDistanceRight"].includes(key);
 }
 
 /**
@@ -958,6 +990,169 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
       { id: "height", label: t("prop.height"), value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
       ...roundSideProperties(shape, width, width, onUpdate),
     ];
+  }
+
+  if (shape.kind === "vase") {
+    const vase = normalizeVaseSettings(shape.vase);
+    // A new choice can change the outline (a hexagon is narrower across its flats): the frame follows it.
+    const setVase = (patch: Partial<VaseSettings>) => onUpdate(vaseShapePatch({ width, depth, height: shape.height }, normalizeVaseSettings({ ...vase, ...patch })));
+    const limits = (key: VaseNumberKey): [number, number] => VASE_LIMITS[key] ?? [0, 100];
+    const range = (key: VaseNumberKey, label: MessageKey, step: number, hint?: MessageKey): ShapePropertyConfig => {
+      const [min, max] = limits(key);
+      return { id: `vase.${key}`, label: t(label), value: vase[key], min, max, step, hint: hint ? t(hint) : undefined, onChange: (value) => setVase({ [key]: value }) };
+    };
+    const percent = (key: VaseNumberKey, label: MessageKey): ShapePropertyConfig => {
+      const [min, max] = limits(key);
+      return { id: `vase.${key}`, label: t(label), value: Math.round(vase[key] * 100), min: min * 100, max: max * 100, step: 1, onChange: (value) => setVase({ [key]: value / 100 }) };
+    };
+    const choice = (key: VaseChoiceKey, label: MessageKey, hint?: MessageKey): ShapePropertyConfig => ({
+      type: "select",
+      id: `vase.${key}`,
+      label: t(label),
+      value: vase[key],
+      options: Object.entries(VASE_CHOICES[key] ?? {}).map(([value, option]) => ({ value, label: t(option) })),
+      hint: hint ? t(hint) : undefined,
+      onChange: (value) => setVase({ [key]: value }),
+    });
+    const size = Math.max(width, depth);
+    const properties: ShapePropertyConfig[] = [
+      {
+        id: "diameter",
+        label: t("prop.vaseDiameter"),
+        value: size,
+        min: MIN_SHAPE_SIZE,
+        max: 300,
+        // Both sides together, so an outline that is not round keeps its proportions.
+        onChange: (value) => onUpdate({ width: (width * value) / size, depth: (depth * value) / size, size: value }, { resizeAxis: "width" }),
+      },
+      { id: "height", label: t("prop.height"), value: shape.height, min: MIN_SHAPE_SIZE, max: 400, onChange: setHeight },
+      choice("profile", "prop.vaseProfile"),
+      choice("section", "prop.vaseSection"),
+    ];
+    if (vase.section === "vieleck") properties.push(range("polySides", "prop.vaseSides", 1), percent("polyRound", "prop.vaseCornerRound"));
+    if (vase.section === "welle") properties.push(range("sectionWaves", "prop.vaseWaves", 1), percent("sectionWaveAmp", "prop.vaseWaveDepth"), choice("sectionWaveStyle", "prop.vaseWaveStyle"));
+    properties.push(choice("section2", "prop.vaseSection2", "vase.section2Hint"));
+    if (vase.section2 === "vieleck") properties.push(range("section2Sides", "prop.vaseSides2", 1), percent("section2Round", "prop.vaseCornerRound2"));
+    if (vase.section2 === "welle") properties.push(range("section2Waves", "prop.vaseWaves2", 1), percent("section2WaveAmp", "prop.vaseWaveDepth2"), choice("section2WaveStyle", "prop.vaseWaveStyle2"));
+    if (vase.section2 !== "keiner") properties.push(range("section2From", "prop.vaseSection2From", 1), range("section2To", "prop.vaseSection2To", 1));
+    // A drawn cross-section: the symmetry that makes the whole outline of the part drawn (card Draw).
+    if (vase.section === "gezeichnet" || vase.section2 === "gezeichnet") {
+      properties.push(choice("drawSymmetry", "prop.vaseDrawSymmetry", "vase.drawSymmetryHint"));
+      if (vase.drawSymmetry === "windmuehle") properties.push(range("drawRepeat", "prop.vaseDrawRepeat", 1));
+    }
+    // A twist as a curve is drawn (card Draw); evenly, it comes from these sliders.
+    properties.push(choice("twistMode", "prop.vaseTwistMode"));
+    if (vase.twistMode !== "kurve") {
+      properties.push(range("twist", "prop.vaseTwist", 1), range("swayAngle", "prop.vaseSway", 1, "vase.swayHint"));
+      if (vase.swayAngle > 0) properties.push(range("swayCount", "prop.vaseSwayCount", 1));
+    }
+    if (vase.twistMode === "kurve" || vase.twist !== 0 || vase.swayAngle > 0) properties.push(choice("twistAlong", "prop.vaseTwistAlong"));
+    properties.push(choice("body", "prop.vaseBody", vase.body === "voll" ? "vase.bodySolidHint" : "vase.bodyHollowHint"));
+    if (vase.body === "hohl") properties.push(range("wall", "prop.vaseWall", 0.1), range("bottom", "prop.vaseBottom", 0.1), choice("innerShape", "prop.vaseInner"));
+    properties.push(choice("effect", "prop.vaseEffect", "vase.effectHint"));
+    if (vase.effect === "rillen") {
+      properties.push(range("ribCount", "prop.vaseGrooveCount", 1), range("ribDepth", "prop.vaseGrooveDepth", 0.1), percent("grooveWidth", "prop.vaseGrooveWidth"), choice("ribShape", "prop.vaseGrooveShape"), range("waveAmplitude", "prop.vaseGrooveWave", 0.5));
+      if (vase.waveAmplitude > 0) properties.push(range("waveCount", "prop.vaseGrooveWaves", 1));
+    }
+    if (vase.effect === "streifen") properties.push(range("stripeCount", "prop.vaseStripeCount", 1), range("stripeDepth", "prop.vaseStripeDepth", 0.1), percent("stripeWidth", "prop.vaseStripeWidth"), range("stripeTurn", "prop.vaseStripeTurn", 1), choice("stripeStyle", "prop.vaseStripeStyle"));
+    if (vase.effect === "voronoi") properties.push(range("voronoiCell", "prop.vaseCellSize", 0.5), range("voronoiGap", "prop.vaseCellGap", 0.1), range("voronoiDepth", "prop.vaseCellDepth", 0.1), range("voronoiSeed", "prop.vaseSeed", 1));
+    if (vase.effect === "lowpoly") properties.push(range("lowpolyAround", "prop.vaseFacetsAround", 1), range("lowpolyRows", "prop.vaseFacetRows", 1), percent("lowpolyJitter", "prop.vaseFacetJitter"), range("lowpolySeed", "prop.vaseSeed", 1));
+    if (vase.effect !== "keine" && vase.effect !== "lowpoly") properties.push(range("zoneFrom", "prop.vaseZoneFrom", 1), range("zoneTo", "prop.vaseZoneTo", 1));
+    properties.push(choice("quality", "prop.vaseQuality", "vase.qualityHint"));
+    // Bottom and wall, on a card of their own (ids "vaseFloor."): what the core builds into the body besides its form.
+    const floor = (config: ShapePropertyConfig): ShapePropertyConfig => ({ ...config, id: config.id.replace(/^vase\./, "vaseFloor.") });
+    const hollow = vase.body === "hohl";
+    properties.push(floor({
+      type: "toggle",
+      id: "vase.watertight",
+      label: t("prop.vaseWatertight"),
+      value: vase.watertight === "ja",
+      onChange: (value) => setVase({ watertight: value ? "ja" : "nein" }),
+    }));
+    if (hollow) {
+      properties.push(floor(range("drainHoles", "prop.vaseDrainHoles", 1, "vase.floorHint")));
+      if (vase.drainHoles > 0) properties.push(floor(range("drainDiameter", "prop.vaseDrainDiameter", 0.5)), floor(range("floorSlope", "prop.vaseFloorSlope", 0.1)));
+      if (vase.lamp !== "puck") properties.push(floor(range("footHeight", "prop.vaseFootHeight", 1)));
+    }
+    properties.push(floor(range("rubberFeet", "prop.vaseRubberFeet", 1)));
+    if (vase.rubberFeet > 0) properties.push(floor(range("rubberFootDiameter", "prop.vaseRubberFootDiameter", 0.5)), floor(range("rubberFootDepth", "prop.vaseRubberFootDepth", 0.1)));
+    if (hollow) {
+      properties.push(floor(choice("cutout", "prop.vaseCutout", "vase.cutoutHint")));
+      if (vase.cutout !== "keine") {
+        properties.push(
+          floor(range("cutoutSize", "prop.vaseCutoutSize", 0.5)),
+          floor(range("cutoutWeb", "prop.vaseCutoutWeb", 0.5)),
+          floor(range("cutoutFrom", "prop.vaseCutoutFrom", 1)),
+          floor(range("cutoutTo", "prop.vaseCutoutTo", 1)),
+          floor(range("cutoutAspect", "prop.vaseCutoutAspect", 0.05)),
+          floor(choice("cutoutEdge", "prop.vaseCutoutEdge")),
+        );
+        if (vase.cutout === "voronoi") properties.push(floor(range("cutoutSeed", "prop.vaseSeed", 1)));
+      }
+      properties.push(floor(choice("lamp", "prop.vaseLamp", "vase.lampHint")));
+      if (vase.lamp === "haengend" || vase.lamp === "stehend") {
+        properties.push(floor(choice("lampSocket", "prop.vaseLampSocket")));
+        if (vase.lampSocket === "eigen") properties.push(floor(range("lampHole", "prop.vaseLampHole", 0.5)));
+      }
+      if (vase.lamp === "puck") properties.push(floor(range("puckDiameter", "prop.vasePuckDiameter", 1)));
+      if (vase.lamp === "stehend" || vase.lamp === "puck") {
+        properties.push(floor(range("lampNotch", "prop.vaseLampNotch", 0.5)));
+        if (vase.lampNotch > 0) properties.push(floor(range("lampNotchHeight", "prop.vaseLampNotchHeight", 0.5)));
+      }
+    } else {
+      properties.push(floor(choice("reinforce", "prop.vaseReinforce", "vase.reinforceHint")));
+      if (vase.reinforce !== "keine") {
+        properties.push(
+          floor(range("reinforceCount", "prop.vaseReinforceCount", 1)),
+          floor(range("reinforceDepth", vase.reinforce === "rippen" ? "prop.vaseRibReach" : "prop.vaseWallGap", 0.5)),
+          floor(range("slitWidth", "prop.vaseSlitWidth", 0.01)),
+          floor(range("lineWidth", "prop.vaseLineWidth", 0.01)),
+        );
+      }
+    }
+    // Accessories, on a card of their own (ids "vaseParts."): the legs' sockets, a lid's groove or thread go into the body.
+    const part = (config: ShapePropertyConfig): ShapePropertyConfig => ({ ...config, id: config.id.replace(/^vase\./, "vaseParts.") });
+    const yesNo = (key: VaseChoiceKey, label: MessageKey): ShapePropertyConfig => part({
+      type: "toggle",
+      id: `vase.${key}`,
+      label: t(label),
+      value: vase[key] === "ja",
+      onChange: (value) => setVase({ [key]: value ? "ja" : "nein" }),
+    });
+    properties.push(part(choice("legMode", "prop.vaseLegs")));
+    if (vase.legMode !== "keine") {
+      properties.push(part(range("legCount", "prop.vaseLegCount", 1)), part(range("legHeight", "prop.vaseLegHeight", 1)), part(range("legDiameter", "prop.vaseLegDiameter", 0.5)), part(choice("legShape", "prop.vaseLegShape")), part(range("legSplay", "prop.vaseLegSplay", 1)));
+      if (vase.legMode !== "staender") properties.push(part(percent("legInset", "prop.vaseLegInset")));
+    }
+    properties.push(part(choice("saucerMode", "prop.vaseSaucer")));
+    if (vase.saucerMode === "schale") {
+      properties.push(part(range("saucerHeight", "prop.vaseSaucerHeight", 1)), part(range("saucerGap", "prop.vaseSaucerGap", 0.5)), part(range("saucerWall", "prop.vaseSaucerWall", 0.1)), yesNo("saucerRibs", "prop.vaseSaucerRibs"), yesNo("saucerSpout", "prop.vaseSaucerSpout"), yesNo("saucerGrip", "prop.vaseSaucerGrip"));
+    }
+    if (hollow) {
+      properties.push(part(choice("insertMode", "prop.vaseInsert")));
+      if (vase.insertMode === "pflanze" || vase.insertMode === "bewaesserung") properties.push(part(range("insertWall", "prop.vaseInsertWall", 0.1)), part(range("insertStandoff", "prop.vaseInsertStandoff", 0.5)));
+      if (vase.insertMode === "bewaesserung") properties.push(part(range("reservoirHeight", "prop.vaseReservoirHeight", 1)));
+      if (vase.insertMode === "stecker") properties.push(part(range("frogHole", "prop.vaseFrogHole", 0.5)));
+      if (vase.insertMode === "roehrchen") properties.push(part(range("tubeDiameter", "prop.vaseTubeDiameter", 0.5)));
+    }
+    properties.push(part(choice("lidMode", "prop.vaseLid", "vase.lidHint")));
+    if (vase.lidMode !== "keiner") {
+      properties.push(part(range("lidClearance", "prop.vaseLidClearance", 0.05)), part(range("lidThickness", "prop.vaseLidThickness", 0.1)), part(range("lidDepth", "prop.vaseLidDepth", 0.5)));
+      if (vase.lidMode === "schraube") properties.push(part(range("threadPitch", "prop.vaseThreadPitch", 0.1)));
+      properties.push(yesNo("lidGrip", "prop.vaseLidGrip"));
+    }
+    properties.push(part(range("fitClearance", "prop.vaseFitClearance", 0.05, "vase.fitHint")));
+    // Printing (ids "vasePrint."): the material weighs it, the line width counts in the slicer's vase mode.
+    properties.push({
+      type: "select",
+      id: "vasePrint.material",
+      label: t("prop.vaseMaterial"),
+      value: vase.material,
+      options: Object.entries(VASE_MATERIALS).map(([value, material]) => ({ value, label: material.label })),
+      onChange: (value) => setVase({ material: value }),
+    });
+    if (vase.body === "voll" && vase.reinforce === "keine") properties.push({ ...range("lineWidth", "prop.vaseLineWidth", 0.01), id: "vasePrint.lineWidth" });
+    return properties;
   }
 
   if (shape.kind === "knurl") {
@@ -2484,6 +2679,7 @@ export function ShapeInspector({
   canSeparateParts = false,
   onSeparateParts,
   onWrapAroundCylinder,
+  onVaseAccessories,
   onLayerText,
   onTextTags,
   onFixKeyringTab,
@@ -2513,6 +2709,8 @@ export function ShapeInspector({
   onSeparateParts?: () => void;
   /** Wraps this body around a cylinder of the given diameter (#106). */
   onWrapAroundCylinder?: (diameter: number, inward: boolean) => void;
+  /** Lays this vase's accessories out beside it, ready to print. */
+  onVaseAccessories?: () => void;
   /** Splits a text into layers, or builds a layered text again with new words, font or layers (#215). */
   onLayerText?: (patch: TextLayerPatch) => void;
   /** One tag like this text or stack per name, laid out in rows (#215). */
@@ -2574,7 +2772,14 @@ export function ShapeInspector({
   const showTaperCards = !shapeIgnoresTaper && !shape.layeredText;
   const threadRoleProperty = isThread ? findSelectProperty(properties, "threadRole") : null;
   const threadHeadProperty = isThread ? findSelectProperty(properties, "threadHead") : null;
-  const primaryProperties = shape.kind === "gear"
+  // A vase: its measures here, its form and pattern and its bottom and wall on cards of their own.
+  const vaseFormProperties = shape.kind === "vase" ? properties.filter((property) => property.id.startsWith("vase.")) : [];
+  const vaseFloorProperties = shape.kind === "vase" ? properties.filter((property) => property.id.startsWith("vaseFloor.")) : [];
+  const vasePrintProperties = shape.kind === "vase" ? properties.filter((property) => property.id.startsWith("vasePrint.")) : [];
+  const vasePartProperties = shape.kind === "vase" ? properties.filter((property) => property.id.startsWith("vaseParts.")) : [];
+  const primaryProperties = shape.kind === "vase"
+    ? properties.filter((property) => !property.id.startsWith("vase"))
+    : shape.kind === "gear"
     ? properties.filter((property) => ["centerHole", "length", "width", "height"].includes(property.id))
     : isThread
       ? properties.filter((property) => ["threadSize", "diameter", "threadLength", "headHeight", "headChamfer"].includes(property.id))
@@ -2723,6 +2928,13 @@ export function ShapeInspector({
   const [taperOpen, setTaperOpen] = useInspectorCard("taper", false);
   const [twistOpen, setTwistOpen] = useInspectorCard("twist", false);
   const [gearTeethOpen, setGearTeethOpen] = useInspectorCard("gearTeeth", false);
+  const [vaseFormOpen, setVaseFormOpen] = useInspectorCard("vaseForm", true);
+  const [vaseFloorOpen, setVaseFloorOpen] = useInspectorCard("vaseFloor", false);
+  const [vasePartsOpen, setVasePartsOpen] = useInspectorCard("vaseParts", false);
+  const [vasePrintOpen, setVasePrintOpen] = useInspectorCard("vasePrint", false);
+  // The window to draw the vase in; another body selected closes it.
+  const [vaseDrawOpen, setVaseDrawOpen] = useState(false);
+  useEffect(() => setVaseDrawOpen(false), [shape.id]);
   const [threadOpen, setThreadOpen] = useInspectorCard("thread", false);
   const [gearHelixOpen, setGearHelixOpen] = useInspectorCard("gearHelix", false);
   const [colorOpen, setColorOpen] = useState(false);
@@ -2931,6 +3143,16 @@ export function ShapeInspector({
             onToggleKeep={toggleKeptColor}
           />
         </div>
+      ) : null}
+
+      {shape.kind === "vase" ? (
+        <button className="edit-sketch-button" type="button" disabled={locked} aria-pressed={vaseDrawOpen} onClick={() => setVaseDrawOpen((open) => !open)}>
+          <Pencil size={17} strokeWidth={2.5} />
+          <span>{t("inspector.vaseDraw")}</span>
+        </button>
+      ) : null}
+      {shape.kind === "vase" && vaseDrawOpen ? (
+        <VaseDrawingWindow shape={shape} disabled={locked} onUpdate={onUpdate} onInteractionActiveChange={onInteractionActiveChange} onClose={() => setVaseDrawOpen(false)} />
       ) : null}
 
       {shape.sketchProfile && onEditSketch ? (
@@ -3217,6 +3439,64 @@ export function ShapeInspector({
             </div>
           ) : null}
         </div>
+      ) : null}
+      {shape.kind === "vase" ? (
+        <>
+          <div className={`property-card ${vaseFormOpen ? "" : "collapsed"}`}>
+            <button className="property-card-header" type="button" aria-expanded={vaseFormOpen} aria-controls={`vase-form-${shape.id}`} onClick={() => setVaseFormOpen((open) => !open)}>
+              <span>{t("inspector.vaseForm")}</span>
+              <ChevronUp className={vaseFormOpen ? "" : "collapsed"} size={25} strokeWidth={2.8} />
+            </button>
+            {vaseFormOpen ? (
+              <div className="property-list" id={`vase-form-${shape.id}`}>
+                <ShapePropertyRows properties={vaseFormProperties} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+              </div>
+            ) : null}
+          </div>
+          <div className={`property-card ${vaseFloorOpen ? "" : "collapsed"}`}>
+            <button className="property-card-header" type="button" aria-expanded={vaseFloorOpen} aria-controls={`vase-floor-${shape.id}`} onClick={() => setVaseFloorOpen((open) => !open)}>
+              <span>{t("inspector.vaseFloor")}</span>
+              <ChevronUp className={vaseFloorOpen ? "" : "collapsed"} size={25} strokeWidth={2.8} />
+            </button>
+            {vaseFloorOpen ? (
+              <div className="property-list" id={`vase-floor-${shape.id}`}>
+                <ShapePropertyRows properties={vaseFloorProperties} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+              </div>
+            ) : null}
+          </div>
+          <div className={`property-card ${vasePartsOpen ? "" : "collapsed"}`}>
+            <button className="property-card-header" type="button" aria-expanded={vasePartsOpen} aria-controls={`vase-parts-${shape.id}`} onClick={() => setVasePartsOpen((open) => !open)}>
+              <span>{t("inspector.vaseParts")}</span>
+              <ChevronUp className={vasePartsOpen ? "" : "collapsed"} size={25} strokeWidth={2.8} />
+            </button>
+            {vasePartsOpen ? (
+              <div className="property-list" id={`vase-parts-${shape.id}`}>
+                <ShapePropertyRows properties={vasePartProperties} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+                {onVaseAccessories ? (
+                  <>
+                    <p className="cylinder-wrap-hint">{t("inspector.vasePartsHint")}</p>
+                    <button className="inspector-action-button" type="button" disabled={locked} onClick={onVaseAccessories}>
+                      <Plus size={17} strokeWidth={2.5} />
+                      <span>{t("inspector.vasePartsMake")}</span>
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className={`property-card ${vasePrintOpen ? "" : "collapsed"}`}>
+            <button className="property-card-header" type="button" aria-expanded={vasePrintOpen} aria-controls={`vase-print-${shape.id}`} onClick={() => setVasePrintOpen((open) => !open)}>
+              <span>{t("inspector.vasePrint")}</span>
+              <ChevronUp className={vasePrintOpen ? "" : "collapsed"} size={25} strokeWidth={2.8} />
+            </button>
+            {vasePrintOpen ? (
+              <div className="property-list" id={`vase-print-${shape.id}`}>
+                <ShapePropertyRows properties={vasePrintProperties} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+                <VasePrintReport shape={shape} />
+              </div>
+            ) : null}
+          </div>
+        </>
       ) : null}
       {shape.kind === "gear" ? (
         <div className={`property-card ${gearTeethOpen ? "" : "collapsed"}`}>

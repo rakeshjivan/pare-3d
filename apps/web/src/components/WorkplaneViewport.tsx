@@ -71,6 +71,7 @@ import { keepsProportionsOnAxis } from "@/lib/keepProportions";
 import { createHingeGeometry } from "@/lib/hingeGeometry";
 import { createGridfinityGeometry, gridfinityFootprintPatch } from "@/lib/gridfinityGeometry";
 import { createKnurlGeometry } from "@/lib/knurlGeometry";
+import { createVaseGeometry, fittedVaseMesh } from "@/lib/vaseShape";
 import { createTeardropGeometry } from "@/lib/teardropGeometry";
 import { createScrewHoleGeometry } from "@/lib/screwHoleGeometry";
 import { createHoneycombGeometry } from "@/lib/honeycombGeometry";
@@ -415,6 +416,8 @@ type WorkplaneViewportProps = {
   onSelectionHide?: () => void;
   /** Wraps the selected body around a cylinder of this diameter (#106). */
   onWrapAroundCylinder?: (diameter: number, inward: boolean) => void;
+  /** Lays the selected vase's accessories out beside it. */
+  onVaseAccessories?: () => void;
   onLayerText?: (patch: TextLayerPatch) => void;
   onTextTags?: (names: string[], gap: number) => void;
   /** Fixes the selected key ring tab to the nearest tag, where it was put (#598). */
@@ -1169,6 +1172,7 @@ export function tapeShapeTopologyKey(shape: WorkplaneShape): string {
     knurlDepth: shape.knurlDepth,
     knurlAngle: shape.knurlAngle,
     knurlChamfer: shape.knurlChamfer,
+    vase: shape.kind === "vase" ? JSON.stringify(shape.vase ?? null) : undefined,
     dovetailNeckWidth: shape.dovetailNeckWidth,
     dovetailClearance: shape.dovetailClearance,
     loftBottomOutline: shape.loftBottomOutline,
@@ -1484,6 +1488,7 @@ export function shapeGeometrySignature(shape: WorkplaneShape): string {
     knurlDepth: shape.knurlDepth,
     knurlAngle: shape.knurlAngle,
     knurlChamfer: shape.knurlChamfer,
+    vase: shape.kind === "vase" ? JSON.stringify(shape.vase ?? null) : undefined,
     dovetailNeckWidth: shape.dovetailNeckWidth,
     dovetailClearance: shape.dovetailClearance,
     loftBottomOutline: shape.loftBottomOutline,
@@ -3548,6 +3553,7 @@ export function WorkplaneViewport({
   onSelectionLock,
   onSelectionHide,
   onWrapAroundCylinder,
+  onVaseAccessories,
   onLayerText,
   onTextTags,
   onFixKeyringTab,
@@ -10992,6 +10998,7 @@ export function WorkplaneViewport({
           canSeparateParts={canSeparateParts}
           onSeparateParts={onSeparateParts}
           onWrapAroundCylinder={onWrapAroundCylinder}
+          onVaseAccessories={onVaseAccessories}
           onLayerText={onLayerText}
           onTextTags={onTextTags}
           onFixKeyringTab={onFixKeyringTab}
@@ -14942,6 +14949,9 @@ function createShapeObject(
     case "knurl":
       addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createKnurlGeometry({ width, height, knurlPattern: shape.knurlPattern, knurlCount: shape.knurlCount, knurlDepth: shape.knurlDepth, knurlAngle: shape.knurlAngle, knurlChamfer: shape.knurlChamfer })), material, shape);
       break;
+    case "vase":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createVaseGeometry({ width, depth, height, vase: shape.vase })), material, shape);
+      break;
     case "hinge":
       addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createHingeGeometry({
         width,
@@ -15498,7 +15508,9 @@ function addShapeEdgeDecorations(group: THREE.Group, mesh: THREE.Mesh, prepared:
     Boolean(shape.importedMesh) ||
     ["cone", "pyramid", "roof", "roundRoof", "halfSphere", "paraboloid", "torus", "tube", "ring", "star", "gear", "wedge", "polygon", "heart", "crescent", "slot", "dovetail", "hinge", "gridfinity", "knurl", "teardrop", "counterbore", "countersink", "doubleCountersink", "honeycomb", "loft"].includes(shape.kind);
   const importedTriangleCount = shape.importedMesh?.triangleCount ?? 0;
-  const skipHeavyImportedEdges = Boolean(shape.importedMesh) && importedTriangleCount > IMPORTED_SELECTED_EDGE_TRIANGLE_LIMIT;
+  // A vase's relief has an edge at every rib: drawn like a heavy imported mesh, without the lines.
+  const skipHeavyImportedEdges = (Boolean(shape.importedMesh) && importedTriangleCount > IMPORTED_SELECTED_EDGE_TRIANGLE_LIMIT)
+    || (shape.kind === "vase" && fittedVaseMesh(shape).triangleCount > IMPORTED_SELECTED_EDGE_TRIANGLE_LIMIT);
   // The setting draws a line on every body, in the colour chosen.
   // "Show holes more clearly" (#662) gives every hole that line too, darker.
   const allEdgeLines = (edgeLineStyle.enabled || (strongHoles && Boolean(shape.hole))) && importedTriangleCount <= ALL_EDGE_LINES_IMPORTED_TRIANGLE_LIMIT;

@@ -19,7 +19,7 @@ export const editorTargetSchema = {
  */
 export const creatableShapeKinds = [
   "box", "roundedBox", "cube", "cylinder", "slot", "ellipse", "polygon", "sphere", "cone", "pyramid", "wedge",
-  "roundRoof", "halfSphere", "paraboloid", "torus", "loft", "tube", "bentTube", "star", "heart", "crescent", "text", "thread", "spring", "gridfinity", "gear",
+  "roundRoof", "halfSphere", "paraboloid", "torus", "loft", "vase", "tube", "bentTube", "star", "heart", "crescent", "text", "thread", "spring", "gridfinity", "gear",
   "hinge", "knurl", "dovetail", "counterbore", "countersink", "doubleCountersink", "teardrop", "ruler", "sketch",
 ];
 
@@ -261,6 +261,10 @@ export const shapeSettingSchema = {
     },
     description: "Bent tube only: the chain of segments, each a straight run followed by an arc bend. The tube starts along +X; roll 0 bends within the workplane, roll 90 bends upward. layerling_read_scene reports this list as JSON text, which is accepted here as well.",
   },
+  vase: {
+    type: ["object", "string"],
+    description: "Vase only: its settings, by the vase tool's own (German) names, for example { profile: \"bauchig\" (or flasche, schale, fass, zylinder, trichter), section: \"vieleck\" (or kreis, welle), polySides: 6, sectionWaves: 12, sectionWaveStyle: \"weich\" (or spitz, bogen, lamellen), twist: 90, swayAngle: 10, body: \"voll\" (one wall for the slicer's vase mode) or \"hohl\" with wall and bottom in mm, effect: \"rillen\" (or keine, streifen, voronoi, lowpoly), ribCount: 48, ribDepth: 1.6, stripeCount, voronoiCell, lowpolyAround, zoneFrom/zoneTo in % of the height, quality: \"entwurf\", \"standard\" or \"fein\" }. Also: section2 (a second cross-section the first blends into, between section2From and section2To %), waveAmplitude/waveCount (winding grooves), and bottom and wall: watertight: \"ja\", drainHoles, drainDiameter, floorSlope, footHeight, rubberFeet, cutout (keine, voronoi, waben, rauten, kreise; cutoutSize, cutoutWeb, cutoutFrom, cutoutTo) and lamp (keine, haengend, stehend, puck; lampSocket e27, e14 or eigen with lampHole) for a hollow vase, reinforce (keine, rippen, doppelwand; reinforceCount, reinforceDepth) for a solid one. Drawn shapes: profile \"gezeichnet\" with profilePoints [[height 0..1, radius 0..1, kind?, slope?], ...] (kind 1 a corner, 2 a handle with its slope; the widest point is the diameter), section or section2 \"gezeichnet\" with drawSymmetry (halb, viertel, windmuehle with drawRepeat blades, frei) and drawPoints [{ x, y, corner, tx?, ty? }, ...] in the unit circle (the part the symmetry repeats), twistMode \"kurve\" with twistPoints [[height 0..1, angle in degrees, kind?, slope?], ...]. Accessories: legMode (keine, stecken = legs to plug in, angeformt = moulded on, staender = a stand; legCount, legHeight, legDiameter, legShape kegel/zylinder/kantig, legSplay, legInset), saucerMode (keine, schale = a saucer, versteckt = hidden in the foot; saucerHeight, saucerGap, saucerWall, saucerRibs/saucerSpout/saucerGrip \"ja\" or \"nein\"), insertMode (keine, pflanze, bewaesserung, stecker, roehrchen; insertWall, insertStandoff, reservoirHeight, frogHole, tubeDiameter) for a hollow vase, lidMode (keiner, stuelp, schnapp, schraube; lidClearance, lidThickness, lidDepth, threadPitch, lidGrip) and fitClearance; vaseParts lays them out as objects. For printing: material (pla, petg, abs, asa, tpu) and lineWidth (the slicer's line in vase mode, mm), which the editor's Print card weighs. Settings not given stay as they were (when creating: the vase tool's defaults). The height is the object's height and the widest diameter its larger side; the other side follows the outline. layerling_read_scene reports the settings that differ from the defaults as JSON text, which is accepted here as well.",
+  },
   text: { type: "string", description: "Text only: the lettering itself." },
   font: { type: "string", description: "Text only: a built-in font (Multilanguage, Sans, Serif, Script, Monospace, Rounded, Stencil), or a font of one's own by its id (custom:...) or its name, as layerling_list_fonts gives them." },
   textCurved: { type: "boolean", description: "Text only: true bends the line along a circle. Width and depth then follow radius and letter size." },
@@ -355,6 +359,7 @@ export const tools = [
         },
         silhouette: { type: "boolean", description: "For kind sketch and kind text: leave out every outline inside another - holes, and islands in them; on a text the counters of O, A and e - so only the outermost outlines count, as Tinkercad's Silhouette." },
         ...shapeSettingSchema,
+        vaseParts: { type: "boolean", description: "Vase only: true also lays out the vase's accessories (legs to plug in, a stand, a saucer, an insert, a lid, as its settings ask for) as objects of their own beside it, ready to print; the ones laid out for this vase before are replaced. Returns them as parts; accessories this vase does not allow (an insert through a narrow neck) are listed as notPossible." },
         ...threadSizeSetting,
       },
     },
@@ -488,6 +493,7 @@ export const tools = [
         rotationX: { type: "number" },
         rotationZ: { type: "number" },
         ...shapeSettingSchema,
+        vaseParts: { type: "boolean", description: "Vase only: true also lays out the vase's accessories (legs to plug in, a stand, a saucer, an insert, a lid, as its settings ask for) as objects of their own beside it, ready to print; the ones laid out for this vase before are replaced. Returns them as parts; accessories this vase does not allow (an insert through a narrow neck) are listed as notPossible." },
         ...threadSizeSetting,
       },
     },
