@@ -5,12 +5,12 @@ import { CAD_MODIFIER_RUNTIME_BASE } from "@/lib/cadModifierRuntime";
 import { sketchCadDeflection } from "@/lib/sketchCadDeflection";
 import { cadSketchRegions } from "@/lib/sketchCadProfile";
 import { buildRevolvedSketchSolid } from "@/lib/cadSketchRevolve";
-import { buildStrokedSketchSolid } from "@/lib/cadSketchStroke";
+import { buildStrokedSketchSolid, chamferTopEdges } from "@/lib/cadSketchStroke";
 import { buildSweptSketchSolid } from "@/lib/cadSketchSweep";
 import { buildInsetSketchSolid } from "@/lib/cadSketchInset";
 import { pathWire } from "@/lib/sketchCadWire";
 import { buildMessage } from "@/lib/buildStamp";
-import { SKETCH_INSET_UNSUPPORTED, SKETCH_STROKE_UNSUPPORTED, type SketchCadBuildRequest, type SketchCadBuildResponse } from "@/lib/sketchCadTypes";
+import { SKETCH_EDGE_FAILED, SKETCH_INSET_UNSUPPORTED, SKETCH_STROKE_UNSUPPORTED, type SketchCadBuildRequest, type SketchCadBuildResponse } from "@/lib/sketchCadTypes";
 
 /** Past this many edges in a sketch's outlines the kernel's validity check is skipped (it takes seconds to minutes there). */
 const LARGE_SKETCH_EDGES = 1500;
@@ -78,6 +78,11 @@ self.onmessage = async (event: MessageEvent<SketchCadBuildRequest>) => {
       const edgeCount = regions.reduce((sum, region) => sum + region.outer.steps.length + region.holes.reduce((inner, hole) => inner + hole.steps.length, 0), 0);
       const sound = edgeCount > LARGE_SKETCH_EDGES ? cad.getVolume(result) > 1e-9 : cad.isValid(result);
       if (!sound) throw new Error("OpenCascade produced invalid sketch topology");
+    }
+    if (request.topChamfer && !request.revolve && !request.sweep) {
+      const chamfered = chamferTopEdges(cad, result, request.height, request.topChamfer);
+      if (!chamfered) throw new Error(SKETCH_EDGE_FAILED);
+      result = chamfered;
     }
     const deflection = sketchCadDeflection(request.profile);
     const mesh = cad.tessellate(result, { linearDeflection: deflection.linear, angularDeflection: deflection.angular });

@@ -12794,7 +12794,14 @@ export function LayerlingEditor({
       const color = targets[0].color;
       const build = async (profile: SketchProfile, height: number, name: string) =>
         canonicalizeShape({ ...place(await cadShapeFromSketchProfile(profile, height, single)), id: createLocalId("cutter"), name, color, hole: false });
-      const wall = await build(profiles.wall, options.height, "Wall");
+      // An outline with steps shorter than the edge's chamfer cannot take it; the cutter is built with a flat top then, and says so.
+      let edgeLeftOut = false;
+      const wall = await build(profiles.wall, options.height, "Wall").catch((error: unknown) => {
+        if (!(error instanceof Error && error.message === t("sketch.edgeFailed")) || !profiles.wall.stroke) throw error;
+        edgeLeftOut = true;
+        const { edge: _edge, ...flat } = profiles.wall.stroke;
+        return build({ ...profiles.wall, stroke: flat }, options.height, "Wall");
+      });
       const rim = await build(profiles.rim, options.rimHeight, "Rim");
       if (projectInfoRef.current.projectId !== sourceProjectId || projectShapesFingerprint(shapesRef.current) !== sourceFingerprint) {
         return fail(t("status.cookieCutterChanged"));
@@ -12803,8 +12810,8 @@ export function LayerlingEditor({
       if (!group) return fail(t("status.cookieCutterNoOutline"));
       const cutter = withSelectionPivot(canonicalizeShape({ ...group, name: t("cookieCutter.name"), groupOperation: "bundle" }), activeRotationPivot);
       const consumed = new Set(targets.map((shape) => shape.id));
-      commitShapes([...shapesRef.current.filter((shape) => !consumed.has(shape.id)), cutter], cutter.id, t("status.cookieCutterMade"));
-      return { ok: true as const, id: cutter.id };
+      commitShapes([...shapesRef.current.filter((shape) => !consumed.has(shape.id)), cutter], cutter.id, t(edgeLeftOut ? "status.cookieCutterMadeFlat" : "status.cookieCutterMade"));
+      return { ok: true as const, id: cutter.id, ...(edgeLeftOut ? { edgeLeftOut } : {}) };
     } catch (error) {
       const message = error instanceof Error && error.message === "cookie-cutter-outline-too-complex"
         ? t("status.cookieCutterTooComplex")
@@ -14415,6 +14422,16 @@ export function LayerlingEditor({
         const intersection = canonicalizeShape({ ...result.group!, groupOperation: "intersection" });
         commitShapes([...remainingShapes, intersection], intersection.id, t("status.intersectedMany", { count: groupable.length }));
         return { object: mcpShapeSummary(intersection) };
+      }
+
+      if (command.action === "cookie_cutter") {
+        const ids = new Set(mcpStringArray(params.ids));
+        const targets = currentShapes().filter((shape) => ids.has(shape.id));
+        if (!targets.length) throw new Error("Pass the ids of the objects to make a cookie cutter from");
+        const result = await makeCookieCutter({ wall: params.wall, height: params.height, rim: params.rim, rimHeight: params.rimHeight, edge: params.edge, mirror: params.mirror }, targets);
+        if (!result.ok) throw new Error(result.message);
+        const cutter = currentShapes().find((shape) => shape.id === result.id);
+        return { object: cutter ? mcpShapeSummary(cutter) : { id: result.id }, ...(result.edgeLeftOut ? { note: "The outline could not take the cutting edge; the wall has a flat top." } : {}) };
       }
 
       if (command.action === "ungroup_objects") {

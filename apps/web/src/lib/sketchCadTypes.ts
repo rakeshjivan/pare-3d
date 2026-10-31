@@ -14,7 +14,12 @@ export type SketchCadBuildRequest = {
   stroke?: SketchStroke;
   /** Set for a sketch built set in from its outlines (the face tool): the kernel moves them itself (cadSketchInset.ts). */
   inset?: SketchInset;
+  /** Set for a stroke with a cutting edge (#982): the top edges get a 45° chamfer reaching this far in, in mm. */
+  topChamfer?: number;
 };
+
+/** The message of the error the worker answers with when the kernel cannot chamfer a cutting edge along the outline. */
+export const SKETCH_EDGE_FAILED = "stroke-edge-failed";
 
 /** The message of the error the worker answers with when a stroke is for the polygon route to build. */
 export const SKETCH_STROKE_UNSUPPORTED = "stroke-unsupported";

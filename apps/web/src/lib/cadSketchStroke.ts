@@ -110,3 +110,34 @@ export function buildStrokedSketchSolid(cad: OcctKernel, profile: SketchProfile,
     return null;
   }
 }
+
+/** Closer than this to the top, in mm, a point of an edge lies on it. */
+const TOP_TOLERANCE = 1e-4;
+/** Past this many chamfered edges the kernel's validity check is skipped, as for a large sketch. */
+const LARGE_TOP_EDGES = 750;
+
+/**
+ * A wall with a cutting edge (#982): every edge along the very top of the solid - the wall's outer and inner rim - gets a 45°
+ * chamfer reaching `amount` in, so the top runs in to a narrow edge. The solid stands from 0 to `height` (y up). Null when
+ * the solid has no edge up there or the kernel cannot chamfer it (outlines with steps shorter than the chamfer).
+ */
+export function chamferTopEdges(cad: OcctKernel, solid: ShapeHandle, height: number, amount: number): ShapeHandle | null {
+  const atTop = (edge: ShapeHandle) => {
+    const { first, last } = cad.curveParameters(edge);
+    for (let step = 0; step <= 4; step += 1) {
+      if (Math.abs(cad.curvePointAtParam(edge, first + ((last - first) * step) / 4).y - height) > TOP_TOLERANCE) return false;
+    }
+    return true;
+  };
+  const edges = cad.getSubShapes(solid, "edge").filter(atTop);
+  if (!edges.length) return null;
+  try {
+    const chamfered = cad.chamfer(solid, edges, amount);
+    // The validity check grows steeply with the edges (#461): a traced outline is checked by its volume alone.
+    if (edges.length <= LARGE_TOP_EDGES && !cad.isValid(chamfered)) return null;
+    return cad.getVolume(chamfered) > 1e-9 ? chamfered : null;
+  } catch (error) {
+    if (/memory|WebAssembly|abort/i.test(error instanceof Error ? error.message : String(error))) throw error;
+    return null;
+  }
+}

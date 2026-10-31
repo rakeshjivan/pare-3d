@@ -478,8 +478,11 @@ export type SketchImage = {
 export type SketchStrokeAlign = "center" | "inside" | "outside" | "grow" | "shrink";
 export type SketchStrokeJoin = "miter" | "round" | "bevel";
 export type SketchStrokeCap = "flat" | "square" | "round";
-/** A sketch drawn as a line of this width instead of a filled area (#154). */
-export type SketchStroke = { width: number; align: SketchStrokeAlign; join: SketchStrokeJoin; cap: SketchStrokeCap };
+/**
+ * A sketch drawn as a line of this width instead of a filled area (#154). `edge` makes the wall a cutting edge (#982): its top
+ * runs in to that width with a 45° chamfer on both sides; only for a line inside, outside or centred, and narrower than the line.
+ */
+export type SketchStroke = { width: number; align: SketchStrokeAlign; join: SketchStrokeJoin; cap: SketchStrokeCap; edge?: number };
 /** Where a name tag's key ring hole sits, seen from above (#215). */
 export type TextKeyringSide = "left" | "right" | "top";
 /**
