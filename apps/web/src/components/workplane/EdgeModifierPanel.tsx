@@ -2,7 +2,7 @@
 
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Check, LoaderCircle, Minus, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput } from "@/lib/measurementUnits";
 import type { CadModifierKind, CadModifierQuality } from "@/lib/cadModifierTypes";
@@ -133,6 +133,13 @@ export function EdgeFeatureHistory({
   );
 }
 
+/**
+ * Build 106: sliders that follow the pointer at once and pass their value on at most once a frame (the
+ * latest value; the last one always) - for panels whose every change starts heavy work, as the studio
+ * frame's. Off unless a panel turns it on.
+ */
+export const SmoothSliders = createContext(false);
+
 export function EdgeModifierSlider({
   label,
   value,
@@ -182,10 +189,24 @@ export function EdgeModifierSlider({
   const rangeMin = coarse ? 0 : controlMin;
   const rangeMax = coarse ? Math.max(controlMin, Math.min(controlMax, length ? millimetersToDisplay(coarse.max, workspace) : coarse.max)) : controlMax;
   const rangeStep = coarse ? (length ? displayStepFromMillimeters(coarse.step, workspace) : coarse.step) : controlStep;
-  const sliderValue = clamp(controlValue, rangeMin, rangeMax);
-  const position = ((sliderValue - rangeMin) / Math.max(Number.EPSILON, rangeMax - rangeMin)) * 100;
+  const sliderValueOf = (value: number) => clamp(value, rangeMin, rangeMax);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(formatSliderValue(controlValue, workspace.accuracy, controlStep));
+  const smooth = useContext(SmoothSliders);
+  // Build 106: while dragging, the thumb shows this (display units); the value is passed on once a frame.
+  const [live, setLive] = useState<number | null>(null);
+  const pendingRef = useRef<number | null>(null);
+  const frameRef = useRef(0);
+  const settleRef = useRef(0);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const flush = () => {
+    if (frameRef.current) { cancelAnimationFrame(frameRef.current); frameRef.current = 0; }
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    if (pending !== null) onChangeRef.current(pending);
+  };
+  useEffect(() => () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); window.clearTimeout(settleRef.current); }, []);
   const unitLabel = length ? lengthDisplayUnit(workspace).label : unit;
 
   useEffect(() => {
@@ -233,10 +254,19 @@ export function EdgeModifierSlider({
 
   const handleSliderChange = (nextValue: number) => {
     const next = clamp(Number.isFinite(nextValue) ? nextValue : controlMin, controlMin, controlMax);
-    onChange(clamp(toModelValue(next), safeMin, safeMax));
     setDraft(formatSliderValue(next, workspace.accuracy, controlStep));
+    if (!smooth) { onChange(clamp(toModelValue(next), safeMin, safeMax)); return; }
+    setLive(next);
+    pendingRef.current = clamp(toModelValue(next), safeMin, safeMax);
+    if (!frameRef.current) frameRef.current = requestAnimationFrame(() => { frameRef.current = 0; flush(); });
+    // The thumb goes back to the value given once the moving stops.
+    window.clearTimeout(settleRef.current);
+    settleRef.current = window.setTimeout(() => { flush(); setLive(null); }, 350);
   };
+  const shownValue = live ?? controlValue;
 
+  const sliderValue = sliderValueOf(shownValue);
+  const position = ((sliderValue - rangeMin) / Math.max(Number.EPSILON, rangeMax - rangeMin)) * 100;
   // Fork (build 32): the compact row of the properties panel - the value box rides on the slider as its handle.
   return (
     <label title={title} className={`edge-modifier-field edge-modifier-slider range-property compact${editing ? " editing" : ""}`} style={{ "--slider-pos": `${position}%`, "--slider-frac": String(position / 100) } as CSSProperties}>
@@ -258,6 +288,7 @@ export function EdgeModifierSlider({
           onPointerUp={(event) => {
             const press = pressRef.current;
             pressRef.current = null;
+            if (smooth) flush();
             // A click on the value box, not a drag: type the value.
             if (press?.onBubble && Math.abs(event.clientX - press.x) < 4 && !disabled) window.setTimeout(() => numberInputRef.current?.focus(), 0);
           }}
@@ -267,7 +298,7 @@ export function EdgeModifierSlider({
           <input
             ref={numberInputRef}
             type="text"
-            value={editing ? draft : formatSliderValue(controlValue, workspace.accuracy, controlStep)}
+            value={editing ? draft : formatSliderValue(shownValue, workspace.accuracy, controlStep)}
             inputMode="decimal"
             disabled={disabled}
             onFocus={(event) => {

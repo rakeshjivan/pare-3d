@@ -10794,13 +10794,16 @@ export function LayerlingEditor({
         // scans are laid out side by side, the bite scan hidden - one step of undo.
         const ids = analysis.arches.map((arch) => arch.id).sort().join("|");
         const locked = lockedDentalBite(analysis);
-        let laidOut: "side" | undefined;
+        let laidOut: "side" | "occlusion" | undefined;
         if (!dentalArranged.current.has(ids)) {
           dentalArranged.current.add(ids);
           const slotsNow = { ...state.slots };
           if (!state.rolesChosen) analysis.arches.forEach((arch) => { slotsNow[arch.role] = arch.id; });
-          commitDentalScans(arrangedDentalScans("side", analysis, slotsNow, locked ?? new Map()), t(locked ? "dental.biteLockedDone" : "dental.layoutSideDone"));
-          laidOut = "side";
+          // Build 106: a pair opens in occlusion (side by side is a click away); a single arch stands on its own.
+          // (Scans that do not meet in a bite are still set out side by side.)
+          const mode = slotsNow.upper && slotsNow.lower && !analysis.pair?.apart ? "occlusion" : "side";
+          commitDentalScans(arrangedDentalScans(mode, analysis, slotsNow, locked ?? new Map()), t(locked ? "dental.biteLockedDone" : mode === "side" ? "dental.layoutSideDone" : "dental.layoutOcclusionDone"));
+          laidOut = mode;
           const shown = analysis.arches.map((arch) => arch.id);
           window.setTimeout(() => window.layerlingShowParts?.(shown, [0.35, 0.55, 0.75]), 400);
         } else if (locked) commitDentalScans(locked, t("dental.biteLockedDone"));
@@ -12202,6 +12205,22 @@ export function LayerlingEditor({
     if (!changed.size) return;
     commitShapes(shapesRef.current.map((shape) => changed.get(shape.id) ?? shape), [...changed.keys()], t("waxup.adjusted"));
   }, [commitShapes]);
+  /**
+   * Build 106: one change to every tooth of the arch being waxed (those not held), straight onto the teeth -
+   * for the Position sliders, so what a slider does shows as it moves.
+   */
+  const waxSetDirect = (make: (tooth: { fdi: number; width: number; length: number }) => ToothAdjust | null) => {
+    const current = waxupRef.current;
+    const arch = waxArch();
+    if (!arch) return;
+    const changes = new Map<string, ToothAdjust>();
+    for (const shape of waxTeethOf(arch.shape.id)) {
+      if (!shape.waxTooth || current.locks[shape.waxTooth.fdi]) continue;
+      const change = make(shape.waxTooth);
+      if (change) changes.set(shape.id, change);
+    }
+    moveWaxTeethDirect(changes);
+  };
   /**
    * Build 102: the one-click helpers - most alignment without moving a tooth by hand. Each is one step
    * of the wax-up's Undo; on the patient's teeth each change is kept as the teeth's adjustments (and
@@ -19692,9 +19711,27 @@ export function LayerlingEditor({
               onAutoMarks: () => { if (!autoToothMarks()) setNotice(t("waxup.autoMarksNone")); },
               onMarkTeethSet: (teeth: number[]) => setWaxup((current) => ({ ...current, markTeeth: [...teeth].sort((a, b) => archOrder(a) - archOrder(b)) })),
               onMarkTeethChoose: (fdi: number) => setWaxup((current) => { const teeth = markTeethFor(current); return { ...current, markTeeth: teeth.includes(fdi) ? teeth.filter((n) => n !== fdi) : [...teeth, fdi].sort((a, b) => archOrder(a) - archOrder(b)) }; }),
-              onLengthen: (lengthen) => { waxRecord(true); setWaxup((current) => ({ ...current, lengthen })); },
-              onCentralRatio: (centralRatio) => { waxRecord(true); setWaxup((current) => ({ ...current, centralRatio })); },
-              onArcDepth: (arcDepth) => { waxRecord(true); setWaxup((current) => ({ ...current, arcDepth })); },
+              // Build 106 (manual): the sliders change the placed teeth themselves, as they move - nothing waits for "Place them again".
+              onLengthen: (lengthen) => {
+                waxRecord(true);
+                const current = waxupRef.current, delta = lengthen - current.lengthen;
+                if (current.manual && Math.abs(delta) > 1e-6) waxSetDirect((tooth) => ({ longer: Math.max(0.2, (tooth.length + delta) / Math.max(0.5, tooth.length)) }));
+                setWaxup((now) => ({ ...now, lengthen }));
+              },
+              onCentralRatio: (centralRatio) => {
+                waxRecord(true);
+                const current = waxupRef.current, factor = centralRatio / Math.max(0.01, current.centralRatio);
+                if (current.manual && Math.abs(factor - 1) > 1e-6) waxSetDirect((tooth) => (tooth.fdi % 10 === 1 ? { wider: factor } : null));
+                setWaxup((now) => ({ ...now, centralRatio }));
+              },
+              onArcDepth: (arcDepth) => {
+                waxRecord(true);
+                const current = waxupRef.current;
+                const before = current.arcDepth ?? current.arcUsed ?? 1, after = arcDepth ?? current.arcUsed ?? 1, delta = after - before;
+                // The canine tips rise towards the gum (a tooth's up runs from its neck to its edge); the laterals half as far.
+                if (current.manual && Math.abs(delta) > 1e-6) waxSetDirect((tooth) => (tooth.fdi % 10 === 3 ? { up: -delta } : tooth.fdi % 10 === 2 ? { up: -delta / 2 } : null));
+                setWaxup((now) => ({ ...now, arcDepth }));
+              },
               onProportions: (proportions) => { waxRecord(); setWaxup((current) => ({ ...current, proportions })); },
               onPlace: () => void placeWaxup(),
               onUndo: waxUndo,

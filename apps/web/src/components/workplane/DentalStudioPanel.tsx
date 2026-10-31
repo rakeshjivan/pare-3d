@@ -13,7 +13,7 @@ import { createPortal } from "react-dom";
 import { useStudioSlot } from "@/lib/studioSlots";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { MovableToolPanel } from "@/components/workplane/MovableToolPanel";
-import { EdgeModifierSlider } from "@/components/workplane/EdgeModifierPanel";
+import { EdgeModifierSlider, SmoothSliders } from "@/components/workplane/EdgeModifierPanel";
 import { ArticulatorPicture, ArticulatorSidesPicture, BaseStylePicture, ModelHeightPicture } from "@/components/workplane/DentalPictures";
 import { WaxupCard, waxupSummary, type WaxupActions, type WaxupPart, type WaxupView } from "@/components/workplane/WaxupCard";
 import { t } from "@/lib/i18n";
@@ -69,6 +69,16 @@ export type DentalAreaTool = "paint" | "erase" | "lassoAdd" | "lassoRemove";
 /** Fork (build 47): Dental Studio - raw intraoral scans to printable models, one arch or a pair with its bite. */
 type ModelStepId = "scans" | "prepare" | "model" | "base" | "articulator" | "label";
 type WaxStepId = "scans" | "trim" | "select" | "teeth" | "find" | "choose" | "set" | "place" | "adjust" | "occlusion" | "sculpt" | "make";
+
+/** Build 106: a step's explanation, kept behind a small (?) - shown on hover or focus. */
+function HelpTip({ text }: { text: string }) {
+  return (
+    <span className="studio-help" tabIndex={0} role="note" aria-label={text} onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}>
+      ?
+      <span className="studio-help-tip" aria-hidden="true">{text}</span>
+    </span>
+  );
+}
 
 export function DentalStudioPanel({
   parts,
@@ -429,7 +439,9 @@ export function DentalStudioPanel({
     return frameStep(id, mbStepName(id), i + 1, id === mbStep ? "current" : i < mbIndex ? "done" : "", !reachable || stage === "making", () => setMbStepId(id));
   }) : null;
   const mbHintKey: Record<ModelStepId, string> = { scans: "dental.step1Hint", prepare: "dental.trimHint", model: "dental.step3Hint", base: "dental.stepBaseHint", articulator: "dental.step4Hint", label: pair ? "dental.step4Hint" : "dental.stepNameHint" };
-  const frameHint = !framed ? null : stage === "made" ? t("dental.madeHint") : waxStep ? t(`waxStudio.stepHint.${waxStep}` as "waxStudio.stepHint.scans") : mbStep ? t(mbHintKey[mbStep] as "dental.step1Hint") : null;
+  const longHint = !framed ? null : stage === "made" ? t("dental.madeHint") : waxStep ? t(`waxStudio.stepHint.${waxStep}` as "waxStudio.stepHint.scans") : mbStep ? t(mbHintKey[mbStep] as "dental.step1Hint") : null;
+  // The line over the 3D view: what to do now, in a few words; the rest is behind the (?).
+  const frameHint = !framed ? null : stage === "made" ? t("studio.hint.made") : waxStep ? t(`studio.hint.${waxStep}` as "studio.hint.scans") : mbStep ? t(`studio.hint.mb.${mbStep}` as "studio.hint.mb.scans") : null;
   const makeButton = (
     <button type="button" className="primary" disabled={!ready} onClick={onApply}>
       {stage === "making" ? <LoaderCircle className="edge-modifier-spinner" size={17} /> : <Check size={17} />}
@@ -455,7 +467,7 @@ export function DentalStudioPanel({
   </>) : null;
   const frameHead = framed && stage !== "made" ? (
     <div className="studio-panel-head">
-      <strong>{waxStep ? waxName(waxStep) : mbStep ? mbStepName(mbStep) : title}</strong>
+      <strong>{waxStep ? waxName(waxStep) : mbStep ? mbStepName(mbStep) : title}{longHint ? <HelpTip text={longHint} /> : null}</strong>
       <span>{waxSteps && waxStep ? t("studio.stepOf", { n: waxIndex + 1, count: waxSteps.length }) : mbSteps && mbStep ? t("studio.stepOf", { n: mbIndex + 1, count: mbSteps.length }) : null}</span>
       {waxAuto ? <p className="dental-status" role="status"><LoaderCircle className="edge-modifier-spinner" size={15} /> {t("waxStudio.auto")} <button type="button" className="link-button" onClick={() => setWaxAuto(false)}>{t("waxStudio.autoStop")}</button></p> : null}
     </div>
@@ -467,6 +479,7 @@ export function DentalStudioPanel({
       <section className={`dental-section dental-card${isFolded ? " folded" : ""}${activeCard === number ? " current" : ""}${nextCard === number ? " next" : ""}`} aria-label={label} onPointerDownCapture={() => { setActiveCard(number); if (!visited[number]) setVisited((state) => ({ ...state, [number]: true })); }}>
         <button type="button" className="dental-card-head" aria-expanded={!isFolded} onClick={() => setFolded((state) => ({ ...state, [number]: !isFolded }))}>
           {step(number, label, done && (number === 1 || Boolean(visited[number])), isFolded ? null : hint)}
+          {framed && hint ? <HelpTip text={hint} /> : null}
           <ChevronDown size={16} className="dental-card-chevron" aria-hidden="true" />
         </button>
         {isFolded ? (summary ? <p className="dental-card-summary">{summary}</p> : null) : body}
@@ -497,7 +510,7 @@ export function DentalStudioPanel({
   );
   return (
     <MovableToolPanel className={`edge-modifier-panel dental-studio-panel${mbSteps ? " mb-steps" : ""}${waxSteps ? " wax-steps-on" : ""}${framed ? " studio-framed" : ""}`} ariaLabel={title}>
-      {(handleProps) => (<>
+      {(handleProps) => (<SmoothSliders.Provider value={framed}>
       {framed && stepsSlot ? createPortal(frameSteps, stepsSlot) : null}
       {framed && navSlot ? createPortal(frameNav, navSlot) : null}
       {framed && hintSlot && frameHint ? createPortal(<span>{frameHint}</span>, hintSlot) : null}
@@ -840,7 +853,7 @@ export function DentalStudioPanel({
         </button> : null}
       </div> : null}
       </>)}
-      </>)}
+      </SmoothSliders.Provider>)}
     </MovableToolPanel>
   );
 }
