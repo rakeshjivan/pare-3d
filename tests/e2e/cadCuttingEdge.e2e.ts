@@ -111,4 +111,24 @@ describe("a cutting edge on a stroked wall with the real OCCT kernel (#982)", ()
     expect(chamferTopEdges(kernel, solid, 15, 0.4)).toBeNull();
     expect(performance.now() - started).toBeLessThan(3000);
   });
+
+  it("builds a wall round a hole as well, inside it, and chamfers both walls (#982)", () => {
+    // A square of 30 with a hole of 12 off its middle: the inside of a letter. The wall runs outside the outer line and inside
+    // the hole, so the dough between them is what the cutter cuts out.
+    const frame = squares(0);
+    [[-6, -6], [6, -6], [6, 6], [-6, 6]].forEach(([x, z], index) => {
+      frame.points.push({ id: `h${index}`, x: x + 3, z, mode: "corner" });
+      frame.segments.push({ id: `hs${index}`, startId: `h${index}`, endId: `h${(index + 1) % 4}`, kind: "line" });
+    });
+    frame.points.forEach((point) => {
+      if (point.id.startsWith("p")) Object.assign(point, { x: point.x * 1.5, z: point.z * 1.5 });
+    });
+    const solid = buildStrokedSketchSolid(kernel, frame, wall, 15)!;
+    expect(kernel.getSubShapes(solid, "solid")).toHaveLength(2);
+    const box = kernel.getBoundingBox(solid, false);
+    expect(box.xmin).toBeCloseTo(-16.2, 4);
+    const chamfered = chamferTopEdges(kernel, solid, 15, 0.4);
+    expect(chamfered).not.toBeNull();
+    expect(kernel.isValid(chamfered!)).toBe(true);
+  });
 });
