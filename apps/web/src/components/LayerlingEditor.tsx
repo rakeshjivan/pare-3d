@@ -18783,7 +18783,8 @@ export function LayerlingEditor({
           <button type="button" className="open-group-done" onClick={() => void finishOpenGroup()} disabled={openGroupBusy}>{t("group.done")}</button>
         </div>
       ) : null}
-      {overhangWarning ? (
+      {/* Build 104: not in Dental Studio - scans sit where the scanner put them, often past the plate. */}
+      {overhangWarning && !dentalWorkspace ? (
         <div className="bed-overhang-warning" role="status">
           <AlertTriangle size={16} aria-hidden="true" />
           <span>{overhangWarning}</span>
