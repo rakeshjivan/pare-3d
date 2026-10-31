@@ -4073,7 +4073,6 @@ function Dashboard({
                     <Trash2 size={15} />
                     <span>{t("home.deleteSelected")}</span>
                   </button>
-                  <button type="button" onClick={leaveSelectMode}>{t("home.selectDone")}</button>
                 </div>
               ) : null}
               {projects.length > 0 || visibleFolders.length > 0 || (sharedProjectsEnabled && !openFolderId) || (openFolderId && !localSearch) ? (
