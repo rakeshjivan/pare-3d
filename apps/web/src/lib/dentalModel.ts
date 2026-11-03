@@ -261,6 +261,26 @@ export const LOOSE_TAG_VOLUME = 150;
  * each is under LOOSE_TAG_VOLUME and a twentieth of the biggest piece. Anything bigger stays, and is
  * reported as loose.
  */
+/**
+ * Build 116: a model made ready to save - edges shorter than TIDY_TOLERANCE collapsed. Cuts that meet almost
+ * exactly (the bevel's steps against a wall, say) leave corners a few hundred-thousandths of a millimetre apart;
+ * written to an STL they become one point, and the triangles between them have no area and an edge used four
+ * times, so the file is not watertight. Collapsing them moves nothing by more than the tolerance (1 micron, far under a print layer). If it fails, or
+ * changes the volume by more than a trace, the model is saved exactly as it was.
+ */
+export const TIDY_TOLERANCE = 1e-3;
+export function tidyForPrint(solid: ManifoldSolid, toFree?: ManifoldSolid[]): ManifoldSolid {
+  try {
+    const tidy = solid.simplify(TIDY_TOLERANCE);
+    const before = solid.volume(), after = tidy.volume();
+    if (tidy.status() !== "NoError" || tidy.isEmpty() || Math.abs(after - before) > Math.max(1e-3, Math.abs(before) * 1e-6)) { tidy.delete(); return solid; }
+    toFree?.push(tidy);
+    return tidy;
+  } catch {
+    return solid;
+  }
+}
+
 export function withoutTags(runtime: ManifoldRuntime, solid: ManifoldSolid): { solid: ManifoldSolid; dropped: number } {
   const split = solid.decompose();
   if (split.length < 2) { split.forEach((piece) => piece.delete()); return { solid, dropped: 0 }; }
@@ -1348,7 +1368,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     if (stop && Number.isFinite(parts.pinY) && options.pinStyle === "set") {
       const raises = [...new Set([...PIN_SET, raise])].sort((a, b) => a - b);
       const set = incisalPins(runtime, raises, parts.axleY, parts.pinY, parts.bossTop);
-      pinSet = { positions: solidPositions(set), raises };
+      pinSet = { positions: solidPositions(tidyForPrint(set)), raises };
       set.delete();
     }
     solids = built.map(({ arch }, i) => {
@@ -1441,7 +1461,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
         offsetX += box.max[0] - box.min[0] + 8;
       }
     }
-    out.push({ id: arch.id, role: arch.role, positions: solidPositions(solid), height: own.max[2] - own.min[2], volume: solid.volume(), ...(pair ? { toBite: laid.clone().invert().toArray() } : {}) });
+    out.push({ id: arch.id, role: arch.role, positions: solidPositions(tidyForPrint(solid, toFree)), height: own.max[2] - own.min[2], volume: solid.volume(), ...(pair ? { toBite: laid.clone().invert().toArray() } : {}) });
     toFree.push(solid);
   });
   if (pair && options.layout === "print") {
