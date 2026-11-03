@@ -101,16 +101,17 @@ export function StudioShell({
   const [caseOpen, setCaseOpen] = useState(true);
   const [view, setView] = useState<DentalView | null>(null);
   // Build 108: each side window can be put away for room to work - a small tab in the middle of its inner edge
-  // (pointing the way it goes); the tab stays at the edge to bring it back. Remembered between visits.
-  const [sides, setSides] = useState(() => {
-    try { return { left: window.localStorage.getItem("pare.studioLeftHidden") === "1", right: window.localStorage.getItem("pare.studioRightHidden") === "1" }; } catch { return { left: false, right: false }; }
-  });
+  // (pointing the way it goes); the tab stays at the edge to bring it back. Build 108: for this session only - every
+  // new wax-up starts with both windows out, so no step's controls are hidden from the start.
+  const [sides, setSides] = useState({ left: false, right: false });
+  useEffect(() => {
+    try { window.localStorage.removeItem("pare.studioLeftHidden"); window.localStorage.removeItem("pare.studioRightHidden"); } catch { /* nothing kept */ }
+  }, []);
   useEffect(() => {
     const root = document.documentElement;
     if (!sideTabs) { root.classList.remove("studio-left-hidden", "studio-right-hidden"); return; }
     root.classList.toggle("studio-left-hidden", sides.left);
     root.classList.toggle("studio-right-hidden", sides.right);
-    try { window.localStorage.setItem("pare.studioLeftHidden", sides.left ? "1" : "0"); window.localStorage.setItem("pare.studioRightHidden", sides.right ? "1" : "0"); } catch { /* this visit only */ }
     // The 3D view takes the room: its canvas follows the window's size.
     window.dispatchEvent(new Event("resize"));
     return () => { root.classList.remove("studio-left-hidden", "studio-right-hidden"); };
