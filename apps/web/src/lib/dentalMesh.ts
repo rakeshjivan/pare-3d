@@ -1180,3 +1180,61 @@ export function cutAlongField(m: Mesh, field: Float64Array, keep?: Uint8Array, s
 }
 /** Build 76: the line snaps onto a corner it passes closer to than this share of the edge. */
 export const SNAP_SHARE = 0.2;
+
+/**
+ * Build 116: a model's triangles cleaned as they will be written (32-bit floats), so the STL is watertight.
+ * Corners a few hundred-thousandths of a millimetre apart in Manifold land on one point in the file; the triangles
+ * between them have no area and leave edges used four times, and thin closed sheets with no volume come apart as
+ * loose flecks. Removed: triangles with two corners on one point, triangles on the same three points as another,
+ * and pieces (joined edge to edge) of no volume. Nothing with area or volume is touched, so the shape is unchanged.
+ */
+export function cleanStlSoup(positions: Float32Array): Float32Array {
+  const corners = positions.length / 3, triangles = corners / 3;
+  if (!triangles) return positions;
+  const { ids } = samePointIds(positions);
+  const keep = new Uint8Array(triangles).fill(1);
+  const keyOf = (a: number, b: number, c: number) => { const s = [a, b, c].sort((x, y) => x - y); return `${s[0]},${s[1]},${s[2]}`; };
+  const byKey = new Map<string, number[]>();
+  for (let t = 0; t < triangles; t += 1) {
+    const a = ids[t * 3], b = ids[t * 3 + 1], c = ids[t * 3 + 2];
+    if (a === b || b === c || a === c) { keep[t] = 0; continue; }
+    const k = keyOf(a, b, c);
+    const list = byKey.get(k);
+    if (list) list.push(t); else byKey.set(k, [t]);
+  }
+  for (const list of byKey.values()) if (list.length > 1) for (const t of list) keep[t] = 0;
+  // Pieces joined edge to edge; one of no volume (and few triangles) goes.
+  const parent = new Int32Array(triangles);
+  for (let t = 0; t < triangles; t += 1) parent[t] = t;
+  const find = (x: number) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const edgeOwner = new Map<string, number>();
+  for (let t = 0; t < triangles; t += 1) {
+    if (!keep[t]) continue;
+    for (let k = 0; k < 3; k += 1) {
+      const a = ids[t * 3 + k], b = ids[t * 3 + ((k + 1) % 3)];
+      const e = a < b ? `${a}_${b}` : `${b}_${a}`;
+      const o = edgeOwner.get(e);
+      if (o === undefined) edgeOwner.set(e, t);
+      else { const ra = find(o), rb = find(t); if (ra !== rb) parent[ra] = rb; }
+    }
+  }
+  const volume = new Map<number, number>(), count = new Map<number, number>();
+  for (let t = 0; t < triangles; t += 1) {
+    if (!keep[t]) continue;
+    const o = t * 9, p = positions;
+    const v = (p[o] * (p[o + 4] * p[o + 8] - p[o + 5] * p[o + 7]) - p[o + 1] * (p[o + 3] * p[o + 8] - p[o + 5] * p[o + 6]) + p[o + 2] * (p[o + 3] * p[o + 7] - p[o + 4] * p[o + 6])) / 6;
+    const r = find(t);
+    volume.set(r, (volume.get(r) ?? 0) + v); count.set(r, (count.get(r) ?? 0) + 1);
+  }
+  let dropped = 0;
+  for (let t = 0; t < triangles; t += 1) {
+    if (!keep[t]) { dropped += 1; continue; }
+    const r = find(t);
+    if (Math.abs(volume.get(r) ?? 0) <= 1e-3 && (count.get(r) ?? 0) <= 1000) { keep[t] = 0; dropped += 1; }
+  }
+  if (!dropped) return positions;
+  const out = new Float32Array((triangles - dropped) * 9);
+  let at = 0;
+  for (let t = 0; t < triangles; t += 1) if (keep[t]) { out.set(positions.subarray(t * 9, t * 9 + 9), at); at += 9; }
+  return out;
+}

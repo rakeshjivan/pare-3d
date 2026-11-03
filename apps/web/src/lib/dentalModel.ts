@@ -281,7 +281,7 @@ export { CUT_FRONT, CUT_BEYOND } from "@/lib/dentalMesh";
 export const CUT_SIDE = 2;
 /** Build 103: the band below the ideal tooth's edge from which the patient's tooth is cut whole (palatally too), mm. */
 export const CUT_EDGE_BAND = 1.5;
-import { CUT_FRONT, CUT_BEYOND } from "@/lib/dentalMesh";
+import { CUT_FRONT, CUT_BEYOND, cleanStlSoup } from "@/lib/dentalMesh";
 /** Gum kept below the teeth by a clean base when none is set, mm. */
 export const CLEAN_GUM = 3;
 /** Rounds of smoothing the margin's line gets along the surface before the cut (build 52). */
@@ -1348,7 +1348,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
     if (stop && Number.isFinite(parts.pinY) && options.pinStyle === "set") {
       const raises = [...new Set([...PIN_SET, raise])].sort((a, b) => a - b);
       const set = incisalPins(runtime, raises, parts.axleY, parts.pinY, parts.bossTop);
-      pinSet = { positions: solidPositions(set), raises };
+      pinSet = { positions: cleanStlSoup(solidPositions(set)), raises };
       set.delete();
     }
     solids = built.map(({ arch }, i) => {
@@ -1441,7 +1441,7 @@ async function studio(input: DentalStudioInput, given_options: DentalStudioOptio
         offsetX += box.max[0] - box.min[0] + 8;
       }
     }
-    out.push({ id: arch.id, role: arch.role, positions: solidPositions(solid), height: own.max[2] - own.min[2], volume: solid.volume(), ...(pair ? { toBite: laid.clone().invert().toArray() } : {}) });
+    out.push({ id: arch.id, role: arch.role, positions: cleanStlSoup(solidPositions(solid)), height: own.max[2] - own.min[2], volume: solid.volume(), ...(pair ? { toBite: laid.clone().invert().toArray() } : {}) });
     toFree.push(solid);
   });
   if (pair && options.layout === "print") {
