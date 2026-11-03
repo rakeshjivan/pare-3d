@@ -71,7 +71,7 @@ import { PIN_MAX, PIN_STEP } from "@/lib/dentalArticulator";
 import { BUILT_IN_FINDER, finderBytes, loadStoredFinder, storeFinder } from "@/lib/toothFinderStore";
 import { toothColour, transferLabels, type ScanTeeth } from "@/lib/toothSegment";
 import { smoothOpenEdges, smoothOpenEdgesOf } from "@/lib/edgeSmooth";
-import { solidPositions, toManifold, transformSoup, weld, type ManifoldSolid } from "@/lib/dentalMesh";
+import { solidPositions, toManifold, transformSoup, weld, type ManifoldSolid, cleanStlBinary } from "@/lib/dentalMesh";
 import { WAX_SET_FORMS } from "@/lib/waxSetForms";
 import { BUILT_IN_LIBRARIES, loadToothLibrary, loadToothSet, type ToothLibraryManifest } from "@/lib/toothLibrary";
 import { exocadSets } from "@/lib/exocadLibrary";
@@ -18141,7 +18141,7 @@ export function LayerlingEditor({
         if (!meshes.length) continue;
         const which = part.id === state.madeFor?.upper ? t("dental.upper") : part.id === state.madeFor?.lower ? t("dental.lower") : displayShapeName(part);
         const name = projectExportFileName([label, which, date].filter(Boolean).join(" - "), "stl");
-        const answer = await saveUserFile(name, new Blob([new Uint8Array(exportMeshesToStl(meshes))], { type: "model/stl" }), t("files.saveExport"));
+        const answer = await saveUserFile(name, new Blob([new Uint8Array(cleanStlBinary(exportMeshesToStl(meshes)))], { type: "model/stl" }), t("files.saveExport"));
         if (answer === "cancelled") return;
         saved.push(name);
       }

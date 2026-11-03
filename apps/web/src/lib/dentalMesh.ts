@@ -1238,3 +1238,37 @@ export function cleanStlSoup(positions: Float32Array): Float32Array {
   for (let t = 0; t < triangles; t += 1) if (keep[t]) { out.set(positions.subarray(t * 9, t * 9 + 9), at); at += 9; }
   return out;
 }
+
+/**
+ * Build 116: a binary STL cleaned as written (cleanStlSoup on its 32-bit corners), for Dental Studio's saved models:
+ * the model is placed in the scene after it is made, and rounding there can bring corners together again.
+ */
+export function cleanStlBinary(buffer: ArrayBuffer): ArrayBuffer {
+  const view = new DataView(buffer);
+  if (buffer.byteLength < 84) return buffer;
+  const count = view.getUint32(80, true);
+  if (buffer.byteLength !== 84 + count * 50) return buffer;
+  const soup = new Float32Array(count * 9);
+  for (let t = 0; t < count; t += 1) for (let k = 0; k < 9; k += 1) soup[t * 9 + k] = view.getFloat32(84 + t * 50 + 12 + k * 4, true);
+  // A coordinate a hair off zero (the floor at 0.000000003 mm, say) is zero: a slicer that rounds would join it to the
+  // floor's own corners and find slivers between them. Nothing moves by more than 0.00001 mm.
+  let snapped = false;
+  for (let i = 0; i < soup.length; i += 1) if (soup[i] !== 0 && Math.abs(soup[i]) < 1e-5) { soup[i] = 0; snapped = true; }
+  const clean = cleanStlSoup(soup);
+  if (clean === soup && !snapped) return buffer;
+  const kept = clean.length / 9;
+  const out = new ArrayBuffer(84 + kept * 50);
+  new Uint8Array(out).set(new Uint8Array(buffer, 0, 80));
+  const w = new DataView(out);
+  w.setUint32(80, kept, true);
+  for (let t = 0; t < kept; t += 1) {
+    const o = t * 9, p = clean;
+    const ux = p[o + 3] - p[o], uy = p[o + 4] - p[o + 1], uz = p[o + 5] - p[o + 2], vx = p[o + 6] - p[o], vy = p[o + 7] - p[o + 1], vz = p[o + 8] - p[o + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz) || 1;
+    const at = 84 + t * 50;
+    w.setFloat32(at, nx / l, true); w.setFloat32(at + 4, ny / l, true); w.setFloat32(at + 8, nz / l, true);
+    for (let k = 0; k < 9; k += 1) w.setFloat32(at + 12 + k * 4, p[o + k], true);
+    w.setUint16(at + 48, 0, true);
+  }
+  return out;
+}
