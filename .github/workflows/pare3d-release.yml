@@ -17,7 +17,8 @@ permissions:
 jobs:
   build:
     # A Mac, so the native app can be compiled.
-    runs-on: macos-latest
+    # Build 116: an Intel Mac - the Apple silicon ones were at capacity (jobs cancelled unstarted); the app is built universal either way.
+    runs-on: macos-15-intel
     outputs:
       number: ${{ steps.build.outputs.number }}
       version: ${{ steps.build.outputs.version }}
