@@ -59,6 +59,7 @@ export function StudioShell({
   colour,
   dark,
   layoutView,
+  snap,
   chart,
   onView,
   contacts,
@@ -80,6 +81,8 @@ export function StudioShell({
   dark?: { on: boolean; onChange: (on: boolean) => void } | null;
   /** Build 106: the made models laid out to print, or in the bite. */
   layoutView?: { occlusion: boolean; onChange: (occlusion: boolean) => void } | null;
+  /** Build 116: puts the upper and lower back in the bite they were scanned in (one was moved by accident or out of the way). */
+  snap?: { onSnap: () => void; disabled?: boolean } | null;
   chart?: StudioChart | null;
   onView?: (view: DentalView) => void;
   /** legend false: the studio shows its own key (the bite map's, in the case panel). */
@@ -178,6 +181,7 @@ export function StudioShell({
               </div>
             ))}
             {objects.length === 0 ? <p className="studio-muted">{t("studio.noObjects")}</p> : null}
+            {snap ? <button type="button" className="studio-snap" disabled={snap.disabled} title={t("studio.snapOcclusionHint")} onClick={snap.onSnap}>{t("studio.snapOcclusion")}</button> : null}
             {colour ? (
               <div className="studio-toggle">
                 <span id="studio-colour-label">{t("studio.colour")}</span>

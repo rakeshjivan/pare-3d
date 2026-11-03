@@ -21265,6 +21265,7 @@ export function LayerlingEditor({
             colour={studioWax && waxup.placed.length ? { on: waxColourful, onChange: setWaxColourful } : null}
             dark={{ on: studioDark, onChange: (on) => { setStudioDarkState(on); setStudioDark(on); } }}
             layoutView={dentalStudio.stage === "made" && shapes.some((shape) => shape.dentalBite && dentalStudio.made?.includes(shape.id)) ? { occlusion: studioOccView, onChange: setStudioOccView } : null}
+            snap={dentalStudio.slots.upper && dentalStudio.slots.lower && dentalStudio.analysis && dentalStudio.stage === "ready" && !dentalStudio.analysis.pair?.apart ? { onSnap: () => layOutDentalScans("occlusion") } : null}
             chart={studioWax && arches.length ? {
               arch: waxSlot,
               arches: [...arches],

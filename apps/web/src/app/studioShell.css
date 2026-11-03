@@ -950,6 +950,11 @@
 .studio-make { margin-top: 16px; }
 .studio-make button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; color: #ffffff; background: var(--studio-teal, #2f7d6d); border: 0; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; }
 .studio-make button:disabled { opacity: 0.5; cursor: default; }
+/* Build 116: Make filling while it works - a transform, so it keeps moving even while the work holds the page. */
+.studio-make button.studio-make-filling { position: relative; overflow: hidden; isolation: isolate; background: #8fbfb4; opacity: 1; cursor: progress; }
+.studio-make button.studio-make-filling > * { position: relative; z-index: 1; }
+.studio-make button.studio-make-filling::before { content: ""; position: absolute; inset: 0; z-index: 0; background: var(--studio-teal, #2f7d6d); transform-origin: left center; transform: scaleX(0); will-change: transform; animation: studio-make-fill 90s cubic-bezier(0.1, 0.6, 0.3, 1) forwards; }
+@keyframes studio-make-fill { from { transform: scaleX(0); } to { transform: scaleX(0.96); } }
 .studio-layout-toggle { display: inline-flex; padding: 2px; background: #f1f3f6; border-radius: 10px; }
 .studio-layout-toggle button { padding: 7px 12px; color: #3d4654; background: transparent; border: 0; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .studio-layout-toggle button.on { color: #ffffff; background: var(--studio-teal, #2f7d6d); }
@@ -1100,3 +1105,7 @@ html.studio-right-hidden .studio-shell-on .dental-studio-panel.studio-framed { d
 .studio-contacts-panel .studio-toggle { margin-top: 6px; }
 .studio-contacts-key { margin-top: 10px; }
 .studio-contacts-key .studio-cticks { display: flex; justify-content: space-between; font-size: 12px; color: var(--studio-muted, #56606f); margin-top: 4px; }
+/* Build 116: Snap to occlusion, under the case objects. */
+.studio-snap { display: block; width: 100%; margin-top: 12px; min-height: 36px; padding: 6px 12px; color: var(--studio-teal, #2f7d6d); background: #ffffff; border: 1px solid var(--studio-teal, #2f7d6d); border-radius: 10px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.studio-snap:hover:not(:disabled) { background: rgba(47, 125, 109, 0.08); }
+.studio-snap:disabled { opacity: 0.5; cursor: default; }

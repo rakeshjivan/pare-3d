@@ -628,10 +628,14 @@ export function DentalStudioPanel({
   const longHint = !framed ? null : stage === "made" ? t("dental.madeHint") : waxStep ? t(`waxStudio.stepHint.${waxStep}` as "waxStudio.stepHint.scans") : mbStep ? t(mbHintKey[mbStep] as "dental.step1Hint") : null;
   // The line over the 3D view: what to do now, in a few words; the rest is behind the (?).
   const frameHint = !framed ? null : stage === "made" ? t("studio.hint.made") : waxStep ? t(`studio.hint.${waxStep}` as "studio.hint.scans") : mbStep ? t(mbStep === "scans" && scansDone ? "studio.hint.mb.scansLoaded" : `studio.hint.mb.${mbStep}` as "studio.hint.mb.scans") : null;
+  // Build 116: while the models are being made (and, in Wax-up Studio, while the wax is fitted to the bite first) the
+  // button stays, fills slowly and says what is happening - the work can hold the screen for a minute.
+  const fitting = Boolean(waxup?.view.occlusion.busy);
+  const makingNow = stage === "making" || fitting;
   const makeButton = (
-    <button type="button" className="primary" disabled={!ready} onClick={onApply}>
-      {stage === "making" ? <LoaderCircle className="edge-modifier-spinner" size={17} /> : <Check size={17} />}
-      {stage === "making" ? t("dental.working") : editing ? t("dental.updateModels") : t(pair ? "dental.applyPair" : "dental.apply")}
+    <button type="button" className={`primary${makingNow ? " studio-make-filling" : ""}`} disabled={!ready || makingNow} aria-busy={makingNow} onClick={onApply}>
+      {makingNow ? <LoaderCircle className="edge-modifier-spinner" size={17} /> : <Check size={17} />}
+      <span>{fitting ? t("waxup.fittingBiteShort") : stage === "making" ? t("dental.working") : editing ? t("dental.updateModels") : t(pair ? "dental.applyPair" : "dental.apply")}</span>
     </button>
   );
   const frameNav = !framed ? null : stage === "made" ? (<>
@@ -1271,7 +1275,7 @@ export function DentalStudioPanel({
         {options.label.trim() ? <p className="blend-hint">{t(options.baseStyle === "ortho" || options.baseStyle === "articulator" ? "dental.labelOrtho" : options.inside === "open" ? "dental.labelClosed" : "dental.labelPlate")}</p> : null}
         </>)}
         {/* Build 106: in the frame, Make models closes the step's panel (not the bar below). */}
-        {framed && stage !== "making" ? <div className="studio-make">{makeButton}</div> : null}
+        {framed ? <div className="studio-make">{makeButton}</div> : null}
       </>)) : null}
       </>) : null}
 
