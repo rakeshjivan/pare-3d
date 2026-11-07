@@ -451,6 +451,18 @@ type EdgeModifierSession = {
  * selection to compare to (the first pick, or the size was changed), the
  * worker's own finding stands.
  */
+/**
+ * Build 269 (Rakesh): a callback whose identity never changes and that always runs the latest version given. The plain
+ * useCallback keeps the whole render it was made in alive - every value of it, the parts and the undo history of that
+ * moment among them - for as long as its dependencies stay the same; a few long-lived ones (leave, export, Edit design
+ * and the like) held earlier sets of models after an Update had replaced them, some 160 MB a time.
+ */
+function useLatestCallback<T extends (...args: never[]) => unknown>(fn: T): T {
+  const latest = useRef(fn);
+  latest.current = fn;
+  return useCallback(((...args: Parameters<T>) => latest.current(...args)) as T, []);
+}
+
 function conflictEdgeIds(session: EdgeModifierSession, workerFailedEdgeIds: number[]) {
   const added = edgesAddedSinceWorking(session);
   const earlier = new Set(session.failedEdgeIds ?? []);
@@ -6258,7 +6270,7 @@ export function LayerlingEditor({
     language: editorLanguage,
   });
 
-  const createProjectFromHistoryState = useCallback(async () => {
+  const createProjectFromHistoryState = useLatestCallback(async () => {
     const view = historyViewStateRef.current;
     if (!view || historyProjectCreating) return;
     if (!onCreateProjectFromState) {
@@ -6292,7 +6304,7 @@ export function LayerlingEditor({
     } finally {
       setHistoryProjectCreating(false);
     }
-  }, [historyProjectCreating, onCreateProjectFromState, snapGrid]);
+  });
 
   const toggleAlignMode = useCallback(() => {
     if (selectedShapes.length > 0 && selectedShapes.every((shape) => shape.locked)) {
@@ -6632,7 +6644,7 @@ export function LayerlingEditor({
   // Fork: the lithophane and Voronoi makers.
   const [makerPanel, setMakerPanel] = useState<"lithophane" | "voronoi" | "trace" | null>(null);
   const [makerBusy, setMakerBusy] = useState(false);
-  const placeMade = useCallback((made: WorkplaneShape, notice: string) => {
+  const placeMade = useLatestCallback((made: WorkplaneShape, notice: string) => {
     const { shapes: inserted } = placeCustomShape({ shapes: [made] }, placementWorkplaneRef.current.origin, []);
     commitShapes([...shapesRef.current, ...inserted], inserted.map((shape) => shape.id), notice);
     if (workspaceSettingsRef.current.clickToPlaceShapes && inserted.length) {
@@ -6640,7 +6652,7 @@ export function LayerlingEditor({
       setCarryIds(inserted.map((shape) => shape.id));
       setNotice(t("status.carryPlace"));
     }
-  }, [commitShapes]);
+  });
   const createLithophane = useCallback(async (image: LithophaneImage, raw: LithophaneOptions) => {
     setMakerBusy(true);
     try {
@@ -11314,7 +11326,7 @@ export function LayerlingEditor({
    * Build 79: opens the design of models made before again - their scans, wax-up teeth and settings
    * back as they were when made, the models hidden until they are made anew (or the studio closed).
    */
-  const editDentalDesign = useCallback((madeIds: string[]) => {
+  const editDentalDesign = useLatestCallback((madeIds: string[]) => {
     const model = shapesRef.current.find((shape) => madeIds.includes(shape.id) && shape.dentalSource);
     const source = model?.dentalSource;
     if (!source) return false;
@@ -11344,7 +11356,7 @@ export function LayerlingEditor({
       editing: source.made.filter((id) => shapesRef.current.some((shape) => shape.id === id)),
     });
     return true;
-  }, [analyseDentalStudio, commitShapes]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
   /** Build 79: leaving a design opened again without making it: the models it was made into come back, its scans go away again. */
   const leaveDentalEdit = useCallback((state: DentalStudioState) => {
     const editing = state.editing;
@@ -16234,7 +16246,7 @@ export function LayerlingEditor({
     return Math.max(0, removed);
   }, [syncProjectShapes]);
 
-  const executeMcpCommand = useCallback(async (command: LayerlingMcpCommand): Promise<unknown> => {
+  const executeMcpCommand = useLatestCallback(async (command: LayerlingMcpCommand): Promise<unknown> => {
     const params = command.params ?? {};
     const currentShapes = () => shapesRef.current;
     const findShape = (id: unknown) => (typeof id === "string" ? currentShapes().find((shape) => shape.id === id) ?? null : null);
@@ -18090,33 +18102,7 @@ export function LayerlingEditor({
       setNotice(message);
       throw error;
     }
-  }, [
-    buildSectionSvg,
-    rebuildSketchBodyFill,
-    applyCustomFontToSelection,
-    addReferencePoints,
-    commitNotes,
-    workspaceSettings.width,
-    workspaceSettings.depth,
-    applyCadModifierForMcp,
-    cancelOpenGroup,
-    commitShapes,
-    finishOpenGroup,
-    initialSnap,
-    openGroupForEditing,
-    invalidateCadModifierSession,
-    mcpSceneSnapshot,
-    placementElevation,
-    prepareCadModifierForMcp,
-    deleteFacesShape,
-    setActivePlacementWorkplane,
-    updateProjectWorkspaceSettings,
-    sectionContours,
-    closeHistoryView,
-    openHistoryView,
-    runCustomShapeMcp,
-    layOutVaseAccessories,
-  ]);
+  });
 
   useEffect(() => {
     executeMcpCommandRef.current = executeMcpCommand;
@@ -18988,7 +18974,7 @@ export function LayerlingEditor({
     }
   }, [exportSource, projectName, stepExporting]);
 
-  const exportLylDesign = useCallback(async (exportName: string, historyLimit: LylHistoryLimit, target: LylExportTarget = "download") => {
+  const exportLylDesign = useLatestCallback(async (exportName: string, historyLimit: LylHistoryLimit, target: LylExportTarget = "download") => {
     if (lylExporting) return;
     if (target === "shared" && !onSaveSharedProject) {
       setNotice(t("status.sharedUnavailable"), true);
@@ -19079,7 +19065,7 @@ export function LayerlingEditor({
     } finally {
       setLylExporting(false);
     }
-  }, [onSaveSharedProject, placementElevation, placementWorkplane, projectCreatedAt, projectModifiedAt, projectName, lylExporting, snapGrid]);
+  });
 
   /** Ctrl+S: into the file the design is tied to; the first time it asks for one (#251). */
   const saveDesignRef = useRef<() => void>(() => undefined);
@@ -19102,7 +19088,7 @@ export function LayerlingEditor({
   }, []);
 
   /** Der Entwurf als .lyl samt einer Textdatei, die sagt, wo und womit es passiert ist. */
-  const saveBugReport = useCallback(async () => {
+  const saveBugReport = useLatestCallback(async () => {
     if (projectInteractionActiveRef.current) {
       setNotice(t("status.finishBeforeSave"));
       return;
@@ -19179,7 +19165,7 @@ export function LayerlingEditor({
     } catch (error) {
       setNotice(error instanceof Error ? localizedError(error.message) : t("status.saveProjectFailed"));
     }
-  }, [editorLanguage, placementElevation, placementWorkplane, projectCreatedAt, projectModifiedAt, projectName, setNotice, sketchActive, snapGrid]);
+  });
 
   /**
    * A project opened from the server keeps working on the fast local copy, and
@@ -19507,7 +19493,7 @@ export function LayerlingEditor({
       setStudioExportBusy(false);
     }
   };
-  const leaveToDashboard = useCallback(() => {
+  const leaveToDashboard = useLatestCallback(() => {
     if (!onHome) return;
     let left = false;
     const leave = () => {
@@ -19530,7 +19516,7 @@ export function LayerlingEditor({
     saveProjectShapesNow();
     void saveToServerRef.current();
     void flushProjectSnapshot({ evenIfUnchanged: true }).finally(leave);
-  }, [flushProjectSnapshot, onHome, saveProjectShapesNow]);
+  });
 
   // A saved design's bodies into the open one - for parts kept as building
   // blocks. Fresh ids so nothing clashes, embedded source files come along,
